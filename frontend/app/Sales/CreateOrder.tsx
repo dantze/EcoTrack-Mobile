@@ -40,7 +40,7 @@ const CreateOrder = () => {
             setFilteredClients(data);
         } catch (error) {
             console.error('Error fetching clients:', error);
-            Alert.alert("Error", "Nu s-au putut încărca clienții.");
+            Alert.alert("Eroare", "Nu s-au putut încărca clienții.");
         } finally {
             setLoading(false);
         }

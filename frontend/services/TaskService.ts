@@ -25,7 +25,7 @@ export const TaskService = {
      */
     getAllTasks: async (): Promise<Task[]> => {
         const response = await fetch(`${API_BASE_URL}/tasks`);
-        if (!response.ok) throw new Error('Failed to fetch tasks');
+        if (!response.ok) throw new Error('Eșec la preluarea sarcinilor');
         return await response.json();
     },
 
@@ -34,7 +34,7 @@ export const TaskService = {
      */
     getTaskById: async (id: number): Promise<Task> => {
         const response = await fetch(`${API_BASE_URL}/tasks/${id}`);
-        if (!response.ok) throw new Error('Task not found');
+        if (!response.ok) throw new Error('Sarcina nu a fost găsită');
         return await response.json();
     },
 
@@ -43,7 +43,7 @@ export const TaskService = {
      */
     getTasksByRouteId: async (routeId: number): Promise<Task[]> => {
         const response = await fetch(`${API_BASE_URL}/tasks/route/${routeId}`);
-        if (!response.ok) throw new Error('Failed to fetch route tasks');
+        if (!response.ok) throw new Error('Eșec la preluarea sarcinilor rutei');
         return await response.json();
     },
 
@@ -58,12 +58,12 @@ export const TaskService = {
             },
             body: JSON.stringify({ orderId, routeId }),
         });
-        
+
         if (!response.ok) {
             const errorText = await response.text();
-            throw new Error(errorText || 'Failed to create task from order');
+            throw new Error(errorText || 'Eșec la crearea sarcinii din comandă');
         }
-        
+
         return await response.json();
     },
 
@@ -72,7 +72,7 @@ export const TaskService = {
      */
     checkOrderHasTask: async (orderId: number): Promise<OrderTaskStatus> => {
         const response = await fetch(`${API_BASE_URL}/tasks/order/${orderId}/exists`);
-        if (!response.ok) throw new Error('Failed to check order task status');
+        if (!response.ok) throw new Error('Eșec la verificarea stării sarcinii');
         return await response.json();
     },
 
@@ -87,7 +87,7 @@ export const TaskService = {
             },
             body: JSON.stringify({ status }),
         });
-        if (!response.ok) throw new Error('Failed to update task status');
+        if (!response.ok) throw new Error('Eșec la actualizarea stării sarcinii');
         return await response.json();
     },
 
@@ -98,6 +98,32 @@ export const TaskService = {
         const response = await fetch(`${API_BASE_URL}/tasks/${taskId}`, {
             method: 'DELETE',
         });
-        if (!response.ok) throw new Error('Failed to delete task');
+        if (!response.ok) throw new Error('Eșec la ștergerea sarcinii');
+    },
+
+    /**
+     * Reassign a single task to a different route
+     */
+    reassignTask: async (taskId: number, newRouteId: number): Promise<Task> => {
+        const response = await fetch(`${API_BASE_URL}/tasks/${taskId}/reassign/${newRouteId}`, {
+            method: 'PUT',
+        });
+        if (!response.ok) throw new Error('Eșec la reasignarea sarcinii');
+        return await response.json();
+    },
+
+    /**
+     * Reassign multiple tasks to a different route
+     */
+    reassignTasks: async (taskIds: number[], newRouteId: number): Promise<Task[]> => {
+        const response = await fetch(`${API_BASE_URL}/tasks/reassign`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ taskIds, newRouteId }),
+        });
+        if (!response.ok) throw new Error('Eșec la reasignarea sarcinilor');
+        return await response.json();
     },
 };

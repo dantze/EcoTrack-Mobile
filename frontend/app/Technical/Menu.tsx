@@ -13,7 +13,7 @@ const Menu = () => {
     return (
         <View style={styles.container}>
             <View style={styles.headerContainer}>
-                <Text style={styles.headerText}>Technical Menu</Text>
+                <Text style={styles.headerText}>Meniu Tehnic</Text>
                 {county && <Text style={styles.subHeaderText}>{county}</Text>}
             </View>
 
@@ -28,7 +28,7 @@ const Menu = () => {
                         router.push({ pathname: '/Technical/Orders', params: { zona, county } })
                     }
                 >
-                    <Text style={styles.continueButtonText}>Orders</Text>
+                    <Text style={styles.continueButtonText}>Comenzi</Text>
                 </Pressable>
 
                 <View style={styles.separator} />
@@ -42,7 +42,7 @@ const Menu = () => {
                         router.push({ pathname: '/Technical/Routes', params: { zona, county } })
                     }
                 >
-                    <Text style={styles.continueButtonText}>Routes</Text>
+                    <Text style={styles.continueButtonText}>Rute</Text>
                 </Pressable>
 
                 <View style={styles.separator} />
@@ -56,8 +56,22 @@ const Menu = () => {
                         router.push({ pathname: '/Technical/RoutesAndDrivers', params: { zona, county } })
                     }
                 >
-                    <Text style={styles.continueButtonText}>Routes and Drivers</Text>
+                    <Text style={styles.continueButtonText}>Rute și Șoferi</Text>
                 </Pressable>
+
+                <View style={styles.separator} />
+
+                <Pressable style={({ pressed }) => [
+                    styles.optiuneButton,
+                    pressed && { opacity: 0.8, transform: [{ scale: 0.99 }] }
+                ]}
+                    onPress={() =>
+                        router.push({ pathname: '/Technical/ChangeDriver', params: { zona, county } })
+                    }
+                >
+                    <Text style={styles.continueButtonText}>Schimbare Șoferi și Rute</Text>
+                </Pressable>
+
             </View>
 
             <View style={styles.mapContainer}>

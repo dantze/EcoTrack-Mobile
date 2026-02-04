@@ -20,7 +20,7 @@ export const ClientService = {
     getClients: async () => {
         const response = await fetch(`${API_BASE_URL}/clients`);
         if (!response.ok) {
-            throw new Error('Failed to fetch clients');
+            throw new Error('Eșec la preluarea clienților');
         }
         return await response.json();
     },
@@ -39,7 +39,7 @@ export const ClientService = {
         });
 
         if (!response.ok) {
-            throw new Error('Network response was not ok');
+            throw new Error('Răspunsul de la rețea nu a fost ok');
         }
 
         return await response.json();
@@ -61,7 +61,7 @@ export const ClientService = {
 
         if (!response.ok) {
             const errText = await response.text();
-            throw new Error(errText || 'Failed to create order');
+            throw new Error(errText || 'Eșec la crearea comenzii');
         }
 
         return await response.json();
@@ -74,7 +74,7 @@ export const ClientService = {
     getOrders: async (clientId: number) => {
         const response = await fetch(`${API_BASE_URL}/clients/${clientId}/orders`);
         if (!response.ok) {
-            throw new Error('Failed to fetch orders');
+            throw new Error('Eșec la preluarea comenzilor');
         }
         return await response.json();
     },
@@ -110,7 +110,7 @@ export const ClientService = {
 
         if (!response.ok) {
             const errText = await response.text();
-            throw new Error(errText || 'Failed to upload photo');
+            throw new Error(errText || 'Eșec la încărcarea fotografiei');
         }
 
         // The endpoint returns a plain string, so use .text() instead of .json()

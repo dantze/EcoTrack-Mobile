@@ -32,7 +32,7 @@ const WestCenter = () => {
             setIsCountyOpen(!isCountyOpen);
             setIsZoneOpen(false);
         } else {
-            alert("Please select a Zone first.");
+            alert("Te rog selectează mai întâi o Zonă.");
         }
     };
 
@@ -56,14 +56,14 @@ const WestCenter = () => {
                 params: { zona: selectedZone }
             });
         } else {
-            alert("Please select a county first.");
+            alert("Te rog selectează mai întâi un județ.");
         }
     };
 
     return (
         <View style={styles.container}>
             <View style={styles.headerContainer}>
-                <Text style={styles.headerText}>Select Zone</Text>
+                <Text style={styles.headerText}>Selectează Zona</Text>
             </View>
 
             <View style={styles.inputsContainer}>
@@ -75,7 +75,7 @@ const WestCenter = () => {
                         onPress={toggleZoneMenu}
                     >
                         <Text style={styles.buttonText}>
-                            {selectedZone ? selectedZone : "Select Zone"}
+                            {selectedZone ? selectedZone : "Selectează Zona"}
                         </Text>
                         <AntDesign name={isZoneOpen ? "up" : "down"} size={16} color="#16283C" />
                     </Pressable>
@@ -108,7 +108,7 @@ const WestCenter = () => {
                         onPress={toggleCountyMenu}
                     >
                         <Text style={[styles.buttonText, !selectedZone && { color: '#999' }]}>
-                            {selectedCounty ? selectedCounty : "County"}
+                            {selectedCounty ? selectedCounty : "Județ"}
                         </Text>
                         <AntDesign name={isCountyOpen ? "up" : "down"} size={16} color={selectedZone ? "#16283C" : "#999"} />
                     </Pressable>
@@ -138,7 +138,7 @@ const WestCenter = () => {
                         style={({ pressed }) => [styles.continueButton, pressed && styles.buttonPressed]}
                         onPress={handleContinue}
                     >
-                        <Text style={styles.continueButtonText}>Continue</Text>
+                        <Text style={styles.continueButtonText}>Continuă</Text>
                     </Pressable>
                 )}
 

@@ -42,7 +42,7 @@ const RouteTasks = () => {
             const route = await RouteService.getRouteById(Number(routeId));
             setTasks(route.tasks || []);
         } catch (err) {
-            setError('Nu s-au putut încărca task-urile');
+            setError('Nu s-au putut încărca sarcinile');
             console.error(err);
         } finally {
             setLoading(false);
@@ -85,7 +85,7 @@ const RouteTasks = () => {
             case 'MAINTENANCE':
                 return 'Mentenanță';
             default:
-                return taskType || 'Task';
+                return taskType || 'Sarcină';
         }
     };
 
@@ -112,9 +112,9 @@ const RouteTasks = () => {
         });
     };
 
-    const headerTitle = driverName 
+    const headerTitle = driverName
         ? `${driverName} - ${formatDate(routeDate)}`
-        : `Tasks - Ruta #${routeId}`;
+        : `Sarcini - Ruta #${routeId}`;
 
     return (
         <View style={styles.container}>
@@ -143,7 +143,7 @@ const RouteTasks = () => {
             {loading ? (
                 <View style={styles.centerContent}>
                     <ActivityIndicator size="large" color="#427992" />
-                    <Text style={styles.loadingText}>Se încarcă task-urile...</Text>
+                    <Text style={styles.loadingText}>Se încarcă sarcinile...</Text>
                 </View>
             ) : error ? (
                 <View style={styles.centerContent}>
@@ -154,7 +154,7 @@ const RouteTasks = () => {
                 </View>
             ) : tasks.length === 0 ? (
                 <View style={styles.centerContent}>
-                    <Text style={styles.emptyText}>Această rută nu are task-uri</Text>
+                    <Text style={styles.emptyText}>Această rută nu are sarcini</Text>
                 </View>
             ) : (
                 <ScrollView

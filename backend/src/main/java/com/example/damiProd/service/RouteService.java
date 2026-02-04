@@ -8,7 +8,9 @@ import com.example.damiProd.repository.RouteRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class RouteService {
@@ -38,21 +40,21 @@ public class RouteService {
         Route route = new Route();
         route.setDate(request.getDate());
         route.setCounty(request.getCounty());
-        
+
         // Set employee if provided
         if (request.getEmployeeId() != null) {
             Employee employee = employeeRepository.findById(request.getEmployeeId())
                     .orElseThrow(() -> new RuntimeException("Angajatul nu a fost găsit"));
             route.setEmployee(employee);
         }
-        
+
         return routeRepository.save(route);
     }
 
     public void deleteRoute(Long id) {
         routeRepository.deleteById(id);
     }
-    
+
     @Transactional(readOnly = true)
     public Route getRouteById(Long id) {
         Route route = routeRepository.findById(id)
@@ -70,13 +72,28 @@ public class RouteService {
         return routes;
     }
 
+    @Transactional(readOnly = true)
+    public List<Route> getRoutesByEmployeeIdAndDate(Long employeeId, LocalDate date) {
+        List<Route> routes = routeRepository.findByEmployee_IdAndDate(employeeId, date);
+        // Force loading of tasks for each route
+        routes.forEach(route -> route.getTasks().size());
+        return routes;
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<Route> getRouteByEmployeeIdAndDateAndCounty(Long employeeId, LocalDate date, String county) {
+        Optional<Route> routeOpt = routeRepository.findByEmployee_IdAndDateAndCounty(employeeId, date, county);
+        routeOpt.ifPresent(route -> route.getTasks().size());
+        return routeOpt;
+    }
+
     @Transactional
     public Route assignDriverToRoute(Long routeId, Long employeeId) {
         Route route = routeRepository.findById(routeId)
                 .orElseThrow(() -> new RuntimeException("Ruta nu a fost găsită"));
         Employee employee = employeeRepository.findById(employeeId)
                 .orElseThrow(() -> new RuntimeException("Angajatul nu a fost găsit"));
-        
+
         route.setEmployee(employee);
         return routeRepository.save(route);
     }

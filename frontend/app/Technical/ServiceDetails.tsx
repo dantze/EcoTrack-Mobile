@@ -42,7 +42,7 @@ const ServiceDetails = () => {
 
             {/* --- HEADER WITH STATUS --- */}
             <View style={styles.headerContainer}>
-                <Text style={styles.headerText}>Task Details</Text>
+                <Text style={styles.headerText}>Detalii Sarcină</Text>
                 <View style={styles.statusContainer}>
                     <Text style={styles.statusText}>Status</Text>
                     <View style={styles.statusDot} />
@@ -54,18 +54,18 @@ const ServiceDetails = () => {
                 {/* --- MAIN BLUE CARD --- */}
                 <View style={styles.mainCard}>
 
-                    <DetailRow label="Company Name" value={data.companyName} />
-                    <DetailRow label="Last Sanitization" value={data.lastSanitization} />
-                    <DetailRow label="Phone" value={data.phone} />
+                    <DetailRow label="Nume Companie" value={data.companyName} />
+                    <DetailRow label="Ultima Igienizare" value={data.lastSanitization} />
+                    <DetailRow label="Telefon" value={data.phone} />
 
                     <View style={[styles.rowContainer, { marginTop: 10 }]}>
-                        <Text style={styles.label}>Task Type</Text>
+                        <Text style={styles.label}>Tip Sarcină</Text>
                     </View>
                     <Text style={[styles.value, { textAlign: 'right', marginBottom: 15 }]}>
                         {data.taskType}
                     </Text>
 
-                    <Text style={[styles.label, { marginBottom: 10 }]}>Information</Text>
+                    <Text style={[styles.label, { marginBottom: 10 }]}>Informații</Text>
 
                     {/* --- IMAGE AND GALLERY AREA --- */}
                     <View style={styles.mediaContainer}>
@@ -79,19 +79,19 @@ const ServiceDetails = () => {
                             style={({ pressed }) => [styles.galleryButton, pressed && styles.cardPressed]}
                             onPress={() => console.log("Open gallery")}
                         >
-                            <Text style={styles.galleryText}>Gallery</Text>
+                            <Text style={styles.galleryText}>Galerie</Text>
                             <Ionicons name="images-outline" size={20} color="white" style={{ marginLeft: 5 }} />
                         </Pressable>
                     </View>
 
-                    <DetailRow label="Secondary Phone" value={data.secondaryPhone} />
+                    <DetailRow label="Telefon Secundar" value={data.secondaryPhone} />
 
                     {/* --- EXPANDABLE AREA --- */}
                     <Pressable
                         style={styles.expandHeader}
                         onPress={() => setIsExpanded(!isExpanded)}
                     >
-                        <Text style={styles.label}>Additional Details</Text>
+                        <Text style={styles.label}>Detalii Suplimentare</Text>
                         <Ionicons
                             name={isExpanded ? "arrow-up" : "arrow-down"}
                             size={20}
@@ -115,7 +115,7 @@ const ServiceDetails = () => {
                     style={({ pressed }) => [styles.actionButton, styles.postponeButton, pressed && styles.cardPressed]}
                     onPress={() => console.log("Postpone")}
                 >
-                    <Text style={styles.actionText}>Postpone</Text>
+                    <Text style={styles.actionText}>Amână</Text>
                 </Pressable>
 
                 <Pressable
@@ -123,7 +123,7 @@ const ServiceDetails = () => {
                     style={({ pressed }) => [styles.actionButton, styles.finishButton, pressed && styles.cardPressed]}
                     onPress={() => console.log("Finalize")}
                 >
-                    <Text style={styles.actionText}>Finalize</Text>
+                    <Text style={styles.actionText}>Finalizează</Text>
                 </Pressable>
             </View>
 

@@ -94,7 +94,7 @@ const DriverRoutesList = () => {
                             <View style={styles.routeInfo}>
                                 <Text style={styles.routeDate}>{formatDate(route.date)}</Text>
                                 <Text style={styles.taskCount}>
-                                    {route.tasks?.length || 0} task-uri
+                                    {route.tasks?.length || 0} sarcini
                                 </Text>
                             </View>
                             <View style={styles.routeIdBadge}>

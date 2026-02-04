@@ -18,7 +18,8 @@ public class TaskService {
     private final OrderRepository orderRepository;
     private final RouteRepository routeRepository;
 
-    public TaskService(TaskRepository taskRepository, OrderRepository orderRepository, RouteRepository routeRepository) {
+    public TaskService(TaskRepository taskRepository, OrderRepository orderRepository,
+            RouteRepository routeRepository) {
         this.taskRepository = taskRepository;
         this.orderRepository = orderRepository;
         this.routeRepository = routeRepository;
@@ -50,7 +51,7 @@ public class TaskService {
     public void deleteTask(Long id) {
         taskRepository.deleteById(id);
     }
-    
+
     /**
      * Creates a Task from an Order and assigns it to a Route
      */
@@ -60,21 +61,21 @@ public class TaskService {
         if (taskRepository.existsByOrder_Id(orderId)) {
             throw new RuntimeException("Această comandă are deja un task asociat");
         }
-        
+
         Order order = orderRepository.findById(orderId)
                 .orElseThrow(() -> new RuntimeException("Comanda nu a fost găsită"));
-        
+
         Route route = routeRepository.findById(routeId)
                 .orElseThrow(() -> new RuntimeException("Ruta nu a fost găsită"));
-        
+
         // Determine task type based on order type
         TaskType taskType = mapOrderTypeToTaskType(order.getOrderType());
-        
+
         // Get client info
         String clientName = "Client necunoscut";
         String clientPhone = null;
         String address = order.getLocationCoordinates();
-        
+
         if (order.getClient() != null) {
             Client client = order.getClient();
             if (client instanceof Company) {
@@ -87,7 +88,7 @@ public class TaskService {
                 address = client.getAddress();
             }
         }
-        
+
         // Create the task
         Task task = new Task();
         task.setType(taskType);
@@ -99,27 +100,55 @@ public class TaskService {
         task.setScheduledTime(LocalDateTime.now());
         task.setRoute(route);
         task.setOrder(order);
-        
+
         return taskRepository.save(task);
     }
-    
+
     /**
      * Get task by order ID
      */
     public Optional<Task> getTaskByOrderId(Long orderId) {
         return taskRepository.findByOrder_Id(orderId);
     }
-    
+
     /**
      * Check if order has an associated task
      */
     public boolean orderHasTask(Long orderId) {
         return taskRepository.existsByOrder_Id(orderId);
     }
-    
+
+    /**
+     * Reassign a task to a different route
+     */
+    @Transactional
+    public Task reassignTask(Long taskId, Long newRouteId) {
+        Task task = getTaskById(taskId);
+        Route newRoute = routeRepository.findById(newRouteId)
+                .orElseThrow(() -> new RuntimeException("Ruta nu a fost găsită"));
+
+        task.setRoute(newRoute);
+        return taskRepository.save(task);
+    }
+
+    /**
+     * Reassign multiple tasks to a different route
+     */
+    @Transactional
+    public List<Task> reassignTasks(List<Long> taskIds, Long newRouteId) {
+        Route newRoute = routeRepository.findById(newRouteId)
+                .orElseThrow(() -> new RuntimeException("Ruta nu a fost găsită"));
+
+        List<Task> tasks = taskRepository.findAllById(taskIds);
+        tasks.forEach(task -> task.setRoute(newRoute));
+
+        return taskRepository.saveAll(tasks);
+    }
+
     private TaskType mapOrderTypeToTaskType(String orderType) {
-        if (orderType == null) return TaskType.PLACEMENT;
-        
+        if (orderType == null)
+            return TaskType.PLACEMENT;
+
         switch (orderType.toLowerCase()) {
             case "amplasari":
             case "amplasare":

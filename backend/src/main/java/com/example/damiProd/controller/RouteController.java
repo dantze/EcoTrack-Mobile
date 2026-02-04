@@ -3,9 +3,11 @@ package com.example.damiProd.controller;
 import com.example.damiProd.domain.Route;
 import com.example.damiProd.dto.CreateRouteRequest;
 import com.example.damiProd.service.RouteService;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -51,6 +53,15 @@ public class RouteController {
     @GetMapping("/employee/{employeeId}")
     public ResponseEntity<List<Route>> getRoutesByEmployee(@PathVariable Long employeeId) {
         List<Route> routes = routeService.getRoutesByEmployeeId(employeeId);
+        return ResponseEntity.ok(routes);
+    }
+
+    // Get routes for a specific employee on a specific date
+    @GetMapping("/employee/{employeeId}/date/{date}")
+    public ResponseEntity<List<Route>> getRoutesByEmployeeAndDate(
+            @PathVariable Long employeeId,
+            @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
+        List<Route> routes = routeService.getRoutesByEmployeeIdAndDate(employeeId, date);
         return ResponseEntity.ok(routes);
     }
 

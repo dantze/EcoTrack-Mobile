@@ -58,12 +58,12 @@ export const TaskService = {
             },
             body: JSON.stringify({ orderId, routeId }),
         });
-        
+
         if (!response.ok) {
             const errorText = await response.text();
             throw new Error(errorText || 'Failed to create task from order');
         }
-        
+
         return await response.json();
     },
 
@@ -99,5 +99,31 @@ export const TaskService = {
             method: 'DELETE',
         });
         if (!response.ok) throw new Error('Failed to delete task');
+    },
+
+    /**
+     * Reassign a single task to a different route
+     */
+    reassignTask: async (taskId: number, newRouteId: number): Promise<Task> => {
+        const response = await fetch(`${API_BASE_URL}/tasks/${taskId}/reassign/${newRouteId}`, {
+            method: 'PUT',
+        });
+        if (!response.ok) throw new Error('Failed to reassign task');
+        return await response.json();
+    },
+
+    /**
+     * Reassign multiple tasks to a different route
+     */
+    reassignTasks: async (taskIds: number[], newRouteId: number): Promise<Task[]> => {
+        const response = await fetch(`${API_BASE_URL}/tasks/reassign`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ taskIds, newRouteId }),
+        });
+        if (!response.ok) throw new Error('Failed to reassign tasks');
+        return await response.json();
     },
 };

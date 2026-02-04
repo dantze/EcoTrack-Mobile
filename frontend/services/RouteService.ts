@@ -17,7 +17,7 @@ export interface Route {
 }
 
 export const RouteService = {
-   
+
     getAllRoutes: async () => {
         const response = await fetch(`${API_BASE_URL}/routes`);
         if (!response.ok) {
@@ -42,6 +42,14 @@ export const RouteService = {
         return await response.json();
     },
 
+    getRoutesByEmployeeIdAndDate: async (employeeId: number, date: string): Promise<Route[]> => {
+        const response = await fetch(`${API_BASE_URL}/routes/employee/${employeeId}/date/${date}`);
+        if (!response.ok) {
+            throw new Error('Eșec la preluarea rutelor șoferului');
+        }
+        return await response.json();
+    },
+
     getRouteById: async (routeId: number): Promise<Route> => {
         const response = await fetch(`${API_BASE_URL}/routes/${routeId}`);
         if (!response.ok) {
@@ -50,7 +58,7 @@ export const RouteService = {
         return await response.json();
     },
 
-    
+
     createRoute: async (routeData: CreateRouteData) => {
         const response = await fetch(`${API_BASE_URL}/routes`, {
             method: 'POST',

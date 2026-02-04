@@ -46,21 +46,21 @@ public class TaskController {
         Task savedTask = taskService.createTask(task);
         return ResponseEntity.ok(savedTask);
     }
-    
+
     // Create a task from an order and assign to a route
     @PostMapping("/from-order")
     public ResponseEntity<Task> createTaskFromOrder(@RequestBody Map<String, Long> request) {
         Long orderId = request.get("orderId");
         Long routeId = request.get("routeId");
-        
+
         if (orderId == null || routeId == null) {
             return ResponseEntity.badRequest().build();
         }
-        
+
         Task task = taskService.createTaskFromOrder(orderId, routeId);
         return ResponseEntity.ok(task);
     }
-    
+
     // Check if an order has an associated task
     @GetMapping("/order/{orderId}/exists")
     public ResponseEntity<Map<String, Object>> checkOrderHasTask(@PathVariable Long orderId) {
@@ -81,7 +81,7 @@ public class TaskController {
     public ResponseEntity<Task> updateTaskStatus(
             @PathVariable Long id,
             @RequestBody Map<String, String> statusUpdate) {
-        
+
         String statusStr = statusUpdate.get("status");
         TaskStatus status = TaskStatus.valueOf(statusStr);
         Task updatedTask = taskService.updateTaskStatus(id, status);
@@ -93,5 +93,26 @@ public class TaskController {
     public ResponseEntity<Void> deleteTask(@PathVariable Long id) {
         taskService.deleteTask(id);
         return ResponseEntity.noContent().build();
+    }
+
+    // Reassign a single task to a different route
+    @PutMapping("/{id}/reassign/{newRouteId}")
+    public ResponseEntity<Task> reassignTask(
+            @PathVariable Long id,
+            @PathVariable Long newRouteId) {
+        Task updatedTask = taskService.reassignTask(id, newRouteId);
+        return ResponseEntity.ok(updatedTask);
+    }
+
+    // Reassign multiple tasks to a different route
+    @PutMapping("/reassign")
+    public ResponseEntity<List<Task>> reassignTasks(@RequestBody Map<String, Object> request) {
+        @SuppressWarnings("unchecked")
+        List<Integer> taskIdInts = (List<Integer>) request.get("taskIds");
+        List<Long> taskIds = taskIdInts.stream().map(Integer::longValue).toList();
+        Long newRouteId = ((Number) request.get("newRouteId")).longValue();
+
+        List<Task> updatedTasks = taskService.reassignTasks(taskIds, newRouteId);
+        return ResponseEntity.ok(updatedTasks);
     }
 }

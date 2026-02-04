@@ -148,7 +148,7 @@ const CreateClient = () => {
             }
         } catch (error) {
             console.error('Error creating client:', error);
-            Alert.alert("Error", "Failed to create client. Please try again.");
+            Alert.alert("Eroare", "Nu s-a putut crea clientul. Te rog încearcă din nou.");
         }
     };
 

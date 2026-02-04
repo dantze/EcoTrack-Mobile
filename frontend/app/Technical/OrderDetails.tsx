@@ -22,7 +22,7 @@ const OrderDetails = () => {
     const [loading, setLoading] = useState(true);
     const [routes, setRoutes] = useState<Route[]>([]);
     const [orderTaskStatus, setOrderTaskStatus] = useState<{ hasTask: boolean; routeId: number | null }>({ hasTask: false, routeId: null });
-    
+
     // --- STATE FOR MODAL ---
     const [modalVisible, setModalVisible] = useState(false);
     const [selectedRoute, setSelectedRoute] = useState<Route | null>(null);
@@ -43,7 +43,7 @@ const OrderDetails = () => {
             setOrder(data);
         } catch (error: any) {
             console.error("Fetch order error:", error);
-            Alert.alert("Error", `Could not fetch order details: ${error.message}`);
+            Alert.alert("Eroare", `Nu s-au putut încărca detaliile comenzii: ${error.message}`);
             router.back();
         } finally {
             setLoading(false);
@@ -53,7 +53,7 @@ const OrderDetails = () => {
     const fetchRoutes = async () => {
         try {
             let data: Route[] = [];
-            
+
             // If county is provided, try to filter by county first
             if (county) {
                 data = await RouteService.getRoutesByCounty(county);
@@ -65,13 +65,13 @@ const OrderDetails = () => {
             } else {
                 data = await RouteService.getAllRoutes();
             }
-            
+
             setRoutes(data);
         } catch (error) {
             console.error("Failed to fetch routes", error);
         }
     };
-    
+
     const checkTaskStatus = async () => {
         try {
             const status = await TaskService.checkOrderHasTask(orderId!);
@@ -104,7 +104,7 @@ const OrderDetails = () => {
     const handleSelectRoute = (route: Route) => {
         setSelectedRoute(route);
     };
-    
+
     // Format route date for display
     const formatRouteDate = (dateString: string) => {
         const date = new Date(dateString);
@@ -124,7 +124,7 @@ const OrderDetails = () => {
                 setModalVisible(false);
                 setOrderTaskStatus({ hasTask: true, routeId: selectedRoute.id });
                 Alert.alert(
-                    "Succes!", 
+                    "Succes!",
                     `Comanda a fost atribuită rutei din ${formatRouteDate(selectedRoute.date)} (${selectedRoute.employeeName || 'Șofer'})!`
                 );
             } catch (error: any) {
@@ -158,7 +158,7 @@ const OrderDetails = () => {
     if (!order) return null;
 
     // Updated here: use 'name' instead of 'companyName', with email fallback
-    const clientName = order.client?.type === 'company' 
+    const clientName = order.client?.type === 'company'
         ? (order.client?.name || order.client?.email || 'N/A')
         : (order.client?.fullName || order.client?.email || 'N/A');
     const clientAddress = order.client?.address || order.locationCoordinates;
@@ -170,31 +170,31 @@ const OrderDetails = () => {
                 <Pressable onPress={() => router.back()} style={{ position: 'absolute', left: 20, top: 0 }}>
                     <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
                 </Pressable>
-                <Text style={styles.headerText}>Order Details</Text>
+                <Text style={styles.headerText}>Detalii Comandă</Text>
             </View>
 
             <ScrollView contentContainerStyle={styles.scrollContent}>
 
                 <View style={styles.detailsCard}>
-                    <DetailRow label="Client Name" value={clientName} />
-                    <DetailRow label="Client Type" value={order.client?.type} />
-                     {order.client?.cui && <DetailRow label="CUI" value={order.client.cui} />}
-                    <DetailRow label="Address" value={clientAddress} isMultiline />
-                    
+                    <DetailRow label="Nume Client" value={clientName} />
+                    <DetailRow label="Tip Client" value={order.client?.type} />
+                    {order.client?.cui && <DetailRow label="CUI" value={order.client.cui} />}
+                    <DetailRow label="Adresă" value={clientAddress} isMultiline />
+
                     <View style={{ height: 10 }} />
-                    <DetailRow label="Product" value={order.product?.name} />
-                    <DetailRow label="Quantity" value={order.quantity?.toString()} />
-                    <DetailRow label="Type" value={order.orderType} />
-                    
+                    <DetailRow label="Produs" value={order.product?.name} />
+                    <DetailRow label="Cantitate" value={order.quantity?.toString()} />
+                    <DetailRow label="Tip" value={order.orderType} />
+
                     <View style={{ height: 10 }} />
-                    <DetailRow label="Start Date" value={order.startDate} />
-                    <DetailRow label="End Date" value={order.endDate} />
-                    <DetailRow label="Duration" value={order.durationDays ? `${order.durationDays} days` : (order.isIndefinite ? 'Indefinite' : 'N/A')} />
-                    
+                    <DetailRow label="Dată Început" value={order.startDate} />
+                    <DetailRow label="Dată Sfârșit" value={order.endDate} />
+                    <DetailRow label="Durată" value={order.durationDays ? `${order.durationDays} zile` : (order.isIndefinite ? 'Nedefinit' : 'N/A')} />
+
                     <View style={{ height: 10 }} />
                     <DetailRow label="Contact" value={order.contact} />
-                    <DetailRow label="Assigned Route" value={order.routeDefinition?.name} />
-                    <DetailRow label="Details" value={order.details} isMultiline />
+                    <DetailRow label="Rută Asignată" value={order.routeDefinition?.name} />
+                    <DetailRow label="Detalii" value={order.details} isMultiline />
                 </View>
 
                 {/* STATUS BADGE - shows if already assigned */}
@@ -221,7 +221,7 @@ const OrderDetails = () => {
                 </Pressable>
 
                 <Pressable onPress={() => console.log("Navigate map")} style={styles.mapLinkContainer}>
-                    <Text style={styles.mapLinkText}>Navigate map →</Text>
+                    <Text style={styles.mapLinkText}>Navighează pe hartă →</Text>
                 </Pressable>
 
             </ScrollView>
@@ -252,7 +252,7 @@ const OrderDetails = () => {
                                 ]}
                                 {...panResponder.panHandlers}
                             >
-                                <Text style={styles.draggableTitle} numberOfLines={1}>Order #{order.id}</Text>
+                                <Text style={styles.draggableTitle} numberOfLines={1}>Comandă #{order.id}</Text>
                                 <View style={styles.draggableIcons}>
                                     <Ionicons name="location-sharp" size={24} color="#16283C" />
                                     <View style={{ width: 10 }} />
@@ -309,7 +309,7 @@ const OrderDetails = () => {
                                                 styles.routeCardTasks,
                                                 selectedRoute?.id === route.id && styles.activeRouteSubtext
                                             ]}>
-                                                {route.tasks?.length || 0} task-uri
+                                                {route.tasks?.length || 0} sarcini
                                             </Text>
                                         </View>
                                         {selectedRoute?.id === route.id && (
@@ -329,7 +329,7 @@ const OrderDetails = () => {
                             style={styles.closeModalButton}
                             onPress={() => setModalVisible(false)}
                         >
-                            <Text style={styles.closeModalText}>Close</Text>
+                            <Text style={styles.closeModalText}>Închide</Text>
                         </Pressable>
 
                     </View>
@@ -357,7 +357,7 @@ const styles = StyleSheet.create({
     disabledActionButton: { backgroundColor: '#6B8A9A' },
     buttonPressed: { opacity: 0.8, transform: [{ scale: 0.98 }] },
     actionButtonText: { color: '#FFFFFF', fontSize: 20, fontWeight: 'bold' },
-    
+
     // Assigned Badge
     assignedBadge: {
         flexDirection: 'row',
@@ -374,7 +374,7 @@ const styles = StyleSheet.create({
         fontWeight: 'bold',
         marginLeft: 8,
     },
-    
+
     mapLinkContainer: { marginTop: 20, alignSelf: 'flex-end' },
     mapLinkText: { color: '#5D8AA8', fontSize: 16, fontWeight: 'bold' },
 

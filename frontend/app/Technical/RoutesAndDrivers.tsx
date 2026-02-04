@@ -28,13 +28,14 @@ const RoutesAndDrivers = () => {
                 if (data.length === 0) {
                     console.log(`No drivers found for county ${county}`);
                 }
+                data = await getAllDrivers();
             } else {
                 setError('Alegeti un județ')
             }
 
             setDrivers(data);
         } catch (err) {
-            setError('Nu s-au putut încărca șoferii');
+            setError('Nu s-au putut încărca șoferii sau nu sunt șoferi în acest județ');
             console.error(err);
         } finally {
             setLoading(false);

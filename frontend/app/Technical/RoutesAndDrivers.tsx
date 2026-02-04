@@ -20,19 +20,18 @@ const RoutesAndDrivers = () => {
         try {
             setLoading(true);
             setError(null);
-            
+
             let data: Employee[] = [];
-            
+
             if (county) {
                 data = await getDriversByCounty(county);
                 if (data.length === 0) {
-                    console.log(`No drivers found for county ${county}, showing all drivers`);
-                    data = await getAllDrivers();
+                    console.log(`No drivers found for county ${county}`);
                 }
             } else {
-                data = await getAllDrivers();
+                setError('Alegeti un județ')
             }
-            
+
             setDrivers(data);
         } catch (err) {
             setError('Nu s-au putut încărca șoferii');

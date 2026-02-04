@@ -1,48 +1,88 @@
-import { StyleSheet, Text, View, TextInput, Pressable, Alert, Modal, ScrollView } from 'react-native'
-import React, { useState } from 'react'
-import { useRouter } from 'expo-router'
+import { StyleSheet, Text, View, Pressable, Alert, Modal, ScrollView, Platform } from 'react-native'
+import React, { useState, useEffect } from 'react'
+import { useRouter, useLocalSearchParams } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons';
-import { RouteDefinitionService } from '../../services/RouteDefinitionService';
+import { RouteService } from '../../services/RouteService';
+import { getAllDrivers, getDriversByCounty, Employee } from '../../services/EmployeeService';
+import { Calendar } from 'react-native-calendars';
 
-// Mock data for cities
-const CITIES = [
-    { id: 1, name: 'Arad' },
-    { id: 2, name: 'București' },
-    { id: 3, name: 'Cluj-Napoca' },
-    { id: 4, name: 'Sibiu' },
-    { id: 5, name: 'Timișoara' },
-    { id: 6, name: 'Brașov' },
-    { id: 7, name: 'Iași' },
-    { id: 8, name: 'Constanța' },
-    { id: 9, name: 'Oradea' },
-    { id: 10, name: 'Craiova' },
+// Lista de județe
+const COUNTIES = [
+    'Alba', 'Arad', 'Argeș', 'Bacău', 'Bihor', 'Bistrița-Năsăud', 'Botoșani', 
+    'Brașov', 'Brăila', 'București', 'Buzău', 'Caraș-Severin', 'Călărași', 
+    'Cluj', 'Constanța', 'Covasna', 'Dâmbovița', 'Dolj', 'Galați', 'Giurgiu', 
+    'Gorj', 'Harghita', 'Hunedoara', 'Ialomița', 'Iași', 'Ilfov', 'Maramureș', 
+    'Mehedinți', 'Mureș', 'Neamț', 'Olt', 'Prahova', 'Satu Mare', 'Sălaj', 
+    'Sibiu', 'Suceava', 'Teleorman', 'Timiș', 'Tulcea', 'Vaslui', 'Vâlcea', 'Vrancea'
 ];
 
 const CreateRoute = () => {
     const router = useRouter();
-    const [routeName, setRouteName] = useState('');
-    const [selectedCity, setSelectedCity] = useState('');
-    const [dropdownVisible, setDropdownVisible] = useState(false);
+    const { zona, county: initialCounty } = useLocalSearchParams<{ zona?: string; county?: string }>();
+    
+    const [selectedDate, setSelectedDate] = useState(new Date());
+    const [showDatePicker, setShowDatePicker] = useState(false);
+    const [selectedCounty, setSelectedCounty] = useState(initialCounty || '');
+    const [countyDropdownVisible, setCountyDropdownVisible] = useState(false);
+    
+    // Opțional: selectare șofer
+    const [selectedDriver, setSelectedDriver] = useState<Employee | null>(null);
+    const [driverDropdownVisible, setDriverDropdownVisible] = useState(false);
+    const [drivers, setDrivers] = useState<Employee[]>([]);
+    const [driversLoading, setDriversLoading] = useState(false);
+
+    // Fetch drivers when county changes
+    useEffect(() => {
+        fetchDrivers();
+    }, [selectedCounty]);
+
+    const fetchDrivers = async () => {
+        try {
+            setDriversLoading(true);
+            let data: Employee[] = [];
+            
+            if (selectedCounty) {
+                data = await getDriversByCounty(selectedCounty);
+                if (data.length === 0) {
+                    data = await getAllDrivers();
+                }
+            } else {
+                data = await getAllDrivers();
+            }
+            
+            setDrivers(data);
+        } catch (error) {
+            console.error('Error fetching drivers:', error);
+        } finally {
+            setDriversLoading(false);
+        }
+    };
 
     const handleFinalize = async () => {
-        if (!routeName.trim()) {
-            Alert.alert('Eroare', 'Te rog introdu numele rutei.');
-            return;
-        }
-        if (!selectedCity) {
-            Alert.alert('Eroare', 'Te rog selectează un oraș.');
+        if (!selectedCounty) {
+            Alert.alert('Eroare', 'Te rog selectează un județ.');
             return;
         }
 
         try {
-            await RouteDefinitionService.createRouteDefinition({
-                name: routeName,
-                city: selectedCity
-            });
+            // Format date as YYYY-MM-DD
+            const formattedDate = selectedDate.toISOString().split('T')[0];
+            
+            const routeData: any = {
+                date: formattedDate,
+                county: selectedCounty,
+            };
+            
+            // Add employeeId if selected
+            if (selectedDriver) {
+                routeData.employeeId = selectedDriver.id;
+            }
+            
+            await RouteService.createRoute(routeData);
             
             Alert.alert(
                 'Succes',
-                `Ruta "${routeName}" în ${selectedCity} a fost creată!`,
+                `Ruta pentru ${formatDisplayDate(selectedDate)} în ${selectedCounty} a fost creată!`,
                 [
                     {
                         text: 'OK',
@@ -56,9 +96,36 @@ const CreateRoute = () => {
         }
     };
 
-    const handleCitySelect = (cityName: string) => {
-        setSelectedCity(cityName);
-        setDropdownVisible(false);
+    const formatDisplayDate = (date: Date) => {
+        return date.toLocaleDateString('ro-RO', {
+            weekday: 'long',
+            day: 'numeric',
+            month: 'long',
+            year: 'numeric'
+        });
+    };
+
+    // Format date for Calendar component (YYYY-MM-DD)
+    const getCalendarDateString = (date: Date) => {
+        return date.toISOString().split('T')[0];
+    };
+
+    const handleDateSelect = (day: any) => {
+        const newDate = new Date(day.dateString);
+        setSelectedDate(newDate);
+        setShowDatePicker(false);
+    };
+
+    const handleCountySelect = (county: string) => {
+        setSelectedCounty(county);
+        setCountyDropdownVisible(false);
+        // Reset driver selection when county changes
+        setSelectedDriver(null);
+    };
+
+    const handleDriverSelect = (driver: Employee) => {
+        setSelectedDriver(driver);
+        setDriverDropdownVisible(false);
     };
 
     return (
@@ -73,72 +140,201 @@ const CreateRoute = () => {
 
             {/* Form Container */}
             <View style={styles.formContainer}>
-                {/* Route Name Input */}
+                {/* Date Picker */}
                 <View style={styles.inputGroup}>
-                    <Text style={styles.label}>Nume Rută</Text>
-                    <TextInput
-                        style={styles.textInput}
-                        placeholder="Introdu numele rutei..."
-                        placeholderTextColor="#888"
-                        value={routeName}
-                        onChangeText={setRouteName}
-                    />
-                </View>
-
-                {/* City Dropdown */}
-                <View style={styles.inputGroup}>
-                    <Text style={styles.label}>Oraș</Text>
+                    <Text style={styles.label}>Data Rutei</Text>
                     <Pressable
                         style={styles.dropdownButton}
-                        onPress={() => setDropdownVisible(true)}
+                        onPress={() => setShowDatePicker(true)}
+                    >
+                        <Ionicons name="calendar-outline" size={20} color="#FFFFFF" style={{ marginRight: 10 }} />
+                        <Text style={styles.dropdownButtonText}>
+                            {formatDisplayDate(selectedDate)}
+                        </Text>
+                    </Pressable>
+                </View>
+
+                {/* County Dropdown */}
+                <View style={styles.inputGroup}>
+                    <Text style={styles.label}>Județ</Text>
+                    <Pressable
+                        style={styles.dropdownButton}
+                        onPress={() => setCountyDropdownVisible(true)}
                     >
                         <Text style={[
                             styles.dropdownButtonText,
-                            !selectedCity && styles.placeholderText
+                            !selectedCounty && styles.placeholderText
                         ]}>
-                            {selectedCity || 'Selectează orașul...'}
+                            {selectedCounty || 'Selectează județul...'}
+                        </Text>
+                        <Ionicons name="chevron-down" size={20} color="#FFFFFF" />
+                    </Pressable>
+                </View>
+
+                {/* Driver Dropdown (Optional) */}
+                <View style={styles.inputGroup}>
+                    <Text style={styles.label}>Șofer (opțional)</Text>
+                    <Pressable
+                        style={styles.dropdownButton}
+                        onPress={() => setDriverDropdownVisible(true)}
+                    >
+                        <Ionicons name="person-outline" size={20} color="#FFFFFF" style={{ marginRight: 10 }} />
+                        <Text style={[
+                            styles.dropdownButtonText,
+                            { flex: 1 },
+                            !selectedDriver && styles.placeholderText
+                        ]}>
+                            {selectedDriver?.fullName || 'Selectează șoferul...'}
                         </Text>
                         <Ionicons name="chevron-down" size={20} color="#FFFFFF" />
                     </Pressable>
                 </View>
             </View>
 
-            {/* Dropdown Modal */}
+            {/* Date Picker Modal */}
             <Modal
-                visible={dropdownVisible}
+                visible={showDatePicker}
                 transparent={true}
                 animationType="fade"
-                onRequestClose={() => setDropdownVisible(false)}
+                onRequestClose={() => setShowDatePicker(false)}
             >
                 <Pressable 
                     style={styles.modalOverlay}
-                    onPress={() => setDropdownVisible(false)}
+                    onPress={() => setShowDatePicker(false)}
+                >
+                    <View style={styles.calendarModal}>
+                        <Text style={styles.dropdownTitle}>Selectează Data</Text>
+                        <Calendar
+                            current={getCalendarDateString(selectedDate)}
+                            minDate={getCalendarDateString(new Date())}
+                            onDayPress={handleDateSelect}
+                            markedDates={{
+                                [getCalendarDateString(selectedDate)]: { selected: true, selectedColor: '#4CAF50' }
+                            }}
+                            theme={{
+                                backgroundColor: '#2A4158',
+                                calendarBackground: '#2A4158',
+                                textSectionTitleColor: '#FFFFFF',
+                                selectedDayBackgroundColor: '#4CAF50',
+                                selectedDayTextColor: '#FFFFFF',
+                                todayTextColor: '#4CAF50',
+                                dayTextColor: '#FFFFFF',
+                                textDisabledColor: '#666666',
+                                arrowColor: '#FFFFFF',
+                                monthTextColor: '#FFFFFF',
+                            }}
+                        />
+                    </View>
+                </Pressable>
+            </Modal>
+
+            {/* County Dropdown Modal */}
+            <Modal
+                visible={countyDropdownVisible}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setCountyDropdownVisible(false)}
+            >
+                <Pressable 
+                    style={styles.modalOverlay}
+                    onPress={() => setCountyDropdownVisible(false)}
                 >
                     <View style={styles.dropdownModal}>
-                        <Text style={styles.dropdownTitle}>Selectează Orașul</Text>
+                        <Text style={styles.dropdownTitle}>Selectează Județul</Text>
                         <ScrollView style={styles.dropdownList}>
-                            {CITIES.map((city) => (
+                            {COUNTIES.map((county) => (
                                 <Pressable
-                                    key={city.id}
+                                    key={county}
                                     style={({ pressed }) => [
                                         styles.dropdownItem,
-                                        selectedCity === city.name && styles.dropdownItemSelected,
+                                        selectedCounty === county && styles.dropdownItemSelected,
                                         pressed && styles.dropdownItemPressed
                                     ]}
-                                    onPress={() => handleCitySelect(city.name)}
+                                    onPress={() => handleCountySelect(county)}
                                 >
                                     <Text style={[
                                         styles.dropdownItemText,
-                                        selectedCity === city.name && styles.dropdownItemTextSelected
+                                        selectedCounty === county && styles.dropdownItemTextSelected
                                     ]}>
-                                        {city.name}
+                                        {county}
                                     </Text>
-                                    {selectedCity === city.name && (
+                                    {selectedCounty === county && (
                                         <Ionicons name="checkmark" size={20} color="#4CAF50" />
                                     )}
                                 </Pressable>
                             ))}
                         </ScrollView>
+                    </View>
+                </Pressable>
+            </Modal>
+
+            {/* Driver Dropdown Modal */}
+            <Modal
+                visible={driverDropdownVisible}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setDriverDropdownVisible(false)}
+            >
+                <Pressable 
+                    style={styles.modalOverlay}
+                    onPress={() => setDriverDropdownVisible(false)}
+                >
+                    <View style={styles.dropdownModal}>
+                        <Text style={styles.dropdownTitle}>Selectează Șoferul</Text>
+                        {driversLoading ? (
+                            <Text style={styles.loadingText}>Se încarcă...</Text>
+                        ) : drivers.length === 0 ? (
+                            <Text style={styles.emptyText}>Nu există șoferi disponibili</Text>
+                        ) : (
+                            <ScrollView style={styles.dropdownList}>
+                                {/* Option to clear selection */}
+                                <Pressable
+                                    style={({ pressed }) => [
+                                        styles.dropdownItem,
+                                        !selectedDriver && styles.dropdownItemSelected,
+                                        pressed && styles.dropdownItemPressed
+                                    ]}
+                                    onPress={() => {
+                                        setSelectedDriver(null);
+                                        setDriverDropdownVisible(false);
+                                    }}
+                                >
+                                    <Text style={[
+                                        styles.dropdownItemText,
+                                        styles.placeholderText
+                                    ]}>
+                                        Fără șofer asignat
+                                    </Text>
+                                </Pressable>
+                                
+                                {drivers.map((driver) => (
+                                    <Pressable
+                                        key={driver.id}
+                                        style={({ pressed }) => [
+                                            styles.dropdownItem,
+                                            selectedDriver?.id === driver.id && styles.dropdownItemSelected,
+                                            pressed && styles.dropdownItemPressed
+                                        ]}
+                                        onPress={() => handleDriverSelect(driver)}
+                                    >
+                                        <View style={{ flex: 1 }}>
+                                            <Text style={[
+                                                styles.dropdownItemText,
+                                                selectedDriver?.id === driver.id && styles.dropdownItemTextSelected
+                                            ]}>
+                                                {driver.fullName}
+                                            </Text>
+                                            {driver.county && (
+                                                <Text style={styles.driverCountyText}>{driver.county}</Text>
+                                            )}
+                                        </View>
+                                        {selectedDriver?.id === driver.id && (
+                                            <Ionicons name="checkmark" size={20} color="#4CAF50" />
+                                        )}
+                                    </Pressable>
+                                ))}
+                            </ScrollView>
+                        )}
                     </View>
                 </Pressable>
             </Modal>
@@ -152,7 +348,7 @@ const CreateRoute = () => {
                     ]}
                     onPress={handleFinalize}
                 >
-                    <Text style={styles.finalizeButtonText}>Finalizează Rută</Text>
+                    <Text style={styles.finalizeButtonText}>Creează Rută</Text>
                 </Pressable>
             </View>
         </View>
@@ -242,6 +438,12 @@ const styles = StyleSheet.create({
         maxHeight: '60%',
         padding: 20,
     },
+    calendarModal: {
+        backgroundColor: '#2A4158',
+        borderRadius: 16,
+        width: '90%',
+        padding: 20,
+    },
     dropdownTitle: {
         color: '#FFFFFF',
         fontSize: 18,
@@ -274,6 +476,23 @@ const styles = StyleSheet.create({
     },
     dropdownItemTextSelected: {
         fontWeight: 'bold',
+    },
+    driverCountyText: {
+        color: 'rgba(255, 255, 255, 0.6)',
+        fontSize: 12,
+        marginTop: 2,
+    },
+    loadingText: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        textAlign: 'center',
+        padding: 20,
+    },
+    emptyText: {
+        color: 'rgba(255, 255, 255, 0.6)',
+        fontSize: 16,
+        textAlign: 'center',
+        padding: 20,
     },
     bottomContainer: {
         paddingHorizontal: 20,

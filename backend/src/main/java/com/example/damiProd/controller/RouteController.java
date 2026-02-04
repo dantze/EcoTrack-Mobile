@@ -1,6 +1,7 @@
 package com.example.damiProd.controller;
 
 import com.example.damiProd.domain.Route;
+import com.example.damiProd.dto.CreateRouteRequest;
 import com.example.damiProd.service.RouteService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -28,8 +29,8 @@ public class RouteController {
     }
 
     @PostMapping
-    public ResponseEntity<Route> createRoute(@RequestBody Route route) {
-        Route savedRoute = routeService.createRoute(route);
+    public ResponseEntity<Route> createRoute(@RequestBody CreateRouteRequest request) {
+        Route savedRoute = routeService.createRoute(request);
         return ResponseEntity.ok(savedRoute);
     }
 

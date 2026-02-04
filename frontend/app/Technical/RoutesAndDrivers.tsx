@@ -23,10 +23,8 @@ const RoutesAndDrivers = () => {
             
             let data: Employee[] = [];
             
-            // If county is provided, try to filter by county first
             if (county) {
                 data = await getDriversByCounty(county);
-                // If no drivers found for this county, fall back to all drivers
                 if (data.length === 0) {
                     console.log(`No drivers found for county ${county}, showing all drivers`);
                     data = await getAllDrivers();

@@ -20,7 +20,7 @@ public class Route {
     private String county;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "employee_id", nullable = false)
+    @JoinColumn(name = "employee_id", nullable = true)
     @JsonIgnore
     private Employee employee;
 

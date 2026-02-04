@@ -1,13 +1,10 @@
 import { API_BASE_URL } from '../constants/ApiConfig';
 
-// Definim structura datelor, similar cu entitatea Java
-export interface RouteData {
-    id?: number;
-    date: string; 
-    employee: {
-        id: number;
-        fullName?: string; 
-    }; 
+// Definim structura datelor pentru crearea unei rute
+export interface CreateRouteData {
+    date: string;
+    county?: string;
+    employeeId?: number;
 }
 
 export interface Route {
@@ -54,7 +51,7 @@ export const RouteService = {
     },
 
     
-    createRoute: async (routeData: RouteData) => {
+    createRoute: async (routeData: CreateRouteData) => {
         const response = await fetch(`${API_BASE_URL}/routes`, {
             method: 'POST',
             headers: {

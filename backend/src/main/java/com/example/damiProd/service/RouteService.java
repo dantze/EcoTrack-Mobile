@@ -2,6 +2,7 @@ package com.example.damiProd.service;
 
 import com.example.damiProd.domain.Employee;
 import com.example.damiProd.domain.Route;
+import com.example.damiProd.dto.CreateRouteRequest;
 import com.example.damiProd.repository.EmployeeRepository;
 import com.example.damiProd.repository.RouteRepository;
 import org.springframework.stereotype.Service;
@@ -32,7 +33,19 @@ public class RouteService {
         return routes;
     }
 
-    public Route createRoute(Route route) {
+    @Transactional
+    public Route createRoute(CreateRouteRequest request) {
+        Route route = new Route();
+        route.setDate(request.getDate());
+        route.setCounty(request.getCounty());
+        
+        // Set employee if provided
+        if (request.getEmployeeId() != null) {
+            Employee employee = employeeRepository.findById(request.getEmployeeId())
+                    .orElseThrow(() -> new RuntimeException("Angajatul nu a fost găsit"));
+            route.setEmployee(employee);
+        }
+        
         return routeRepository.save(route);
     }
 

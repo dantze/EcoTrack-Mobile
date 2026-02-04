@@ -58,6 +58,20 @@ const Menu = () => {
                 >
                     <Text style={styles.continueButtonText}>Routes and Drivers</Text>
                 </Pressable>
+
+                <View style={styles.separator} />
+
+                <Pressable style={({ pressed }) => [
+                    styles.optiuneButton,
+                    pressed && { opacity: 0.8, transform: [{ scale: 0.99 }] }
+                ]}
+                    onPress={() =>
+                        router.push({ pathname: '/Technical/ChangeDriver', params: { zona, county } })
+                    }
+                >
+                    <Text style={styles.continueButtonText}>Schimbare Șoferi și Rute</Text>
+                </Pressable>
+
             </View>
 
             <View style={styles.mapContainer}>

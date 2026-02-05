@@ -1,5 +1,5 @@
-import { StyleSheet, Text, View, Pressable, ScrollView, Image, Modal, Animated, PanResponder, Alert, ActivityIndicator } from 'react-native'
-import React, { useState, useRef, useEffect } from 'react'
+import { StyleSheet, Text, View, Pressable, ScrollView, Image, Modal, Alert, ActivityIndicator } from 'react-native'
+import React, { useState, useEffect } from 'react'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { OrderService } from '../../services/OrderService';
@@ -81,24 +81,7 @@ const OrderDetails = () => {
         }
     };
 
-    // --- DRAG & DROP LOGIC (ANIMATION) ---
-    const pan = useRef(new Animated.ValueXY()).current;
 
-    const panResponder = useRef(
-        PanResponder.create({
-            onStartShouldSetPanResponder: () => true,
-            onPanResponderMove: Animated.event(
-                [null, { dx: pan.x, dy: pan.y }],
-                { useNativeDriver: false }
-            ),
-            onPanResponderRelease: () => {
-                Animated.spring(pan, {
-                    toValue: { x: 0, y: 0 },
-                    useNativeDriver: false,
-                }).start();
-            },
-        })
-    ).current;
 
     // Route selection function
     const handleSelectRoute = (route: Route) => {
@@ -137,6 +120,41 @@ const OrderDetails = () => {
         }
     };
 
+    // Handle reassignment - deletes the existing task
+    const handleReassign = async () => {
+        if (!orderTaskStatus.hasTask) return;
+
+        try {
+            const status = await TaskService.checkOrderHasTask(orderId!);
+            if (status.hasTask && status.taskId) {
+                Alert.alert(
+                    "Reasignare comandă",
+                    "Sigur dorești să reasignezi această comandă la o altă rută? Atribuirea curentă va fi ștearsă.",
+                    [
+                        { text: "Anulează", style: "cancel" },
+                        {
+                            text: "Reasignează",
+                            style: "destructive",
+                            onPress: async () => {
+                                try {
+                                    await TaskService.deleteTask(status.taskId!);
+                                    setOrderTaskStatus({ hasTask: false, routeId: null });
+                                    setSelectedRoute(null);
+                                    setModalVisible(true);
+                                    Alert.alert("Succes", "Atribuirea anterioară a fost ștearsă. Poți selecta o nouă rută.");
+                                } catch (error: any) {
+                                    Alert.alert("Eroare", error.message || "Nu s-a putut șterge atribuirea.");
+                                }
+                            }
+                        }
+                    ]
+                );
+            }
+        } catch (error) {
+            console.error("Error checking task status:", error);
+        }
+    };
+
     // Component for detail rows
     const DetailRow = ({ label, value, isMultiline = false }: DetailRowProps) => (
         <View style={styles.rowContainer}>
@@ -161,13 +179,13 @@ const OrderDetails = () => {
     const clientName = order.client?.type === 'company'
         ? (order.client?.name || order.client?.email || 'N/A')
         : (order.client?.fullName || order.client?.email || 'N/A');
-    const clientAddress = order.client?.address || order.locationCoordinates;
+    const clientAddress = order.locationAddress || order.client?.address || order.locationCoordinates;
 
     return (
         <View style={styles.container}>
 
             <View style={styles.headerContainer}>
-                <Pressable onPress={() => router.back()} style={{ position: 'absolute', left: 20, top: 0 }}>
+                <Pressable onPress={() => router.back()} style={styles.backButton}>
                     <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
                 </Pressable>
                 <Text style={styles.headerText}>Detalii Comandă</Text>
@@ -220,6 +238,20 @@ const OrderDetails = () => {
                     </Text>
                 </Pressable>
 
+                {/* REASSIGN BUTTON - Only visible when order has task */}
+                {orderTaskStatus.hasTask && (
+                    <Pressable
+                        style={({ pressed }) => [
+                            styles.reassignButton,
+                            pressed && styles.buttonPressed
+                        ]}
+                        onPress={handleReassign}
+                    >
+                        <Ionicons name="refresh" size={20} color="white" style={{ marginRight: 8 }} />
+                        <Text style={styles.reassignButtonText}>Reasignează la altă rută</Text>
+                    </Pressable>
+                )}
+
             </ScrollView>
 
             {/* ================= ASSIGNMENT MODAL ================= */}
@@ -232,49 +264,32 @@ const OrderDetails = () => {
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalContent}>
 
-                        <View style={{ alignItems: 'flex-end', width: '100%', paddingRight: 10 }}>
-                            <Ionicons name="information-circle" size={24} color="#16283C" />
-                        </View>
-
-                        {/* --- TOP SECTION (DRAGGABLE + BUTTON) --- */}
-                        <View style={styles.modalTopSection}>
-
-                            {/* Draggable Card */}
-                            <Animated.View
-                                style={[
-                                    styles.draggableBox,
-                                    { transform: [{ translateX: pan.x }, { translateY: pan.y }] },
-                                    { zIndex: 999 }
-                                ]}
-                                {...panResponder.panHandlers}
-                            >
-                                <Text style={styles.draggableTitle} numberOfLines={1}>Comandă #{order.id}</Text>
-                                <View style={styles.draggableIcons}>
-                                    <Ionicons name="location-sharp" size={24} color="#16283C" />
-                                    <View style={{ width: 10 }} />
-                                    <Ionicons name="information-circle" size={24} color="#16283C" />
-                                </View>
-                            </Animated.View>
-
-                            {/* Finalize Button */}
-                            <Pressable
-                                style={[
-                                    styles.finalizeButton,
-                                    (!selectedRoute || assigning) && styles.disabledButton
-                                ]}
-                                onPress={handleFinalize}
-                                disabled={!selectedRoute || assigning}
-                            >
-                                {assigning ? (
-                                    <ActivityIndicator size="small" color="white" />
-                                ) : (
-                                    <>
-                                        <Text style={styles.finalizeText}>Finalizează</Text>
-                                        <MaterialCommunityIcons name="truck-delivery" size={20} color="white" style={{ marginLeft: 5 }} />
-                                    </>
-                                )}
+                        {/* --- HEADER: Title + Close --- */}
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.modalTitle}>Selectează Ruta</Text>
+                            <Pressable onPress={() => setModalVisible(false)}>
+                                <Ionicons name="close" size={24} color="#16283C" />
                             </Pressable>
                         </View>
+
+                        {/* --- FINALIZE BUTTON (Top Center) --- */}
+                        <Pressable
+                            style={[
+                                styles.finalizeButton,
+                                (!selectedRoute || assigning) && styles.disabledButton
+                            ]}
+                            onPress={handleFinalize}
+                            disabled={!selectedRoute || assigning}
+                        >
+                            {assigning ? (
+                                <ActivityIndicator size="small" color="white" />
+                            ) : (
+                                <>
+                                    <Text style={styles.finalizeText}>Finalizează Atribuirea</Text>
+                                    <MaterialCommunityIcons name="truck-delivery" size={20} color="white" style={{ marginLeft: 8 }} />
+                                </>
+                            )}
+                        </Pressable>
 
                         {/* --- SCROLLABLE ROUTES LIST --- */}
                         <ScrollView style={styles.routesScrollView} contentContainerStyle={styles.routesScrollContent}>
@@ -321,13 +336,6 @@ const OrderDetails = () => {
                             )}
                         </ScrollView>
 
-                        <Pressable
-                            style={styles.closeModalButton}
-                            onPress={() => setModalVisible(false)}
-                        >
-                            <Text style={styles.closeModalText}>Închide</Text>
-                        </Pressable>
-
                     </View>
                 </View>
             </Modal>
@@ -340,7 +348,8 @@ export default OrderDetails
 
 const styles = StyleSheet.create({
     container: { flex: 1, backgroundColor: '#16283C' },
-    headerContainer: { marginTop: 60, paddingHorizontal: 20, width: '100%', marginBottom: 20 },
+    headerContainer: { marginTop: 60, paddingHorizontal: 20, width: '100%', marginBottom: 20, flexDirection: 'row', alignItems: 'center' },
+    backButton: { marginRight: 15 },
     headerText: { color: '#FFFFFF', fontSize: 28, fontWeight: 'bold' },
     scrollContent: { paddingHorizontal: 20, paddingBottom: 50, alignItems: 'center' },
     detailsCard: { backgroundColor: '#5D8AA8', borderRadius: 20, padding: 20, width: '100%', marginBottom: 30 },
@@ -390,46 +399,31 @@ const styles = StyleSheet.create({
         elevation: 10,
     },
 
-    // Top Section (Draggable + Button)
-    modalTopSection: {
+    // Modal Header
+    modalHeader: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
         width: '100%',
-        marginBottom: 30,
-        marginTop: 10,
+        marginBottom: 20,
     },
-
-    // Draggable Box
-    draggableBox: {
-        width: 140,
-        height: 80,
-        backgroundColor: '#5D8AA8', // Teal-blue
-        borderRadius: 15,
-        justifyContent: 'center',
-        alignItems: 'center',
-        elevation: 5,
-    },
-    draggableTitle: {
-        color: 'white',
+    modalTitle: {
+        fontSize: 22,
         fontWeight: 'bold',
-        fontSize: 18,
-        marginBottom: 5,
-    },
-    draggableIcons: {
-        flexDirection: 'row',
+        color: '#16283C',
     },
 
     // Finalize Button
     finalizeButton: {
-        width: 140,
+        width: '100%',
         height: 50,
         backgroundColor: '#5D8AA8',
-        borderRadius: 10,
+        borderRadius: 12,
         flexDirection: 'row',
         justifyContent: 'center',
         alignItems: 'center',
         elevation: 2,
+        marginBottom: 20,
     },
     disabledButton: {
         backgroundColor: '#BDC3C7', // Gray when disabled
@@ -437,7 +431,7 @@ const styles = StyleSheet.create({
     finalizeText: {
         color: 'white',
         fontWeight: 'bold',
-        fontSize: 14,
+        fontSize: 16,
     },
 
     // Routes Scroll View
@@ -504,5 +498,23 @@ const styles = StyleSheet.create({
     closeModalText: {
         color: '#999',
         fontWeight: 'bold',
-    }
+    },
+
+    // Reassign Button
+    reassignButton: {
+        width: '100%',
+        height: 50,
+        backgroundColor: '#E67E22',
+        borderRadius: 15,
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginTop: 15,
+        elevation: 3,
+    },
+    reassignButtonText: {
+        color: 'white',
+        fontWeight: 'bold',
+        fontSize: 16,
+    },
 })

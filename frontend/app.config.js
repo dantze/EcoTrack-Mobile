@@ -38,6 +38,9 @@ export default {
         plugins: [
             "expo-router"
         ],
+        extra: {
+            googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY
+        },
         experiments: {
             typedRoutes: true
         }

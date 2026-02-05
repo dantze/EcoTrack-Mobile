@@ -10,6 +10,7 @@ type Order = {
     orderType: string;
     quantity: number;
     locationCoordinates: string;
+    locationAddress: string;
     startDate: string;
     endDate: string;
     details: string;
@@ -49,7 +50,7 @@ const Orders = () => {
     useEffect(() => {
         fetchOrders();
     }, []);
-    
+
     // Check task status for all orders after they're loaded
     useEffect(() => {
         if (orders.length > 0) {
@@ -72,11 +73,11 @@ const Orders = () => {
             setLoading(false);
         }
     };
-    
+
     // Check task status for all orders
     const checkAllOrderTaskStatus = async () => {
         const statusMap: OrderTaskMap = {};
-        
+
         // Check each order in parallel
         await Promise.all(
             orders.map(async (order) => {
@@ -88,18 +89,18 @@ const Orders = () => {
                 }
             })
         );
-        
+
         setOrderTaskStatus(statusMap);
     };
 
     // Format date from ISO string or any date format
     const formatDate = (dateString: string) => {
         if (!dateString) return { month: 'N/A', day: '--' };
-        
+
         try {
             const date = new Date(dateString);
             if (isNaN(date.getTime())) return { month: 'N/A', day: '--' };
-            
+
             const months = ['Ian', 'Feb', 'Mar', 'Apr', 'Mai', 'Iun', 'Iul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
             return {
                 month: months[date.getMonth()],
@@ -131,6 +132,9 @@ const Orders = () => {
 
     // Get location display text
     const getLocationText = (order: Order): string => {
+        if (order.locationAddress) {
+            return order.locationAddress;
+        }
         if (order.client?.address) {
             return order.client.address;
         }
@@ -192,7 +196,7 @@ const Orders = () => {
                     orders.map((order) => {
                         const { month, day } = formatDate(order.startDate);
                         const hasTask = orderTaskStatus[order.id] || false;
-                        
+
                         return (
                             <Pressable
                                 key={order.id}
@@ -205,12 +209,12 @@ const Orders = () => {
                                 <View style={styles.cardInfo}>
                                     <View style={styles.clientRow}>
                                         <Text style={styles.clientName}>{getClientName(order)}</Text>
-                                        {hasTask && (
+                                        {/* {hasTask && (
                                             <View style={styles.assignedBadge}>
                                                 <Ionicons name="checkmark-circle" size={14} color="#2ECC71" />
                                                 <Text style={styles.assignedBadgeText}>Atribuită</Text>
                                             </View>
-                                        )}
+                                        )} */}
                                     </View>
                                     <Text style={styles.actionText}>{getActionText(order)}</Text>
 
@@ -220,7 +224,7 @@ const Orders = () => {
                                             {getLocationText(order)}
                                         </Text>
                                     </View>
-                                    
+
                                     {/* Status indicator */}
                                     <View style={[styles.statusIndicator, hasTask ? styles.statusAssigned : styles.statusPending]}>
                                         <Text style={styles.statusText}>

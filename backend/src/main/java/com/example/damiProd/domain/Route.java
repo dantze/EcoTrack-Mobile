@@ -48,9 +48,10 @@ public class Route {
     public Route() {
     }
 
-    public Route(String name, LocalDate date, Employee employee) {
+    public Route(String name, LocalDate date, String county, Employee employee) {
         this.name = name;
         this.date = date;
+        this.county = county;
         this.employee = employee;
     }
 }

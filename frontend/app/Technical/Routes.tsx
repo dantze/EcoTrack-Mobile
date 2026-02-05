@@ -175,13 +175,13 @@ const Routes = () => {
                 )}
             </View>
 
-            <View style={styles.footerContainer}>
+            {/* <View style={styles.footerContainer}>
                 <Image
                     source={mapImageSource}
                     style={styles.mapImage}
                     resizeMode="contain"
                 />
-            </View>
+            </View> */}
 
             {/* Driver Assignment Modal */}
             <Modal

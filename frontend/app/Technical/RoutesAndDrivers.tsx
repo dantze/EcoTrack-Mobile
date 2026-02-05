@@ -28,7 +28,7 @@ const RoutesAndDrivers = () => {
                 if (data.length === 0) {
                     console.log(`No drivers found for county ${county}`);
                 }
-                data = await getAllDrivers();
+                // data = await getAllDrivers();
             } else {
                 setError('Alegeti un județ')
             }

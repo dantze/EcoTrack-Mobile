@@ -220,10 +220,6 @@ const OrderDetails = () => {
                     </Text>
                 </Pressable>
 
-                <Pressable onPress={() => console.log("Navigate map")} style={styles.mapLinkContainer}>
-                    <Text style={styles.mapLinkText}>Navighează pe hartă →</Text>
-                </Pressable>
-
             </ScrollView>
 
             {/* ================= ASSIGNMENT MODAL ================= */}

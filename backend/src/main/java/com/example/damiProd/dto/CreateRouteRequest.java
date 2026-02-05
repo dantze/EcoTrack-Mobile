@@ -3,11 +3,21 @@ package com.example.damiProd.dto;
 import java.time.LocalDate;
 
 public class CreateRouteRequest {
+    private String name;
     private LocalDate date;
     private String county;
     private Long employeeId;
 
-    public CreateRouteRequest() {}
+    public CreateRouteRequest() {
+    }
+
+    public String getName() {
+        return name;
+    }
+
+    public void setName(String name) {
+        this.name = name;
+    }
 
     public LocalDate getDate() {
         return date;

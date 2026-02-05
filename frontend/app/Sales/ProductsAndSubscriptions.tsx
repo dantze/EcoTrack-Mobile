@@ -2,14 +2,7 @@ import { StyleSheet, Text, View, Pressable, ScrollView, TextInput, Modal, Activi
 import React, { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'expo-router'
 import { Ionicons, AntDesign, MaterialIcons } from '@expo/vector-icons';
-import { API_BASE_URL } from '../../constants/ApiConfig';
-
-interface Product {
-    id: number;
-    name: string;
-    description: string | null;
-    price: number;
-}
+import { ProductService, Product } from '../../services/ProductService';
 
 const ProductsAndSubscriptions = () => {
     const router = useRouter();
@@ -32,13 +25,8 @@ const ProductsAndSubscriptions = () => {
     // Fetch products
     const fetchProducts = useCallback(async () => {
         try {
-            const response = await fetch(`${API_BASE_URL}/products`);
-            if (response.ok) {
-                const data = await response.json();
-                setProducts(data);
-            } else {
-                console.error('Failed to fetch products');
-            }
+            const data = await ProductService.getAllProducts();
+            setProducts(data);
         } catch (error) {
             console.error('Error fetching products:', error);
         } finally {
@@ -105,36 +93,22 @@ const ProductsAndSubscriptions = () => {
             };
 
             const isEditing = editingProduct !== null;
-            const url = isEditing
-                ? `${API_BASE_URL}/products/${editingProduct.id}`
-                : `${API_BASE_URL}/products`;
-            const method = isEditing ? 'PUT' : 'POST';
 
-            const response = await fetch(url, {
-                method,
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(payload),
-            });
-
-            if (response.ok) {
-                const savedProduct = await response.json();
-                if (isEditing) {
-                    setProducts(prev => prev.map(p => p.id === savedProduct.id ? savedProduct : p));
-                    Alert.alert('Succes', 'Produsul a fost actualizat cu succes!');
-                } else {
-                    setProducts(prev => [...prev, savedProduct]);
-                    Alert.alert('Succes', 'Produsul a fost adăugat cu succes!');
-                }
-                setModalVisible(false);
-                resetForm();
+            let savedProduct: Product;
+            if (isEditing) {
+                savedProduct = await ProductService.updateProduct(editingProduct.id, payload);
+                setProducts(prev => prev.map(p => p.id === savedProduct.id ? savedProduct : p));
+                Alert.alert('Succes', 'Produsul a fost actualizat cu succes!');
             } else {
-                Alert.alert('Eroare', 'Nu am putut salva produsul. Încearcă din nou.');
+                savedProduct = await ProductService.createProduct(payload);
+                setProducts(prev => [...prev, savedProduct]);
+                Alert.alert('Succes', 'Produsul a fost adăugat cu succes!');
             }
-        } catch (error) {
+            setModalVisible(false);
+            resetForm();
+        } catch (error: any) {
             console.error('Error saving product:', error);
-            Alert.alert('Eroare', 'Eroare de conexiune. Verifică conexiunea la internet.');
+            Alert.alert('Eroare', error.message || 'Eroare de conexiune.');
         } finally {
             setSaving(false);
         }
@@ -158,21 +132,15 @@ const ProductsAndSubscriptions = () => {
                     onPress: async () => {
                         setSaving(true);
                         try {
-                            const response = await fetch(`${API_BASE_URL}/products/${editingProduct.id}`, {
-                                method: 'DELETE',
-                            });
+                            const result = await ProductService.deleteProduct(editingProduct.id);
 
-                            if (response.ok || response.status === 204) {
+                            if (result.success) {
                                 setProducts(prev => prev.filter(p => p.id !== editingProduct.id));
                                 setModalVisible(false);
                                 resetForm();
                                 Alert.alert('Succes', 'Produsul a fost șters cu succes!');
-                            } else if (response.status === 409) {
-                                // Product is in use by orders
-                                const data = await response.json();
-                                Alert.alert('Nu se poate șterge', data.error || 'Produsul este folosit în comenzi existente.');
                             } else {
-                                Alert.alert('Eroare', 'Nu am putut șterge produsul. Încearcă din nou.');
+                                Alert.alert('Nu se poate șterge', result.error || 'Eroare la ștergerea produsului.');
                             }
                         } catch (error) {
                             console.error('Error deleting product:', error);

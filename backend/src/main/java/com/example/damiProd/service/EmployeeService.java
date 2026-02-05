@@ -1,7 +1,6 @@
 package com.example.damiProd.service;
 
 import com.example.damiProd.domain.Employee;
-import com.example.damiProd.domain.EmployeeRole;
 import com.example.damiProd.repository.EmployeeRepository;
 import org.springframework.stereotype.Service;
 

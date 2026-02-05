@@ -12,11 +12,14 @@ import java.util.Optional;
 @Repository
 public interface OrderRepository extends JpaRepository<Order, Long> {
     List<Order> findByClientId(Long clientId);
+
     List<Order> findByRouteDefinitionId(Long routeDefinitionId);
-    
+
     @Query("SELECT o FROM Order o LEFT JOIN FETCH o.client LEFT JOIN FETCH o.product LEFT JOIN FETCH o.routeDefinition")
     List<Order> findAllWithClientAndProduct();
-    
+
     @Query("SELECT o FROM Order o LEFT JOIN FETCH o.client LEFT JOIN FETCH o.product LEFT JOIN FETCH o.routeDefinition WHERE o.id = :id")
     Optional<Order> findByIdWithClientAndProduct(@Param("id") Long id);
+
+    boolean existsByProductId(Long productId);
 }

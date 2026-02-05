@@ -42,6 +42,7 @@ public class Order {
     private String startDate;
     private String endDate;
     private String locationCoordinates; // "lat,long"
+    private String locationAddress; // Human-readable address string
     private String contact;
     private Integer igienizariPerMonth;
     private String details;

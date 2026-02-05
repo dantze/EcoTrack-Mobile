@@ -38,6 +38,7 @@ public class RouteService {
     @Transactional
     public Route createRoute(CreateRouteRequest request) {
         Route route = new Route();
+        route.setName(request.getName());
         route.setDate(request.getDate());
         route.setCounty(request.getCounty());
 

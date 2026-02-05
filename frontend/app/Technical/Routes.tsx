@@ -13,7 +13,7 @@ const Routes = () => {
     const zonaLabel = zona ?? 'Center';
     const [routes, setRoutes] = useState<Route[]>([]);
     const [loading, setLoading] = useState(true);
-    
+
     // Driver assignment modal state
     const [driverModalVisible, setDriverModalVisible] = useState(false);
     const [selectedRoute, setSelectedRoute] = useState<Route | null>(null);
@@ -24,7 +24,7 @@ const Routes = () => {
         try {
             setLoading(true);
             let data: Route[] = [];
-            
+
             // If county is provided, try to filter by county first
             if (county) {
                 data = await RouteService.getRoutesByCounty(county);
@@ -36,7 +36,7 @@ const Routes = () => {
             } else {
                 data = await RouteService.getAllRoutes();
             }
-            
+
             setRoutes(data);
         } catch (error) {
             console.error('Error fetching routes:', error);
@@ -56,7 +56,7 @@ const Routes = () => {
         try {
             setDriversLoading(true);
             let data: Employee[] = [];
-            
+
             if (county) {
                 data = await getDriversByCounty(county);
                 if (data.length === 0) {
@@ -66,7 +66,7 @@ const Routes = () => {
             } else {
                 data = await getAllDrivers();
             }
-            
+
             setDrivers(data);
         } catch (error) {
             console.error('Error fetching drivers:', error);
@@ -101,7 +101,7 @@ const Routes = () => {
 
     const handleSelectDriver = async (driver: Employee) => {
         if (!selectedRoute) return;
-        
+
         try {
             await RouteService.assignDriverToRoute(selectedRoute.id, driver.id);
             console.log(`Assigned driver ${driver.fullName} to route ${selectedRoute.id}`);
@@ -162,11 +162,8 @@ const Routes = () => {
                                     onPress={() => handleRoutePress(route)}
                                 >
                                     <View style={styles.routeInfo}>
-                                        <Text style={styles.buttonText}>{formatDate(route.date)}</Text>
-                                        <Text style={styles.subtitleText}>{route.employeeName || 'Șofer neasignat'}</Text>
-                                    </View>
-                                    <View style={styles.routeIdBadge}>
-                                        <Text style={styles.routeIdText}>#{route.id}</Text>
+                                        <Text style={styles.buttonText}>{route.name || `Ruta #${route.id}`}</Text>
+                                        <Text style={styles.subtitleText}>{formatDate(route.date)}</Text>
                                     </View>
                                 </Pressable>
 
@@ -178,13 +175,13 @@ const Routes = () => {
                 )}
             </View>
 
-            <View style={styles.footerContainer}>
+            {/* <View style={styles.footerContainer}>
                 <Image
                     source={mapImageSource}
                     style={styles.mapImage}
                     resizeMode="contain"
                 />
-            </View>
+            </View> */}
 
             {/* Driver Assignment Modal */}
             <Modal
@@ -201,10 +198,10 @@ const Routes = () => {
                                 <Ionicons name="close" size={24} color="#FFFFFF" />
                             </Pressable>
                         </View>
-                        
+
                         {selectedRoute && (
                             <Text style={styles.modalSubtitle}>
-                                Rută: {formatDate(selectedRoute.date)} - #{selectedRoute.id}
+                                Rută: {selectedRoute.name || `#${selectedRoute.id}`}
                             </Text>
                         )}
 

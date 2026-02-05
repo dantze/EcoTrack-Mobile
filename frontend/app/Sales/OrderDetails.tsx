@@ -176,6 +176,7 @@ const OrderDetails = () => {
                                         startDate: orderData.startDate,
                                         endDate: orderData.endDate,
                                         locationCoordinates: orderData.location ? `${orderData.location.latitude},${orderData.location.longitude}` : null,
+                                        locationAddress: orderData.locationAddress || null,
                                         contact: orderData.contact,
                                         igienizariPerMonth: parseInt(orderData.igienizari),
                                         details: orderData.details,

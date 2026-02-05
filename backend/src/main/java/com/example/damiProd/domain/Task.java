@@ -1,7 +1,6 @@
 package com.example.damiProd.domain;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -39,7 +38,7 @@ public class Task {
     @JoinColumn(name = "route_id")
     @JsonIgnore
     private Route route;
-    
+
     // Link to the original order
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "order_id")
@@ -49,13 +48,13 @@ public class Task {
     @OneToMany(mappedBy = "task", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonIgnore
     private List<TaskPhoto> photos = new ArrayList<>();
-    
+
     // Transient field to expose route ID in JSON
     @Transient
     public Long getRouteId() {
         return route != null ? route.getId() : null;
     }
-    
+
     // Transient field to expose order ID in JSON
     @Transient
     public Long getOrderId() {

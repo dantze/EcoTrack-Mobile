@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View, Pressable, Alert, Modal, ScrollView, Platform } from 'react-native'
+import { StyleSheet, Text, View, Pressable, Alert, Modal, ScrollView, Platform, TextInput } from 'react-native'
 import React, { useState, useEffect } from 'react'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons';
@@ -8,57 +8,33 @@ import { Calendar } from 'react-native-calendars';
 
 // Lista de județe
 const COUNTIES = [
-    'Alba', 'Arad', 'Argeș', 'Bacău', 'Bihor', 'Bistrița-Năsăud', 'Botoșani', 
-    'Brașov', 'Brăila', 'București', 'Buzău', 'Caraș-Severin', 'Călărași', 
-    'Cluj', 'Constanța', 'Covasna', 'Dâmbovița', 'Dolj', 'Galați', 'Giurgiu', 
-    'Gorj', 'Harghita', 'Hunedoara', 'Ialomița', 'Iași', 'Ilfov', 'Maramureș', 
-    'Mehedinți', 'Mureș', 'Neamț', 'Olt', 'Prahova', 'Satu Mare', 'Sălaj', 
+    'Alba', 'Arad', 'Argeș', 'Bacău', 'Bihor', 'Bistrița-Năsăud', 'Botoșani',
+    'Brașov', 'Brăila', 'București', 'Buzău', 'Caraș-Severin', 'Călărași',
+    'Cluj', 'Constanța', 'Covasna', 'Dâmbovița', 'Dolj', 'Galați', 'Giurgiu',
+    'Gorj', 'Harghita', 'Hunedoara', 'Ialomița', 'Iași', 'Ilfov', 'Maramureș',
+    'Mehedinți', 'Mureș', 'Neamț', 'Olt', 'Prahova', 'Satu Mare', 'Sălaj',
     'Sibiu', 'Suceava', 'Teleorman', 'Timiș', 'Tulcea', 'Vaslui', 'Vâlcea', 'Vrancea'
 ];
 
 const CreateRoute = () => {
     const router = useRouter();
     const { zona, county: initialCounty } = useLocalSearchParams<{ zona?: string; county?: string }>();
-    
+
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [showDatePicker, setShowDatePicker] = useState(false);
     const [selectedCounty, setSelectedCounty] = useState(initialCounty || '');
     const [countyDropdownVisible, setCountyDropdownVisible] = useState(false);
-    
-    // Opțional: selectare șofer
-    const [selectedDriver, setSelectedDriver] = useState<Employee | null>(null);
-    const [driverDropdownVisible, setDriverDropdownVisible] = useState(false);
-    const [drivers, setDrivers] = useState<Employee[]>([]);
-    const [driversLoading, setDriversLoading] = useState(false);
 
-    // Fetch drivers when county changes
-    useEffect(() => {
-        fetchDrivers();
-    }, [selectedCounty]);
+    // Route name
+    const [routeName, setRouteName] = useState('');
 
-    const fetchDrivers = async () => {
-        try {
-            setDriversLoading(true);
-            let data: Employee[] = [];
-            
-            if (selectedCounty) {
-                data = await getDriversByCounty(selectedCounty);
-                if (data.length === 0) {
-                    data = await getAllDrivers();
-                }
-            } else {
-                data = await getAllDrivers();
-            }
-            
-            setDrivers(data);
-        } catch (error) {
-            console.error('Error fetching drivers:', error);
-        } finally {
-            setDriversLoading(false);
-        }
-    };
 
     const handleFinalize = async () => {
+        if (!routeName.trim()) {
+            Alert.alert('Eroare', 'Te rog introdu un nume pentru rută.');
+            return;
+        }
+
         if (!selectedCounty) {
             Alert.alert('Eroare', 'Te rog selectează un județ.');
             return;
@@ -67,22 +43,18 @@ const CreateRoute = () => {
         try {
             // Format date as YYYY-MM-DD
             const formattedDate = selectedDate.toISOString().split('T')[0];
-            
+
             const routeData: any = {
+                name: routeName.trim(),
                 date: formattedDate,
                 county: selectedCounty,
             };
-            
-            // Add employeeId if selected
-            if (selectedDriver) {
-                routeData.employeeId = selectedDriver.id;
-            }
-            
+
             await RouteService.createRoute(routeData);
-            
+
             Alert.alert(
                 'Succes',
-                `Ruta pentru ${formatDisplayDate(selectedDate)} în ${selectedCounty} a fost creată!`,
+                `Ruta "${routeName}" a fost creată!`,
                 [
                     {
                         text: 'OK',
@@ -119,14 +91,9 @@ const CreateRoute = () => {
     const handleCountySelect = (county: string) => {
         setSelectedCounty(county);
         setCountyDropdownVisible(false);
-        // Reset driver selection when county changes
-        setSelectedDriver(null);
     };
 
-    const handleDriverSelect = (driver: Employee) => {
-        setSelectedDriver(driver);
-        setDriverDropdownVisible(false);
-    };
+
 
     return (
         <View style={styles.container}>
@@ -140,6 +107,18 @@ const CreateRoute = () => {
 
             {/* Form Container */}
             <View style={styles.formContainer}>
+                {/* Route Name Input */}
+                <View style={styles.inputGroup}>
+                    <Text style={styles.label}>Nume Rută</Text>
+                    <TextInput
+                        style={styles.textInput}
+                        value={routeName}
+                        onChangeText={setRouteName}
+                        placeholder="ex: Ruta Cluj Vest"
+                        placeholderTextColor="#888"
+                    />
+                </View>
+
                 {/* Date Picker */}
                 <View style={styles.inputGroup}>
                     <Text style={styles.label}>Data Rutei</Text>
@@ -171,24 +150,6 @@ const CreateRoute = () => {
                     </Pressable>
                 </View>
 
-                {/* Driver Dropdown (Optional) */}
-                <View style={styles.inputGroup}>
-                    <Text style={styles.label}>Șofer (opțional)</Text>
-                    <Pressable
-                        style={styles.dropdownButton}
-                        onPress={() => setDriverDropdownVisible(true)}
-                    >
-                        <Ionicons name="person-outline" size={20} color="#FFFFFF" style={{ marginRight: 10 }} />
-                        <Text style={[
-                            styles.dropdownButtonText,
-                            { flex: 1 },
-                            !selectedDriver && styles.placeholderText
-                        ]}>
-                            {selectedDriver?.fullName || 'Selectează șoferul...'}
-                        </Text>
-                        <Ionicons name="chevron-down" size={20} color="#FFFFFF" />
-                    </Pressable>
-                </View>
             </View>
 
             {/* Date Picker Modal */}
@@ -198,7 +159,7 @@ const CreateRoute = () => {
                 animationType="fade"
                 onRequestClose={() => setShowDatePicker(false)}
             >
-                <Pressable 
+                <Pressable
                     style={styles.modalOverlay}
                     onPress={() => setShowDatePicker(false)}
                 >
@@ -235,7 +196,7 @@ const CreateRoute = () => {
                 animationType="fade"
                 onRequestClose={() => setCountyDropdownVisible(false)}
             >
-                <Pressable 
+                <Pressable
                     style={styles.modalOverlay}
                     onPress={() => setCountyDropdownVisible(false)}
                 >
@@ -268,76 +229,6 @@ const CreateRoute = () => {
                 </Pressable>
             </Modal>
 
-            {/* Driver Dropdown Modal */}
-            <Modal
-                visible={driverDropdownVisible}
-                transparent={true}
-                animationType="fade"
-                onRequestClose={() => setDriverDropdownVisible(false)}
-            >
-                <Pressable 
-                    style={styles.modalOverlay}
-                    onPress={() => setDriverDropdownVisible(false)}
-                >
-                    <View style={styles.dropdownModal}>
-                        <Text style={styles.dropdownTitle}>Selectează Șoferul</Text>
-                        {driversLoading ? (
-                            <Text style={styles.loadingText}>Se încarcă...</Text>
-                        ) : drivers.length === 0 ? (
-                            <Text style={styles.emptyText}>Nu există șoferi disponibili</Text>
-                        ) : (
-                            <ScrollView style={styles.dropdownList}>
-                                {/* Option to clear selection */}
-                                <Pressable
-                                    style={({ pressed }) => [
-                                        styles.dropdownItem,
-                                        !selectedDriver && styles.dropdownItemSelected,
-                                        pressed && styles.dropdownItemPressed
-                                    ]}
-                                    onPress={() => {
-                                        setSelectedDriver(null);
-                                        setDriverDropdownVisible(false);
-                                    }}
-                                >
-                                    <Text style={[
-                                        styles.dropdownItemText,
-                                        styles.placeholderText
-                                    ]}>
-                                        Fără șofer asignat
-                                    </Text>
-                                </Pressable>
-                                
-                                {drivers.map((driver) => (
-                                    <Pressable
-                                        key={driver.id}
-                                        style={({ pressed }) => [
-                                            styles.dropdownItem,
-                                            selectedDriver?.id === driver.id && styles.dropdownItemSelected,
-                                            pressed && styles.dropdownItemPressed
-                                        ]}
-                                        onPress={() => handleDriverSelect(driver)}
-                                    >
-                                        <View style={{ flex: 1 }}>
-                                            <Text style={[
-                                                styles.dropdownItemText,
-                                                selectedDriver?.id === driver.id && styles.dropdownItemTextSelected
-                                            ]}>
-                                                {driver.fullName}
-                                            </Text>
-                                            {driver.county && (
-                                                <Text style={styles.driverCountyText}>{driver.county}</Text>
-                                            )}
-                                        </View>
-                                        {selectedDriver?.id === driver.id && (
-                                            <Ionicons name="checkmark" size={20} color="#4CAF50" />
-                                        )}
-                                    </Pressable>
-                                ))}
-                            </ScrollView>
-                        )}
-                    </View>
-                </Pressable>
-            </Modal>
 
             {/* Finalize Button */}
             <View style={styles.bottomContainer}>

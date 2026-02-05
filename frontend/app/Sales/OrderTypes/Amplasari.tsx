@@ -42,7 +42,7 @@ const Amplasari = ({ client, onDataChange }: { client: any, onDataChange: (data:
     const [placementEndDate, setPlacementEndDate] = useState('');
 
     // Location State
-    const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+    const [location, setLocation] = useState<{ latitude: number; longitude: number; address?: string } | null>(null);
     const [existingPlacements, setExistingPlacements] = useState<any[]>([]);
 
     // Fetch Client Orders for Map
@@ -111,7 +111,8 @@ const Amplasari = ({ client, onDataChange }: { client: any, onDataChange: (data:
             details: additionalDetails,
             startDate: placementStartDate,
             endDate: placementEndDate,
-            location
+            location,
+            locationAddress: location?.address
         });
     }, [selectedPacket, quantity, isIndefinite, durationDays, igienizariPerMonth, contactSantier, additionalDetails, placementStartDate, placementEndDate, location]);
 

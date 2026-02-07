@@ -53,7 +53,10 @@ jobs:
             
             # Start the application in background and save PID
             echo "▶️ Starting application..."
-            nohup java -jar build/libs/*.jar --spring.profiles.active=prod > ~/app.log 2>&1 &
+            # Use the Spring Boot executable jar (not the plain.jar)
+            JAR_FILE=$(ls build/libs/*.jar | grep -v plain | head -1)
+            echo "Using JAR: $JAR_FILE"
+            nohup java -jar $JAR_FILE --spring.profiles.active=prod > ~/app.log 2>&1 &
             echo $! > ~/app.pid
             
             # Wait a moment for startup

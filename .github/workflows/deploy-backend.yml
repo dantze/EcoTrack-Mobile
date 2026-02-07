@@ -1,6 +1,10 @@
 name: Deploy Backend to Production
 
 on:
+  # Manual trigger - adds "Run workflow" button in GitHub
+  workflow_dispatch: 
+  
+  # Auto trigger on push to main
   push:
     branches:
       - main

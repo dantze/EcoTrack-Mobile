@@ -1,18 +1,57 @@
-import { StyleSheet, Text, View, TextInput, Pressable, TouchableWithoutFeedback, Keyboard } from 'react-native'
+import { StyleSheet, Text, View, TextInput, Pressable, TouchableWithoutFeedback, Keyboard, Alert, ActivityIndicator } from 'react-native'
 import React, { useState } from 'react'
 import { useRouter } from 'expo-router'
+import { AuthService } from '../services/AuthService'
 
 const login = () => {
   const router = useRouter();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
-  return (
+  const [loading, setLoading] = useState(false);
 
+  const handleLogin = async () => {
+    // Validate input
+    if (!username.trim() || !password.trim()) {
+      Alert.alert('Eroare', 'Te rog introdu username și parola.');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const response = await AuthService.login(username.trim().toLowerCase(), password);
+
+      if (response.success) {
+        console.log('Login successful:', response.fullName, 'Roles:', response.roles);
+
+        // Redirect based on role
+        if (response.roles.includes('DRIVER')) {
+          // Drivers go to Driver section
+          router.replace('/Driver/WestCenter');
+        } else if (response.roles.includes('SALES') || response.roles.includes('TECH')) {
+          // Sales and Tech staff go to Sales section (they see the same things)
+          router.replace('/Sales/WestCenter');
+        } else {
+          // Fallback - shouldn't happen but just in case
+          Alert.alert('Eroare', 'Rolul utilizatorului nu este recunoscut.');
+        }
+      } else {
+        // Login failed
+        Alert.alert('Eroare', response.message || 'Autentificare eșuată.');
+      }
+    } catch (error) {
+      console.error('Login error:', error);
+      Alert.alert('Eroare', 'Nu s-a putut conecta la server. Verifică conexiunea.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
       <View style={styles.container}>
 
         <View style={styles.logoStack}>
-
           <View style={styles.logoBar} />
           <View style={styles.logoBar} />
           <View style={styles.logoBar} />
@@ -21,6 +60,7 @@ const login = () => {
             <Text style={styles.ecoTrack}>EcoTrack</Text>
           </View>
         </View>
+
         <View style={styles.inputFields}>
           <TextInput
             style={styles.input}
@@ -28,6 +68,9 @@ const login = () => {
             placeholderTextColor='#A5A5A5'
             value={username}
             onChangeText={setUsername}
+            autoCapitalize='none'
+            autoCorrect={false}
+            editable={!loading}
           />
           <TextInput
             style={styles.input}
@@ -40,32 +83,24 @@ const login = () => {
             textContentType='password'
             autoComplete='password'
             secureTextEntry={true}
+            editable={!loading}
           />
         </View>
+
         <Pressable
           style={({ pressed }) => [
             styles.loginButton,
-            pressed && { opacity: 0.8, transform: [{ scale: 0.99 }] }
+            pressed && !loading && { opacity: 0.8, transform: [{ scale: 0.99 }] },
+            loading && { opacity: 0.6 }
           ]}
-          onPress={() => {
-            if (username === 'driver' || password === 'driver' || username === 'sofer' || password === 'sofer' || username === 'Driver' || password === 'Driver') {
-              console.log('Login pressed'),
-                router.push('/Driver/WestCenter')
-            }
-            else if (username === 'sales' || password === 'sales' || username === 'vanzari' || password === 'vanzari' || username === 'Sales' || password === 'Sales') {
-              console.log('Login pressed'),
-                router.push('/Sales/WestCenter')
-            }
-            else if (username === 'technical' || password === 'technical' || username === 'tehnic' || password === 'tehnic' || username === 'Technical' || password === 'Technical') {
-              console.log('Login pressed'),
-                router.push('/Technical/WestCenter')
-            } else { // test
-              console.log('Login pressed for creating new client'),
-                router.push('/Sales/CreateClient')
-            }
-          }}
+          onPress={handleLogin}
+          disabled={loading}
         >
-          <Text style={styles.loginText}>Login</Text>
+          {loading ? (
+            <ActivityIndicator color="#FFFFFF" />
+          ) : (
+            <Text style={styles.loginText}>Login</Text>
+          )}
         </Pressable>
       </View>
     </TouchableWithoutFeedback>

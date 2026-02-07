@@ -4,7 +4,6 @@ import { useRouter, useLocalSearchParams } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons';
 import { RouteService } from '../../services/RouteService';
 import { getAllDrivers, getDriversByCounty, Employee } from '../../services/EmployeeService';
-import { Calendar } from 'react-native-calendars';
 
 // Lista de județe
 const COUNTIES = [
@@ -16,12 +15,23 @@ const COUNTIES = [
     'Sibiu', 'Suceava', 'Teleorman', 'Timiș', 'Tulcea', 'Vaslui', 'Vâlcea', 'Vrancea'
 ];
 
+// Zilele săptămânii (1=Luni, 2=Marți, ..., 7=Duminică)
+const DAYS_OF_WEEK = [
+    { value: 1, label: 'Luni' },
+    { value: 2, label: 'Marți' },
+    { value: 3, label: 'Miercuri' },
+    { value: 4, label: 'Joi' },
+    { value: 5, label: 'Vineri' },
+    { value: 6, label: 'Sâmbătă' },
+    { value: 7, label: 'Duminică' },
+];
+
 const CreateRoute = () => {
     const router = useRouter();
     const { zona, county: initialCounty } = useLocalSearchParams<{ zona?: string; county?: string }>();
 
-    const [selectedDate, setSelectedDate] = useState(new Date());
-    const [showDatePicker, setShowDatePicker] = useState(false);
+    const [selectedDayOfWeek, setSelectedDayOfWeek] = useState<number | null>(null);
+    const [showDayPicker, setShowDayPicker] = useState(false);
     const [selectedCounty, setSelectedCounty] = useState(initialCounty || '');
     const [countyDropdownVisible, setCountyDropdownVisible] = useState(false);
 
@@ -40,13 +50,15 @@ const CreateRoute = () => {
             return;
         }
 
-        try {
-            // Format date as YYYY-MM-DD
-            const formattedDate = selectedDate.toISOString().split('T')[0];
+        if (!selectedDayOfWeek) {
+            Alert.alert('Eroare', 'Te rog selectează ziua săptămânii.');
+            return;
+        }
 
+        try {
             const routeData: any = {
                 name: routeName.trim(),
-                date: formattedDate,
+                dayOfWeek: selectedDayOfWeek,
                 county: selectedCounty,
             };
 
@@ -68,24 +80,15 @@ const CreateRoute = () => {
         }
     };
 
-    const formatDisplayDate = (date: Date) => {
-        return date.toLocaleDateString('ro-RO', {
-            weekday: 'long',
-            day: 'numeric',
-            month: 'long',
-            year: 'numeric'
-        });
+    const getDayLabel = (dayValue: number | null) => {
+        if (!dayValue) return null;
+        const day = DAYS_OF_WEEK.find(d => d.value === dayValue);
+        return day ? day.label : null;
     };
 
-    // Format date for Calendar component (YYYY-MM-DD)
-    const getCalendarDateString = (date: Date) => {
-        return date.toISOString().split('T')[0];
-    };
-
-    const handleDateSelect = (day: any) => {
-        const newDate = new Date(day.dateString);
-        setSelectedDate(newDate);
-        setShowDatePicker(false);
+    const handleDaySelect = (dayValue: number) => {
+        setSelectedDayOfWeek(dayValue);
+        setShowDayPicker(false);
     };
 
     const handleCountySelect = (county: string) => {
@@ -119,17 +122,21 @@ const CreateRoute = () => {
                     />
                 </View>
 
-                {/* Date Picker */}
+                {/* Day of Week Picker */}
                 <View style={styles.inputGroup}>
-                    <Text style={styles.label}>Data Rutei</Text>
+                    <Text style={styles.label}>Ziua Săptămânii</Text>
                     <Pressable
                         style={styles.dropdownButton}
-                        onPress={() => setShowDatePicker(true)}
+                        onPress={() => setShowDayPicker(true)}
                     >
                         <Ionicons name="calendar-outline" size={20} color="#FFFFFF" style={{ marginRight: 10 }} />
-                        <Text style={styles.dropdownButtonText}>
-                            {formatDisplayDate(selectedDate)}
+                        <Text style={[
+                            styles.dropdownButtonText,
+                            !selectedDayOfWeek && styles.placeholderText
+                        ]}>
+                            {getDayLabel(selectedDayOfWeek) || 'Selectează ziua...'}
                         </Text>
+                        <Ionicons name="chevron-down" size={20} color="#FFFFFF" />
                     </Pressable>
                 </View>
 
@@ -152,39 +159,42 @@ const CreateRoute = () => {
 
             </View>
 
-            {/* Date Picker Modal */}
+            {/* Day of Week Picker Modal */}
             <Modal
-                visible={showDatePicker}
+                visible={showDayPicker}
                 transparent={true}
                 animationType="fade"
-                onRequestClose={() => setShowDatePicker(false)}
+                onRequestClose={() => setShowDayPicker(false)}
             >
                 <Pressable
                     style={styles.modalOverlay}
-                    onPress={() => setShowDatePicker(false)}
+                    onPress={() => setShowDayPicker(false)}
                 >
-                    <View style={styles.calendarModal}>
-                        <Text style={styles.dropdownTitle}>Selectează Data</Text>
-                        <Calendar
-                            current={getCalendarDateString(selectedDate)}
-                            minDate={getCalendarDateString(new Date())}
-                            onDayPress={handleDateSelect}
-                            markedDates={{
-                                [getCalendarDateString(selectedDate)]: { selected: true, selectedColor: '#4CAF50' }
-                            }}
-                            theme={{
-                                backgroundColor: '#2A4158',
-                                calendarBackground: '#2A4158',
-                                textSectionTitleColor: '#FFFFFF',
-                                selectedDayBackgroundColor: '#4CAF50',
-                                selectedDayTextColor: '#FFFFFF',
-                                todayTextColor: '#4CAF50',
-                                dayTextColor: '#FFFFFF',
-                                textDisabledColor: '#666666',
-                                arrowColor: '#FFFFFF',
-                                monthTextColor: '#FFFFFF',
-                            }}
-                        />
+                    <View style={styles.dropdownModal}>
+                        <Text style={styles.dropdownTitle}>Selectează Ziua</Text>
+                        <ScrollView style={styles.dropdownList}>
+                            {DAYS_OF_WEEK.map((day) => (
+                                <Pressable
+                                    key={day.value}
+                                    style={({ pressed }) => [
+                                        styles.dropdownItem,
+                                        selectedDayOfWeek === day.value && styles.dropdownItemSelected,
+                                        pressed && styles.dropdownItemPressed
+                                    ]}
+                                    onPress={() => handleDaySelect(day.value)}
+                                >
+                                    <Text style={[
+                                        styles.dropdownItemText,
+                                        selectedDayOfWeek === day.value && styles.dropdownItemTextSelected
+                                    ]}>
+                                        {day.label}
+                                    </Text>
+                                    {selectedDayOfWeek === day.value && (
+                                        <Ionicons name="checkmark" size={20} color="#4CAF50" />
+                                    )}
+                                </Pressable>
+                            ))}
+                        </ScrollView>
                     </View>
                 </Pressable>
             </Modal>

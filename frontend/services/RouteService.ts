@@ -3,7 +3,8 @@ import { API_BASE_URL } from '../constants/ApiConfig';
 // Definim structura datelor pentru crearea unei rute
 export interface CreateRouteData {
     name: string;
-    date: string;
+    date?: string;
+    dayOfWeek?: number; // 1=Luni, 2=Marți, ..., 7=Duminică
     county?: string;
     employeeId?: number;
 }
@@ -11,7 +12,8 @@ export interface CreateRouteData {
 export interface Route {
     id: number;
     name: string;
-    date: string;
+    date?: string;
+    dayOfWeek?: number; // 1=Luni, 2=Marți, ..., 7=Duminică
     county?: string;
     employeeId: number;
     employeeName: string;

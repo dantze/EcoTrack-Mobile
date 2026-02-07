@@ -23,6 +23,9 @@ public class Route {
 
     private LocalDate date;
 
+    // Day of week: 1=Monday, 2=Tuesday, ..., 7=Sunday
+    private Integer dayOfWeek;
+
     private String county;
 
     @ManyToOne(fetch = FetchType.LAZY)

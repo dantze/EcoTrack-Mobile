@@ -56,7 +56,12 @@ jobs:
             # Use the Spring Boot executable jar (not the plain.jar)
             JAR_FILE=$(ls build/libs/*.jar | grep -v plain | head -1)
             echo "Using JAR: $JAR_FILE"
-            nohup java -jar $JAR_FILE --spring.profiles.active=prod > ~/app.log 2>&1 &
+            nohup java -jar $JAR_FILE \
+              --spring.profiles.active=prod \
+              --spring.datasource.url=${{ secrets.DB_URL }} \
+              --spring.datasource.username=${{ secrets.DB_USER }} \
+              --spring.datasource.password=${{ secrets.DB_PASS }} \
+              > ~/app.log 2>&1 &
             echo $! > ~/app.pid
             
             # Wait a moment for startup

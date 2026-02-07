@@ -36,25 +36,35 @@ jobs:
             # Navigate to backend
             cd backend
             
-            # Stop existing process (if running)
+            # Stop existing process using PID file (safer than pkill)
             echo "🛑 Stopping existing backend..."
-            pkill -f 'java.*damiProd' || true
+            if [ -f ~/app.pid ]; then
+              PID=$(cat ~/app.pid)
+              if ps -p $PID > /dev/null 2>&1; then
+                kill $PID || true
+                sleep 2
+              fi
+              rm -f ~/app.pid
+            fi
             
             # Build the application
             echo "🔨 Building application..."
             ./gradlew build -x test
             
-            # Start the application in background
+            # Start the application in background and save PID
             echo "▶️ Starting application..."
             nohup java -jar build/libs/*.jar --spring.profiles.active=prod > ~/app.log 2>&1 &
+            echo $! > ~/app.pid
             
             # Wait a moment for startup
-            sleep 5
+            sleep 10
             
             # Check if it's running
-            if pgrep -f 'java.*damiProd' > /dev/null; then
-              echo "✅ Deployment successful!"
+            PID=$(cat ~/app.pid)
+            if ps -p $PID > /dev/null 2>&1; then
+              echo "✅ Deployment successful! App running with PID: $PID"
             else
               echo "❌ Deployment failed! Check ~/app.log"
+              tail -50 ~/app.log
               exit 1
             fi

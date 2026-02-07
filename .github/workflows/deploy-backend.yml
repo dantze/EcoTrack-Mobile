@@ -1,0 +1,55 @@
+name: Deploy Backend to Production
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/**'  # Only deploy when backend changes
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Deploy to Production
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.DROPLET_IP }}
+          username: ${{ secrets.DROPLET_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          script: |
+            echo "🚀 Starting deployment..."
+            
+            # Navigate to project directory
+            cd ~/Dami-Prod-EcoTrack
+            
+            # Pull latest changes
+            echo "📥 Pulling latest code..."
+            git pull origin main
+            
+            # Navigate to backend
+            cd backend
+            
+            # Stop existing process (if running)
+            echo "🛑 Stopping existing backend..."
+            pkill -f 'java.*damiProd' || true
+            
+            # Build the application
+            echo "🔨 Building application..."
+            ./gradlew build -x test
+            
+            # Start the application in background
+            echo "▶️ Starting application..."
+            nohup java -jar build/libs/*.jar --spring.profiles.active=prod > ~/app.log 2>&1 &
+            
+            # Wait a moment for startup
+            sleep 5
+            
+            # Check if it's running
+            if pgrep -f 'java.*damiProd' > /dev/null; then
+              echo "✅ Deployment successful!"
+            else
+              echo "❌ Deployment failed! Check ~/app.log"
+              exit 1
+            fi

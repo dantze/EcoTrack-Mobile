@@ -17,7 +17,8 @@ type Task = {
 
 type Route = {
     id: number;
-    date: string;
+    date?: string;
+    dayOfWeek?: number; // 1=Luni, 2=Marți, ..., 7=Duminică
     tasks: Task[];
 };
 
@@ -49,16 +50,36 @@ const DriverRoutes = () => {
         }
     };
 
-    const formatDate = (dateString: string) => {
+    // Convert dayOfWeek number to Romanian day name
+    const getDayOfWeekInfo = (dayOfWeek?: number, dateString?: string) => {
+        const daysRo: { [key: number]: string } = {
+            1: 'Luni',
+            2: 'Marți',
+            3: 'Miercuri',
+            4: 'Joi',
+            5: 'Vineri',
+            6: 'Sâmbătă',
+            7: 'Duminică'
+        };
+
+        // If dayOfWeek is available, use it
+        if (dayOfWeek && daysRo[dayOfWeek]) {
+            return {
+                dayName: daysRo[dayOfWeek],
+                date: 'Săptămânal'
+            };
+        }
+
+        // Fallback to date parsing if no dayOfWeek
         if (!dateString) return { dayName: 'N/A', date: '--' };
-        
+
         try {
             const date = new Date(dateString);
             if (isNaN(date.getTime())) return { dayName: 'N/A', date: '--' };
-            
+
             const days = ['Duminică', 'Luni', 'Marți', 'Miercuri', 'Joi', 'Vineri', 'Sâmbătă'];
             const months = ['Ian', 'Feb', 'Mar', 'Apr', 'Mai', 'Iun', 'Iul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-            
+
             return {
                 dayName: days[date.getDay()],
                 date: `${date.getDate()} ${months[date.getMonth()]}`
@@ -97,7 +118,7 @@ const DriverRoutes = () => {
         <View style={styles.container}>
             <View style={styles.headerContainer}>
                 <Text style={styles.headerText}>Rutele Mele</Text>
-                <Text style={styles.subHeaderText}>Bine ai venit, Șofer!</Text>
+                <Text style={styles.subHeaderText}>Bine ai venit!</Text>
             </View>
 
             <ScrollView
@@ -113,7 +134,7 @@ const DriverRoutes = () => {
                     </View>
                 ) : (
                     routes.map((route) => {
-                        const { dayName, date } = formatDate(route.date);
+                        const { dayName, date } = getDayOfWeekInfo(route.dayOfWeek, route.date);
                         const { total, completed } = getTasksCount(route);
                         const isCompleted = total > 0 && completed === total;
 
@@ -141,7 +162,7 @@ const DriverRoutes = () => {
                                             {completed}/{total} sarcini
                                         </Text>
                                     </View>
-                                    
+
                                     {isCompleted ? (
                                         <View style={styles.completedBadge}>
                                             <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />

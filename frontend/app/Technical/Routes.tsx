@@ -82,14 +82,18 @@ const Routes = () => {
         });
     };
 
-    // Format date for display
-    const formatDate = (dateString: string) => {
-        const date = new Date(dateString);
-        return date.toLocaleDateString('ro-RO', {
-            weekday: 'short',
-            day: 'numeric',
-            month: 'short',
-        });
+    // Convert dayOfWeek number to Romanian label
+    const getDayOfWeekLabel = (dayOfWeek?: number) => {
+        const days: { [key: number]: string } = {
+            1: 'Luni',
+            2: 'Marți',
+            3: 'Miercuri',
+            4: 'Joi',
+            5: 'Vineri',
+            6: 'Sâmbătă',
+            7: 'Duminică'
+        };
+        return dayOfWeek ? days[dayOfWeek] || 'N/A' : 'N/A';
     };
 
     const handleRoutePress = (route: Route) => {
@@ -163,7 +167,7 @@ const Routes = () => {
                                 >
                                     <View style={styles.routeInfo}>
                                         <Text style={styles.buttonText}>{route.name || `Ruta #${route.id}`}</Text>
-                                        <Text style={styles.subtitleText}>{formatDate(route.date)}</Text>
+                                        <Text style={styles.subtitleText}>{getDayOfWeekLabel(route.dayOfWeek)}</Text>
                                     </View>
                                 </Pressable>
 

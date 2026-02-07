@@ -40,6 +40,7 @@ public class RouteService {
         Route route = new Route();
         route.setName(request.getName());
         route.setDate(request.getDate());
+        route.setDayOfWeek(request.getDayOfWeek());
         route.setCounty(request.getCounty());
 
         // Set employee if provided

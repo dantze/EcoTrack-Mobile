@@ -5,10 +5,20 @@ import java.time.LocalDate;
 public class CreateRouteRequest {
     private String name;
     private LocalDate date;
+    // Day of week: 1=Monday, 2=Tuesday, ..., 7=Sunday
+    private Integer dayOfWeek;
     private String county;
     private Long employeeId;
 
     public CreateRouteRequest() {
+    }
+
+    public Integer getDayOfWeek() {
+        return dayOfWeek;
+    }
+
+    public void setDayOfWeek(Integer dayOfWeek) {
+        this.dayOfWeek = dayOfWeek;
     }
 
     public String getName() {

@@ -1,12 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { 
-    View, 
-    StyleSheet, 
-    ActivityIndicator, 
-    Alert, 
-    Text, 
+import {
+    View,
+    StyleSheet,
+    ActivityIndicator,
+    Alert,
+    Text,
     Dimensions,
-    Pressable 
+    Pressable
 } from 'react-native';
 import MapView, { Marker, Callout, PROVIDER_GOOGLE, Region } from 'react-native-maps';
 import { API_BASE_URL } from '../../constants/ApiConfig';
@@ -43,7 +43,8 @@ interface ExistingPlacement {
     id: number;
     latitude: number;
     longitude: number;
-    count: number;
+    orderCount: number;  // Number of orders at this location
+    itemCount: number;   // Total quantity of items across all orders
     name: string;
 }
 
@@ -67,7 +68,7 @@ export default function AllOrdersMap() {
 
             console.log('Fetched orders:', orders.length);
 
-            // Transform orders using the SAME logic as Amplasari.tsx
+            // Transform orders - now tracking both order count and item count
             const rawPlacements = orders
                 .filter((o: any) => o.locationCoordinates && o.locationCoordinates.includes(','))
                 .map((o: any) => {
@@ -76,14 +77,15 @@ export default function AllOrdersMap() {
                         id: o.id,
                         latitude: parseFloat(parts[0]),
                         longitude: parseFloat(parts[1]),
-                        count: o.quantity || 1,
+                        orderCount: 1,  // Each raw placement represents 1 order
+                        itemCount: o.quantity || 1,
                         name: o.product?.name || 'Comanda #' + o.id
                     };
                 });
 
             console.log('Raw placements with location:', rawPlacements.length);
 
-            // Simple Clustering Logic (same as Amplasari.tsx)
+            // Simple Clustering Logic - now properly tracks orders vs items
             const clustered: ExistingPlacement[] = [];
             const THRESHOLD = 0.0002; // Approx 20-30 meters
 
@@ -94,7 +96,8 @@ export default function AllOrdersMap() {
                 );
 
                 if (existing) {
-                    existing.count += p.count;
+                    existing.orderCount += 1;  // Increment order count
+                    existing.itemCount += p.itemCount;  // Add items from this order
                 } else {
                     clustered.push({ ...p });
                 }
@@ -125,18 +128,18 @@ export default function AllOrdersMap() {
                 {placements.map((placement) => (
                     <Marker
                         key={placement.id}
-                        coordinate={{ 
-                            latitude: placement.latitude, 
-                            longitude: placement.longitude 
+                        coordinate={{
+                            latitude: placement.latitude,
+                            longitude: placement.longitude
                         }}
                     >
                         <View style={styles.clusterMarker}>
-                            <Text style={styles.clusterText}>{placement.count}</Text>
+                            <Text style={styles.clusterText}>{placement.orderCount}</Text>
                         </View>
                         <Callout>
                             <View style={styles.calloutContainer}>
                                 <Text style={styles.calloutTitle}>
-                                    {placement.count} {placement.count === 1 ? 'Comandă' : 'Comenzi'}
+                                    {placement.orderCount} {placement.orderCount === 1 ? 'comandă' : 'comenzi'} cu {placement.itemCount} {placement.itemCount === 1 ? 'produs' : 'produse'}
                                 </Text>
                                 <Text style={styles.calloutText}>{placement.name}</Text>
                             </View>
@@ -157,7 +160,7 @@ export default function AllOrdersMap() {
             {/* Footer info */}
             <View style={styles.footer}>
                 <Text style={styles.hintText}>
-                    {placements.reduce((sum, p) => sum + p.count, 0)} comenzi afișate în {placements.length} locații
+                    {placements.reduce((sum, p) => sum + p.orderCount, 0)} comenzi ({placements.reduce((sum, p) => sum + p.itemCount, 0)} produse) în {placements.length} locații
                 </Text>
             </View>
 

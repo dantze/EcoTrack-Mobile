@@ -1,7 +1,7 @@
 import { StyleSheet, Text, View, Pressable, Image, ScrollView } from 'react-native'
 import React, { useState } from 'react'
 import { useRouter } from 'expo-router'
-import { AntDesign } from '@expo/vector-icons';
+import { AntDesign, Ionicons } from '@expo/vector-icons';
 
 const mapImageSource = require('../../assets/images/harta_romania.png');
 
@@ -56,7 +56,15 @@ const WestCenter = () => {
     return (
         <View style={styles.container}>
             <View style={styles.headerContainer}>
-                <Text style={styles.headerText}>Selectează Zona - Tehnic</Text>
+                <View style={styles.headerTop}>
+                    <Text style={styles.headerText}>Selectează Zona - Tehnic</Text>
+                    <Pressable
+                        style={styles.logoutButton}
+                        onPress={() => router.replace('/login')}
+                    >
+                        <Ionicons name="log-out-outline" size={24} color="#FF5252" />
+                    </Pressable>
+                </View>
             </View>
 
             <View style={styles.inputsContainer}>
@@ -161,6 +169,14 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
         width: '100%',
         marginBottom: 40,
+    },
+    headerTop: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+    },
+    logoutButton: {
+        padding: 8,
     },
     headerText: {
         color: '#FFFFFF',

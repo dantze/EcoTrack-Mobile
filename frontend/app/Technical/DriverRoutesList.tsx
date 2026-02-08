@@ -35,14 +35,17 @@ const DriverRoutesList = () => {
         }
     };
 
-    const formatDate = (dateString: string) => {
-        const date = new Date(dateString);
-        return date.toLocaleDateString('ro-RO', {
-            weekday: 'long',
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric',
-        });
+    const getDayOfWeekName = (dayOfWeek?: number) => {
+        const daysRo: { [key: number]: string } = {
+            1: 'Luni',
+            2: 'Marți',
+            3: 'Miercuri',
+            4: 'Joi',
+            5: 'Vineri',
+            6: 'Sâmbătă',
+            7: 'Duminică'
+        };
+        return dayOfWeek ? daysRo[dayOfWeek] || 'N/A' : null;
     };
 
     const handleRoutePress = (route: Route) => {
@@ -92,9 +95,9 @@ const DriverRoutesList = () => {
                             onPress={() => handleRoutePress(route)}
                         >
                             <View style={styles.routeInfo}>
-                                <Text style={styles.routeDate}>{formatDate(route.date)}</Text>
+                                <Text style={styles.routeName}>{route.name || `Ruta #${route.id}`}</Text>
                                 <Text style={styles.taskCount}>
-                                    {route.tasks?.length || 0} sarcini
+                                    {getDayOfWeekName(route.dayOfWeek) ? `${getDayOfWeekName(route.dayOfWeek)} • ` : ''}{route.tasks?.length || 0} sarcini
                                 </Text>
                             </View>
                             <View style={styles.routeIdBadge}>
@@ -203,11 +206,10 @@ const styles = StyleSheet.create({
     routeInfo: {
         flex: 1,
     },
-    routeDate: {
+    routeName: {
         color: '#FFFFFF',
         fontSize: 16,
         fontWeight: 'bold',
-        textTransform: 'capitalize',
     },
     taskCount: {
         color: 'rgba(255,255,255,0.8)',

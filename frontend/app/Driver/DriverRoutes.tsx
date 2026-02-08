@@ -117,8 +117,18 @@ const DriverRoutes = () => {
     return (
         <View style={styles.container}>
             <View style={styles.headerContainer}>
-                <Text style={styles.headerText}>Rutele Mele</Text>
-                <Text style={styles.subHeaderText}>Bine ai venit!</Text>
+                <View style={styles.headerTop}>
+                    <View>
+                        <Text style={styles.headerText}>Rutele Mele</Text>
+                        <Text style={styles.subHeaderText}>Bine ai venit!</Text>
+                    </View>
+                    <Pressable
+                        style={styles.logoutButton}
+                        onPress={() => router.replace('/login')}
+                    >
+                        <Ionicons name="log-out-outline" size={24} color="#FF5252" />
+                    </Pressable>
+                </View>
             </View>
 
             <ScrollView
@@ -216,6 +226,14 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
         width: '100%',
         marginBottom: 20,
+    },
+    headerTop: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+    },
+    logoutButton: {
+        padding: 8,
     },
     headerText: {
         color: '#FFFFFF',

@@ -88,13 +88,18 @@ const OrderDetails = () => {
         setSelectedRoute(route);
     };
 
-    // Format route date for display
-    const formatRouteDate = (dateString: string) => {
-        const date = new Date(dateString);
-        return date.toLocaleDateString('ro-RO', {
-            day: 'numeric',
-            month: 'short',
-        });
+    // Get day of week name
+    const getDayOfWeekName = (dayOfWeek?: number) => {
+        const daysRo: { [key: number]: string } = {
+            1: 'Luni',
+            2: 'Marți',
+            3: 'Miercuri',
+            4: 'Joi',
+            5: 'Vineri',
+            6: 'Sâmbătă',
+            7: 'Duminică'
+        };
+        return dayOfWeek ? daysRo[dayOfWeek] || null : null;
     };
 
     // Finalize function - creates a Task and assigns it to the selected Route
@@ -108,7 +113,7 @@ const OrderDetails = () => {
                 setOrderTaskStatus({ hasTask: true, routeId: selectedRoute.id });
                 Alert.alert(
                     "Succes!",
-                    `Comanda a fost atribuită rutei din ${formatRouteDate(selectedRoute.date)} (${selectedRoute.employeeName || 'Șofer'})!`
+                    `Comanda a fost atribuită rutei "${selectedRoute.name || 'Ruta #' + selectedRoute.id}" (${selectedRoute.employeeName || 'Șofer'})!`
                 );
             } catch (error: any) {
                 Alert.alert("Eroare", error.message || "Nu s-a putut atribui ruta.");
@@ -204,9 +209,6 @@ const OrderDetails = () => {
                     <DetailRow label="Cantitate" value={order.quantity?.toString()} />
                     <DetailRow label="Tip" value={order.orderType} />
 
-                    <View style={{ height: 10 }} />
-                    <DetailRow label="Dată Început" value={order.startDate} />
-                    <DetailRow label="Dată Sfârșit" value={order.endDate} />
                     <DetailRow label="Durată" value={order.durationDays ? `${order.durationDays} zile` : (order.isIndefinite ? 'Nedefinit' : 'N/A')} />
 
                     <View style={{ height: 10 }} />
@@ -314,7 +316,7 @@ const OrderDetails = () => {
                                                 styles.routeCardDate,
                                                 selectedRoute?.id === route.id && styles.activeRouteSubtext
                                             ]}>
-                                                {formatRouteDate(route.date)}
+                                                {route.name || `Ruta #${route.id}`}{getDayOfWeekName(route.dayOfWeek) ? ` • ${getDayOfWeekName(route.dayOfWeek)}` : ''}
                                             </Text>
                                             <Text style={[
                                                 styles.routeCardTasks,

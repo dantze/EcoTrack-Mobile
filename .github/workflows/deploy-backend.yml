@@ -18,13 +18,20 @@ jobs:
     steps:
       - name: Deploy to Production
         uses: appleboy/ssh-action@v1.0.3
+        env:
+          DB_URL: ${{ secrets.DB_URL }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASS: ${{ secrets.DB_PASS }}
         with:
           host: ${{ secrets.SERVER_IP }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           command_timeout: 10m
+          envs: DB_URL,DB_USER,DB_PASS
           script: |
             echo "🚀 Starting deployment..."
+            echo "DB_URL=$DB_URL"
+            echo "DB_USER=$DB_USER"
             
             # Navigate to project directory
             cd ~/Dami-Prod-EcoTrack
@@ -58,14 +65,14 @@ jobs:
             echo "Using JAR: $JAR_FILE"
             nohup java -jar $JAR_FILE \
               --spring.profiles.active=prod \
-              --spring.datasource.url=${{ secrets.DB_URL }} \
-              --spring.datasource.username=${{ secrets.DB_USER }} \
-              --spring.datasource.password=${{ secrets.DB_PASS }} \
-              > ~/app.log 2>&1 & disown
+              --spring.datasource.url="$DB_URL" \
+              --spring.datasource.username="$DB_USER" \
+              --spring.datasource.password="$DB_PASS" \
+              > ~/app.log 2>&1 &
             echo $! > ~/app.pid
             
             # Wait a moment for startup
-            sleep 10
+            sleep 15
             
             # Check if it's running
             PID=$(cat ~/app.pid)

@@ -132,16 +132,11 @@ const Orders = () => {
 
     // Get location display text
     const getLocationText = (order: Order): string => {
-        if (order.locationAddress) {
-            return order.locationAddress;
-        }
-        if (order.client?.address) {
-            return order.client.address;
-        }
-        if (order.locationCoordinates) {
-            return `Coordonate: ${order.locationCoordinates.substring(0, 20)}...`;
-        }
-        return 'Locație nespecificată';
+        const coord = order.locationCoordinates.split(",");
+        return order.locationAddress ||
+            coord[0].substring(0, 10) + ", " + coord[1].substring(0, 10) ||
+            "Eroare în procesarea datelor, adresa clientului:" + order.client?.address ||
+            'Locație nespecificată: Eroare majora, contactati developerii aplicatie';
     };
 
     // Get action text based on order type and quantity

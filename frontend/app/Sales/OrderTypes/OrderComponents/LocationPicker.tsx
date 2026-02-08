@@ -65,6 +65,18 @@ const GOOGLE_MAPS_API_KEY = Constants.expoConfig?.extra?.googleMapsApiKey || '';
 
 const LocationPicker = ({ onLocationSelect, initialLocation, existingPlacements = [] }: LocationPickerProps) => {
     const [modalVisible, setModalVisible] = useState(false);
+
+    useEffect(() => {
+        (async () => {
+            await Location.requestForegroundPermissionsAsync();
+        })();
+
+        return () => {
+            if (debounceRef.current) clearTimeout(debounceRef.current);
+            if (mapDebounceRef.current) clearTimeout(mapDebounceRef.current);
+        }
+    }, []);
+
     const [region, setRegion] = useState<Region>(DEFAULT_REGION);
     const [selectedLocation, setSelectedLocation] = useState<LocationData | null>(initialLocation || null);
     const [selectedExistingId, setSelectedExistingId] = useState<number | undefined>(undefined);
@@ -77,11 +89,36 @@ const LocationPicker = ({ onLocationSelect, initialLocation, existingPlacements 
     const [showPredictions, setShowPredictions] = useState(false);
     const [selectedAddress, setSelectedAddress] = useState<string>('');
 
-    // Debounce timer
+    // Debounce timers
     const debounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+    const mapDebounceRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
 
-    const handleRegionChange = (newRegion: Region) => {
+    const reverseGeocodeRegion = async (latitude: number, longitude: number) => {
+        try {
+            const result = await Location.reverseGeocodeAsync({ latitude, longitude });
+            if (result.length > 0) {
+                const a = result[0];
+                const parts = [a.street, a.streetNumber, a.city, a.region].filter(Boolean);
+                if (parts.length > 0) {
+                    setSelectedAddress(parts.join(', '));
+                }
+            }
+        } catch (error) {
+            console.log("Reverse geocode error:", error);
+        }
+    };
+
+    const handleRegionChange = (newRegion: Region, details?: { isGesture?: boolean }) => {
         setRegion(newRegion);
+
+        // Only reverse geocode if moved BY USER gesture (dragging)
+        if (details?.isGesture && !selectedExistingId) {
+            if (mapDebounceRef.current) clearTimeout(mapDebounceRef.current);
+
+            mapDebounceRef.current = setTimeout(() => {
+                reverseGeocodeRegion(newRegion.latitude, newRegion.longitude);
+            }, 800);
+        }
     };
 
     // Fetch address predictions from Google Places Autocomplete API

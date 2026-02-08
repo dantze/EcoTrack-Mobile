@@ -184,7 +184,7 @@ const OrderDetails = () => {
     const clientName = order.client?.type === 'company'
         ? (order.client?.name || order.client?.email || 'N/A')
         : (order.client?.fullName || order.client?.email || 'N/A');
-    const clientAddress = order.locationAddress || order.client?.address || order.locationCoordinates;
+    const clientAddress = order.locationAddress || order.locationCoordinates || order.client?.address;
 
     return (
         <View style={styles.container}>
@@ -200,7 +200,7 @@ const OrderDetails = () => {
 
                 <View style={styles.detailsCard}>
                     <DetailRow label="Nume Client" value={clientName} />
-                    <DetailRow label="Tip Client" value={order.client?.type} />
+                    <DetailRow label="Tip Client" value={order.client?.type === 'company' ? 'Firmă' : 'Persoană Fizică'} />
                     {order.client?.cui && <DetailRow label="CUI" value={order.client.cui} />}
                     <DetailRow label="Adresă" value={clientAddress} isMultiline />
 

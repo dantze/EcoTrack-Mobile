@@ -4,7 +4,7 @@ import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons';
 import { Calendar } from 'react-native-calendars';
 import { Employee, getAllDrivers } from '@/services/EmployeeService';
-import { RouteService, Route } from '@/services/RouteService';
+import { RouteService } from '@/services/RouteService';
 import { TaskService, Task } from '@/services/TaskService';
 
 const ChangeDriver = () => {
@@ -22,10 +22,6 @@ const ChangeDriver = () => {
     const [targetDriver, setTargetDriver] = useState<Employee | null>(null);
     const [sourceDriverDropdownVisible, setSourceDriverDropdownVisible] = useState(false);
     const [targetDriverDropdownVisible, setTargetDriverDropdownVisible] = useState(false);
-
-    // Routes
-    const [sourceRoutes, setSourceRoutes] = useState<Route[]>([]);
-    const [targetRoutes, setTargetRoutes] = useState<Route[]>([]);
 
     // Tasks
     const [tasks, setTasks] = useState<Task[]>([]);
@@ -45,18 +41,8 @@ const ChangeDriver = () => {
         } else {
             setTasks([]);
             setSelectedTaskIds(new Set());
-            setSourceRoutes([]);
         }
     }, [sourceDriver, selectedDate]);
-
-    // Load target routes when target driver changes
-    useEffect(() => {
-        if (targetDriver) {
-            loadTargetRoutes();
-        } else {
-            setTargetRoutes([]);
-        }
-    }, [targetDriver, selectedDate]);
 
     const loadDrivers = async () => {
         try {
@@ -78,36 +64,15 @@ const ChangeDriver = () => {
             setLoading(true);
             const dateString = getCalendarDateString(selectedDate);
 
-            // Get routes for the source driver on this date
-            const routes = await RouteService.getRoutesByEmployeeIdAndDate(sourceDriver.id, dateString);
-            setSourceRoutes(routes);
-
-            // Collect all tasks from all routes
-            const allTasks: Task[] = [];
-            for (const route of routes) {
-                const routeTasks = await TaskService.getTasksByRouteId(route.id);
-                allTasks.push(...routeTasks);
-            }
-
-            setTasks(allTasks);
+            // Fetch tasks directly by employee + scheduled date
+            const employeeTasks = await TaskService.getTasksByEmployeeAndDate(sourceDriver.id, dateString);
+            setTasks(employeeTasks);
             setSelectedTaskIds(new Set());
         } catch (error) {
             console.error('Error loading tasks:', error);
             Alert.alert('Eroare', 'Nu s-au putut încărca sarcinile');
         } finally {
             setLoading(false);
-        }
-    };
-
-    const loadTargetRoutes = async () => {
-        if (!targetDriver) return;
-
-        try {
-            const dateString = getCalendarDateString(selectedDate);
-            const routes = await RouteService.getRoutesByEmployeeIdAndDate(targetDriver.id, dateString);
-            setTargetRoutes(routes);
-        } catch (error) {
-            console.error('Error loading target routes:', error);
         }
     };
 
@@ -173,10 +138,6 @@ const ChangeDriver = () => {
             Alert.alert('Eroare', 'Te rog selectează cel puțin o sarcină.');
             return;
         }
-        if (targetRoutes.length === 0) {
-            Alert.alert('Eroare', `${targetDriver.fullName} nu are nicio rută pentru această dată. Creează mai întâi o rută pentru acest șofer.`);
-            return;
-        }
 
         Alert.alert(
             'Confirmare Transfer',
@@ -192,12 +153,19 @@ const ChangeDriver = () => {
     };
 
     const performTransfer = async () => {
-        if (!targetDriver || targetRoutes.length === 0) return;
+        if (!targetDriver) return;
 
         try {
             setTransferring(true);
 
-            // Use the first route of the target driver
+            // Get routes for the target driver to find a route to assign to
+            const targetRoutes = await RouteService.getRoutesByEmployeeId(targetDriver.id);
+
+            if (targetRoutes.length === 0) {
+                Alert.alert('Eroare', `${targetDriver.fullName} nu are nicio rută. Creează mai întâi o rută pentru acest șofer.`);
+                return;
+            }
+
             const targetRouteId = targetRoutes[0].id;
             const taskIdsArray = Array.from(selectedTaskIds);
 
@@ -302,11 +270,6 @@ const ChangeDriver = () => {
                         </Text>
                         <Ionicons name="chevron-down" size={20} color={sourceDriver ? "#FFFFFF" : "#666"} />
                     </Pressable>
-                    {targetDriver && targetRoutes.length === 0 && (
-                        <Text style={styles.warningText}>
-                            ⚠️ Acest șofer nu are rută pentru această dată
-                        </Text>
-                    )}
                 </View>
 
                 {/* Tasks Section */}

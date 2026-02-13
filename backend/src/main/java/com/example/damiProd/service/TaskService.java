@@ -7,6 +7,7 @@ import com.example.damiProd.repository.TaskRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
@@ -36,6 +37,22 @@ public class TaskService {
 
     public List<Task> getTasksByRouteId(Long routeId) {
         return taskRepository.findByRoute_Id(routeId);
+    }
+
+    /**
+     * Get all tasks for an employee on a specific scheduled date
+     */
+    public List<Task> getTasksByEmployeeAndDate(Long employeeId, LocalDate date) {
+        LocalDateTime startOfDay = date.atStartOfDay();
+        LocalDateTime endOfDay = date.plusDays(1).atStartOfDay();
+        return taskRepository.findByEmployeeAndScheduledDate(employeeId, startOfDay, endOfDay);
+    }
+
+    /**
+     * Get all tasks belonging to an employee (via route), regardless of date
+     */
+    public List<Task> getTasksByEmployee(Long employeeId) {
+        return taskRepository.findByRoute_Employee_Id(employeeId);
     }
 
     public Task createTask(Task task) {
@@ -71,10 +88,21 @@ public class TaskService {
         // Determine task type based on order type
         TaskType taskType = mapOrderTypeToTaskType(order.getOrderType());
 
-        // Get client info
+        // --- Build address: prioritize order location, fallback to client ---
+        String address = null;
+        String coordinates = order.getLocationCoordinates(); // always keep raw coords
+
+        if (order.getLocationAddress() != null && !order.getLocationAddress().isEmpty()) {
+            address = order.getLocationAddress();
+        } else if (coordinates != null && !coordinates.isEmpty()) {
+            address = coordinates; // show coords if no human-readable address
+        } else if (order.getClient() != null && order.getClient().getAddress() != null) {
+            address = order.getClient().getAddress(); // last resort fallback
+        }
+
+        // --- Build client info ---
         String clientName = "Client necunoscut";
         String clientPhone = null;
-        String address = order.getLocationCoordinates();
 
         if (order.getClient() != null) {
             Client client = order.getClient();
@@ -84,20 +112,27 @@ public class TaskService {
                 clientName = ((Individual) client).getFullName();
             }
             clientPhone = client.getPhone();
-            if (client.getAddress() != null && !client.getAddress().isEmpty()) {
-                address = client.getAddress();
-            }
         }
 
-        // Create the task
+        // --- Build product info ---
+        String productName = null;
+        if (order.getProduct() != null) {
+            productName = order.getProduct().getName();
+        }
+
+        // Create the task with all order data
         Task task = new Task();
         task.setType(taskType);
         task.setStatus(TaskStatus.NEW);
+        task.setAddress(address);
+        task.setCoordinates(coordinates);
         task.setClientName(clientName);
         task.setClientPhone(clientPhone);
-        task.setAddress(address);
+        task.setContactPerson(order.getContact());
+        task.setProductName(productName);
+        task.setQuantity(order.getQuantity());
         task.setInternalNotes(order.getDetails());
-        task.setScheduledTime(LocalDateTime.now());
+        // scheduledTime left null - will be set explicitly by the user
         task.setRoute(route);
         task.setOrder(order);
 

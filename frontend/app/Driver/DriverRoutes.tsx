@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react'
 import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons';
 import { API_BASE_URL } from '../../constants/ApiConfig';
+import { AuthService, User } from '../../services/AuthService';
 
 type Task = {
     id: number;
@@ -26,15 +27,43 @@ const DriverRoutes = () => {
     const router = useRouter();
     const [routes, setRoutes] = useState<Route[]>([]);
     const [loading, setLoading] = useState(true);
-
-    // TODO: Replace with actual logged-in driver's employee ID
-    const employeeId = 1; // Mock employee ID for now
+    const [currentUser, setCurrentUser] = useState<User | null>(null);
+    const [isAdmin, setIsAdmin] = useState(false);
 
     useEffect(() => {
-        fetchDriverRoutes();
+        loadUserAndRoutes();
     }, []);
 
-    const fetchDriverRoutes = async () => {
+    const loadUserAndRoutes = async () => {
+        try {
+            const user = await AuthService.getCurrentUser();
+            if (!user) {
+                router.replace('/login');
+                return;
+            }
+
+            // Check if this user is an admin (has more than one role)
+            const userIsAdmin = user.roles && user.roles.length > 1;
+            setIsAdmin(userIsAdmin);
+
+            // Check if an admin selected a specific driver to view as
+            const activeDriver = await AuthService.getActiveDriver();
+            if (activeDriver) {
+                // Admin is impersonating a driver
+                setCurrentUser({ ...user, id: activeDriver.id, fullName: activeDriver.fullName });
+                await fetchDriverRoutes(activeDriver.id);
+            } else {
+                // Regular driver viewing their own routes
+                setCurrentUser(user);
+                await fetchDriverRoutes(user.id);
+            }
+        } catch (error) {
+            console.error('Error loading user:', error);
+            router.replace('/login');
+        }
+    };
+
+    const fetchDriverRoutes = async (employeeId: number) => {
         try {
             const response = await fetch(`${API_BASE_URL}/routes/employee/${employeeId}`);
             if (!response.ok) {
@@ -117,8 +146,31 @@ const DriverRoutes = () => {
     return (
         <View style={styles.container}>
             <View style={styles.headerContainer}>
-                <Text style={styles.headerText}>Rutele Mele</Text>
-                <Text style={styles.subHeaderText}>Bine ai venit!</Text>
+                <View style={styles.headerTop}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        {isAdmin && (
+                            <Pressable
+                                onPress={async () => {
+                                    await AuthService.clearActiveDriver();
+                                    router.replace('/Driver/DriverSelection');
+                                }}
+                                style={styles.backButton}
+                            >
+                                <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
+                            </Pressable>
+                        )}
+                        <View>
+                            <Text style={styles.headerText}>Rutele Mele</Text>
+                            <Text style={styles.subHeaderText}>Bine ai venit, {currentUser?.fullName?.split(' ')[0] || 'Șofer'}!</Text>
+                        </View>
+                    </View>
+                    <Pressable
+                        style={styles.logoutButton}
+                        onPress={() => router.replace('/login')}
+                    >
+                        <Ionicons name="log-out-outline" size={24} color="#FF5252" />
+                    </Pressable>
+                </View>
             </View>
 
             <ScrollView
@@ -186,7 +238,7 @@ const DriverRoutes = () => {
                     styles.refreshButton,
                     pressed && styles.buttonPressed
                 ]}
-                onPress={fetchDriverRoutes}
+                onPress={() => currentUser && fetchDriverRoutes(currentUser.id)}
             >
                 <Ionicons name="refresh" size={24} color="#FFFFFF" />
                 <Text style={styles.refreshText}>Reîmprospătează</Text>
@@ -216,6 +268,23 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
         width: '100%',
         marginBottom: 20,
+    },
+    headerTop: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+    },
+    logoutButton: {
+        padding: 8,
+    },
+    backButton: {
+        width: 38,
+        height: 38,
+        borderRadius: 19,
+        backgroundColor: '#427992',
+        justifyContent: 'center' as const,
+        alignItems: 'center' as const,
+        marginRight: 12,
     },
     headerText: {
         color: '#FFFFFF',

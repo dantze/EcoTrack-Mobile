@@ -1,8 +1,9 @@
-import { StyleSheet, Text, View, Pressable, ScrollView, ActivityIndicator, Alert } from 'react-native'
-import React, { useEffect, useState } from 'react'
+import { StyleSheet, Text, View, Pressable, ScrollView, ActivityIndicator, Dimensions, useWindowDimensions } from 'react-native'
+import React, { useEffect, useState, useRef } from 'react'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons';
 import { API_BASE_URL } from '../../constants/ApiConfig';
+import { AuthService } from '../../services/AuthService';
 
 type Task = {
     id: number;
@@ -36,27 +37,47 @@ const STATUS_COLORS: { [key: string]: string } = {
     'CANCELLED': '#F44336',
 };
 
+const DAY_NAMES_SHORT = ['DU', 'LU', 'MA', 'MI', 'JO', 'VI', 'SÂ'];
+
 const RouteTasks = () => {
     const router = useRouter();
     const { routeId, routeDate } = useLocalSearchParams<{ routeId: string; routeDate?: string }>();
-    
+    const { width: screenWidth } = useWindowDimensions();
+
     const [tasks, setTasks] = useState<Task[]>([]);
     const [loading, setLoading] = useState(true);
+    const [selectedDate, setSelectedDate] = useState(new Date());
+    const [activeTab, setActiveTab] = useState(0); // 0 = Rămase, 1 = Finalizate
+    const scrollViewRef = useRef<ScrollView>(null);
 
     useEffect(() => {
-        if (routeId) {
-            fetchTasks();
-        }
-    }, [routeId]);
+        fetchTasks();
+    }, [selectedDate]);
 
     const fetchTasks = async () => {
         try {
-            const response = await fetch(`${API_BASE_URL}/tasks/route/${routeId}`);
+            setLoading(true);
+
+            // Get the logged-in user or active driver
+            const user = await AuthService.getCurrentUser();
+            const activeDriver = await AuthService.getActiveDriver();
+            const employeeId = activeDriver?.id || user?.id;
+
+            if (!employeeId) {
+                setTasks([]);
+                return;
+            }
+
+            // Format date as YYYY-MM-DD
+            const dateString = selectedDate.toISOString().split('T')[0];
+
+            // Fetch tasks for the employee on the selected date
+            const response = await fetch(`${API_BASE_URL}/tasks/employee/${employeeId}/date/${dateString}`);
             if (!response.ok) {
                 throw new Error(`Failed to fetch tasks. Status: ${response.status}`);
             }
             const data: Task[] = await response.json();
-            console.log('Fetched tasks:', data.length);
+            console.log('Fetched tasks for', dateString, ':', data.length);
             setTasks(data);
         } catch (error) {
             console.error("Error fetching tasks:", error);
@@ -74,76 +95,95 @@ const RouteTasks = () => {
         });
     };
 
-    const handleStartTask = async (task: Task) => {
-        try {
-            const response = await fetch(`${API_BASE_URL}/tasks/${task.id}/status`, {
-                method: 'PATCH',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ status: 'IN_PROGRESS' }),
-            });
-            
-            if (!response.ok) {
-                throw new Error('Failed to update task status');
-            }
-            
-            Alert.alert('Succes', 'Sarcina a fost marcată ca "În progres"');
-            fetchTasks(); // Refresh tasks
-        } catch (error) {
-            console.error('Error updating task:', error);
-            Alert.alert('Eroare', 'Nu s-a putut actualiza sarcina');
+    // Date navigation
+    const goToPreviousDay = () => {
+        const newDate = new Date(selectedDate);
+        newDate.setDate(newDate.getDate() - 1);
+        setSelectedDate(newDate);
+    };
+
+    const goToNextDay = () => {
+        const newDate = new Date(selectedDate);
+        newDate.setDate(newDate.getDate() + 1);
+        setSelectedDate(newDate);
+    };
+
+    const formatDateNav = (date: Date) => {
+        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const dayName = DAY_NAMES_SHORT[date.getDay()];
+        return `${day}/${month} ${dayName}`;
+    };
+
+    // Slider tab handling
+    const handleTabPress = (index: number) => {
+        setActiveTab(index);
+        scrollViewRef.current?.scrollTo({ x: index * screenWidth, animated: true });
+    };
+
+    const handleSliderScroll = (event: any) => {
+        const offsetX = event.nativeEvent.contentOffset.x;
+        const newIndex = Math.round(offsetX / screenWidth);
+        if (newIndex !== activeTab) {
+            setActiveTab(newIndex);
         }
     };
 
-    const handleCompleteTask = async (task: Task) => {
-        Alert.alert(
-            'Finalizare Sarcină',
-            'Ești sigur că vrei să marchezi sarcina ca finalizată?',
-            [
-                { text: 'Anulează', style: 'cancel' },
-                {
-                    text: 'Finalizează',
-                    onPress: async () => {
-                        try {
-                            const response = await fetch(`${API_BASE_URL}/tasks/${task.id}/status`, {
-                                method: 'PATCH',
-                                headers: {
-                                    'Content-Type': 'application/json',
-                                },
-                                body: JSON.stringify({ status: 'COMPLETED' }),
-                            });
-                            
-                            if (!response.ok) {
-                                throw new Error('Failed to update task status');
-                            }
-                            
-                            Alert.alert('Succes', 'Sarcina a fost finalizată!');
-                            fetchTasks(); // Refresh tasks
-                        } catch (error) {
-                            console.error('Error updating task:', error);
-                            Alert.alert('Eroare', 'Nu s-a putut actualiza sarcina');
-                        }
-                    }
-                }
-            ]
-        );
-    };
+    // Filter tasks
+    const remainingTasks = tasks.filter(t => t.status === 'NEW' || t.status === 'IN_PROGRESS');
+    const completedTasks = tasks.filter(t => t.status === 'COMPLETED');
 
-    const formatDate = (dateString: string) => {
-        if (!dateString) return 'Data necunoscută';
-        try {
-            const date = new Date(dateString);
-            const days = ['Duminică', 'Luni', 'Marți', 'Miercuri', 'Joi', 'Vineri', 'Sâmbătă'];
-            const months = ['Ianuarie', 'Februarie', 'Martie', 'Aprilie', 'Mai', 'Iunie', 
-                          'Iulie', 'August', 'Septembrie', 'Octombrie', 'Noiembrie', 'Decembrie'];
-            return `${days[date.getDay()]}, ${date.getDate()} ${months[date.getMonth()]}`;
-        } catch {
-            return 'Data necunoscută';
-        }
-    };
+    const renderTaskCard = (task: Task) => (
+        <Pressable
+            key={task.id}
+            style={({ pressed }) => [
+                styles.card,
+                task.status === 'COMPLETED' && styles.cardCompleted,
+                pressed && styles.cardPressed
+            ]}
+            onPress={() => handleTaskPress(task)}
+        >
+            <View style={styles.cardInfo}>
+                <View style={styles.taskTypeRow}>
+                    <Text style={styles.taskType}>
+                        {TASK_TYPE_LABELS[task.type] || task.type}
+                    </Text>
+                    <View style={[styles.statusBadge, { backgroundColor: STATUS_COLORS[task.status] || '#888' }]}>
+                        <Text style={styles.statusText}>
+                            {STATUS_LABELS[task.status] || task.status}
+                        </Text>
+                    </View>
+                </View>
 
-    if (loading) {
+                <Text style={styles.clientName}>{task.clientName || 'Client necunoscut'}</Text>
+
+                <View style={styles.addressRow}>
+                    <Ionicons name="location-sharp" size={14} color="#E0E0E0" />
+                    <Text style={styles.addressText} numberOfLines={1}>
+                        {task.address || 'Adresă necunoscută'}
+                    </Text>
+                </View>
+
+                {task.clientPhone && (
+                    <View style={styles.phoneRow}>
+                        <Ionicons name="call" size={14} color="#E0E0E0" />
+                        <Text style={styles.phoneText}>{task.clientPhone}</Text>
+                    </View>
+                )}
+            </View>
+
+            <Ionicons name="chevron-forward" size={22} color="#FFFFFF" style={{ marginLeft: 8 }} />
+        </Pressable>
+    );
+
+    const renderEmptyState = (message: string) => (
+        <View style={styles.emptyContainer}>
+            <Ionicons name="clipboard-outline" size={60} color="#5D8AA8" />
+            <Text style={styles.emptyText}>{message}</Text>
+        </View>
+    );
+
+    if (loading && tasks.length === 0) {
         return (
             <View style={[styles.container, styles.loadingContainer]}>
                 <ActivityIndicator size="large" color="#FFFFFF" />
@@ -159,122 +199,115 @@ const RouteTasks = () => {
                 <Pressable onPress={() => router.back()} style={styles.backButton}>
                     <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
                 </Pressable>
-                <View style={styles.headerTextContainer}>
-                    <Text style={styles.headerText}>Sarcini Rută</Text>
-                    <Text style={styles.subHeaderText}>{formatDate(routeDate || '')}</Text>
-                </View>
+                <Text style={styles.headerText}>Sarcinile Mele</Text>
             </View>
 
-            {/* Stats Summary */}
+            {/* Date Navigation */}
+            <View style={styles.dateNavContainer}>
+                <Pressable onPress={goToPreviousDay} style={styles.dateNavArrow}>
+                    <Ionicons name="chevron-back" size={22} color="#FFFFFF" />
+                </Pressable>
+                <View style={styles.dateNavCenter}>
+                    <Ionicons name="calendar-outline" size={18} color="#5D8AA8" style={{ marginRight: 8 }} />
+                    <Text style={styles.dateNavText}>{formatDateNav(selectedDate)}</Text>
+                </View>
+                <Pressable onPress={goToNextDay} style={styles.dateNavArrow}>
+                    <Ionicons name="chevron-forward" size={22} color="#FFFFFF" />
+                </Pressable>
+            </View>
+
+            {/* Stats - only Rămase and Finalizate */}
             <View style={styles.statsContainer}>
                 <View style={styles.statItem}>
-                    <Text style={styles.statNumber}>{tasks.length}</Text>
-                    <Text style={styles.statLabel}>Total</Text>
-                </View>
-                <View style={styles.statItem}>
-                    <Text style={[styles.statNumber, { color: '#4CAF50' }]}>
-                        {tasks.filter(t => t.status === 'COMPLETED').length}
-                    </Text>
-                    <Text style={styles.statLabel}>Finalizate</Text>
-                </View>
-                <View style={styles.statItem}>
                     <Text style={[styles.statNumber, { color: '#FFA500' }]}>
-                        {tasks.filter(t => t.status === 'NEW' || t.status === 'IN_PROGRESS').length}
+                        {remainingTasks.length}
                     </Text>
                     <Text style={styles.statLabel}>Rămase</Text>
                 </View>
+                <View style={styles.statDivider} />
+                <View style={styles.statItem}>
+                    <Text style={[styles.statNumber, { color: '#4CAF50' }]}>
+                        {completedTasks.length}
+                    </Text>
+                    <Text style={styles.statLabel}>Finalizate</Text>
+                </View>
             </View>
 
+            {/* Tab Buttons */}
+            <View style={styles.tabContainer}>
+                <Pressable
+                    style={[styles.tab, activeTab === 0 && styles.tabActive]}
+                    onPress={() => handleTabPress(0)}
+                >
+                    <Text style={[styles.tabText, activeTab === 0 && styles.tabTextActive]}>
+                        Rămase ({remainingTasks.length})
+                    </Text>
+                </Pressable>
+                <Pressable
+                    style={[styles.tab, activeTab === 1 && styles.tabActive]}
+                    onPress={() => handleTabPress(1)}
+                >
+                    <Text style={[styles.tabText, activeTab === 1 && styles.tabTextActive]}>
+                        Finalizate ({completedTasks.length})
+                    </Text>
+                </Pressable>
+            </View>
+
+            {/* Horizontal Slider */}
             <ScrollView
-                style={styles.scrollContainer}
-                contentContainerStyle={styles.scrollContent}
-                showsVerticalScrollIndicator={false}
+                ref={scrollViewRef}
+                horizontal
+                pagingEnabled
+                showsHorizontalScrollIndicator={false}
+                onMomentumScrollEnd={handleSliderScroll}
+                style={styles.sliderContainer}
             >
-                {tasks.length === 0 ? (
-                    <View style={styles.emptyContainer}>
-                        <Ionicons name="clipboard-outline" size={60} color="#5D8AA8" />
-                        <Text style={styles.emptyText}>Nu există sarcini pentru această rută</Text>
-                    </View>
-                ) : (
-                    tasks.map((task, index) => (
-                        <Pressable
-                            key={task.id}
-                            style={({ pressed }) => [
-                                styles.card,
-                                task.status === 'COMPLETED' && styles.cardCompleted,
-                                pressed && styles.cardPressed
-                            ]}
-                            onPress={() => handleTaskPress(task)}
-                        >
-                            {/* Task Number Badge */}
-                            <View style={styles.taskNumberBadge}>
-                                <Text style={styles.taskNumberText}>{index + 1}</Text>
-                            </View>
+                {/* Page 1: Remaining Tasks */}
+                <ScrollView
+                    style={{ width: screenWidth }}
+                    contentContainerStyle={styles.pageContent}
+                    showsVerticalScrollIndicator={false}
+                >
+                    {remainingTasks.length === 0 ? (
+                        renderEmptyState('Nicio sarcină rămasă pentru această zi 🎉')
+                    ) : (
+                        remainingTasks.map(renderTaskCard)
+                    )}
+                    <View style={{ height: 80 }} />
+                </ScrollView>
 
-                            {/* Task Info */}
-                            <View style={styles.cardInfo}>
-                                <View style={styles.taskTypeRow}>
-                                    <Text style={styles.taskType}>
-                                        {TASK_TYPE_LABELS[task.type] || task.type}
-                                    </Text>
-                                    <View style={[styles.statusBadge, { backgroundColor: STATUS_COLORS[task.status] || '#888' }]}>
-                                        <Text style={styles.statusText}>
-                                            {STATUS_LABELS[task.status] || task.status}
-                                        </Text>
-                                    </View>
-                                </View>
-
-                                <Text style={styles.clientName}>{task.clientName || 'Client necunoscut'}</Text>
-
-                                <View style={styles.addressRow}>
-                                    <Ionicons name="location-sharp" size={14} color="#E0E0E0" />
-                                    <Text style={styles.addressText} numberOfLines={1}>
-                                        {task.address || 'Adresă necunoscută'}
-                                    </Text>
-                                </View>
-
-                                {task.clientPhone && (
-                                    <View style={styles.phoneRow}>
-                                        <Ionicons name="call" size={14} color="#E0E0E0" />
-                                        <Text style={styles.phoneText}>{task.clientPhone}</Text>
-                                    </View>
-                                )}
-                            </View>
-
-                            {/* Action Buttons */}
-                            <View style={styles.actionButtons}>
-                                {task.status === 'NEW' && (
-                                    <Pressable
-                                        style={styles.startButton}
-                                        onPress={(e) => {
-                                            e.stopPropagation();
-                                            handleStartTask(task);
-                                        }}
-                                    >
-                                        <Ionicons name="play" size={20} color="#FFFFFF" />
-                                    </Pressable>
-                                )}
-                                {task.status === 'IN_PROGRESS' && (
-                                    <Pressable
-                                        style={styles.completeButton}
-                                        onPress={(e) => {
-                                            e.stopPropagation();
-                                            handleCompleteTask(task);
-                                        }}
-                                    >
-                                        <Ionicons name="checkmark" size={20} color="#FFFFFF" />
-                                    </Pressable>
-                                )}
-                                {task.status === 'COMPLETED' && (
-                                    <Ionicons name="checkmark-circle" size={28} color="#4CAF50" />
-                                )}
-                            </View>
-                        </Pressable>
-                    ))
-                )}
-
-                <View style={{ height: 20 }} />
+                {/* Page 2: Completed Tasks */}
+                <ScrollView
+                    style={{ width: screenWidth }}
+                    contentContainerStyle={styles.pageContent}
+                    showsVerticalScrollIndicator={false}
+                >
+                    {completedTasks.length === 0 ? (
+                        renderEmptyState('Nicio sarcină finalizată pentru această zi')
+                    ) : (
+                        completedTasks.map(renderTaskCard)
+                    )}
+                    <View style={{ height: 80 }} />
+                </ScrollView>
             </ScrollView>
+
+            {/* Loading overlay when changing dates */}
+            {loading && (
+                <View style={styles.loadingOverlay}>
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                </View>
+            )}
+
+            {/* Floating Refresh Button */}
+            <Pressable
+                style={({ pressed }) => [
+                    styles.refreshFab,
+                    pressed && styles.refreshFabPressed
+                ]}
+                onPress={fetchTasks}
+            >
+                <Ionicons name="refresh" size={24} color="#FFFFFF" />
+            </Pressable>
         </View>
     )
 }
@@ -299,7 +332,7 @@ const styles = StyleSheet.create({
         marginTop: 60,
         paddingHorizontal: 20,
         width: '100%',
-        marginBottom: 20,
+        marginBottom: 15,
         flexDirection: 'row',
         alignItems: 'center',
     },
@@ -312,31 +345,64 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginRight: 15,
     },
-    headerTextContainer: {
-        flex: 1,
-    },
     headerText: {
         color: '#FFFFFF',
         fontSize: 24,
         fontWeight: 'bold',
     },
-    subHeaderText: {
-        color: '#5D8AA8',
-        fontSize: 14,
-        marginTop: 2,
+
+    // Date Navigation
+    dateNavContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginHorizontal: 20,
+        marginBottom: 15,
+        backgroundColor: '#1E3A52',
+        borderRadius: 14,
+        paddingVertical: 12,
+        paddingHorizontal: 8,
+        borderWidth: 1,
+        borderColor: '#2A4A65',
     },
+    dateNavArrow: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    dateNavCenter: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+    },
+    dateNavText: {
+        color: '#FFFFFF',
+        fontSize: 17,
+        fontWeight: '600',
+        letterSpacing: 0.5,
+    },
+
+    // Stats
     statsContainer: {
         flexDirection: 'row',
-        justifyContent: 'space-around',
-        paddingHorizontal: 20,
-        paddingVertical: 15,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingVertical: 12,
         backgroundColor: '#2A4158',
         marginHorizontal: 20,
         borderRadius: 12,
-        marginBottom: 20,
+        marginBottom: 12,
     },
     statItem: {
         alignItems: 'center',
+        paddingHorizontal: 30,
+    },
+    statDivider: {
+        width: 1,
+        height: 30,
+        backgroundColor: '#427992',
     },
     statNumber: {
         color: '#FFFFFF',
@@ -348,13 +414,44 @@ const styles = StyleSheet.create({
         fontSize: 12,
         marginTop: 2,
     },
-    scrollContainer: {
+
+    // Tabs
+    tabContainer: {
+        flexDirection: 'row',
+        marginHorizontal: 20,
+        marginBottom: 8,
+        backgroundColor: '#1E3A52',
+        borderRadius: 12,
+        padding: 4,
+    },
+    tab: {
         flex: 1,
+        paddingVertical: 10,
+        alignItems: 'center',
+        borderRadius: 10,
+    },
+    tabActive: {
+        backgroundColor: '#427992',
+    },
+    tabText: {
+        color: '#5D8AA8',
+        fontSize: 14,
+        fontWeight: '600',
+    },
+    tabTextActive: {
+        color: '#FFFFFF',
+    },
+
+    // Slider
+    sliderContainer: {
+        flex: 1,
+    },
+    pageContent: {
         paddingHorizontal: 20,
+        paddingTop: 8,
     },
-    scrollContent: {
-        paddingBottom: 40,
-    },
+
+    // Empty state
     emptyContainer: {
         alignItems: 'center',
         justifyContent: 'center',
@@ -366,6 +463,8 @@ const styles = StyleSheet.create({
         marginTop: 15,
         textAlign: 'center',
     },
+
+    // Task Cards
     card: {
         backgroundColor: '#427992',
         borderRadius: 16,
@@ -381,25 +480,11 @@ const styles = StyleSheet.create({
     },
     cardCompleted: {
         backgroundColor: '#2A4158',
-        opacity: 0.8,
+        opacity: 0.85,
     },
     cardPressed: {
         opacity: 0.9,
         transform: [{ scale: 0.98 }]
-    },
-    taskNumberBadge: {
-        width: 36,
-        height: 36,
-        borderRadius: 18,
-        backgroundColor: '#16283C',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 12,
-    },
-    taskNumberText: {
-        color: '#FFFFFF',
-        fontSize: 16,
-        fontWeight: 'bold',
     },
     cardInfo: {
         flex: 1,
@@ -450,23 +535,38 @@ const styles = StyleSheet.create({
         color: '#B0B0B0',
         marginLeft: 4,
     },
-    actionButtons: {
-        marginLeft: 10,
-    },
-    startButton: {
-        width: 40,
-        height: 40,
+
+    // Loading overlay
+    loadingOverlay: {
+        position: 'absolute',
+        top: 130,
+        alignSelf: 'center',
+        backgroundColor: 'rgba(22, 40, 60, 0.85)',
+        paddingHorizontal: 20,
+        paddingVertical: 8,
         borderRadius: 20,
-        backgroundColor: '#2196F3',
+    },
+
+    // Floating Refresh Button
+    refreshFab: {
+        position: 'absolute',
+        bottom: 30,
+        right: 20,
+        width: 56,
+        height: 56,
+        borderRadius: 28,
+        backgroundColor: '#427992',
         justifyContent: 'center',
         alignItems: 'center',
+        elevation: 10,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 5,
+        zIndex: 999,
     },
-    completeButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: '#4CAF50',
-        justifyContent: 'center',
-        alignItems: 'center',
+    refreshFabPressed: {
+        opacity: 0.8,
+        transform: [{ scale: 0.92 }],
     },
 })

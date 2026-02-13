@@ -6,6 +6,9 @@ import com.example.damiProd.service.TaskService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -37,6 +40,23 @@ public class TaskController {
     @GetMapping("/route/{routeId}")
     public ResponseEntity<List<Task>> getTasksByRoute(@PathVariable Long routeId) {
         List<Task> tasks = taskService.getTasksByRouteId(routeId);
+        return ResponseEntity.ok(tasks);
+    }
+
+    // Get tasks by employee and scheduled date
+    @GetMapping("/employee/{employeeId}/date/{date}")
+    public ResponseEntity<List<Task>> getTasksByEmployeeAndDate(
+            @PathVariable Long employeeId,
+            @PathVariable String date) {
+        LocalDate localDate = LocalDate.parse(date);
+        List<Task> tasks = taskService.getTasksByEmployeeAndDate(employeeId, localDate);
+        return ResponseEntity.ok(tasks);
+    }
+
+    // Get all tasks for an employee (regardless of date)
+    @GetMapping("/employee/{employeeId}")
+    public ResponseEntity<List<Task>> getTasksByEmployee(@PathVariable Long employeeId) {
+        List<Task> tasks = taskService.getTasksByEmployee(employeeId);
         return ResponseEntity.ok(tasks);
     }
 
@@ -73,6 +93,7 @@ public class TaskController {
         response.put("hasTask", hasTask);
         response.put("taskId", task != null ? task.getId() : null);
         response.put("routeId", task != null && task.getRouteId() != null ? task.getRouteId() : null);
+        response.put("scheduledTime", task != null ? task.getScheduledTime() : null);
         return ResponseEntity.ok(response);
     }
 
@@ -85,6 +106,26 @@ public class TaskController {
         String statusStr = statusUpdate.get("status");
         TaskStatus status = TaskStatus.valueOf(statusStr);
         Task updatedTask = taskService.updateTaskStatus(id, status);
+        return ResponseEntity.ok(updatedTask);
+    }
+
+    // Update scheduled date for a task
+    @PatchMapping("/{id}/scheduled-date")
+    public ResponseEntity<Task> updateScheduledDate(
+            @PathVariable Long id,
+            @RequestBody Map<String, String> body) {
+
+        String dateStr = body.get("scheduledDate");
+        if (dateStr == null || dateStr.isEmpty()) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        LocalDate date = LocalDate.parse(dateStr);
+        LocalDateTime dateTime = date.atTime(LocalTime.of(8, 0)); // Default to 8:00 AM
+
+        Task task = taskService.getTaskById(id);
+        task.setScheduledTime(dateTime);
+        Task updatedTask = taskService.createTask(task); // save
         return ResponseEntity.ok(updatedTask);
     }
 

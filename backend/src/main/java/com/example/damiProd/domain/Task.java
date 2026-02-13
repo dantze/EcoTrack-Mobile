@@ -30,8 +30,12 @@ public class Task {
     private TaskStatus status = TaskStatus.NEW;
 
     private String address;
+    private String coordinates; // "lat,lng" for map navigation
     private String clientName;
     private String clientPhone;
+    private String contactPerson; // On-site contact from order
+    private String productName;
+    private Integer quantity;
     private String internalNotes;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -68,6 +72,14 @@ public class Task {
         this.type = type;
         this.scheduledTime = scheduledTime;
         this.address = address;
+        this.clientName = clientName;
+    }
+
+    public Task(TaskType type, LocalDateTime scheduledTime, String address, String coordinates, String clientName) {
+        this.type = type;
+        this.scheduledTime = scheduledTime;
+        this.address = address;
+        this.coordinates = coordinates;
         this.clientName = clientName;
     }
 }

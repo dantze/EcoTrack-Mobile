@@ -22,6 +22,7 @@ export interface User {
 }
 
 const USER_STORAGE_KEY = '@ecotrack_user';
+const ACTIVE_DRIVER_KEY = '@ecotrack_active_driver';
 
 export const AuthService = {
     /**
@@ -74,6 +75,7 @@ export const AuthService = {
      */
     logout: async (): Promise<void> => {
         await AsyncStorage.removeItem(USER_STORAGE_KEY);
+        await AsyncStorage.removeItem(ACTIVE_DRIVER_KEY);
     },
 
     /**
@@ -96,5 +98,34 @@ export const AuthService = {
      */
     isOfficeStaff: (user: User | null): boolean => {
         return AuthService.hasRole(user, 'SALES') || AuthService.hasRole(user, 'TECH');
+    },
+
+    /**
+     * Set the active driver (for admin impersonation)
+     */
+    setActiveDriver: async (driverId: number, driverName: string): Promise<void> => {
+        await AsyncStorage.setItem(ACTIVE_DRIVER_KEY, JSON.stringify({ id: driverId, fullName: driverName }));
+    },
+
+    /**
+     * Get the active driver (returns the impersonated driver, or null)
+     */
+    getActiveDriver: async (): Promise<{ id: number; fullName: string } | null> => {
+        try {
+            const json = await AsyncStorage.getItem(ACTIVE_DRIVER_KEY);
+            if (json) {
+                return JSON.parse(json);
+            }
+        } catch (error) {
+            console.error('Error getting active driver:', error);
+        }
+        return null;
+    },
+
+    /**
+     * Clear the active driver selection
+     */
+    clearActiveDriver: async (): Promise<void> => {
+        await AsyncStorage.removeItem(ACTIVE_DRIVER_KEY);
     },
 };

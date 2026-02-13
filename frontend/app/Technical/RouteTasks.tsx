@@ -18,11 +18,9 @@ type TaskItem = {
 
 const RouteTasks = () => {
     const router = useRouter();
-    const { routeId, driverName, routeDate, zona } = useLocalSearchParams<{
+    const { routeId, driverName } = useLocalSearchParams<{
         routeId?: string;
         driverName?: string;
-        routeDate?: string;
-        zona?: string;
     }>();
 
     const [tasks, setTasks] = useState<TaskItem[]>([]);
@@ -112,16 +110,11 @@ const RouteTasks = () => {
         });
     };
 
-    const headerTitle = driverName
-        ? `${driverName} - ${formatDate(routeDate)}`
-        : `Sarcini - Ruta #${routeId}`;
-
     return (
         <View style={styles.container}>
 
             <View style={styles.headerContainer}>
-                <Text style={styles.headerText}>{headerTitle}</Text>
-                {zona && <Text style={styles.subHeaderText}>{zona}</Text>}
+                <Text style={styles.headerText}>{driverName}</Text>
             </View>
 
             {/* LEGEND */}

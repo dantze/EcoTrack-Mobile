@@ -24,16 +24,29 @@ const login = () => {
       if (response.success) {
         console.log('Login successful:', response.fullName, 'Roles:', response.roles);
 
-        // Redirect based on role
-        if (response.roles.includes('DRIVER')) {
-          // Drivers go to Driver section
-          router.replace('/Driver/WestCenter');
-        } else if (response.roles.includes('SALES') || response.roles.includes('TECH')) {
-          // Sales and Tech staff go to Sales section (they see the same things)
-          router.replace('/Sales/WestCenter');
+        // If user has multiple roles, show role selection screen
+        if (response.roles.length > 1) {
+          router.replace({
+            pathname: '/RoleSelection',
+            params: {
+              roles: response.roles.join(','),
+              fullName: response.fullName,
+            },
+          });
+        } else if (response.roles.length === 1) {
+          // Single role - redirect directly
+          const role = response.roles[0];
+          if (role === 'DRIVER') {
+            router.replace('/Driver/DriverRoutes');
+          } else if (role === 'SALES') {
+            router.replace('/Sales/WestCenter');
+          } else if (role === 'TECH') {
+            router.replace('/Technical/WestCenter');
+          } else {
+            Alert.alert('Eroare', 'Rolul utilizatorului nu este recunoscut.');
+          }
         } else {
-          // Fallback - shouldn't happen but just in case
-          Alert.alert('Eroare', 'Rolul utilizatorului nu este recunoscut.');
+          Alert.alert('Eroare', 'Utilizatorul nu are niciun rol asignat.');
         }
       } else {
         // Login failed

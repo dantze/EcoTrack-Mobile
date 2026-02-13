@@ -6,8 +6,12 @@ export interface Task {
     status: string;
     scheduledTime?: string;
     address?: string;
+    coordinates?: string;
     clientName?: string;
     clientPhone?: string;
+    contactPerson?: string;
+    productName?: string;
+    quantity?: number;
     internalNotes?: string;
     routeId?: number;
     orderId?: number;
@@ -17,6 +21,7 @@ export interface OrderTaskStatus {
     hasTask: boolean;
     taskId: number | null;
     routeId: number | null;
+    scheduledTime?: string | null;
 }
 
 export const TaskService = {
@@ -44,6 +49,24 @@ export const TaskService = {
     getTasksByRouteId: async (routeId: number): Promise<Task[]> => {
         const response = await fetch(`${API_BASE_URL}/tasks/route/${routeId}`);
         if (!response.ok) throw new Error('Eșec la preluarea sarcinilor rutei');
+        return await response.json();
+    },
+
+    /**
+     * Get tasks for a specific employee on a specific scheduled date
+     */
+    getTasksByEmployeeAndDate: async (employeeId: number, date: string): Promise<Task[]> => {
+        const response = await fetch(`${API_BASE_URL}/tasks/employee/${employeeId}/date/${date}`);
+        if (!response.ok) throw new Error('Eșec la preluarea sarcinilor angajatului');
+        return await response.json();
+    },
+
+    /**
+     * Get all tasks for a specific employee (regardless of date)
+     */
+    getTasksByEmployee: async (employeeId: number): Promise<Task[]> => {
+        const response = await fetch(`${API_BASE_URL}/tasks/employee/${employeeId}`);
+        if (!response.ok) throw new Error('Eșec la preluarea sarcinilor angajatului');
         return await response.json();
     },
 
@@ -124,6 +147,21 @@ export const TaskService = {
             body: JSON.stringify({ taskIds, newRouteId }),
         });
         if (!response.ok) throw new Error('Eșec la reasignarea sarcinilor');
+        return await response.json();
+    },
+
+    /**
+     * Update scheduled date for a task
+     */
+    updateScheduledDate: async (taskId: number, scheduledDate: string): Promise<Task> => {
+        const response = await fetch(`${API_BASE_URL}/tasks/${taskId}/scheduled-date`, {
+            method: 'PATCH',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ scheduledDate }),
+        });
+        if (!response.ok) throw new Error('Eșec la actualizarea datei programate');
         return await response.json();
     },
 };

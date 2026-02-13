@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react'
 import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons';
 import { API_BASE_URL } from '../../constants/ApiConfig';
+import { AuthService, User } from '../../services/AuthService';
 
 type Task = {
     id: number;
@@ -26,15 +27,38 @@ const DriverRoutes = () => {
     const router = useRouter();
     const [routes, setRoutes] = useState<Route[]>([]);
     const [loading, setLoading] = useState(true);
-
-    // TODO: Replace with actual logged-in driver's employee ID
-    const employeeId = 1; // Mock employee ID for now
+    const [currentUser, setCurrentUser] = useState<User | null>(null);
 
     useEffect(() => {
-        fetchDriverRoutes();
+        loadUserAndRoutes();
     }, []);
 
-    const fetchDriverRoutes = async () => {
+    const loadUserAndRoutes = async () => {
+        try {
+            const user = await AuthService.getCurrentUser();
+            if (!user) {
+                router.replace('/login');
+                return;
+            }
+
+            // Check if an admin selected a specific driver to view as
+            const activeDriver = await AuthService.getActiveDriver();
+            if (activeDriver) {
+                // Admin is impersonating a driver
+                setCurrentUser({ ...user, id: activeDriver.id, fullName: activeDriver.fullName });
+                await fetchDriverRoutes(activeDriver.id);
+            } else {
+                // Regular driver viewing their own routes
+                setCurrentUser(user);
+                await fetchDriverRoutes(user.id);
+            }
+        } catch (error) {
+            console.error('Error loading user:', error);
+            router.replace('/login');
+        }
+    };
+
+    const fetchDriverRoutes = async (employeeId: number) => {
         try {
             const response = await fetch(`${API_BASE_URL}/routes/employee/${employeeId}`);
             if (!response.ok) {
@@ -120,7 +144,7 @@ const DriverRoutes = () => {
                 <View style={styles.headerTop}>
                     <View>
                         <Text style={styles.headerText}>Rutele Mele</Text>
-                        <Text style={styles.subHeaderText}>Bine ai venit!</Text>
+                        <Text style={styles.subHeaderText}>Bine ai venit, {currentUser?.fullName?.split(' ')[0] || 'Șofer'}!</Text>
                     </View>
                     <Pressable
                         style={styles.logoutButton}
@@ -196,7 +220,7 @@ const DriverRoutes = () => {
                     styles.refreshButton,
                     pressed && styles.buttonPressed
                 ]}
-                onPress={fetchDriverRoutes}
+                onPress={() => currentUser && fetchDriverRoutes(currentUser.id)}
             >
                 <Ionicons name="refresh" size={24} color="#FFFFFF" />
                 <Text style={styles.refreshText}>Reîmprospătează</Text>

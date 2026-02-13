@@ -8,7 +8,7 @@ const ROLE_CONFIG = {
         title: 'Șofer',
         subtitle: 'Rute și livrări',
         icon: 'car-outline' as const,
-        route: '/Driver/DriverRoutes',
+        route: '/Driver/DriverSelection',
         color: '#4CAF50',
     },
     SALES: {

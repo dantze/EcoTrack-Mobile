@@ -6,8 +6,12 @@ export interface Task {
     status: string;
     scheduledTime?: string;
     address?: string;
+    coordinates?: string;
     clientName?: string;
     clientPhone?: string;
+    contactPerson?: string;
+    productName?: string;
+    quantity?: number;
     internalNotes?: string;
     routeId?: number;
     orderId?: number;

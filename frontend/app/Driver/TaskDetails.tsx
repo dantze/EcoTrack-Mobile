@@ -2,19 +2,9 @@ import { StyleSheet, Text, View, Pressable, ScrollView, ActivityIndicator, Alert
 import React, { useEffect, useState } from 'react'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons';
-import { API_BASE_URL } from '../../constants/ApiConfig';
+import { TaskService, Task } from '../../services/TaskService';
+import { OrderService } from '../../services/OrderService';
 import * as ImagePicker from 'expo-image-picker';
-
-type Task = {
-    id: number;
-    type: string;
-    status: string;
-    address: string;
-    clientName: string;
-    clientPhone: string;
-    scheduledTime: string;
-    internalNotes: string;
-};
 
 const TASK_TYPE_LABELS: { [key: string]: string } = {
     'PLACEMENT': 'Amplasare',
@@ -37,29 +27,65 @@ const STATUS_COLORS: { [key: string]: string } = {
     'CANCELLED': '#F44336',
 };
 
+type OrderDetails = {
+    productName?: string;
+    quantity?: number;
+    orderType?: string;
+    contact?: string;
+    details?: string;
+    startDate?: string;
+    endDate?: string;
+};
+
 const TaskDetails = () => {
     const router = useRouter();
     const { taskId } = useLocalSearchParams<{ taskId: string }>();
 
     const [task, setTask] = useState<Task | null>(null);
+    const [orderDetails, setOrderDetails] = useState<OrderDetails | null>(null);
     const [loading, setLoading] = useState(true);
     const [photos, setPhotos] = useState<string[]>([]);
 
     useEffect(() => {
         if (taskId) {
-            fetchTask();
+            loadTaskDetails();
         }
     }, [taskId]);
 
-    const fetchTask = async () => {
+    const loadTaskDetails = async () => {
         try {
-            const response = await fetch(`${API_BASE_URL}/tasks/${taskId}`);
-            if (!response.ok) {
-                throw new Error(`Failed to fetch task. Status: ${response.status}`);
+            const taskData = await TaskService.getTaskById(Number(taskId));
+            setTask(taskData);
+
+            // Try to fetch order details if orderId exists
+            if (taskData.orderId) {
+                try {
+                    const order = await OrderService.getOrderById(taskData.orderId);
+                    setOrderDetails({
+                        productName: order.product?.name || taskData.productName,
+                        quantity: order.quantity || taskData.quantity,
+                        orderType: order.orderType,
+                        contact: order.contact,
+                        details: order.details,
+                        startDate: order.startDate,
+                        endDate: order.endDate,
+                    });
+                } catch {
+                    // If order fetch fails, use task's own product info
+                    if (taskData.productName) {
+                        setOrderDetails({
+                            productName: taskData.productName,
+                            quantity: taskData.quantity,
+                        });
+                    }
+                }
+            } else if (taskData.productName) {
+                // No orderId but task has product info
+                setOrderDetails({
+                    productName: taskData.productName,
+                    quantity: taskData.quantity,
+                });
             }
-            const data: Task = await response.json();
-            console.log('Fetched task:', data);
-            setTask(data);
         } catch (error) {
             console.error("Error fetching task:", error);
             Alert.alert('Eroare', 'Nu s-a putut încărca sarcina');
@@ -68,32 +94,22 @@ const TaskDetails = () => {
         }
     };
 
-    const updateTaskStatus = async (newStatus: string) => {
+    const handleUpdateStatus = async (newStatus: string) => {
         try {
-            const response = await fetch(`${API_BASE_URL}/tasks/${taskId}/status`, {
-                method: 'PATCH',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify({ status: newStatus }),
-            });
-
-            if (!response.ok) {
-                throw new Error('Failed to update task status');
-            }
-
+            await TaskService.updateTaskStatus(Number(taskId), newStatus);
             const statusLabel = STATUS_LABELS[newStatus] || newStatus;
             Alert.alert('Succes', `Sarcina a fost marcată ca "${statusLabel}"`);
-            fetchTask(); // Refresh task
+            loadTaskDetails();
         } catch (error) {
             console.error('Error updating task:', error);
             Alert.alert('Eroare', 'Nu s-a putut actualiza sarcina');
         }
     };
 
-    const handleCall = () => {
-        if (task?.clientPhone) {
-            Linking.openURL(`tel:${task.clientPhone}`);
+    const handleCall = (phone?: string) => {
+        const number = phone || task?.clientPhone;
+        if (number) {
+            Linking.openURL(`tel:${number}`);
         }
     };
 
@@ -110,7 +126,7 @@ const TaskDetails = () => {
             'Ești sigur că vrei să începi această sarcină?',
             [
                 { text: 'Anulează', style: 'cancel' },
-                { text: 'Începe', onPress: () => updateTaskStatus('IN_PROGRESS') }
+                { text: 'Începe', onPress: () => handleUpdateStatus('IN_PROGRESS') }
             ]
         );
     };
@@ -121,7 +137,7 @@ const TaskDetails = () => {
             'Ești sigur că vrei să marchezi sarcina ca finalizată?',
             [
                 { text: 'Anulează', style: 'cancel' },
-                { text: 'Finalizează', onPress: () => updateTaskStatus('COMPLETED') }
+                { text: 'Finalizează', onPress: () => handleUpdateStatus('COMPLETED') }
             ]
         );
     };
@@ -237,9 +253,53 @@ const TaskDetails = () => {
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
             >
-                {/* Task Type - simple text, no icon */}
-                <View style={styles.typeCard}>
-                    <Text style={styles.typeText}>{TASK_TYPE_LABELS[task.type] || task.type}</Text>
+                {/* Informații Comandă */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Informații Comandă</Text>
+
+                    <View style={styles.orderInfoRow}>
+                        <Text style={styles.orderInfoLabel}>Tip Sarcină</Text>
+                        <Text style={styles.orderInfoValue}>{TASK_TYPE_LABELS[task.type] || task.type}</Text>
+                    </View>
+
+                    {orderDetails?.productName && (
+                        <View style={styles.orderItemRow}>
+                            <View style={styles.orderItemLeft}>
+                                <Ionicons name="cube-outline" size={18} color="#5D8AA8" />
+                                <Text style={styles.orderItemName}>{orderDetails.productName}</Text>
+                            </View>
+                            {orderDetails.quantity != null && (
+                                <View style={styles.quantityBadge}>
+                                    <Text style={styles.quantityText}>x{orderDetails.quantity}</Text>
+                                </View>
+                            )}
+                        </View>
+                    )}
+
+                    {orderDetails?.contact && (
+                        <Pressable
+                            style={({ pressed }) => [
+                                styles.pressableRow,
+                                pressed && styles.pressableRowPressed
+                            ]}
+                            onPress={() => handleCall(orderDetails.contact)}
+                        >
+                            <Ionicons name="call" size={20} color="#4CAF50" />
+                            <View style={styles.infoContent}>
+                                <Text style={styles.infoLabel}>Persoană contact</Text>
+                                <Text style={[styles.infoValue, styles.linkText]}>{orderDetails.contact}</Text>
+                            </View>
+                            <View style={styles.pressableArrow}>
+                                <Ionicons name="chevron-forward" size={18} color="#FFFFFF" />
+                            </View>
+                        </Pressable>
+                    )}
+
+                    {orderDetails?.details && (
+                        <View style={styles.orderDetailsBox}>
+                            <Text style={styles.orderDetailsText}>{orderDetails.details}</Text>
+                        </View>
+                    )}
                 </View>
 
                 {/* Client Info */}
@@ -255,13 +315,21 @@ const TaskDetails = () => {
                     </View>
 
                     {task.clientPhone && (
-                        <Pressable style={styles.infoRow} onPress={handleCall}>
+                        <Pressable
+                            style={({ pressed }) => [
+                                styles.pressableRow,
+                                pressed && styles.pressableRowPressed
+                            ]}
+                            onPress={() => handleCall()}
+                        >
                             <Ionicons name="call" size={20} color="#4CAF50" />
                             <View style={styles.infoContent}>
                                 <Text style={styles.infoLabel}>Telefon</Text>
                                 <Text style={[styles.infoValue, styles.linkText]}>{task.clientPhone}</Text>
                             </View>
-                            <Ionicons name="chevron-forward" size={20} color="#5D8AA8" />
+                            <View style={styles.pressableArrow}>
+                                <Ionicons name="chevron-forward" size={18} color="#FFFFFF" />
+                            </View>
                         </Pressable>
                     )}
                 </View>
@@ -270,31 +338,30 @@ const TaskDetails = () => {
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Locație</Text>
 
-                    <Pressable style={styles.infoRow} onPress={handleNavigate}>
+                    <Pressable
+                        style={({ pressed }) => [
+                            styles.pressableRow,
+                            pressed && styles.pressableRowPressed
+                        ]}
+                        onPress={handleNavigate}
+                    >
                         <Ionicons name="location" size={20} color="#F44336" />
                         <View style={styles.infoContent}>
                             <Text style={styles.infoLabel}>Adresă</Text>
                             <Text style={[styles.infoValue, styles.linkText]}>{task.address || 'Necunoscută'}</Text>
                         </View>
-                        <Ionicons name="navigate" size={20} color="#5D8AA8" />
+                        <View style={styles.pressableArrow}>
+                            <Ionicons name="navigate" size={16} color="#FFFFFF" />
+                        </View>
                     </Pressable>
                 </View>
 
-                {/* Notes */}
-                {task.internalNotes && (
-                    <View style={styles.section}>
-                        <Text style={styles.sectionTitle}>Note Interne</Text>
-                        <View style={styles.notesContainer}>
-                            <Text style={styles.notesText}>{task.internalNotes}</Text>
-                        </View>
-                    </View>
-                )}
+
 
                 {/* Photos Section */}
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Poze ({photos.length})</Text>
 
-                    {/* Photo grid */}
                     {hasPhotos && (
                         <View style={styles.photoGrid}>
                             {photos.map((uri, index) => (
@@ -315,11 +382,10 @@ const TaskDetails = () => {
                         </View>
                     )}
 
-                    {/* Add photos button */}
                     <Pressable
                         style={({ pressed }) => [
                             styles.addPhotoButton,
-                            pressed && { opacity: 0.7 }
+                            pressed && { opacity: 0.7, transform: [{ scale: 0.98 }] }
                         ]}
                         onPress={handleAddPhotos}
                     >
@@ -329,29 +395,10 @@ const TaskDetails = () => {
                     </Pressable>
                 </View>
 
-                {/* Quick Actions */}
-                <View style={styles.quickActions}>
-                    <Pressable
-                        style={[styles.quickActionButton, { backgroundColor: '#4CAF50' }]}
-                        onPress={handleCall}
-                    >
-                        <Ionicons name="call" size={24} color="#FFFFFF" />
-                        <Text style={styles.quickActionText}>Sună</Text>
-                    </Pressable>
-
-                    <Pressable
-                        style={[styles.quickActionButton, { backgroundColor: '#2196F3' }]}
-                        onPress={handleNavigate}
-                    >
-                        <Ionicons name="navigate" size={24} color="#FFFFFF" />
-                        <Text style={styles.quickActionText}>Navighează</Text>
-                    </Pressable>
-                </View>
-
                 <View style={{ height: 100 }} />
             </ScrollView>
 
-            {/* Bottom Action Button */}
+            {/* Bottom Action Buttons */}
             {task.status === 'NEW' && (
                 <View style={styles.bottomAction}>
                     <Pressable
@@ -395,7 +442,7 @@ const TaskDetails = () => {
 
             {task.status === 'COMPLETED' && (
                 <View style={styles.bottomAction}>
-                    <View style={[styles.completedBanner]}>
+                    <View style={styles.completedBanner}>
                         <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
                         <Text style={styles.completedBannerText}>Sarcină Finalizată</Text>
                     </View>
@@ -483,19 +530,6 @@ const styles = StyleSheet.create({
     scrollContent: {
         paddingBottom: 40,
     },
-    typeCard: {
-        backgroundColor: '#427992',
-        borderRadius: 16,
-        paddingVertical: 16,
-        paddingHorizontal: 20,
-        alignItems: 'center',
-        marginBottom: 20,
-    },
-    typeText: {
-        color: '#FFFFFF',
-        fontSize: 22,
-        fontWeight: 'bold',
-    },
     section: {
         backgroundColor: '#2A4158',
         borderRadius: 12,
@@ -508,7 +542,73 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         textTransform: 'uppercase',
         marginBottom: 12,
+        letterSpacing: 0.5,
     },
+
+    // Order Info
+    orderInfoRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingVertical: 8,
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(93, 138, 168, 0.15)',
+    },
+    orderInfoLabel: {
+        color: '#5D8AA8',
+        fontSize: 14,
+    },
+    orderInfoValue: {
+        color: '#FFFFFF',
+        fontSize: 15,
+        fontWeight: '600',
+    },
+    orderItemRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        backgroundColor: '#1E3A52',
+        borderRadius: 10,
+        paddingVertical: 12,
+        paddingHorizontal: 14,
+        marginTop: 10,
+    },
+    orderItemLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        flex: 1,
+    },
+    orderItemName: {
+        color: '#FFFFFF',
+        fontSize: 15,
+        fontWeight: '500',
+        marginLeft: 10,
+    },
+    quantityBadge: {
+        backgroundColor: '#427992',
+        borderRadius: 8,
+        paddingHorizontal: 12,
+        paddingVertical: 4,
+        marginLeft: 10,
+    },
+    quantityText: {
+        color: '#FFFFFF',
+        fontSize: 14,
+        fontWeight: '700',
+    },
+    orderDetailsBox: {
+        backgroundColor: '#16283C',
+        borderRadius: 8,
+        padding: 12,
+        marginTop: 10,
+    },
+    orderDetailsText: {
+        color: '#E0E0E0',
+        fontSize: 14,
+        lineHeight: 20,
+    },
+
+    // Info rows
     infoRow: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -530,16 +630,31 @@ const styles = StyleSheet.create({
     linkText: {
         color: '#64B5F6',
     },
-    notesContainer: {
-        backgroundColor: '#16283C',
-        borderRadius: 8,
-        padding: 12,
+
+    // Pressable rows (phone, address)
+    pressableRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 10,
+        paddingHorizontal: 10,
+        marginHorizontal: -10,
+        borderRadius: 10,
+        backgroundColor: 'transparent',
     },
-    notesText: {
-        color: '#E0E0E0',
-        fontSize: 14,
-        lineHeight: 20,
+    pressableRowPressed: {
+        backgroundColor: 'rgba(66, 121, 146, 0.3)',
+        transform: [{ scale: 0.98 }],
     },
+    pressableArrow: {
+        width: 30,
+        height: 30,
+        borderRadius: 15,
+        backgroundColor: '#427992',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+
+
 
     // Photos
     photoGrid: {
@@ -588,26 +703,7 @@ const styles = StyleSheet.create({
         marginTop: 4,
     },
 
-    quickActions: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginBottom: 20,
-    },
-    quickActionButton: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 14,
-        borderRadius: 12,
-        marginHorizontal: 5,
-    },
-    quickActionText: {
-        color: '#FFFFFF',
-        fontSize: 14,
-        fontWeight: '600',
-        marginLeft: 8,
-    },
+    // Bottom actions
     bottomAction: {
         position: 'absolute',
         bottom: 0,
@@ -625,7 +721,7 @@ const styles = StyleSheet.create({
     },
     buttonPressed: {
         opacity: 0.8,
-        transform: [{ scale: 0.98 }]
+        transform: [{ scale: 0.97 }],
     },
     actionButtonText: {
         color: '#FFFFFF',

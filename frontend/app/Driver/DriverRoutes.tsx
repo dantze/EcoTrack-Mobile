@@ -28,6 +28,7 @@ const DriverRoutes = () => {
     const [routes, setRoutes] = useState<Route[]>([]);
     const [loading, setLoading] = useState(true);
     const [currentUser, setCurrentUser] = useState<User | null>(null);
+    const [isAdmin, setIsAdmin] = useState(false);
 
     useEffect(() => {
         loadUserAndRoutes();
@@ -40,6 +41,10 @@ const DriverRoutes = () => {
                 router.replace('/login');
                 return;
             }
+
+            // Check if this user is an admin (has more than one role)
+            const userIsAdmin = user.roles && user.roles.length > 1;
+            setIsAdmin(userIsAdmin);
 
             // Check if an admin selected a specific driver to view as
             const activeDriver = await AuthService.getActiveDriver();
@@ -142,9 +147,22 @@ const DriverRoutes = () => {
         <View style={styles.container}>
             <View style={styles.headerContainer}>
                 <View style={styles.headerTop}>
-                    <View>
-                        <Text style={styles.headerText}>Rutele Mele</Text>
-                        <Text style={styles.subHeaderText}>Bine ai venit, {currentUser?.fullName?.split(' ')[0] || 'Șofer'}!</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        {isAdmin && (
+                            <Pressable
+                                onPress={async () => {
+                                    await AuthService.clearActiveDriver();
+                                    router.replace('/Driver/DriverSelection');
+                                }}
+                                style={styles.backButton}
+                            >
+                                <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
+                            </Pressable>
+                        )}
+                        <View>
+                            <Text style={styles.headerText}>Rutele Mele</Text>
+                            <Text style={styles.subHeaderText}>Bine ai venit, {currentUser?.fullName?.split(' ')[0] || 'Șofer'}!</Text>
+                        </View>
                     </View>
                     <Pressable
                         style={styles.logoutButton}
@@ -258,6 +276,15 @@ const styles = StyleSheet.create({
     },
     logoutButton: {
         padding: 8,
+    },
+    backButton: {
+        width: 38,
+        height: 38,
+        borderRadius: 19,
+        backgroundColor: '#427992',
+        justifyContent: 'center' as const,
+        alignItems: 'center' as const,
+        marginRight: 12,
     },
     headerText: {
         color: '#FFFFFF',

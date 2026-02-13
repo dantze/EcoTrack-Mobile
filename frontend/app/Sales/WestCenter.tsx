@@ -1,18 +1,43 @@
 import { StyleSheet, Text, View, Pressable, Image, ScrollView } from 'react-native'
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useRouter } from 'expo-router'
 import { AntDesign, Ionicons } from '@expo/vector-icons';
+import { AuthService } from '../../services/AuthService';
 
 const mapImageSource = require('../../assets/images/harta_romania.png');
 
 
 const ZONES_DATA: Record<string, string[]> = {
-    "Center": ["Alba", "Cluj", "Sibiu", "Hunedoara", "Brașov", "Mureș", "Covasna", "Harghita"],
-    "West": ["Timiș", "Arad", "Caraș-Severin", "Bihor"]
+    "Centru": ["Alba", "Cluj", "Sibiu", "Hunedoara", "Brașov", "Mureș", "Covasna", "Harghita"],
+    "Vest": ["Timiș", "Arad", "Caraș-Severin", "Bihor"]
 };
 
 const WestCenter = () => {
     const router = useRouter();
+    const [isAdmin, setIsAdmin] = useState(false);
+
+    useEffect(() => {
+        const checkAdmin = async () => {
+            const user = await AuthService.getCurrentUser();
+            if (user && user.roles && user.roles.length > 1) {
+                setIsAdmin(true);
+            }
+        };
+        checkAdmin();
+    }, []);
+
+    const handleGoBackToRoles = async () => {
+        const user = await AuthService.getCurrentUser();
+        if (user) {
+            router.replace({
+                pathname: '/RoleSelection',
+                params: {
+                    roles: user.roles.join(','),
+                    fullName: user.fullName,
+                },
+            });
+        }
+    };
 
 
     const [isZoneOpen, setIsZoneOpen] = useState(false);
@@ -64,7 +89,14 @@ const WestCenter = () => {
         <View style={styles.container}>
             <View style={styles.headerContainer}>
                 <View style={styles.headerTop}>
-                    <Text style={styles.headerText}>Selectează Zona</Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                        {isAdmin && (
+                            <Pressable onPress={handleGoBackToRoles} style={styles.backButton}>
+                                <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
+                            </Pressable>
+                        )}
+                        <Text style={styles.headerText}>Selectează Zona</Text>
+                    </View>
                     <Pressable
                         style={styles.logoutButton}
                         onPress={() => router.replace('/login')}
@@ -184,6 +216,15 @@ const styles = StyleSheet.create({
     },
     logoutButton: {
         padding: 8,
+    },
+    backButton: {
+        width: 38,
+        height: 38,
+        borderRadius: 19,
+        backgroundColor: '#427992',
+        justifyContent: 'center' as const,
+        alignItems: 'center' as const,
+        marginRight: 12,
     },
     headerText: {
         color: '#FFFFFF',

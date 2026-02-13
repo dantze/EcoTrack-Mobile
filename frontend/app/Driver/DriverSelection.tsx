@@ -41,10 +41,25 @@ const DriverSelection = () => {
         );
     }
 
+    const handleGoBack = async () => {
+        const user = await AuthService.getCurrentUser();
+        if (user && user.roles.length > 1) {
+            router.replace({
+                pathname: '/RoleSelection',
+                params: {
+                    roles: user.roles.join(','),
+                    fullName: user.fullName,
+                },
+            });
+        } else {
+            router.replace('/login');
+        }
+    };
+
     return (
         <View style={styles.container}>
             <View style={styles.headerContainer}>
-                <Pressable onPress={() => router.back()} style={styles.backButton}>
+                <Pressable onPress={handleGoBack} style={styles.backButton}>
                     <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
                 </Pressable>
                 <View>

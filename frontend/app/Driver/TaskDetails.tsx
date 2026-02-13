@@ -1,8 +1,9 @@
-import { StyleSheet, Text, View, Pressable, ScrollView, ActivityIndicator, Alert, Linking } from 'react-native'
+import { StyleSheet, Text, View, Pressable, ScrollView, ActivityIndicator, Alert, Linking, Image } from 'react-native'
 import React, { useEffect, useState } from 'react'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons';
 import { API_BASE_URL } from '../../constants/ApiConfig';
+import * as ImagePicker from 'expo-image-picker';
 
 type Task = {
     id: number;
@@ -39,9 +40,10 @@ const STATUS_COLORS: { [key: string]: string } = {
 const TaskDetails = () => {
     const router = useRouter();
     const { taskId } = useLocalSearchParams<{ taskId: string }>();
-    
+
     const [task, setTask] = useState<Task | null>(null);
     const [loading, setLoading] = useState(true);
+    const [photos, setPhotos] = useState<string[]>([]);
 
     useEffect(() => {
         if (taskId) {
@@ -75,11 +77,11 @@ const TaskDetails = () => {
                 },
                 body: JSON.stringify({ status: newStatus }),
             });
-            
+
             if (!response.ok) {
                 throw new Error('Failed to update task status');
             }
-            
+
             const statusLabel = STATUS_LABELS[newStatus] || newStatus;
             Alert.alert('Succes', `Sarcina a fost marcată ca "${statusLabel}"`);
             fetchTask(); // Refresh task
@@ -124,6 +126,74 @@ const TaskDetails = () => {
         );
     };
 
+    // Photo functionality
+    const handleAddPhotos = () => {
+        Alert.alert(
+            'Adaugă Poze',
+            'De unde vrei să adaugi pozele?',
+            [
+                { text: 'Anulează', style: 'cancel' },
+                { text: '📷 Camera', onPress: handleTakePhoto },
+                { text: '🖼️ Galerie', onPress: handlePickFromGallery },
+            ]
+        );
+    };
+
+    const handleTakePhoto = async () => {
+        const { status } = await ImagePicker.requestCameraPermissionsAsync();
+        if (status !== 'granted') {
+            Alert.alert('Permisiune necesară', 'Aplicația are nevoie de acces la cameră pentru a face poze.');
+            return;
+        }
+
+        const result = await ImagePicker.launchCameraAsync({
+            mediaTypes: ['images'],
+            quality: 0.8,
+            allowsEditing: false,
+        });
+
+        if (!result.canceled && result.assets.length > 0) {
+            const newUris = result.assets.map(asset => asset.uri);
+            setPhotos(prev => [...prev, ...newUris]);
+        }
+    };
+
+    const handlePickFromGallery = async () => {
+        const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (status !== 'granted') {
+            Alert.alert('Permisiune necesară', 'Aplicația are nevoie de acces la galerie pentru a selecta poze.');
+            return;
+        }
+
+        const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ['images'],
+            quality: 0.8,
+            allowsMultipleSelection: true,
+        });
+
+        if (!result.canceled && result.assets.length > 0) {
+            const newUris = result.assets.map(asset => asset.uri);
+            setPhotos(prev => [...prev, ...newUris]);
+        }
+    };
+
+    const handleRemovePhoto = (index: number) => {
+        Alert.alert(
+            'Șterge Poza',
+            'Ești sigur că vrei să ștergi această poză?',
+            [
+                { text: 'Anulează', style: 'cancel' },
+                {
+                    text: 'Șterge',
+                    style: 'destructive',
+                    onPress: () => {
+                        setPhotos(prev => prev.filter((_, i) => i !== index));
+                    }
+                }
+            ]
+        );
+    };
+
     if (loading) {
         return (
             <View style={[styles.container, styles.loadingContainer]}>
@@ -145,6 +215,8 @@ const TaskDetails = () => {
         );
     }
 
+    const hasPhotos = photos.length > 0;
+
     return (
         <View style={styles.container}>
             {/* Header */}
@@ -165,24 +237,15 @@ const TaskDetails = () => {
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
             >
-                {/* Task Type Card */}
+                {/* Task Type - simple text, no icon */}
                 <View style={styles.typeCard}>
-                    <Ionicons 
-                        name={
-                            task.type === 'PLACEMENT' ? 'add-circle' :
-                            task.type === 'PICKUP' ? 'remove-circle' :
-                            task.type === 'SANITIZATION' ? 'water' : 'construct'
-                        } 
-                        size={40} 
-                        color="#FFFFFF" 
-                    />
                     <Text style={styles.typeText}>{TASK_TYPE_LABELS[task.type] || task.type}</Text>
                 </View>
 
                 {/* Client Info */}
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Informații Client</Text>
-                    
+
                     <View style={styles.infoRow}>
                         <Ionicons name="person" size={20} color="#5D8AA8" />
                         <View style={styles.infoContent}>
@@ -206,7 +269,7 @@ const TaskDetails = () => {
                 {/* Location Info */}
                 <View style={styles.section}>
                     <Text style={styles.sectionTitle}>Locație</Text>
-                    
+
                     <Pressable style={styles.infoRow} onPress={handleNavigate}>
                         <Ionicons name="location" size={20} color="#F44336" />
                         <View style={styles.infoContent}>
@@ -227,17 +290,56 @@ const TaskDetails = () => {
                     </View>
                 )}
 
+                {/* Photos Section */}
+                <View style={styles.section}>
+                    <Text style={styles.sectionTitle}>Poze ({photos.length})</Text>
+
+                    {/* Photo grid */}
+                    {hasPhotos && (
+                        <View style={styles.photoGrid}>
+                            {photos.map((uri, index) => (
+                                <Pressable
+                                    key={index}
+                                    style={styles.photoWrapper}
+                                    onLongPress={() => handleRemovePhoto(index)}
+                                >
+                                    <Image source={{ uri }} style={styles.photoImage} />
+                                    <Pressable
+                                        style={styles.removePhotoButton}
+                                        onPress={() => handleRemovePhoto(index)}
+                                    >
+                                        <Ionicons name="close-circle" size={22} color="#FF5252" />
+                                    </Pressable>
+                                </Pressable>
+                            ))}
+                        </View>
+                    )}
+
+                    {/* Add photos button */}
+                    <Pressable
+                        style={({ pressed }) => [
+                            styles.addPhotoButton,
+                            pressed && { opacity: 0.7 }
+                        ]}
+                        onPress={handleAddPhotos}
+                    >
+                        <Ionicons name="camera" size={28} color="#5D8AA8" />
+                        <Text style={styles.addPhotoText}>Adaugă Poze</Text>
+                        <Text style={styles.addPhotoSubtext}>Apasă pentru a face sau selecta poze</Text>
+                    </Pressable>
+                </View>
+
                 {/* Quick Actions */}
                 <View style={styles.quickActions}>
-                    <Pressable 
+                    <Pressable
                         style={[styles.quickActionButton, { backgroundColor: '#4CAF50' }]}
                         onPress={handleCall}
                     >
                         <Ionicons name="call" size={24} color="#FFFFFF" />
                         <Text style={styles.quickActionText}>Sună</Text>
                     </Pressable>
-                    
-                    <Pressable 
+
+                    <Pressable
                         style={[styles.quickActionButton, { backgroundColor: '#2196F3' }]}
                         onPress={handleNavigate}
                     >
@@ -266,7 +368,7 @@ const TaskDetails = () => {
                 </View>
             )}
 
-            {task.status === 'IN_PROGRESS' && (
+            {task.status === 'IN_PROGRESS' && hasPhotos && (
                 <View style={styles.bottomAction}>
                     <Pressable
                         style={({ pressed }) => [
@@ -279,6 +381,15 @@ const TaskDetails = () => {
                         <Ionicons name="checkmark-circle" size={24} color="#FFFFFF" />
                         <Text style={styles.actionButtonText}>Finalizează Sarcina</Text>
                     </Pressable>
+                </View>
+            )}
+
+            {task.status === 'IN_PROGRESS' && !hasPhotos && (
+                <View style={styles.bottomAction}>
+                    <View style={styles.noPhotosWarning}>
+                        <Ionicons name="camera-outline" size={20} color="#FFA500" />
+                        <Text style={styles.noPhotosWarningText}>Adaugă poze pentru a putea finaliza sarcina</Text>
+                    </View>
                 </View>
             )}
 
@@ -375,7 +486,8 @@ const styles = StyleSheet.create({
     typeCard: {
         backgroundColor: '#427992',
         borderRadius: 16,
-        padding: 20,
+        paddingVertical: 16,
+        paddingHorizontal: 20,
         alignItems: 'center',
         marginBottom: 20,
     },
@@ -383,7 +495,6 @@ const styles = StyleSheet.create({
         color: '#FFFFFF',
         fontSize: 22,
         fontWeight: 'bold',
-        marginTop: 10,
     },
     section: {
         backgroundColor: '#2A4158',
@@ -429,6 +540,54 @@ const styles = StyleSheet.create({
         fontSize: 14,
         lineHeight: 20,
     },
+
+    // Photos
+    photoGrid: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        marginBottom: 12,
+        gap: 8,
+    },
+    photoWrapper: {
+        width: 90,
+        height: 90,
+        borderRadius: 10,
+        overflow: 'hidden',
+        position: 'relative',
+    },
+    photoImage: {
+        width: '100%',
+        height: '100%',
+        borderRadius: 10,
+    },
+    removePhotoButton: {
+        position: 'absolute',
+        top: 2,
+        right: 2,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        borderRadius: 11,
+    },
+    addPhotoButton: {
+        borderWidth: 2,
+        borderColor: '#427992',
+        borderStyle: 'dashed',
+        borderRadius: 12,
+        paddingVertical: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    addPhotoText: {
+        color: '#5D8AA8',
+        fontSize: 16,
+        fontWeight: '600',
+        marginTop: 8,
+    },
+    addPhotoSubtext: {
+        color: '#3E6B84',
+        fontSize: 12,
+        marginTop: 4,
+    },
+
     quickActions: {
         flexDirection: 'row',
         justifyContent: 'space-between',
@@ -488,6 +647,22 @@ const styles = StyleSheet.create({
         color: '#4CAF50',
         fontSize: 16,
         fontWeight: '600',
+        marginLeft: 8,
+    },
+    noPhotosWarning: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: '#2A4158',
+        paddingVertical: 14,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: '#FFA500',
+    },
+    noPhotosWarningText: {
+        color: '#FFA500',
+        fontSize: 13,
+        fontWeight: '500',
         marginLeft: 8,
     },
 })

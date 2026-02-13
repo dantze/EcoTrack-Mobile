@@ -135,12 +135,19 @@ const ServiceDetails = () => {
     const address = task.address || additionalInfo?.locationAddress || 'Adresă indisponibilă';
     const phone = task.clientPhone || additionalInfo?.contact || 'N/A';
     const taskType = getTaskTypeLabel(task.type);
+    const hasScheduledDate = !!task.scheduledTime;
     const scheduledDate = task.scheduledTime
-        ? new Date(task.scheduledTime).toLocaleDateString('ro-RO')
-        : (additionalInfo?.startDate ? new Date(additionalInfo.startDate).toLocaleDateString('ro-RO') : 'N/A');
+        ? new Date(task.scheduledTime).toLocaleDateString('ro-RO', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric'
+        })
+        : null;
 
-    // Description combines task notes and order details
-    const description = [task.internalNotes, additionalInfo?.details].filter(Boolean).join('\n\n') || "Fără descriere suplimentară.";
+
+    // Description shows order details only
+    const description = additionalInfo?.details || "Fără descriere suplimentară.";
 
     // Use a placeholder image if no photos (assuming photos not yet implemented in backend fetch)
     const imageUrl = "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSCCvGfvCGF5vX0Dq2yT9YnfnvL_qVbCg4q4Q&s";
@@ -167,7 +174,17 @@ const ServiceDetails = () => {
                 <View style={styles.mainCard}>
 
                     <DetailRow label="Client / Companie" value={clientName} />
-                    <DetailRow label="Dată Programată" value={scheduledDate} />
+                    {hasScheduledDate ? (
+                        <DetailRow label="Dată Programată" value={scheduledDate!} />
+                    ) : (
+                        <View style={styles.rowContainer}>
+                            <Text style={styles.label}>Dată Programată</Text>
+                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                <Ionicons name="alert-circle-outline" size={16} color="#F39C12" style={{ marginRight: 4 }} />
+                                <Text style={{ color: '#F39C12', fontSize: 13, fontWeight: '600' }}>Nicio dată programată</Text>
+                            </View>
+                        </View>
+                    )}
                     <DetailRow label="Telefon" value={phone} />
                     <DetailRow label="Adresă" value={address} isMultiline />
 

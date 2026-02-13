@@ -1,10 +1,11 @@
-import { StyleSheet, Text, View, Pressable, ScrollView, Image, Modal, Alert, ActivityIndicator } from 'react-native'
+import { StyleSheet, Text, View, Pressable, ScrollView, Image, Modal, Alert, ActivityIndicator, Platform } from 'react-native'
 import React, { useState, useEffect } from 'react'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { OrderService } from '../../services/OrderService';
 import { RouteService, Route } from '../../services/RouteService';
 import { TaskService } from '../../services/TaskService';
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 
 type DetailRowProps = {
     label: string;
@@ -21,12 +22,17 @@ const OrderDetails = () => {
     const [order, setOrder] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [routes, setRoutes] = useState<Route[]>([]);
-    const [orderTaskStatus, setOrderTaskStatus] = useState<{ hasTask: boolean; routeId: number | null }>({ hasTask: false, routeId: null });
+    const [orderTaskStatus, setOrderTaskStatus] = useState<{ hasTask: boolean; taskId: number | null; routeId: number | null; scheduledTime?: string | null }>({ hasTask: false, taskId: null, routeId: null });
 
     // --- STATE FOR MODAL ---
     const [modalVisible, setModalVisible] = useState(false);
     const [selectedRoute, setSelectedRoute] = useState<Route | null>(null);
     const [assigning, setAssigning] = useState(false);
+
+    // --- STATE FOR DATE PICKER ---
+    const [showDatePicker, setShowDatePicker] = useState(false);
+    const [savingDate, setSavingDate] = useState(false);
+    const [pickerDate, setPickerDate] = useState<Date>(new Date());
 
     useEffect(() => {
         if (orderId) {
@@ -75,7 +81,7 @@ const OrderDetails = () => {
     const checkTaskStatus = async () => {
         try {
             const status = await TaskService.checkOrderHasTask(orderId!);
-            setOrderTaskStatus({ hasTask: status.hasTask, routeId: status.routeId });
+            setOrderTaskStatus({ hasTask: status.hasTask, taskId: status.taskId, routeId: status.routeId, scheduledTime: status.scheduledTime });
         } catch (error) {
             console.error("Failed to check task status", error);
         }
@@ -108,9 +114,9 @@ const OrderDetails = () => {
             try {
                 setAssigning(true);
                 // Create task from order and assign to route
-                await TaskService.createTaskFromOrder(orderId, selectedRoute.id);
+                const createdTask = await TaskService.createTaskFromOrder(orderId, selectedRoute.id);
                 setModalVisible(false);
-                setOrderTaskStatus({ hasTask: true, routeId: selectedRoute.id });
+                setOrderTaskStatus({ hasTask: true, taskId: createdTask.id, routeId: selectedRoute.id, scheduledTime: null });
                 Alert.alert(
                     "Succes!",
                     `Comanda a fost atribuită rutei "${selectedRoute.name || 'Ruta #' + selectedRoute.id}" (${selectedRoute.employeeName || 'Șofer'})!`
@@ -143,7 +149,7 @@ const OrderDetails = () => {
                             onPress: async () => {
                                 try {
                                     await TaskService.deleteTask(status.taskId!);
-                                    setOrderTaskStatus({ hasTask: false, routeId: null });
+                                    setOrderTaskStatus({ hasTask: false, taskId: null, routeId: null, scheduledTime: null });
                                     setSelectedRoute(null);
                                     setModalVisible(true);
                                     Alert.alert("Succes", "Atribuirea anterioară a fost ștearsă. Poți selecta o nouă rută.");
@@ -158,6 +164,50 @@ const OrderDetails = () => {
         } catch (error) {
             console.error("Error checking task status:", error);
         }
+    };
+
+    // Track date selection locally (no auto-save)
+    const handleDateChange = (_event: DateTimePickerEvent, selectedDate?: Date) => {
+        if (selectedDate) {
+            setPickerDate(selectedDate);
+        }
+    };
+
+    // Toggle picker: open it or save & close it
+    const handleDateButtonPress = async () => {
+        if (showDatePicker) {
+            // Picker is open → save and close
+            if (orderTaskStatus.taskId) {
+                try {
+                    setSavingDate(true);
+                    const dateStr = pickerDate.toISOString().split('T')[0];
+                    await TaskService.updateScheduledDate(orderTaskStatus.taskId, dateStr);
+                    setOrderTaskStatus(prev => ({ ...prev, scheduledTime: pickerDate.toISOString() }));
+                    Alert.alert("Succes", `Data programată a fost setată: ${pickerDate.toLocaleDateString('ro-RO')}`);
+                } catch (error: any) {
+                    Alert.alert("Eroare", error.message || "Nu s-a putut seta data programată.");
+                } finally {
+                    setSavingDate(false);
+                }
+            }
+            setShowDatePicker(false);
+        } else {
+            // Picker is closed → open it, initialize with existing date or today
+            setPickerDate(orderTaskStatus.scheduledTime ? new Date(orderTaskStatus.scheduledTime) : new Date());
+            setShowDatePicker(true);
+        }
+    };
+
+    const getScheduledDateDisplay = () => {
+        if (orderTaskStatus.scheduledTime) {
+            return new Date(orderTaskStatus.scheduledTime).toLocaleDateString('ro-RO', {
+                weekday: 'long',
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric'
+            });
+        }
+        return null;
     };
 
     // Component for detail rows
@@ -186,6 +236,27 @@ const OrderDetails = () => {
         : (order.client?.fullName || order.client?.email || 'N/A');
     const clientAddress = order.locationAddress || order.locationCoordinates || order.client?.address;
 
+    const renderDateRow = () => {
+        if (!order || !order.startDate) return null;
+        try {
+            const start = new Date(order.startDate);
+            if (isNaN(start.getTime())) return null;
+
+            const formatDate = (d: Date) => d.toLocaleDateString('ro-RO');
+            const startStr = formatDate(start);
+
+            if (order.endDate) {
+                const end = new Date(order.endDate);
+                if (!isNaN(end.getTime()) && start.getTime() !== end.getTime()) {
+                    return <DetailRow label="Perioadă" value={`${startStr} - ${formatDate(end)}`} />;
+                }
+            }
+            return <DetailRow label="Data Comenzii" value={startStr} />;
+        } catch (e) {
+            return null;
+        }
+    };
+
     return (
         <View style={styles.container}>
 
@@ -209,13 +280,66 @@ const OrderDetails = () => {
                     <DetailRow label="Cantitate" value={order.quantity?.toString()} />
                     <DetailRow label="Tip" value={order.orderType} />
 
+                    {renderDateRow()}
                     <DetailRow label="Durată" value={order.durationDays ? `${order.durationDays} zile` : (order.isIndefinite ? 'Nedefinit' : 'N/A')} />
 
                     <View style={{ height: 10 }} />
                     <DetailRow label="Contact" value={order.contact} />
-                    <DetailRow label="Rută Asignată" value={order.routeDefinition?.name} />
                     <DetailRow label="Detalii" value={order.details} isMultiline />
                 </View>
+
+                {/* --- SCHEDULED DATE SECTION --- */}
+                {orderTaskStatus.hasTask && (
+                    <View style={styles.scheduleDateSection}>
+                        <View style={styles.scheduleDateHeader}>
+                            <Ionicons name="calendar-outline" size={20} color="#E0E0E0" />
+                            <Text style={styles.scheduleDateTitle}>Dată Programată</Text>
+                        </View>
+
+                        {getScheduledDateDisplay() ? (
+                            <View style={styles.scheduleDateDisplay}>
+                                <Ionicons name="checkmark-circle" size={18} color="#2ECC71" />
+                                <Text style={styles.scheduleDateText}>{getScheduledDateDisplay()}</Text>
+                            </View>
+                        ) : (
+                            <View style={styles.noDateNotice}>
+                                <Ionicons name="alert-circle-outline" size={18} color="#F39C12" />
+                                <Text style={styles.noDateText}>Nicio dată programată încă</Text>
+                            </View>
+                        )}
+
+                        {showDatePicker && (
+                            <DateTimePicker
+                                value={pickerDate}
+                                mode="date"
+                                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                                onChange={handleDateChange}
+                                minimumDate={new Date()}
+                            />
+                        )}
+
+                        <Pressable
+                            style={({ pressed }) => [
+                                showDatePicker ? styles.saveDateButton : styles.setDateButton,
+                                savingDate && styles.disabledActionButton,
+                                pressed && !savingDate && styles.buttonPressed
+                            ]}
+                            onPress={handleDateButtonPress}
+                            disabled={savingDate}
+                        >
+                            {savingDate ? (
+                                <ActivityIndicator size="small" color="white" />
+                            ) : (
+                                <>
+                                    <Ionicons name={showDatePicker ? "checkmark-circle" : "calendar"} size={20} color="white" style={{ marginRight: 8 }} />
+                                    <Text style={styles.setDateButtonText}>
+                                        {showDatePicker ? 'Salvează Data' : (getScheduledDateDisplay() ? 'Schimbă Data' : 'Setează Data')}
+                                    </Text>
+                                </>
+                            )}
+                        </Pressable>
+                    </View>
+                )}
 
                 {/* STATUS BADGE - shows if already assigned */}
                 {orderTaskStatus.hasTask && (
@@ -518,5 +642,81 @@ const styles = StyleSheet.create({
         color: 'white',
         fontWeight: 'bold',
         fontSize: 16,
+    },
+
+    // --- SCHEDULED DATE SECTION STYLES ---
+    scheduleDateSection: {
+        backgroundColor: '#5D8AA8',
+        borderRadius: 20,
+        padding: 20,
+        width: '100%',
+        marginTop: 20,
+        marginBottom: 10,
+    },
+    scheduleDateHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    scheduleDateTitle: {
+        color: '#E0E0E0',
+        fontSize: 16,
+        fontWeight: '600',
+        marginLeft: 8,
+    },
+    scheduleDateDisplay: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(46, 204, 113, 0.15)',
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        borderRadius: 12,
+        marginBottom: 12,
+    },
+    scheduleDateText: {
+        color: '#FFFFFF',
+        fontSize: 15,
+        fontWeight: 'bold',
+        marginLeft: 8,
+        textTransform: 'capitalize',
+    },
+    noDateNotice: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(243, 156, 18, 0.15)',
+        paddingHorizontal: 12,
+        paddingVertical: 10,
+        borderRadius: 12,
+        marginBottom: 12,
+    },
+    noDateText: {
+        color: '#F39C12',
+        fontSize: 14,
+        fontWeight: '600',
+        marginLeft: 8,
+    },
+    setDateButton: {
+        backgroundColor: '#427992',
+        height: 48,
+        borderRadius: 12,
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        elevation: 3,
+    },
+    setDateButtonText: {
+        color: 'white',
+        fontWeight: 'bold',
+        fontSize: 15,
+    },
+    saveDateButton: {
+        backgroundColor: '#2ECC71',
+        height: 48,
+        borderRadius: 12,
+        flexDirection: 'row',
+        justifyContent: 'center',
+        alignItems: 'center',
+        elevation: 3,
+        marginTop: 10,
     },
 })

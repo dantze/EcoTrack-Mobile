@@ -94,21 +94,34 @@ const Orders = () => {
     };
 
     // Format date from ISO string or any date format
-    const formatDate = (dateString: string) => {
-        if (!dateString) return { month: 'N/A', day: '--' };
+    type DateInfo =
+        | { isRange: true; start: { m: string; d: number }; end: { m: string; d: number } }
+        | { isRange: false; m: string; d: string | number };
 
-        try {
-            const date = new Date(dateString);
-            if (isNaN(date.getTime())) return { month: 'N/A', day: '--' };
+    // Date display logic
+    const getDateInfo = (order: Order): DateInfo => {
+        const months = ['IAN', 'FEB', 'MAR', 'APR', 'MAI', 'IUN', 'IUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+        const parse = (s?: string) => s ? new Date(s) : null;
+        const isValid = (d: Date | null) => d && !isNaN(d.getTime());
 
-            const months = ['Ian', 'Feb', 'Mar', 'Apr', 'Mai', 'Iun', 'Iul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-            return {
-                month: months[date.getMonth()],
-                day: date.getDate().toString()
-            };
-        } catch {
-            return { month: 'N/A', day: '--' };
+        const d1 = parse(order.startDate);
+        const d2 = parse(order.endDate);
+
+        if (isValid(d1)) {
+            const m1 = months[d1!.getMonth()];
+            const day1 = d1!.getDate();
+
+            if (isValid(d2) && d1!.getTime() !== d2!.getTime()) {
+                const sameDay = d1!.getDate() === d2!.getDate() && d1!.getMonth() === d2!.getMonth() && d1!.getFullYear() === d2!.getFullYear();
+                if (!sameDay) {
+                    const m2 = months[d2!.getMonth()];
+                    const day2 = d2!.getDate();
+                    return { isRange: true, start: { m: m1, d: day1 }, end: { m: m2, d: day2 } };
+                }
+            }
+            return { isRange: false, m: m1, d: day1 };
         }
+        return { isRange: false, m: 'N/A', d: '--' };
     };
 
     // Get client display name
@@ -189,7 +202,7 @@ const Orders = () => {
                     </View>
                 ) : (
                     orders.map((order) => {
-                        const { month, day } = formatDate(order.startDate);
+                        const dateInfo = getDateInfo(order);
                         const hasTask = orderTaskStatus[order.id] || false;
 
                         return (
@@ -228,9 +241,25 @@ const Orders = () => {
                                     </View>
                                 </View>
 
-                                <View style={styles.dateBadge}>
-                                    <Text style={styles.dateMonth}>{month}</Text>
-                                    <Text style={styles.dateDay}>{day}</Text>
+                                <View style={[styles.dateBadge, dateInfo.isRange && styles.dateBadgeRange]}>
+                                    {dateInfo.isRange ? (
+                                        <View style={styles.rangeContainer}>
+                                            <View style={styles.dateColumn}>
+                                                <Text style={styles.rangeMonth}>{dateInfo.start.m}</Text>
+                                                <Text style={styles.rangeDay}>{dateInfo.start.d}</Text>
+                                            </View>
+                                            <Text style={styles.rangeSeparator}>-</Text>
+                                            <View style={styles.dateColumn}>
+                                                <Text style={styles.rangeMonth}>{dateInfo.end.m}</Text>
+                                                <Text style={styles.rangeDay}>{dateInfo.end.d}</Text>
+                                            </View>
+                                        </View>
+                                    ) : (
+                                        <>
+                                            <Text style={styles.dateMonth}>{dateInfo.m}</Text>
+                                            <Text style={styles.dateDay}>{dateInfo.d}</Text>
+                                        </>
+                                    )}
                                 </View>
 
                             </Pressable>
@@ -378,6 +407,37 @@ const styles = StyleSheet.create({
         height: 60,
         justifyContent: 'center',
         alignItems: 'center',
+    },
+    dateBadgeRange: {
+        width: 100,
+        paddingHorizontal: 5,
+    },
+    rangeContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+        width: '100%',
+    },
+    dateColumn: {
+        alignItems: 'center',
+    },
+    rangeMonth: {
+        color: '#FFFFFF',
+        fontSize: 12,
+        fontWeight: 'bold',
+        textTransform: 'uppercase',
+    },
+    rangeDay: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: 'bold',
+    },
+    rangeSeparator: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: 'bold',
+        marginTop: 12, // Push it down visually to align somewhat between rows? Or center? 
+        // User asked for "17 - 20". So separator aligns with Days.
     },
     dateMonth: {
         color: '#FFFFFF',

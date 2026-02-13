@@ -11,18 +11,20 @@ type TaskItem = {
     status: 'NEW' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
     scheduledTime?: string;
     address?: string;
+    coordinates?: string;
     clientName?: string;
     clientPhone?: string;
+    contactPerson?: string;
+    productName?: string;
+    quantity?: number;
     internalNotes?: string;
 };
 
 const RouteTasks = () => {
     const router = useRouter();
-    const { routeId, driverName, routeDate, zona } = useLocalSearchParams<{
+    const { routeId, driverName} = useLocalSearchParams<{
         routeId?: string;
         driverName?: string;
-        routeDate?: string;
-        zona?: string;
     }>();
 
     const [tasks, setTasks] = useState<TaskItem[]>([]);
@@ -104,6 +106,21 @@ const RouteTasks = () => {
         }
     };
 
+    const getStatusColor = (status?: string) => {
+        switch (status?.toUpperCase()) {
+            case 'NEW':
+                return '#F39C12'; // Orange
+            case 'IN_PROGRESS':
+                return '#3498DB'; // Blue
+            case 'COMPLETED':
+                return '#2ECC71'; // Green
+            case 'CANCELLED':
+                return '#E74C3C'; // Red
+            default:
+                return '#95A5A6'; // Gray
+        }
+    };
+
     const handleCardPress = (item: TaskItem) => {
         console.log("View task details:", item.id);
         router.push({
@@ -112,16 +129,11 @@ const RouteTasks = () => {
         });
     };
 
-    const headerTitle = driverName
-        ? `${driverName} - ${formatDate(routeDate)}`
-        : `Sarcini - Ruta #${routeId}`;
-
     return (
         <View style={styles.container}>
 
             <View style={styles.headerContainer}>
-                <Text style={styles.headerText}>{headerTitle}</Text>
-                {zona && <Text style={styles.subHeaderText}>{zona}</Text>}
+                <Text style={styles.headerText}>{driverName}</Text>
             </View>
 
             {/* LEGEND */}
@@ -168,38 +180,55 @@ const RouteTasks = () => {
                             style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
                             onPress={() => handleCardPress(item)}
                         >
-                            {/* Left Info */}
-                            <View style={styles.cardInfo}>
-                                <Text style={styles.clientName}>
-                                    {item.clientName || 'Client necunoscut'}
-                                </Text>
-                                <Text style={styles.statusText}>
-                                    Tip: {getTaskTypeLabel(item.type)}
-                                </Text>
-                                <Text style={styles.statusText}>
-                                    Status: {getStatusLabel(item.status)}
-                                </Text>
-                                {item.address && (
-                                    <View style={styles.addressContainer}>
-                                        <Ionicons name="location-outline" size={14} color="#E0E0E0" style={{ marginRight: 5 }} />
-                                        <Text style={styles.statusText} numberOfLines={1}>{item.address}</Text>
-                                    </View>
-                                )}
-                                {item.clientPhone && (
-                                    <View style={styles.phoneContainer}>
-                                        <Ionicons name="call" size={14} color="#E0E0E0" style={{ marginRight: 5 }} />
-                                        <Text style={styles.statusText}>{item.clientPhone}</Text>
-                                    </View>
-                                )}
-                            </View>
+                            {/* Colored left border based on task type */}
+                            <View style={[styles.cardTypeBorder, { backgroundColor: getTaskTypeColor(item.type) }]} />
 
-                            {/* Right Pin */}
-                            <View style={styles.pinContainer}>
-                                <Ionicons
-                                    name="location"
-                                    size={28}
-                                    color={getTaskTypeColor(item.type)}
-                                />
+                            {/* Card Body */}
+                            <View style={styles.cardBody}>
+                                {/* Top Row: Location + Status */}
+                                <View style={styles.cardTopRow}>
+                                    <View style={styles.locationSection}>
+                                        <Ionicons name="location-sharp" size={18} color="#FFFFFF" />
+                                        <Text style={styles.addressText} numberOfLines={2}>
+                                            {item.address || item.coordinates || 'Locație necunoscută'}
+                                        </Text>
+                                    </View>
+                                    <View style={[styles.statusDot, { backgroundColor: getStatusColor(item.status) }]}>
+                                        <Text style={styles.statusDotText}>{getStatusLabel(item.status)}</Text>
+                                    </View>
+                                </View>
+
+                                {/* Order Info */}
+                                <View style={styles.orderInfoSection}>
+                                    {item.productName && (
+                                        <View style={styles.infoRow}>
+                                            <Ionicons name="cube-outline" size={14} color="#D0D0D0" />
+                                            <Text style={styles.infoText}>
+                                                {item.productName}{item.quantity ? ` × ${item.quantity}` : ''}
+                                            </Text>
+                                        </View>
+                                    )}
+                                    <View style={styles.infoRow}>
+                                        <Ionicons name="person-outline" size={14} color="#D0D0D0" />
+                                        <Text style={styles.infoText}>
+                                            {item.clientName || 'Client necunoscut'}
+                                        </Text>
+                                    </View>
+                                    {item.contactPerson && (
+                                        <View style={styles.infoRow}>
+                                            <Ionicons name="call-outline" size={14} color="#D0D0D0" />
+                                            <Text style={styles.infoText}>Contact: {item.contactPerson}</Text>
+                                        </View>
+                                    )}
+                                </View>
+
+                                {/* Bottom: Task Type Tag */}
+                                <View style={[styles.typeTag, { backgroundColor: getTaskTypeColor(item.type) + '30' }]}>
+                                    <View style={[styles.typeTagDot, { backgroundColor: getTaskTypeColor(item.type) }]} />
+                                    <Text style={[styles.typeTagText, { color: getTaskTypeColor(item.type) }]}>
+                                        {getTaskTypeLabel(item.type)}
+                                    </Text>
+                                </View>
                             </View>
                         </Pressable>
                     ))}
@@ -300,47 +329,87 @@ const styles = StyleSheet.create({
 
     // --- TASK CARD ---
     card: {
-        backgroundColor: '#5D8AA8',
+        backgroundColor: '#1E3A52',
         borderRadius: 16,
-        padding: 16,
-        marginBottom: 16,
+        marginBottom: 14,
         flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
+        overflow: 'hidden',
         elevation: 5,
         shadowColor: "#000",
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 3.84,
+        shadowOpacity: 0.15,
+        shadowRadius: 4,
     },
     cardPressed: {
         opacity: 0.9,
         transform: [{ scale: 0.98 }]
     },
-    cardInfo: {
+    cardTypeBorder: {
+        width: 5,
+    },
+    cardBody: {
         flex: 1,
+        padding: 14,
     },
-    clientName: {
-        fontSize: 20,
-        fontWeight: 'bold',
-        color: '#FFFFFF', // White (different from 'Orders')
-        marginBottom: 4,
+    cardTopRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        marginBottom: 10,
     },
-    statusText: {
-        fontSize: 14,
-        color: '#E0E0E0', // Light gray
-        marginBottom: 8,
+    locationSection: {
+        flex: 1,
+        flexDirection: 'row',
+        alignItems: 'flex-start',
+        marginRight: 10,
+        gap: 6,
     },
-    phoneContainer: {
+    addressText: {
+        fontSize: 15,
+        fontWeight: '700',
+        color: '#FFFFFF',
+        flex: 1,
+        lineHeight: 20,
+    },
+    statusDot: {
+        paddingHorizontal: 10,
+        paddingVertical: 4,
+        borderRadius: 12,
+    },
+    statusDotText: {
+        color: '#FFFFFF',
+        fontSize: 11,
+        fontWeight: '700',
+    },
+    orderInfoSection: {
+        marginBottom: 10,
+        gap: 5,
+    },
+    infoRow: {
         flexDirection: 'row',
         alignItems: 'center',
+        gap: 6,
     },
-    pinContainer: {
-        paddingLeft: 10,
+    infoText: {
+        fontSize: 13,
+        color: '#B0BEC5',
     },
-    addressContainer: {
+    typeTag: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginTop: 2,
+        alignSelf: 'flex-start',
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 8,
+        gap: 6,
+    },
+    typeTagDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+    },
+    typeTagText: {
+        fontSize: 12,
+        fontWeight: '700',
     }
 })

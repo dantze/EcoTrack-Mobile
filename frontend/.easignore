@@ -1,0 +1,9 @@
+# Exclude the entire backend from EAS builds (only frontend is needed)
+../backend/
+
+# Exclude local H2 database files
+*.mv.db
+*.trace.db
+
+# Exclude large files not needed for the build
+../backend/data/

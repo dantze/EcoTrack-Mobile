@@ -1,6 +1,6 @@
-export default {
+module.exports = {
     expo: {
-        name: "frontend",
+        name: "EcoTrack",
         slug: "frontend",
         version: "1.0.0",
         orientation: "portrait",
@@ -14,7 +14,8 @@ export default {
             backgroundColor: "#ffffff"
         },
         ios: {
-            supportsTablet: true
+            supportsTablet: true,
+            bundleIdentifier: "com.damiprod.ecotrack"
         },
         android: {
             package: "com.damiprod.ecotrack",
@@ -27,6 +28,7 @@ export default {
                     apiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY
                 }
             },
+            googleServicesFile: "./google-services.json",
             edgeToEdgeEnabled: true,
             predictiveBackGestureEnabled: false
         },
@@ -39,8 +41,12 @@ export default {
             "expo-router"
         ],
         extra: {
-            googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY
+            googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
+            eas: {
+                projectId: "b68f1933-d3e1-4cdb-a5e3-31a0540679b2"
+            }
         },
+        owner: "andreidan",
         experiments: {
             typedRoutes: true
         }

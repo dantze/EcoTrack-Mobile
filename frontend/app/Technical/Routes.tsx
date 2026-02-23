@@ -128,6 +128,9 @@ const Routes = () => {
 
             {/* Header */}
             <View style={styles.headerContainer}>
+                <Pressable onPress={() => router.back()} style={styles.backButton}>
+                    <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+                </Pressable>
                 <Text style={styles.headerText}>{`Rute - ${county || zonaLabel}`}</Text>
             </View>
 
@@ -259,6 +262,17 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
         width: '100%',
         marginBottom: 30,
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    backButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: '#427992',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 15,
     },
     headerText: {
         color: '#FFFFFF',

@@ -39,7 +39,12 @@ module.exports = {
             favicon: "./assets/images/favicon.png"
         },
         plugins: [
-            "expo-router"
+            "expo-router",
+            ["expo-build-properties", {
+                android: {
+                    usesCleartextTraffic: true
+                }
+            }]
         ],
         extra: {
             googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,

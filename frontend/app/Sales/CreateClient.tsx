@@ -1,7 +1,7 @@
 import { StyleSheet, Text, View, Pressable, TextInput, ScrollView, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard, Alert, Image } from 'react-native'
 import React, { useState } from 'react'
 import { useRouter } from 'expo-router'
-import { AntDesign, Feather } from '@expo/vector-icons';
+import { AntDesign, Feather, Ionicons } from '@expo/vector-icons';
 import { API_BASE_URL } from '../../constants/ApiConfig';
 import { ClientService, ClientType } from '../../services/ClientService';
 import * as ImagePicker from 'expo-image-picker';
@@ -159,6 +159,9 @@ const CreateClient = () => {
                 style={styles.container}
             >
                 <View style={styles.headerContainer}>
+                    <Pressable onPress={() => router.back()} style={styles.backButton}>
+                        <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+                    </Pressable>
                     <Text style={styles.headerText}>Creare Client</Text>
                 </View>
 
@@ -273,9 +276,14 @@ const styles = StyleSheet.create({
         backgroundColor: '#16283C',
     },
     headerContainer: {
-        marginTop: 60,
+        marginTop: 75,
         paddingHorizontal: 20,
         marginBottom: 20,
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    backButton: {
+        marginRight: 15,
     },
     headerText: {
         color: '#FFFFFF',

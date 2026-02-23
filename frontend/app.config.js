@@ -30,7 +30,8 @@ module.exports = {
             },
             googleServicesFile: "./google-services.json",
             edgeToEdgeEnabled: true,
-            predictiveBackGestureEnabled: false
+            predictiveBackGestureEnabled: false,
+            usesCleartextTraffic: true
         },
         web: {
             bundler: "metro",

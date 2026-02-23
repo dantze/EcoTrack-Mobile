@@ -76,7 +76,7 @@ public class DataLoader implements CommandLineRunner {
                 createEmployee("tripa_andrei", "sofer123452", "Tripa Andrei", null, null, driverRole);
 
                 // ==================== ADMIN (optional - for testing) ====================
-                Employee admin = createEmployee("admin1212345", "admin4893827878665", "Administrator", null, null,
+                Employee admin = createEmployee("admin", "admin", "Administrator", null, null,
                                 salesRole);
                 admin.getRoles().add(techRole);
                 admin.getRoles().add(driverRole);

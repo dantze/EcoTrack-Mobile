@@ -19,8 +19,8 @@ const { width, height } = Dimensions.get('window');
 const DEFAULT_REGION: Region = {
     latitude: 44.4268,
     longitude: 26.1025,
-    latitudeDelta: 0.05,
-    longitudeDelta: 0.05,
+    latitudeDelta: 0.3,
+    longitudeDelta: 0.3,
 };
 
 // Custom Map Style to remove POIs and simplify (same as LocationPicker)

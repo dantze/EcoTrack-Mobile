@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View, Pressable, Image, ScrollView, ActivityIndicator, Modal } from 'react-native'
+import { StyleSheet, Text, View, Pressable, Image, ScrollView, ActivityIndicator, Modal, Alert } from 'react-native'
 import React, { useState, useCallback } from 'react'
 import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons';
@@ -107,14 +107,17 @@ const Routes = () => {
         if (!selectedRoute) return;
 
         try {
+            const routeName = selectedRoute.name || `#${selectedRoute.id}`;
             await RouteService.assignDriverToRoute(selectedRoute.id, driver.id);
             console.log(`Assigned driver ${driver.fullName} to route ${selectedRoute.id}`);
             setDriverModalVisible(false);
             setSelectedRoute(null);
             // Refresh routes to show updated driver assignment
             fetchRoutes();
+            Alert.alert('Succes', `${driver.fullName} a fost asignat rutei ${routeName}`);
         } catch (error) {
             console.error('Error assigning driver:', error);
+            Alert.alert('Eroare', 'Nu s-a putut asigna șoferul.');
         }
     };
 

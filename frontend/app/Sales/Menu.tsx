@@ -82,15 +82,37 @@ const Menu = () => {
                     <Text style={styles.buttonText}>Produse și Abonamente</Text>
                 </Pressable>
 
+                <View style={styles.separator} />
+
+                <Pressable
+                    style={({ pressed }) => [
+                        styles.menuButton,
+                        pressed && styles.buttonPressed
+                    ]}
+                    onPress={() => router.push({
+                        pathname: '/Sales/ClientsList',
+                    })}
+                >
+                    <Text style={styles.buttonText}>Lista Clienți</Text>
+                </Pressable>
+
+                <View style={styles.separator} />
+
+                <Pressable
+                    style={({ pressed }) => [
+                        styles.menuButton,
+                        pressed && styles.buttonPressed
+                    ]}
+                    onPress={() => router.push({
+                        pathname: '/Sales/OrdersList',
+                    })}
+                >
+                    <Text style={styles.buttonText}>Lista Comenzi</Text>
+                </Pressable>
+
             </View>
 
-            <View style={styles.mapContainer}>
-                <Image
-                    source={mapImageSource}
-                    style={styles.mapImage}
-                    resizeMode="contain"
-                />
-            </View>
+            
 
         </View>
     )

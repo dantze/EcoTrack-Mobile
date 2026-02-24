@@ -80,6 +80,43 @@ export const ClientService = {
     },
 
     /**
+     * Updates a client by ID.
+     * @param clientId The ID of the client to update.
+     * @param clientData The updated client data.
+     */
+    updateClient: async (clientId: number, clientData: ClientData) => {
+        const response = await fetch(`${API_BASE_URL}/clients/${clientId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(clientData),
+        });
+
+        if (!response.ok) {
+            const errText = await response.text();
+            console.error('Update client error:', response.status, errText);
+            throw new Error(errText || `Eșec la actualizarea clientului (${response.status})`);
+        }
+
+        return await response.json();
+    },
+
+    /**
+     * Deletes a client by ID.
+     * @param clientId The ID of the client to delete.
+     */
+    deleteClient: async (clientId: number) => {
+        const response = await fetch(`${API_BASE_URL}/clients/${clientId}`, {
+            method: 'DELETE',
+        });
+
+        if (!response.ok) {
+            throw new Error('Eșec la ștergerea clientului');
+        }
+    },
+
+    /**
      * Uploads an ID photo for a specific client.
      * @param clientId The ID of the client (backend ID).
      * @param photoUri The local URI of the photo to upload.

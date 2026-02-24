@@ -12,6 +12,18 @@ export const OrderService = {
         }
     },
 
+    deleteOrder: async (id: number) => {
+        try {
+            const response = await fetch(`${API_BASE_URL}/orders/${id}`, {
+                method: 'DELETE',
+            });
+            if (!response.ok) throw new Error('Eșec la ștergerea comenzii');
+        } catch (error) {
+            console.error('Error deleting order:', error);
+            throw error;
+        }
+    },
+
     getOrderById: async (id: number) => {
         try {
             const response = await fetch(`${API_BASE_URL}/orders/${id}`);

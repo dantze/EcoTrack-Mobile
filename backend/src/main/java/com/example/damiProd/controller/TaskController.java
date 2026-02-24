@@ -1,14 +1,19 @@
 package com.example.damiProd.controller;
 
 import com.example.damiProd.domain.Task;
+import com.example.damiProd.domain.TaskPhoto;
 import com.example.damiProd.domain.TaskStatus;
+import com.example.damiProd.repository.TaskPhotoRepository;
+import com.example.damiProd.service.PhotoService;
 import com.example.damiProd.service.TaskService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -18,9 +23,13 @@ import java.util.Map;
 public class TaskController {
 
     private final TaskService taskService;
+    private final PhotoService photoService;
+    private final TaskPhotoRepository taskPhotoRepository;
 
-    public TaskController(TaskService taskService) {
+    public TaskController(TaskService taskService, PhotoService photoService, TaskPhotoRepository taskPhotoRepository) {
         this.taskService = taskService;
+        this.photoService = photoService;
+        this.taskPhotoRepository = taskPhotoRepository;
     }
 
     // Get all tasks
@@ -155,5 +164,47 @@ public class TaskController {
 
         List<Task> updatedTasks = taskService.reassignTasks(taskIds, newRouteId);
         return ResponseEntity.ok(updatedTasks);
+    }
+
+    // Upload photos for a task (stored in DO Spaces under "task_photos/" folder)
+    @PostMapping("/{id}/photos")
+    public ResponseEntity<Map<String, Object>> uploadTaskPhotos(
+            @PathVariable Long id,
+            @RequestParam("files") List<MultipartFile> files) {
+
+        Task task = taskService.getTaskById(id);
+        List<String> uploadedUrls = new ArrayList<>();
+
+        for (int i = 0; i < files.size(); i++) {
+            MultipartFile file = files.get(i);
+            if (file.isEmpty())
+                continue;
+
+            try {
+                // Build custom filename: taskId_index (e.g. "42_1")
+                String customFileName = id + "_" + (i + 1);
+                String publicUrl = photoService.uploadPhoto(file, "poze cabine", customFileName);
+
+                // Save reference in database
+                TaskPhoto taskPhoto = new TaskPhoto(publicUrl, null, task);
+                taskPhotoRepository.save(taskPhoto);
+                uploadedUrls.add(publicUrl);
+            } catch (Exception e) {
+                System.err.println("Failed to upload task photo: " + e.getMessage());
+            }
+        }
+
+        Map<String, Object> response = new HashMap<>();
+        response.put("uploaded", uploadedUrls.size());
+        response.put("urls", uploadedUrls);
+        return ResponseEntity.ok(response);
+    }
+
+    // Get all photo URLs for a task
+    @GetMapping("/{id}/photos")
+    public ResponseEntity<List<String>> getTaskPhotos(@PathVariable Long id) {
+        List<TaskPhoto> photos = taskPhotoRepository.findByTaskId(id);
+        List<String> urls = photos.stream().map(TaskPhoto::getImageUrl).toList();
+        return ResponseEntity.ok(urls);
     }
 }

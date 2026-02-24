@@ -87,4 +87,44 @@ export const PhotoService = {
 
         return await response.json();
     },
+
+    /**
+     * Uploads multiple task completion photos to DigitalOcean Spaces.
+     * Photos are stored under the "task_photos/" folder.
+     * 
+     * @param taskId The task ID.
+     * @param photoUris Array of local photo URIs (from ImagePicker).
+     * @returns Object with { uploaded: number, urls: string[] }
+     */
+    uploadTaskPhotos: async (taskId: number, photoUris: string[]): Promise<{ uploaded: number; urls: string[] }> => {
+        const formData = new FormData();
+
+        for (const uri of photoUris) {
+            const filename = uri.split('/').pop() || 'photo.jpg';
+            const match = /\.(\w+)$/.exec(filename);
+            const type = match ? `image/${match[1]}` : 'image/jpeg';
+
+            // @ts-ignore - React Native FormData expects { uri, name, type }
+            formData.append('files', { uri, name: filename, type });
+        }
+
+        console.log(`[PhotoService] Uploading ${photoUris.length} task photos for task ${taskId}...`);
+
+        const response = await fetch(`${API_BASE_URL}/tasks/${taskId}/photos`, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+            },
+            body: formData,
+        });
+
+        const responseData = await response.json();
+        console.log(`[PhotoService] Task photos upload response:`, responseData);
+
+        if (!response.ok) {
+            throw new Error('Eșec la încărcarea pozelor sarcinii');
+        }
+
+        return responseData;
+    },
 };

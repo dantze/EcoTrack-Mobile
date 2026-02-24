@@ -4,6 +4,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons';
 import { TaskService, Task } from '../../services/TaskService';
 import { OrderService } from '../../services/OrderService';
+import { PhotoService } from '../../services/PhotoService';
 import * as ImagePicker from 'expo-image-picker';
 
 const TASK_TYPE_LABELS: { [key: string]: string } = {
@@ -45,6 +46,7 @@ const TaskDetails = () => {
     const [orderDetails, setOrderDetails] = useState<OrderDetails | null>(null);
     const [loading, setLoading] = useState(true);
     const [photos, setPhotos] = useState<string[]>([]);
+    const [completing, setCompleting] = useState(false);
 
     useEffect(() => {
         if (taskId) {
@@ -134,10 +136,37 @@ const TaskDetails = () => {
     const handleCompleteTask = () => {
         Alert.alert(
             'Finalizare Sarcină',
-            'Ești sigur că vrei să marchezi sarcina ca finalizată?',
+            'Ești sigur că vrei să marchezi sarcina ca finalizată? Pozele vor fi încărcate în cloud.',
             [
                 { text: 'Anulează', style: 'cancel' },
-                { text: 'Finalizează', onPress: () => handleUpdateStatus('COMPLETED') }
+                {
+                    text: 'Finalizează',
+                    onPress: async () => {
+                        try {
+                            setCompleting(true);
+
+                            // Step 1: Upload photos to cloud
+                            if (photos.length > 0) {
+                                console.log(`[TaskDetails] Uploading ${photos.length} photos for task ${taskId}...`);
+                                const result = await PhotoService.uploadTaskPhotos(Number(taskId), photos);
+                                console.log(`[TaskDetails] ${result.uploaded} photos uploaded successfully`);
+                            }
+
+                            // Step 2: Mark task as completed
+                            await TaskService.updateTaskStatus(Number(taskId), 'COMPLETED');
+                            Alert.alert('Succes', 'Sarcina a fost finalizată și pozele au fost salvate în cloud!');
+                            loadTaskDetails();
+                        } catch (error: any) {
+                            console.error('[TaskDetails] Complete task error:', error);
+                            Alert.alert(
+                                'Eroare',
+                                'Nu s-a putut finaliza sarcina. Verifică conexiunea la internet și încearcă din nou.'
+                            );
+                        } finally {
+                            setCompleting(false);
+                        }
+                    }
+                }
             ]
         );
     };
@@ -421,12 +450,23 @@ const TaskDetails = () => {
                         style={({ pressed }) => [
                             styles.actionButton,
                             { backgroundColor: '#4CAF50' },
-                            pressed && styles.buttonPressed
+                            pressed && !completing && styles.buttonPressed,
+                            completing && { opacity: 0.7 }
                         ]}
                         onPress={handleCompleteTask}
+                        disabled={completing}
                     >
-                        <Ionicons name="checkmark-circle" size={24} color="#FFFFFF" />
-                        <Text style={styles.actionButtonText}>Finalizează Sarcina</Text>
+                        {completing ? (
+                            <>
+                                <ActivityIndicator size="small" color="#FFFFFF" />
+                                <Text style={styles.actionButtonText}>Se încarcă pozele...</Text>
+                            </>
+                        ) : (
+                            <>
+                                <Ionicons name="checkmark-circle" size={24} color="#FFFFFF" />
+                                <Text style={styles.actionButtonText}>Finalizează Sarcina</Text>
+                            </>
+                        )}
                     </Pressable>
                 </View>
             )}

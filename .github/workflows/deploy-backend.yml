@@ -22,12 +22,16 @@ jobs:
           DB_URL: ${{ secrets.DB_URL }}
           DB_USER: ${{ secrets.DB_USER }}
           DB_PASS: ${{ secrets.DB_PASS }}
+          DO_SPACES_ACCESS_KEY: ${{ secrets.DO_SPACES_ACCESS_KEY }}
+          DO_SPACES_SECRET_KEY: ${{ secrets.DO_SPACES_SECRET_KEY }}
+          DO_SPACES_BUCKET: ${{ secrets.DO_SPACES_BUCKET }}
+          DO_SPACES_REGION: ${{ secrets.DO_SPACES_REGION }}
         with:
           host: ${{ secrets.SERVER_IP }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           command_timeout: 10m
-          envs: DB_URL,DB_USER,DB_PASS
+          envs: DB_URL,DB_USER,DB_PASS,DO_SPACES_ACCESS_KEY,DO_SPACES_SECRET_KEY,DO_SPACES_BUCKET,DO_SPACES_REGION
           script: |
             echo "🚀 Starting deployment..."
             echo "DB_URL=$DB_URL"
@@ -68,6 +72,10 @@ jobs:
               --spring.datasource.url="$DB_URL" \
               --spring.datasource.username="$DB_USER" \
               --spring.datasource.password="$DB_PASS" \
+              --spaces.access-key="$DO_SPACES_ACCESS_KEY" \
+              --spaces.secret-key="$DO_SPACES_SECRET_KEY" \
+              --spaces.bucket="$DO_SPACES_BUCKET" \
+              --spaces.region="$DO_SPACES_REGION" \
               > ~/app.log 2>&1 &
             echo $! > ~/app.pid
             

@@ -19,7 +19,7 @@ public class PhotosController {
 
     private final PhotoService photoService;
     private final ClientRepository clientRepository;
-    private final String clientIdsFolderName = "Individual Client Ids/";
+    private final String clientIdsFolderName = "persoane fizice/";
 
     public PhotosController(PhotoService photoService, ClientRepository clientRepository) {
         this.photoService = photoService;

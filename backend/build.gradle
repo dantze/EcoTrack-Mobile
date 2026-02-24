@@ -39,3 +39,19 @@ dependencies {
 tasks.named('test') {
 	useJUnitPlatform()
 }
+
+// Automatically load .env file when running locally with bootRun
+tasks.named('bootRun') {
+	def envFile = file('.env')
+	if (envFile.exists()) {
+		envFile.readLines().each { line ->
+			// Skip blank lines and comments
+			if (line && !line.startsWith('#') && line.contains('=')) {
+				def parts = line.split('=', 2)
+				def key = parts[0].trim()
+				def value = parts.length > 1 ? parts[1].trim() : ''
+				environment key, value
+			}
+		}
+	}
+}

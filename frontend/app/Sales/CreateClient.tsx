@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router'
 import { AntDesign, Feather, Ionicons } from '@expo/vector-icons';
 import { API_BASE_URL } from '../../constants/ApiConfig';
 import { ClientService, ClientType } from '../../services/ClientService';
+import { PhotoService } from '../../services/PhotoService';
 import * as ImagePicker from 'expo-image-picker';
 
 const TIP_CLIENT = ["Persoană fizică", "Firme"];
@@ -126,15 +127,18 @@ const CreateClient = () => {
             const data = await ClientService.createClient(clientData);
             console.log('Client created successfully:', data);
 
-            // Upload Photo if idPhoto is present and client created successfully
+            // Upload photo to DigitalOcean Spaces via PhotoService
             if (idPhoto && data?.id && selectedType === "Persoană fizică") {
                 try {
-                    console.log(`Uploading photo for new client ID: ${data.id}`);
-                    await ClientService.uploadIdPhoto(data.id, idPhoto);
-                    console.log("Photo upload successful");
+                    console.log(`[CreateClient] Uploading photo for new client ID: ${data.id}`);
+                    const uploadResult = await PhotoService.uploadIdPhoto(data.id, idPhoto);
+                    console.log('[CreateClient] Photo uploaded to cloud:', uploadResult);
                 } catch (photoError) {
-                    console.error("Failed to upload photo:", photoError);
-                    Alert.alert("Eroare Buletin", "Clientul a fost creat, dar poza de buletin nu a putut fi încărcată.");
+                    console.error('[CreateClient] Cloud photo upload failed:', photoError);
+                    Alert.alert(
+                        "Eroare Buletin",
+                        "Clientul a fost creat, dar poza de buletin nu a putut fi încărcată în cloud."
+                    );
                 }
             }
 
@@ -147,7 +151,7 @@ const CreateClient = () => {
                 router.back();
             }
         } catch (error) {
-            console.error('Error creating client:', error);
+            console.error('[CreateClient] Error creating client:', error);
             Alert.alert("Eroare", "Nu s-a putut crea clientul. Te rog încearcă din nou.");
         }
     };

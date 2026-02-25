@@ -6,6 +6,8 @@ import { Calendar } from 'react-native-calendars';
 import { Employee, getAllDrivers } from '@/services/EmployeeService';
 import { RouteService } from '@/services/RouteService';
 import { TaskService, Task } from '@/services/TaskService';
+import ScreenHeader from '../../components/ScreenHeader';
+import { AppColors } from '../../constants/Colors';
 
 const ChangeDriver = () => {
     const router = useRouter();
@@ -210,13 +212,7 @@ const ChangeDriver = () => {
 
     return (
         <View style={styles.container}>
-            {/* Header */}
-            <View style={styles.headerContainer}>
-                <Pressable onPress={() => router.back()} style={styles.backButton}>
-                    <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
-                </Pressable>
-                <Text style={styles.headerText}>Schimbă Șofer</Text>
-            </View>
+            <ScreenHeader title="Schimbă Șofer" />
 
             <ScrollView style={styles.scrollContainer} contentContainerStyle={styles.scrollContent}>
                 {/* Date Picker */}
@@ -489,29 +485,7 @@ export default ChangeDriver
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#16283C',
-    },
-    headerContainer: {
-        marginTop: 60,
-        paddingHorizontal: 20,
-        width: '100%',
-        marginBottom: 20,
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    backButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: '#427992',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 15,
-    },
-    headerText: {
-        color: '#FFFFFF',
-        fontSize: 28,
-        fontWeight: 'bold',
+        backgroundColor: AppColors.screenBackground,
     },
     scrollContainer: {
         flex: 1,
@@ -524,18 +498,18 @@ const styles = StyleSheet.create({
         marginBottom: 20,
     },
     label: {
-        color: '#FFFFFF',
+        color: AppColors.textWhite,
         fontSize: 16,
         fontWeight: '600',
         marginBottom: 10,
     },
     dropdownButton: {
-        backgroundColor: '#2A4158',
+        backgroundColor: AppColors.inputBackground,
         borderRadius: 12,
         paddingHorizontal: 16,
         paddingVertical: 14,
         borderWidth: 1,
-        borderColor: '#427992',
+        borderColor: AppColors.buttonBackground,
         flexDirection: 'row',
         alignItems: 'center',
     },
@@ -544,7 +518,7 @@ const styles = StyleSheet.create({
     },
     dropdownButtonText: {
         fontSize: 16,
-        color: '#FFFFFF',
+        color: AppColors.textWhite,
     },
     placeholderText: {
         color: '#888',
@@ -564,18 +538,18 @@ const styles = StyleSheet.create({
         marginBottom: 15,
     },
     tasksSectionTitle: {
-        color: '#FFFFFF',
+        color: AppColors.textWhite,
         fontSize: 18,
         fontWeight: 'bold',
     },
     selectAllButton: {
-        backgroundColor: '#427992',
+        backgroundColor: AppColors.buttonBackground,
         paddingHorizontal: 12,
         paddingVertical: 8,
         borderRadius: 8,
     },
     selectAllButtonText: {
-        color: '#FFFFFF',
+        color: AppColors.textWhite,
         fontSize: 12,
         fontWeight: '600',
     },
@@ -583,15 +557,15 @@ const styles = StyleSheet.create({
         gap: 12,
     },
     taskCard: {
-        backgroundColor: '#2A4158',
+        backgroundColor: AppColors.inputBackground,
         borderRadius: 12,
         padding: 16,
         borderWidth: 2,
         borderColor: 'transparent',
     },
     taskCardSelected: {
-        borderColor: '#4CAF50',
-        backgroundColor: '#2A4158',
+        borderColor: AppColors.successGreen,
+        backgroundColor: AppColors.inputBackground,
     },
     taskCardContent: {
         flexDirection: 'row',
@@ -608,22 +582,22 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     taskTypeBadgeText: {
-        color: '#FFFFFF',
+        color: AppColors.textWhite,
         fontSize: 11,
         fontWeight: 'bold',
     },
     taskClientName: {
-        color: '#FFFFFF',
+        color: AppColors.textWhite,
         fontSize: 16,
         fontWeight: '600',
         marginBottom: 4,
     },
     taskAddress: {
-        color: 'rgba(255, 255, 255, 0.7)',
+        color: AppColors.subtitleText,
         fontSize: 13,
     },
     loadingText: {
-        color: '#FFFFFF',
+        color: AppColors.textWhite,
         fontSize: 16,
         textAlign: 'center',
         padding: 30,
@@ -638,27 +612,27 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
         paddingTop: 15,
         paddingBottom: 40,
-        backgroundColor: '#16283C',
+        backgroundColor: AppColors.screenBackground,
         borderTopWidth: 1,
-        borderTopColor: '#2A4158',
+        borderTopColor: AppColors.inputBackground,
     },
     selectionInfo: {
         marginBottom: 12,
     },
     selectionInfoText: {
-        color: 'rgba(255, 255, 255, 0.7)',
+        color: AppColors.subtitleText,
         fontSize: 14,
         textAlign: 'center',
     },
     transferButton: {
-        backgroundColor: '#4CAF50',
+        backgroundColor: AppColors.successGreen,
         borderRadius: 20,
         paddingVertical: 16,
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
         elevation: 5,
-        shadowColor: '#000',
+        shadowColor: AppColors.shadow,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.25,
         shadowRadius: 3.84,
@@ -671,7 +645,7 @@ const styles = StyleSheet.create({
         opacity: 0.5,
     },
     transferButtonText: {
-        color: '#FFFFFF',
+        color: AppColors.textWhite,
         fontSize: 18,
         fontWeight: 'bold',
     },
@@ -682,20 +656,20 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     calendarModal: {
-        backgroundColor: '#2A4158',
+        backgroundColor: AppColors.inputBackground,
         borderRadius: 16,
         width: '90%',
         padding: 20,
     },
     dropdownModal: {
-        backgroundColor: '#2A4158',
+        backgroundColor: AppColors.inputBackground,
         borderRadius: 16,
         width: '80%',
         maxHeight: '60%',
         padding: 20,
     },
     modalTitle: {
-        color: '#FFFFFF',
+        color: AppColors.textWhite,
         fontSize: 18,
         fontWeight: 'bold',
         marginBottom: 15,
@@ -714,14 +688,14 @@ const styles = StyleSheet.create({
         marginBottom: 5,
     },
     dropdownItemSelected: {
-        backgroundColor: '#16283C',
+        backgroundColor: AppColors.screenBackground,
     },
     dropdownItemPressed: {
-        backgroundColor: '#16283C',
+        backgroundColor: AppColors.screenBackground,
         opacity: 0.8,
     },
     dropdownItemText: {
-        color: '#FFFFFF',
+        color: AppColors.textWhite,
         fontSize: 16,
     },
     dropdownItemTextSelected: {

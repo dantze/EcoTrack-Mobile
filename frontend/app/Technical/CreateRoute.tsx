@@ -3,6 +3,8 @@ import React, { useState } from 'react'
 import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons';
 import { RouteService } from '../../services/RouteService';
+import ScreenHeader from '../../components/ScreenHeader';
+import { AppColors } from '../../constants/Colors';
 
 // Lista de județe
 const COUNTIES = [
@@ -98,13 +100,7 @@ const CreateRoute = () => {
 
     return (
         <View style={styles.container}>
-            {/* Header with back button */}
-            <View style={styles.headerContainer}>
-                <Pressable onPress={() => router.back()} style={styles.backButton}>
-                    <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
-                </Pressable>
-                <Text style={styles.headerText}>Creare Rută</Text>
-            </View>
+            <ScreenHeader title="Creare Rută" />
 
             {/* Form Container */}
             <View style={styles.formContainer}>
@@ -259,29 +255,7 @@ export default CreateRoute
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#16283C',
-    },
-    headerContainer: {
-        marginTop: 60,
-        paddingHorizontal: 20,
-        width: '100%',
-        marginBottom: 40,
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    backButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: '#427992',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 15,
-    },
-    headerText: {
-        color: '#FFFFFF',
-        fontSize: 28,
-        fontWeight: 'bold',
+        backgroundColor: AppColors.screenBackground,
     },
     formContainer: {
         flex: 1,
@@ -291,35 +265,35 @@ const styles = StyleSheet.create({
         marginBottom: 25,
     },
     label: {
-        color: '#FFFFFF',
+        color: AppColors.textWhite,
         fontSize: 16,
         fontWeight: '600',
         marginBottom: 10,
     },
     textInput: {
-        backgroundColor: '#2A4158',
+        backgroundColor: AppColors.inputBackground,
         borderRadius: 12,
         paddingHorizontal: 16,
         paddingVertical: 14,
         fontSize: 16,
-        color: '#FFFFFF',
+        color: AppColors.textWhite,
         borderWidth: 1,
-        borderColor: '#427992',
+        borderColor: AppColors.buttonBackground,
     },
     dropdownButton: {
-        backgroundColor: '#2A4158',
+        backgroundColor: AppColors.inputBackground,
         borderRadius: 12,
         paddingHorizontal: 16,
         paddingVertical: 14,
         borderWidth: 1,
-        borderColor: '#427992',
+        borderColor: AppColors.buttonBackground,
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
     },
     dropdownButtonText: {
         fontSize: 16,
-        color: '#FFFFFF',
+        color: AppColors.textWhite,
     },
     placeholderText: {
         color: '#888',
@@ -331,20 +305,20 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     dropdownModal: {
-        backgroundColor: '#2A4158',
+        backgroundColor: AppColors.inputBackground,
         borderRadius: 16,
         width: '80%',
         maxHeight: '60%',
         padding: 20,
     },
     calendarModal: {
-        backgroundColor: '#2A4158',
+        backgroundColor: AppColors.inputBackground,
         borderRadius: 16,
         width: '90%',
         padding: 20,
     },
     dropdownTitle: {
-        color: '#FFFFFF',
+        color: AppColors.textWhite,
         fontSize: 18,
         fontWeight: 'bold',
         marginBottom: 15,
@@ -363,14 +337,14 @@ const styles = StyleSheet.create({
         marginBottom: 5,
     },
     dropdownItemSelected: {
-        backgroundColor: '#16283C',
+        backgroundColor: AppColors.screenBackground,
     },
     dropdownItemPressed: {
-        backgroundColor: '#16283C',
+        backgroundColor: AppColors.screenBackground,
         opacity: 0.8,
     },
     dropdownItemText: {
-        color: '#FFFFFF',
+        color: AppColors.textWhite,
         fontSize: 16,
     },
     dropdownItemTextSelected: {
@@ -382,7 +356,7 @@ const styles = StyleSheet.create({
         marginTop: 2,
     },
     loadingText: {
-        color: '#FFFFFF',
+        color: AppColors.textWhite,
         fontSize: 16,
         textAlign: 'center',
         padding: 20,
@@ -398,13 +372,13 @@ const styles = StyleSheet.create({
         paddingBottom: 40,
     },
     finalizeButton: {
-        backgroundColor: '#4CAF50',
+        backgroundColor: AppColors.successGreen,
         borderRadius: 20,
         paddingVertical: 16,
         alignItems: 'center',
         justifyContent: 'center',
         elevation: 5,
-        shadowColor: '#000',
+        shadowColor: AppColors.shadow,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.25,
         shadowRadius: 3.84,
@@ -414,7 +388,7 @@ const styles = StyleSheet.create({
         transform: [{ scale: 0.98 }]
     },
     finalizeButtonText: {
-        color: '#FFFFFF',
+        color: AppColors.textWhite,
         fontSize: 18,
         fontWeight: 'bold',
     },

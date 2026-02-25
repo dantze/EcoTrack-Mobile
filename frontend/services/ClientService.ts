@@ -78,4 +78,79 @@ export const ClientService = {
         }
         return await response.json();
     },
+
+    /**
+     * Updates a client by ID.
+     * @param clientId The ID of the client to update.
+     * @param clientData The updated client data.
+     */
+    updateClient: async (clientId: number, clientData: ClientData) => {
+        const response = await fetch(`${API_BASE_URL}/clients/${clientId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(clientData),
+        });
+
+        if (!response.ok) {
+            const errText = await response.text();
+            console.error('Update client error:', response.status, errText);
+            throw new Error(errText || `Eșec la actualizarea clientului (${response.status})`);
+        }
+
+        return await response.json();
+    },
+
+    /**
+     * Deletes a client by ID.
+     * @param clientId The ID of the client to delete.
+     */
+    deleteClient: async (clientId: number) => {
+        const response = await fetch(`${API_BASE_URL}/clients/${clientId}`, {
+            method: 'DELETE',
+        });
+
+        if (!response.ok) {
+            throw new Error('Eșec la ștergerea clientului');
+        }
+    },
+
+    /**
+     * Uploads an ID photo for a specific client.
+     * @param clientId The ID of the client (backend ID).
+     * @param photoUri The local URI of the photo to upload.
+     */
+    uploadIdPhoto: async (clientId: number, photoUri: string) => {
+        // Create FormData
+        const formData = new FormData();
+
+        // Infer filename and type
+        const filename = photoUri.split('/').pop() || 'photo.jpg';
+        const match = /\.(\w+)$/.exec(filename);
+        const type = match ? `image/${match[1]}` : 'image/jpeg';
+
+        // Append file
+        // @ts-ignore: React Native FormData expects an object with uri, name, type
+        formData.append('file', { uri: photoUri, name: filename, type });
+
+        console.log(`Uploading photo for client ${clientId} to ${API_BASE_URL}/${clientId}/idPhoto`);
+
+        const response = await fetch(`${API_BASE_URL}/${clientId}/idPhoto`, {
+            method: 'POST',
+            headers: {
+                // Content-Type header must NOT be set manually for FormData; fetch sets it with boundary
+                'Accept': 'application/json',
+            },
+            body: formData,
+        });
+
+        if (!response.ok) {
+            const errText = await response.text();
+            throw new Error(errText || 'Eșec la încărcarea pozei');
+        }
+
+        // The endpoint returns a plain string, so use .text() instead of .json()
+        return await response.text();
+    }
 };

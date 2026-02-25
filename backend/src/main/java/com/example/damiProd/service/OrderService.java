@@ -61,9 +61,49 @@ public class OrderService {
         Order existingOrder = orderRepository.findById(orderId)
                 .orElseThrow(() -> new RuntimeException("Order not found with id: " + orderId));
         
+        // Update basic fields
+        if (orderDetails.getOrderType() != null) {
+            existingOrder.setOrderType(orderDetails.getOrderType());
+        }
+        if (orderDetails.getQuantity() != null) {
+            existingOrder.setQuantity(orderDetails.getQuantity());
+        }
+        if (orderDetails.getLocationAddress() != null) {
+            existingOrder.setLocationAddress(orderDetails.getLocationAddress());
+        }
+        if (orderDetails.getLocationCoordinates() != null) {
+            existingOrder.setLocationCoordinates(orderDetails.getLocationCoordinates());
+        }
+        if (orderDetails.getContact() != null) {
+            existingOrder.setContact(orderDetails.getContact());
+        }
+        if (orderDetails.getDetails() != null) {
+            existingOrder.setDetails(orderDetails.getDetails());
+        }
+        if (orderDetails.getStartDate() != null) {
+            existingOrder.setStartDate(orderDetails.getStartDate());
+        }
+        if (orderDetails.getEndDate() != null) {
+            existingOrder.setEndDate(orderDetails.getEndDate());
+        }
+        if (orderDetails.getIsIndefinite() != null) {
+            existingOrder.setIsIndefinite(orderDetails.getIsIndefinite());
+        }
+        if (orderDetails.getDurationDays() != null) {
+            existingOrder.setDurationDays(orderDetails.getDurationDays());
+        }
+        if (orderDetails.getIgienizariPerMonth() != null) {
+            existingOrder.setIgienizariPerMonth(orderDetails.getIgienizariPerMonth());
+        }
         // Update routeDefinition if provided
         if (orderDetails.getRouteDefinition() != null) {
             existingOrder.setRouteDefinition(orderDetails.getRouteDefinition());
+        }
+        // Update product if provided
+        if (orderDetails.getProduct() != null && orderDetails.getProduct().getId() != null) {
+            Product product = productRepository.findById(orderDetails.getProduct().getId())
+                    .orElseThrow(() -> new RuntimeException("Product not found with id: " + orderDetails.getProduct().getId()));
+            existingOrder.setProduct(product);
         }
         
         return orderRepository.save(existingOrder);

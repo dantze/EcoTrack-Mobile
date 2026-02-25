@@ -21,6 +21,8 @@ interface OrderItem {
     quantity?: number;
     locationAddress?: string;
     details?: string;
+    startDate?: string;
+    endDate?: string;
     client?: {
         id: number;
         type: string;
@@ -110,7 +112,7 @@ export default function OrdersList() {
             amplasari: 'Amplasare',
             igienizari: 'Igienizare',
             ridicari: 'Ridicare',
-        };
+        }; 
         return labels[type?.toLowerCase()] || type || 'N/A';
     };
 
@@ -128,6 +130,19 @@ export default function OrdersList() {
         }
     };
 
+    const getOrderDateDisplay = (order: OrderItem): string => {
+        const start = order.startDate ? formatDate(order.startDate) : null;
+        const end = order.endDate ? formatDate(order.endDate) : null;
+
+        if (start && end) {
+            return start === end ? start : `${start} - ${end}`;
+        }
+        if (start) return start;
+        if (end) return end;
+        if (order.date) return formatDate(order.date);
+        return 'N/A';
+    };
+
     const renderOrder = ({ item }: { item: OrderItem }) => (
         <View style={styles.card}>
             <Pressable
@@ -139,7 +154,7 @@ export default function OrdersList() {
             >
                 <View style={styles.cardHeader}>
                     <Text style={styles.orderNumber}>
-                        Comanda #{item.number || item.id}
+                        Comanda 
                     </Text>
                     <View style={styles.typeBadge}>
                         <Text style={styles.typeBadgeText}>
@@ -169,7 +184,7 @@ export default function OrdersList() {
 
                 <View style={styles.infoRow}>
                     <Feather name="calendar" size={14} color="#8BA8BE" />
-                    <Text style={styles.infoText}>{formatDate(item.date)}</Text>
+                    <Text style={styles.infoText}>{getOrderDateDisplay(item)}</Text>
                 </View>
 
                 {item.locationAddress ? (

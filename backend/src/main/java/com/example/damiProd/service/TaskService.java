@@ -88,16 +88,39 @@ public class TaskService {
         // Determine task type based on order type
         TaskType taskType = mapOrderTypeToTaskType(order.getOrderType());
 
-        // --- Build address: prioritize order location, fallback to client ---
+        // --- Build address & coordinates based on order subtype ---
         String address = null;
-        String coordinates = order.getLocationCoordinates(); // always keep raw coords
+        String coordinates = null;
+        Integer quantity = null;
 
-        if (order.getLocationAddress() != null && !order.getLocationAddress().isEmpty()) {
-            address = order.getLocationAddress();
-        } else if (coordinates != null && !coordinates.isEmpty()) {
-            address = coordinates; // show coords if no human-readable address
-        } else if (order.getClient() != null && order.getClient().getAddress() != null) {
-            address = order.getClient().getAddress(); // last resort fallback
+        if (order instanceof AmplasareOrder amp) {
+            coordinates = amp.getLocationCoordinates();
+            if (amp.getLocationAddress() != null && !amp.getLocationAddress().isEmpty()) {
+                address = amp.getLocationAddress();
+            } else if (coordinates != null && !coordinates.isEmpty()) {
+                address = coordinates;
+            }
+            quantity = amp.getQuantity();
+        } else if (order instanceof RidicareOrder rid) {
+            coordinates = rid.getPickupLocationCoordinates();
+            if (rid.getPickupLocationAddress() != null && !rid.getPickupLocationAddress().isEmpty()) {
+                address = rid.getPickupLocationAddress();
+            } else if (coordinates != null && !coordinates.isEmpty()) {
+                address = coordinates;
+            }
+            quantity = rid.getPickupQuantity();
+        } else if (order instanceof IgienizareOrder igi) {
+            coordinates = igi.getSanitationLocationCoordinates();
+            if (igi.getSanitationLocationAddress() != null && !igi.getSanitationLocationAddress().isEmpty()) {
+                address = igi.getSanitationLocationAddress();
+            } else if (coordinates != null && !coordinates.isEmpty()) {
+                address = coordinates;
+            }
+        }
+
+        // Final fallback: use client address if still null
+        if (address == null && order.getClient() != null && order.getClient().getAddress() != null) {
+            address = order.getClient().getAddress();
         }
 
         // --- Build client info ---
@@ -114,10 +137,14 @@ public class TaskService {
             clientPhone = client.getPhone();
         }
 
-        // --- Build product info ---
+        // --- Build product info from the correct subtype ---
         String productName = null;
-        if (order.getProduct() != null) {
-            productName = order.getProduct().getName();
+        if (order instanceof AmplasareOrder amp && amp.getProduct() != null) {
+            productName = amp.getProduct().getName();
+        } else if (order instanceof RidicareOrder rid && rid.getProduct() != null) {
+            productName = rid.getProduct().getName();
+        } else if (order instanceof IgienizareOrder igi && igi.getSubscription() != null) {
+            productName = igi.getSubscription().getName(); // subscription name as the "product"
         }
 
         // Create the task with all order data
@@ -130,7 +157,7 @@ public class TaskService {
         task.setClientPhone(clientPhone);
         task.setContactPerson(order.getContact());
         task.setProductName(productName);
-        task.setQuantity(order.getQuantity());
+        task.setQuantity(quantity);
         task.setInternalNotes(order.getDetails());
         // scheduledTime left null - will be set explicitly by the user
         task.setRoute(route);

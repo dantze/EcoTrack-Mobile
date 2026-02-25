@@ -24,11 +24,12 @@ const Ridicari = ({ client, onDataChange }: { client: any, onDataChange: (data: 
     useEffect(() => {
         onDataChange({
             packetsToRemove,
+            packetGroups: clientPackets,   // full group metadata for payload building
             contact: contactPersoana,
             details: additionalDetails,
             date: placementStartDate
         });
-    }, [packetsToRemove, contactPersoana, additionalDetails, placementStartDate]);
+    }, [packetsToRemove, clientPackets, contactPersoana, additionalDetails, placementStartDate]);
 
     // Fetch Client Packets & Reverse Geocode
     useEffect(() => {
@@ -37,19 +38,21 @@ const Ridicari = ({ client, onDataChange }: { client: any, onDataChange: (data: 
         const fetchAndGroupOrders = async () => {
             setLoading(true);
             try {
-                // 1. Fetch Orders
+                // 1. Fetch all orders for this client
                 const orders = await ClientService.getOrders(client.id);
 
-                // 2. Filter for active 'Amplasari' (assuming they are the ones we can pick up)
-                // In a real app, we might check status like 'ACTIVE' or 'DEPLOYED'
-                const activeOrders = orders.filter((o: any) =>
+                // 2. Split into Amplasare (deployed) and Ridicare (already picked up)
+                const amplasareOrders = orders.filter((o: any) =>
                     o.orderType === 'Amplasari' && o.locationCoordinates
                 );
+                const ridicareOrders = orders.filter((o: any) =>
+                    o.orderType === 'Ridicari'
+                );
 
-                // 3. Group by Product + Location
+                // 3. Group Amplasare orders by Product + Location → totalCount = units deployed
                 const groups: { [key: string]: any } = {};
 
-                for (const order of activeOrders) {
+                for (const order of amplasareOrders) {
                     const locKey = order.locationCoordinates; // "lat,long"
                     const prodId = order.product?.id || 'unknown';
                     const groupKey = `${prodId}_${locKey}`;
@@ -61,17 +64,41 @@ const Ridicari = ({ client, onDataChange }: { client: any, onDataChange: (data: 
                             productName: order.product?.name || 'Produs Necunoscut',
                             locationCoordinates: locKey,
                             totalCount: 0,
+                            alreadyPickedUp: 0,
                             address: 'Se încarcă adresa...',
-                            orders: [] // Keep track of orders in this group if needed
+                            orders: [],
                         };
                     }
-
                     groups[groupKey].totalCount += (order.quantity || 1);
                     groups[groupKey].orders.push(order);
                 }
 
-                // 4. Convert to array and set initial state
-                const groupsArray = Object.values(groups);
+                // 4. Subtract units already picked up by existing Ridicare orders
+                //    Match on pickupLocationCoordinates + product name (denormalized on RidicareOrder)
+                for (const ro of ridicareOrders) {
+                    const locKey = ro.pickupLocationCoordinates;
+                    if (!locKey) continue;
+
+                    // Find the matching group by coordinates (product name used as fallback)
+                    const matchingKey = Object.keys(groups).find(k => {
+                        const g = groups[k];
+                        return g.locationCoordinates === locKey &&
+                            (g.productName === ro.pickupProductName || ro.pickupProductName == null);
+                    });
+
+                    if (matchingKey) {
+                        groups[matchingKey].alreadyPickedUp += (ro.pickupQuantity || 0);
+                    }
+                }
+
+                // 5. Compute effective available count and hide exhausted groups
+                for (const key of Object.keys(groups)) {
+                    const g = groups[key];
+                    g.availableCount = Math.max(0, g.totalCount - g.alreadyPickedUp);
+                }
+
+                // Remove groups where everything has already been picked up
+                const groupsArray = Object.values(groups).filter((g: any) => g.availableCount > 0);
                 setClientPackets(groupsArray);
 
                 // 5. Reverse Geocode (Async)
@@ -157,7 +184,8 @@ const Ridicari = ({ client, onDataChange }: { client: any, onDataChange: (data: 
                 ) : clientPackets.length > 0 ? (
                     clientPackets.map((group) => {
                         const toRemove = packetsToRemove[group.key] || 0;
-                        const remaining = group.totalCount - toRemove;
+                        const available = group.availableCount;  // already-picked-up subtracted
+                        const remaining = available - toRemove;
 
                         return (
                             <View key={group.key} style={[styles.packetRow, toRemove > 0 && styles.packetRowActive]}>
@@ -173,7 +201,10 @@ const Ridicari = ({ client, onDataChange }: { client: any, onDataChange: (data: 
                                     </View>
 
                                     <Text style={styles.packetSubtext}>
-                                        Disponibil: <Text style={{ fontWeight: 'bold', color: '#4CAF50' }}>{remaining}</Text> / {group.totalCount}
+                                        Disponibil: <Text style={{ fontWeight: 'bold', color: remaining > 0 ? '#4CAF50' : '#E53935' }}>{remaining}</Text> / {available}
+                                        {group.alreadyPickedUp > 0 && (
+                                            <Text style={{ color: '#E53935' }}>{`  (-${group.alreadyPickedUp} ridicate)`}</Text>
+                                        )}
                                     </Text>
                                 </View>
 
@@ -192,10 +223,10 @@ const Ridicari = ({ client, onDataChange }: { client: any, onDataChange: (data: 
                                     </View>
 
                                     <Pressable
-                                        style={[styles.counterButton, toRemove >= group.totalCount && styles.counterButtonDisabled]}
-                                        onPress={() => handleIncrement(group.key, group.totalCount)}
+                                        style={[styles.counterButton, toRemove >= available && styles.counterButtonDisabled]}
+                                        onPress={() => handleIncrement(group.key, available)}
                                     >
-                                        <AntDesign name="plus" size={16} color={toRemove >= group.totalCount ? "#ccc" : "#16283C"} />
+                                        <AntDesign name="plus" size={16} color={toRemove >= available ? "#ccc" : "#16283C"} />
                                     </Pressable>
                                 </View>
                             </View>

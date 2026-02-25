@@ -5,35 +5,69 @@ import { Ionicons } from '@expo/vector-icons';
 import { API_BASE_URL } from '../../constants/ApiConfig';
 import { TaskService } from '../../services/TaskService';
 
-type Order = {
+// ─── Shared client shape ────────────────────────────────────────────────────
+type OrderClient = {
     id: number;
-    orderType: string;
-    quantity: number;
-    locationCoordinates: string;
-    locationAddress: string;
-    startDate: string;
-    endDate: string;
-    details: string;
-    contact: string;
-    durationDays: number;
-    igienizariPerMonth: number;
-    isIndefinite: boolean;
-    product: {
-        id: number;
-        name: string;
-        price: number;
-        description: string;
-    };
-    client: {
-        id: number;
-        fullName?: string;
-        address?: string;
-        email?: string;
-        phone?: string;
-        type?: string;
-        name?: string;
-    };
+    fullName?: string;
+    name?: string;
+    address?: string;
+    email?: string;
+    phone?: string;
 };
+
+// ─── Discriminated Union Order types ─────────────────────────────────────────
+type AmplasareOrder = {
+    orderType: 'Amplasari';
+    id: number;
+    contact: string;
+    details: string;
+    client: OrderClient;
+    // Amplasare-specific
+    quantity: number;
+    locationCoordinates?: string;
+    locationAddress?: string;
+    startDate?: string;
+    endDate?: string;
+    durationDays?: number;
+    igienizariPerMonth?: number;
+    isIndefinite?: boolean;
+    product?: { id: number; name: string; price: number; description: string };
+};
+
+type RidicareOrder = {
+    orderType: 'Ridicari';
+    id: number;
+    contact: string;
+    details: string;
+    client: OrderClient;
+    // Ridicare-specific
+    pickupDate?: string;
+    pickupQuantity?: number;
+    pickupProductName?: string;
+    pickupLocationAddress?: string;
+    pickupLocationCoordinates?: string;
+    product?: { id: number; name: string; price: number; description: string };
+};
+
+type IgienizareOrder = {
+    orderType: 'Igienizari';
+    id: number;
+    contact: string;
+    details: string;
+    client: OrderClient;
+    // Igienizare-specific
+    sanitationDate?: string;
+    sanitationLocationAddress?: string;
+    sanitationLocationCoordinates?: string;
+    subscription?: { id: number; name: string; type: string; price: number; visitsPerMonth?: number };
+};
+
+type Order = AmplasareOrder | RidicareOrder | IgienizareOrder;
+
+// ─── Type guards ──────────────────────────────────────────────────────────────
+const isAmplasare = (o: Order): o is AmplasareOrder => o.orderType === 'Amplasari';
+const isRidicari = (o: Order): o is RidicareOrder => o.orderType === 'Ridicari';
+const isIgienizari = (o: Order): o is IgienizareOrder => o.orderType === 'Igienizari';
 
 // Track which orders have associated tasks
 type OrderTaskMap = { [orderId: number]: boolean };
@@ -93,74 +127,88 @@ const Orders = () => {
         setOrderTaskStatus(statusMap);
     };
 
-    // Format date from ISO string or any date format
+    // Date display — each subtype stores dates in different fields
     type DateInfo =
         | { isRange: true; start: { m: string; d: number }; end: { m: string; d: number } }
         | { isRange: false; m: string; d: string | number };
 
-    // Date display logic
     const getDateInfo = (order: Order): DateInfo => {
-        const months = ['IAN', 'FEB', 'MAR', 'APR', 'MAI', 'IUN', 'IUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
-        const parse = (s?: string) => s ? new Date(s) : null;
-        const isValid = (d: Date | null) => d && !isNaN(d.getTime());
+        const MONTHS = ['IAN', 'FEB', 'MAR', 'APR', 'MAI', 'IUN', 'IUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
+        const parse = (s?: string): Date | null => s ? new Date(s) : null;
+        const valid = (d: Date | null): d is Date => !!d && !isNaN(d.getTime());
 
-        const d1 = parse(order.startDate);
-        const d2 = parse(order.endDate);
+        let primary: Date | null = null;
+        let end: Date | null = null;
 
-        if (isValid(d1)) {
-            const m1 = months[d1!.getMonth()];
-            const day1 = d1!.getDate();
+        if (isAmplasare(order)) {
+            primary = parse(order.startDate);
+            end = parse(order.endDate);
+        } else if (isRidicari(order)) {
+            primary = parse(order.pickupDate);
+        } else if (isIgienizari(order)) {
+            primary = parse(order.sanitationDate);
+        }
 
-            if (isValid(d2) && d1!.getTime() !== d2!.getTime()) {
-                const sameDay = d1!.getDate() === d2!.getDate() && d1!.getMonth() === d2!.getMonth() && d1!.getFullYear() === d2!.getFullYear();
-                if (!sameDay) {
-                    const m2 = months[d2!.getMonth()];
-                    const day2 = d2!.getDate();
-                    return { isRange: true, start: { m: m1, d: day1 }, end: { m: m2, d: day2 } };
-                }
+        if (valid(primary)) {
+            const m1 = MONTHS[primary.getMonth()];
+            const d1 = primary.getDate();
+            if (valid(end) && primary.getTime() !== end.getTime()) {
+                const sameDay = d1 === end.getDate()
+                    && primary.getMonth() === end.getMonth()
+                    && primary.getFullYear() === end.getFullYear();
+                if (!sameDay)
+                    return { isRange: true, start: { m: m1, d: d1 }, end: { m: MONTHS[end.getMonth()], d: end.getDate() } };
             }
-            return { isRange: false, m: m1, d: day1 };
+            return { isRange: false, m: m1, d: d1 };
         }
         return { isRange: false, m: 'N/A', d: '--' };
     };
 
     // Get client display name
     const getClientName = (order: Order): string => {
-        if (order.client) {
-            // Check for fullName first (for individual clients)
-            if (order.client.fullName) {
-                return order.client.fullName;
-            }
-            // Check for name (for company clients)
-            if (order.client.name) {
-                return order.client.name;
-            }
-            // Fallback to email if name fields are missing
-            if (order.client.email) {
-                return order.client.email;
-            }
-        }
-        return 'Client necunoscut';
+        const c = order.client;
+        return c?.fullName || c?.name || c?.email || 'Client necunoscut';
     };
 
-    // Get location display text
+    // Get location display text — type-safe per subtype
     const getLocationText = (order: Order): string => {
-        const coord = order.locationCoordinates.split(",");
-        return order.locationAddress ||
-            coord[0].substring(0, 10) + ", " + coord[1].substring(0, 10) ||
-            "Eroare în procesarea datelor, adresa clientului:" + order.client?.address ||
-            'Locație nespecificată: Eroare majora, contactati developerii aplicatie';
+        const formatCoords = (coords?: string): string | null => {
+            if (!coords) return null;
+            const parts = coords.split(',');
+            return parts.length === 2
+                ? `${parts[0].substring(0, 9)}, ${parts[1].substring(0, 9)}`
+                : coords;
+        };
+
+        if (isAmplasare(order)) {
+            return order.locationAddress
+                || formatCoords(order.locationCoordinates)
+                || order.client?.address
+                || 'Locație nespecificată';
+        }
+        if (isRidicari(order)) {
+            return order.pickupLocationAddress
+                || formatCoords(order.pickupLocationCoordinates)
+                || order.client?.address
+                || 'Locație nespecificată';
+        }
+        if (isIgienizari(order)) {
+            return order.sanitationLocationAddress
+                || formatCoords(order.sanitationLocationCoordinates)
+                || order.client?.address
+                || 'Locație nespecificată';
+        }
+        return 'Locație nespecificată';
     };
 
-    // Get action text based on order type and quantity
+    // Get action text — type-safe per subtype
     const getActionText = (order: Order): string => {
-        const typeMap: { [key: string]: string } = {
-            'Amplasari': 'Amplasare',
-            'Ridicari': 'Ridicare',
-            'Igienizari': 'Igienizare'
-        };
-        const actionName = typeMap[order.orderType] || order.orderType || 'Comandă';
-        return `${actionName} (x${order.quantity || 1})`;
+        if (isAmplasare(order)) return `Amplasare (x${order.quantity || 1})`;
+        if (isRidicari(order)) return `Ridicare (x${order.pickupQuantity || 1})`;
+        if (isIgienizari(order)) return order.subscription
+            ? `Igienizare · ${order.subscription.name}`
+            : 'Igienizare';
+        return 'Comandă';
     };
 
     const handleCardPress = (order: Order) => {

@@ -28,7 +28,7 @@ public class ProductService {
 
     public void deleteProduct(Long id) {
         // Check if any orders reference this product
-        if (orderRepository.existsByProductId(id)) {
+        if (orderRepository.existsByAmplasareOrderProductId(id)) {
             throw new IllegalStateException("Nu se poate șterge produsul deoarece este folosit în comenzi existente.");
         }
         productRepository.deleteById(id);

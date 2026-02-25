@@ -5,11 +5,15 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { OrderService } from '../../services/OrderService';
 import { RouteService, Route } from '../../services/RouteService';
 import { TaskService } from '../../services/TaskService';
+import { AppColors } from '../../constants/Colors';
+import { Order, isAmplasare, isRidicari, isIgienizari } from '../../types/OrderTypes';
+import { getLocationText } from '../../utils/orderUtils';
+import ScreenHeader from '../../components/ScreenHeader';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 
 type DetailRowProps = {
     label: string;
-    value: string;
+    value?: string;
     isMultiline?: boolean;
 };
 
@@ -18,7 +22,7 @@ const OrderDetails = () => {
     const params = useLocalSearchParams();
     const orderId = params.id ? Number(params.id) : null;
 
-    const [order, setOrder] = useState<any>(null);
+    const [order, setOrder] = useState<Order | null>(null);
     const [loading, setLoading] = useState(true);
     const [routes, setRoutes] = useState<Route[]>([]);
     const [orderTaskStatus, setOrderTaskStatus] = useState<{ hasTask: boolean; taskId: number | null; routeId: number | null; scheduledTime?: string | null }>({ hasTask: false, taskId: null, routeId: null });
@@ -237,7 +241,7 @@ const OrderDetails = () => {
     const clientName = order.client?.type === 'company'
         ? (order.client?.name || order.client?.email || 'N/A')
         : (order.client?.fullName || order.client?.email || 'N/A');
-    const clientAddress = order.locationAddress || order.locationCoordinates || order.client?.address;
+    const clientAddress = getLocationText(order);
 
     const renderDateRow = (label: string, dateStr?: string, endDateStr?: string) => {
         if (!dateStr) return null;
@@ -257,9 +261,9 @@ const OrderDetails = () => {
 
     // Renders the order-type-specific info rows
     const renderOrderInfo = () => {
-        const type = order?.orderType;
+        if (!order) return null;
 
-        if (type === 'Amplasari') {
+        if (isAmplasare(order)) {
             return (
                 <>
                     <DetailRow label="Produs" value={order.product?.name} />
@@ -278,7 +282,7 @@ const OrderDetails = () => {
             );
         }
 
-        if (type === 'Ridicari') {
+        if (isRidicari(order)) {
             return (
                 <>
                     <DetailRow label="Produs" value={order.pickupProductName} />
@@ -288,7 +292,7 @@ const OrderDetails = () => {
             );
         }
 
-        if (type === 'Igienizari') {
+        if (isIgienizari(order)) {
             return (
                 <>
                     <DetailRow label="Abonament" value={order.subscription?.name} />
@@ -313,12 +317,7 @@ const OrderDetails = () => {
     return (
         <View style={styles.container}>
 
-            <View style={styles.headerContainer}>
-                <Pressable onPress={() => router.back()} style={styles.backButton}>
-                    <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
-                </Pressable>
-                <Text style={styles.headerText}>Detalii Comandă</Text>
-            </View>
+            <ScreenHeader title="Detalii Comandă" />
 
             <ScrollView contentContainerStyle={styles.scrollContent}>
 
@@ -522,10 +521,7 @@ const OrderDetails = () => {
 export default OrderDetails
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#16283C' },
-    headerContainer: { marginTop: 60, paddingHorizontal: 20, width: '100%', marginBottom: 20, flexDirection: 'row', alignItems: 'center' },
-    backButton: { marginRight: 15 },
-    headerText: { color: '#FFFFFF', fontSize: 28, fontWeight: 'bold' },
+    container: { flex: 1, backgroundColor: AppColors.screenBackground },
     scrollContent: { paddingHorizontal: 20, paddingBottom: 50, alignItems: 'center' },
     detailsCard: { backgroundColor: '#5D8AA8', borderRadius: 20, padding: 20, width: '100%', marginBottom: 30 },
     rowContainer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },

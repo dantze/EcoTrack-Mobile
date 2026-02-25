@@ -12,6 +12,9 @@ import {
 import { useRouter } from 'expo-router';
 import { AntDesign, Feather } from '@expo/vector-icons';
 import { OrderService } from '../../services/OrderService';
+import { AppColors } from '../../constants/Colors';
+import { getOrderTypeLabel, formatDate } from '../../utils/orderUtils';
+import ScreenHeader from '../../components/ScreenHeader';
 
 interface OrderItem {
     id: number;
@@ -105,29 +108,6 @@ export default function OrdersList() {
             return order.client.name;
         }
         return `Client #${order.client.id}`;
-    };
-
-    const getOrderTypeLabel = (type: string): string => {
-        const labels: Record<string, string> = {
-            amplasari: 'Amplasare',
-            igienizari: 'Igienizare',
-            ridicari: 'Ridicare',
-        }; 
-        return labels[type?.toLowerCase()] || type || 'N/A';
-    };
-
-    const formatDate = (dateStr: string): string => {
-        if (!dateStr) return 'N/A';
-        try {
-            const date = new Date(dateStr);
-            return date.toLocaleDateString('ro-RO', {
-                day: '2-digit',
-                month: '2-digit',
-                year: 'numeric',
-            });
-        } catch {
-            return dateStr;
-        }
     };
 
     const getOrderDateDisplay = (order: OrderItem): string => {
@@ -224,12 +204,7 @@ export default function OrdersList() {
 
     return (
         <View style={styles.container}>
-            <View style={styles.headerContainer}>
-                <Pressable onPress={() => router.back()} style={styles.backButton}>
-                    <AntDesign name="arrow-left" size={24} color="#FFFFFF" />
-                </Pressable>
-                <Text style={styles.headerText}>Lista Comenzi</Text>
-            </View>
+            <ScreenHeader title="Lista Comenzi" />
 
             {orders.length === 0 ? (
                 <View style={styles.emptyContainer}>
@@ -259,28 +234,13 @@ export default function OrdersList() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#16283C',
+        backgroundColor: AppColors.screenBackground,
     },
     centered: {
         flex: 1,
-        backgroundColor: '#16283C',
+        backgroundColor: AppColors.screenBackground,
         justifyContent: 'center',
         alignItems: 'center',
-    },
-    headerContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginTop: 60,
-        paddingHorizontal: 20,
-        marginBottom: 20,
-    },
-    backButton: {
-        marginRight: 15,
-    },
-    headerText: {
-        color: '#FFFFFF',
-        fontSize: 28,
-        fontWeight: 'bold',
     },
     listContent: {
         paddingHorizontal: 16,

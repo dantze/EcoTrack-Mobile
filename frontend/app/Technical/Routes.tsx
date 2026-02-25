@@ -7,6 +7,7 @@ import { getAllDrivers, Employee } from '../../services/EmployeeService';
 import ScreenHeader from '../../components/ScreenHeader';
 import DriverSelectModal from '../../modals/DriverSelectModal';
 import { AppColors } from '../../constants/Colors';
+import { getDayOfWeekLabel } from '../../constants/RouteConstants';
 
 const Routes = () => {
     const router = useRouter();
@@ -54,20 +55,6 @@ const Routes = () => {
         router.push({
             pathname: "/Technical/CreateRoute",
         });
-    };
-
-    // Convert dayOfWeek number to Romanian label
-    const getDayOfWeekLabel = (dayOfWeek?: number) => {
-        const days: { [key: number]: string } = {
-            1: 'Luni',
-            2: 'Marți',
-            3: 'Miercuri',
-            4: 'Joi',
-            5: 'Vineri',
-            6: 'Sâmbătă',
-            7: 'Duminică'
-        };
-        return dayOfWeek ? days[dayOfWeek] || 'N/A' : 'N/A';
     };
 
     const handleRoutePress = (route: Route) => {

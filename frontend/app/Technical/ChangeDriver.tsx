@@ -7,6 +7,7 @@ import { Employee, getAllDrivers } from '@/services/EmployeeService';
 import { RouteService } from '@/services/RouteService';
 import { TaskService, Task } from '@/services/TaskService';
 import ScreenHeader from '../../components/ScreenHeader';
+import ListPickerModal, { ListPickerItem } from '../../modals/ListPickerModal';
 import { AppColors } from '../../constants/Colors';
 
 const ChangeDriver = () => {
@@ -97,7 +98,9 @@ const ChangeDriver = () => {
         setShowDatePicker(false);
     };
 
-    const handleSourceDriverSelect = (driver: Employee) => {
+    const handleSourceDriverSelect = (item: ListPickerItem) => {
+        const driver = drivers.find(d => d.id === Number(item.key));
+        if (!driver) return;
         setSourceDriver(driver);
         setSourceDriverDropdownVisible(false);
         // Reset target driver if same as source
@@ -106,7 +109,9 @@ const ChangeDriver = () => {
         }
     };
 
-    const handleTargetDriverSelect = (driver: Employee) => {
+    const handleTargetDriverSelect = (item: ListPickerItem) => {
+        const driver = availableTargetDrivers.find(d => d.id === Number(item.key));
+        if (!driver) return;
         setTargetDriver(driver);
         setTargetDriverDropdownVisible(false);
     };
@@ -209,6 +214,10 @@ const ChangeDriver = () => {
 
     // Available drivers for target (exclude source driver)
     const availableTargetDrivers = drivers.filter(d => d.id !== sourceDriver?.id);
+
+    // Prepare picker items
+    const sourceDriverItems: ListPickerItem[] = drivers.map(d => ({ key: String(d.id), label: d.fullName }));
+    const targetDriverItems: ListPickerItem[] = availableTargetDrivers.map(d => ({ key: String(d.id), label: d.fullName }));
 
     return (
         <View style={styles.container}>
@@ -383,99 +392,23 @@ const ChangeDriver = () => {
                 </Pressable>
             </Modal>
 
-            {/* Source Driver Dropdown Modal */}
-            <Modal
+            <ListPickerModal
                 visible={sourceDriverDropdownVisible}
-                transparent={true}
-                animationType="fade"
-                onRequestClose={() => setSourceDriverDropdownVisible(false)}
-            >
-                <Pressable
-                    style={styles.modalOverlay}
-                    onPress={() => setSourceDriverDropdownVisible(false)}
-                >
-                    <View style={styles.dropdownModal}>
-                        <Text style={styles.modalTitle}>Selectează Șoferul Sursă</Text>
-                        {driversLoading ? (
-                            <Text style={styles.loadingText}>Se încarcă...</Text>
-                        ) : drivers.length === 0 ? (
-                            <Text style={styles.emptyText}>Nu există șoferi</Text>
-                        ) : (
-                            <ScrollView style={styles.dropdownList}>
-                                {drivers.map((driver) => (
-                                    <Pressable
-                                        key={driver.id}
-                                        style={({ pressed }) => [
-                                            styles.dropdownItem,
-                                            sourceDriver?.id === driver.id && styles.dropdownItemSelected,
-                                            pressed && styles.dropdownItemPressed
-                                        ]}
-                                        onPress={() => handleSourceDriverSelect(driver)}
-                                    >
-                                        <View style={{ flex: 1 }}>
-                                            <Text style={[
-                                                styles.dropdownItemText,
-                                                sourceDriver?.id === driver.id && styles.dropdownItemTextSelected
-                                            ]}>
-                                                {driver.fullName}
-                                            </Text>
-                                        </View>
-                                        {sourceDriver?.id === driver.id && (
-                                            <Ionicons name="checkmark" size={20} color="#4CAF50" />
-                                        )}
-                                    </Pressable>
-                                ))}
-                            </ScrollView>
-                        )}
-                    </View>
-                </Pressable>
-            </Modal>
+                onClose={() => setSourceDriverDropdownVisible(false)}
+                title="Selectează Șoferul Sursă"
+                items={sourceDriverItems}
+                selectedKey={sourceDriver ? String(sourceDriver.id) : null}
+                onSelect={handleSourceDriverSelect}
+            />
 
-            {/* Target Driver Dropdown Modal */}
-            <Modal
+            <ListPickerModal
                 visible={targetDriverDropdownVisible}
-                transparent={true}
-                animationType="fade"
-                onRequestClose={() => setTargetDriverDropdownVisible(false)}
-            >
-                <Pressable
-                    style={styles.modalOverlay}
-                    onPress={() => setTargetDriverDropdownVisible(false)}
-                >
-                    <View style={styles.dropdownModal}>
-                        <Text style={styles.modalTitle}>Selectează Șoferul Destinație</Text>
-                        {availableTargetDrivers.length === 0 ? (
-                            <Text style={styles.emptyText}>Nu există alți șoferi disponibili</Text>
-                        ) : (
-                            <ScrollView style={styles.dropdownList}>
-                                {availableTargetDrivers.map((driver) => (
-                                    <Pressable
-                                        key={driver.id}
-                                        style={({ pressed }) => [
-                                            styles.dropdownItem,
-                                            targetDriver?.id === driver.id && styles.dropdownItemSelected,
-                                            pressed && styles.dropdownItemPressed
-                                        ]}
-                                        onPress={() => handleTargetDriverSelect(driver)}
-                                    >
-                                        <View style={{ flex: 1 }}>
-                                            <Text style={[
-                                                styles.dropdownItemText,
-                                                targetDriver?.id === driver.id && styles.dropdownItemTextSelected
-                                            ]}>
-                                                {driver.fullName}
-                                            </Text>
-                                        </View>
-                                        {targetDriver?.id === driver.id && (
-                                            <Ionicons name="checkmark" size={20} color="#4CAF50" />
-                                        )}
-                                    </Pressable>
-                                ))}
-                            </ScrollView>
-                        )}
-                    </View>
-                </Pressable>
-            </Modal>
+                onClose={() => setTargetDriverDropdownVisible(false)}
+                title="Selectează Șoferul Destinație"
+                items={targetDriverItems}
+                selectedKey={targetDriver ? String(targetDriver.id) : null}
+                onSelect={handleTargetDriverSelect}
+            />
         </View>
     )
 }
@@ -661,49 +594,11 @@ const styles = StyleSheet.create({
         width: '90%',
         padding: 20,
     },
-    dropdownModal: {
-        backgroundColor: AppColors.inputBackground,
-        borderRadius: 16,
-        width: '80%',
-        maxHeight: '60%',
-        padding: 20,
-    },
     modalTitle: {
         color: AppColors.textWhite,
         fontSize: 18,
         fontWeight: 'bold',
         marginBottom: 15,
         textAlign: 'center',
-    },
-    dropdownList: {
-        maxHeight: 300,
-    },
-    dropdownItem: {
-        paddingVertical: 14,
-        paddingHorizontal: 16,
-        borderRadius: 10,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 5,
-    },
-    dropdownItemSelected: {
-        backgroundColor: AppColors.screenBackground,
-    },
-    dropdownItemPressed: {
-        backgroundColor: AppColors.screenBackground,
-        opacity: 0.8,
-    },
-    dropdownItemText: {
-        color: AppColors.textWhite,
-        fontSize: 16,
-    },
-    dropdownItemTextSelected: {
-        fontWeight: 'bold',
-    },
-    driverCountyText: {
-        color: 'rgba(255, 255, 255, 0.6)',
-        fontSize: 12,
-        marginTop: 2,
     },
 })

@@ -1,31 +1,12 @@
-import { StyleSheet, Text, View, Pressable, Alert, Modal, ScrollView, Platform, TextInput } from 'react-native'
+import { StyleSheet, Text, View, Pressable, Alert, TextInput } from 'react-native'
 import React, { useState } from 'react'
 import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons';
 import { RouteService } from '../../services/RouteService';
 import ScreenHeader from '../../components/ScreenHeader';
+import ListPickerModal, { ListPickerItem } from '../../modals/ListPickerModal';
 import { AppColors } from '../../constants/Colors';
-
-// Lista de județe
-const COUNTIES = [
-    'Alba', 'Arad', 'Argeș', 'Bacău', 'Bihor', 'Bistrița-Năsăud', 'Botoșani',
-    'Brașov', 'Brăila', 'București', 'Buzău', 'Caraș-Severin', 'Călărași',
-    'Cluj', 'Constanța', 'Covasna', 'Dâmbovița', 'Dolj', 'Galați', 'Giurgiu',
-    'Gorj', 'Harghita', 'Hunedoara', 'Ialomița', 'Iași', 'Ilfov', 'Maramureș',
-    'Mehedinți', 'Mureș', 'Neamț', 'Olt', 'Prahova', 'Satu Mare', 'Sălaj',
-    'Sibiu', 'Suceava', 'Teleorman', 'Timiș', 'Tulcea', 'Vaslui', 'Vâlcea', 'Vrancea'
-];
-
-// Zilele săptămânii (1=Luni, 2=Marți, ..., 7=Duminică)
-const DAYS_OF_WEEK = [
-    { value: 1, label: 'Luni' },
-    { value: 2, label: 'Marți' },
-    { value: 3, label: 'Miercuri' },
-    { value: 4, label: 'Joi' },
-    { value: 5, label: 'Vineri' },
-    { value: 6, label: 'Sâmbătă' },
-    { value: 7, label: 'Duminică' },
-];
+import { DAYS_OF_WEEK, COUNTIES, getDayOfWeekLabel } from '../../constants/RouteConstants';
 
 const CreateRoute = () => {
     const router = useRouter();
@@ -38,6 +19,10 @@ const CreateRoute = () => {
     // Route name
     const [routeName, setRouteName] = useState('');
 
+
+    // Prepare picker items
+    const dayItems: ListPickerItem[] = DAYS_OF_WEEK.map(d => ({ key: String(d.value), label: d.label }));
+    const countyItems: ListPickerItem[] = COUNTIES.map(c => ({ key: c, label: c }));
 
     const handleFinalize = async () => {
         if (!routeName.trim()) {
@@ -80,19 +65,13 @@ const CreateRoute = () => {
         }
     };
 
-    const getDayLabel = (dayValue: number | null) => {
-        if (!dayValue) return null;
-        const day = DAYS_OF_WEEK.find(d => d.value === dayValue);
-        return day ? day.label : null;
-    };
-
-    const handleDaySelect = (dayValue: number) => {
-        setSelectedDayOfWeek(dayValue);
+    const handleDaySelect = (item: ListPickerItem) => {
+        setSelectedDayOfWeek(Number(item.key));
         setShowDayPicker(false);
     };
 
-    const handleCountySelect = (county: string) => {
-        setSelectedCounty(county);
+    const handleCountySelect = (item: ListPickerItem) => {
+        setSelectedCounty(item.key);
         setCountyDropdownVisible(false);
     };
 
@@ -123,14 +102,14 @@ const CreateRoute = () => {
                         style={styles.dropdownButton}
                         onPress={() => setShowDayPicker(true)}
                     >
-                        <Ionicons name="calendar-outline" size={20} color="#FFFFFF" style={{ marginRight: 10 }} />
+                        <Ionicons name="calendar-outline" size={20} color={AppColors.textWhite} style={{ marginRight: 10 }} />
                         <Text style={[
                             styles.dropdownButtonText,
                             !selectedDayOfWeek && styles.placeholderText
                         ]}>
-                            {getDayLabel(selectedDayOfWeek) || 'Selectează ziua...'}
+                            {getDayOfWeekLabel(selectedDayOfWeek ?? undefined, 'Selectează ziua...')}
                         </Text>
-                        <Ionicons name="chevron-down" size={20} color="#FFFFFF" />
+                        <Ionicons name="chevron-down" size={20} color={AppColors.textWhite} />
                     </Pressable>
                 </View>
 
@@ -147,91 +126,29 @@ const CreateRoute = () => {
                         ]}>
                             {selectedCounty || 'Selectează județul...'}
                         </Text>
-                        <Ionicons name="chevron-down" size={20} color="#FFFFFF" />
+                        <Ionicons name="chevron-down" size={20} color={AppColors.textWhite} />
                     </Pressable>
                 </View>
 
             </View>
 
-            {/* Day of Week Picker Modal */}
-            <Modal
+            <ListPickerModal
                 visible={showDayPicker}
-                transparent={true}
-                animationType="fade"
-                onRequestClose={() => setShowDayPicker(false)}
-            >
-                <Pressable
-                    style={styles.modalOverlay}
-                    onPress={() => setShowDayPicker(false)}
-                >
-                    <View style={styles.dropdownModal}>
-                        <Text style={styles.dropdownTitle}>Selectează Ziua</Text>
-                        <ScrollView style={styles.dropdownList}>
-                            {DAYS_OF_WEEK.map((day) => (
-                                <Pressable
-                                    key={day.value}
-                                    style={({ pressed }) => [
-                                        styles.dropdownItem,
-                                        selectedDayOfWeek === day.value && styles.dropdownItemSelected,
-                                        pressed && styles.dropdownItemPressed
-                                    ]}
-                                    onPress={() => handleDaySelect(day.value)}
-                                >
-                                    <Text style={[
-                                        styles.dropdownItemText,
-                                        selectedDayOfWeek === day.value && styles.dropdownItemTextSelected
-                                    ]}>
-                                        {day.label}
-                                    </Text>
-                                    {selectedDayOfWeek === day.value && (
-                                        <Ionicons name="checkmark" size={20} color="#4CAF50" />
-                                    )}
-                                </Pressable>
-                            ))}
-                        </ScrollView>
-                    </View>
-                </Pressable>
-            </Modal>
+                onClose={() => setShowDayPicker(false)}
+                title="Selectează Ziua"
+                items={dayItems}
+                selectedKey={selectedDayOfWeek ? String(selectedDayOfWeek) : null}
+                onSelect={handleDaySelect}
+            />
 
-            {/* County Dropdown Modal */}
-            <Modal
+            <ListPickerModal
                 visible={countyDropdownVisible}
-                transparent={true}
-                animationType="fade"
-                onRequestClose={() => setCountyDropdownVisible(false)}
-            >
-                <Pressable
-                    style={styles.modalOverlay}
-                    onPress={() => setCountyDropdownVisible(false)}
-                >
-                    <View style={styles.dropdownModal}>
-                        <Text style={styles.dropdownTitle}>Selectează Județul</Text>
-                        <ScrollView style={styles.dropdownList}>
-                            {COUNTIES.map((county) => (
-                                <Pressable
-                                    key={county}
-                                    style={({ pressed }) => [
-                                        styles.dropdownItem,
-                                        selectedCounty === county && styles.dropdownItemSelected,
-                                        pressed && styles.dropdownItemPressed
-                                    ]}
-                                    onPress={() => handleCountySelect(county)}
-                                >
-                                    <Text style={[
-                                        styles.dropdownItemText,
-                                        selectedCounty === county && styles.dropdownItemTextSelected
-                                    ]}>
-                                        {county}
-                                    </Text>
-                                    {selectedCounty === county && (
-                                        <Ionicons name="checkmark" size={20} color="#4CAF50" />
-                                    )}
-                                </Pressable>
-                            ))}
-                        </ScrollView>
-                    </View>
-                </Pressable>
-            </Modal>
+                onClose={() => setCountyDropdownVisible(false)}
+                title="Selectează Județul"
+                items={countyItems}
+                selectedKey={selectedCounty || null}
+                onSelect={handleCountySelect}
+            />
 
 
             {/* Finalize Button */}
@@ -297,75 +214,6 @@ const styles = StyleSheet.create({
     },
     placeholderText: {
         color: '#888',
-    },
-    modalOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.5)',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    dropdownModal: {
-        backgroundColor: AppColors.inputBackground,
-        borderRadius: 16,
-        width: '80%',
-        maxHeight: '60%',
-        padding: 20,
-    },
-    calendarModal: {
-        backgroundColor: AppColors.inputBackground,
-        borderRadius: 16,
-        width: '90%',
-        padding: 20,
-    },
-    dropdownTitle: {
-        color: AppColors.textWhite,
-        fontSize: 18,
-        fontWeight: 'bold',
-        marginBottom: 15,
-        textAlign: 'center',
-    },
-    dropdownList: {
-        maxHeight: 300,
-    },
-    dropdownItem: {
-        paddingVertical: 14,
-        paddingHorizontal: 16,
-        borderRadius: 10,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 5,
-    },
-    dropdownItemSelected: {
-        backgroundColor: AppColors.screenBackground,
-    },
-    dropdownItemPressed: {
-        backgroundColor: AppColors.screenBackground,
-        opacity: 0.8,
-    },
-    dropdownItemText: {
-        color: AppColors.textWhite,
-        fontSize: 16,
-    },
-    dropdownItemTextSelected: {
-        fontWeight: 'bold',
-    },
-    driverCountyText: {
-        color: 'rgba(255, 255, 255, 0.6)',
-        fontSize: 12,
-        marginTop: 2,
-    },
-    loadingText: {
-        color: AppColors.textWhite,
-        fontSize: 16,
-        textAlign: 'center',
-        padding: 20,
-    },
-    emptyText: {
-        color: 'rgba(255, 255, 255, 0.6)',
-        fontSize: 16,
-        textAlign: 'center',
-        padding: 20,
     },
     bottomContainer: {
         paddingHorizontal: 20,

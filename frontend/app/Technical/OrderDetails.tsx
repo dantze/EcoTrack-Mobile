@@ -9,6 +9,7 @@ import { AppColors } from '../../constants/Colors';
 import { Order, isAmplasare, isRidicari, isIgienizari } from '../../types/OrderTypes';
 import { getLocationText } from '../../utils/orderUtils';
 import ScreenHeader from '../../components/ScreenHeader';
+import { getDayOfWeekLabel } from '../../constants/RouteConstants';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 
 type DetailRowProps = {
@@ -83,20 +84,6 @@ const OrderDetails = () => {
     // Route selection function
     const handleSelectRoute = (route: Route) => {
         setSelectedRoute(route);
-    };
-
-    // Get day of week name
-    const getDayOfWeekName = (dayOfWeek?: number) => {
-        const daysRo: { [key: number]: string } = {
-            1: 'Luni',
-            2: 'Marți',
-            3: 'Miercuri',
-            4: 'Joi',
-            5: 'Vineri',
-            6: 'Sâmbătă',
-            7: 'Duminică'
-        };
-        return dayOfWeek ? daysRo[dayOfWeek] || null : null;
     };
 
     // Finalize function - creates a Task and assigns it to the selected Route
@@ -488,7 +475,7 @@ const OrderDetails = () => {
                                                 styles.routeCardDate,
                                                 selectedRoute?.id === route.id && styles.activeRouteSubtext
                                             ]}>
-                                                {route.name || `Ruta #${route.id}`}{getDayOfWeekName(route.dayOfWeek) ? ` • ${getDayOfWeekName(route.dayOfWeek)}` : ''}
+                                                {route.name || `Ruta #${route.id}`}{route.dayOfWeek ? ` • ${getDayOfWeekLabel(route.dayOfWeek)}` : ''}
                                             </Text>
                                             <Text style={[
                                                 styles.routeCardTasks,

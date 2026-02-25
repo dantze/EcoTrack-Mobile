@@ -2,6 +2,7 @@ import { StyleSheet, Text, View, Pressable, ScrollView, ActivityIndicator } from
 import React, { useEffect, useState } from 'react'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { RouteService, Route } from '../../services/RouteService'
+import { getDayOfWeekLabel } from '../../constants/RouteConstants'
 
 const DriverRoutesList = () => {
     const router = useRouter();
@@ -32,19 +33,6 @@ const DriverRoutesList = () => {
         } finally {
             setLoading(false);
         }
-    };
-
-    const getDayOfWeekName = (dayOfWeek?: number) => {
-        const daysRo: { [key: number]: string } = {
-            1: 'Luni',
-            2: 'Marți',
-            3: 'Miercuri',
-            4: 'Joi',
-            5: 'Vineri',
-            6: 'Sâmbătă',
-            7: 'Duminică'
-        };
-        return dayOfWeek ? daysRo[dayOfWeek] || 'N/A' : null;
     };
 
     const handleRoutePress = (route: Route) => {
@@ -94,7 +82,7 @@ const DriverRoutesList = () => {
                             <View style={styles.routeInfo}>
                                 <Text style={styles.routeName}>{route.name || `Ruta #${route.id}`}</Text>
                                 <Text style={styles.taskCount}>
-                                    {getDayOfWeekName(route.dayOfWeek) ? `${getDayOfWeekName(route.dayOfWeek)} • ` : ''}{route.tasks?.length || 0} sarcini
+                                    {route.dayOfWeek ? `${getDayOfWeekLabel(route.dayOfWeek)} • ` : ''}{route.tasks?.length || 0} sarcini
                                 </Text>
                             </View>
                             <View style={styles.routeIdBadge}>

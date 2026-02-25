@@ -103,11 +103,28 @@ export const ClientService = {
     },
 
     /**
+     * Checks if a client has orders in the database.
+     * @param clientId The ID of the client.
+     */
+    checkClientHasOrders: async (clientId: number): Promise<boolean> => {
+        const response = await fetch(`${API_BASE_URL}/clients/${clientId}/has-orders`);
+        if (!response.ok) {
+            throw new Error('Eșec la verificarea comenzilor clientului');
+        }
+        const data = await response.json();
+        return data.hasOrders;
+    },
+
+    /**
      * Deletes a client by ID.
      * @param clientId The ID of the client to delete.
+     * @param cascade If true, also deletes all orders (and their tasks) associated with the client.
      */
-    deleteClient: async (clientId: number) => {
-        const response = await fetch(`${API_BASE_URL}/clients/${clientId}`, {
+    deleteClient: async (clientId: number, cascade: boolean = false) => {
+        const url = cascade
+            ? `${API_BASE_URL}/clients/${clientId}?cascade=true`
+            : `${API_BASE_URL}/clients/${clientId}`;
+        const response = await fetch(url, {
             method: 'DELETE',
         });
 

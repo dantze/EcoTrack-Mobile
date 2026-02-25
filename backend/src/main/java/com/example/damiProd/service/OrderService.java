@@ -5,9 +5,12 @@ import com.example.damiProd.repository.ClientRepository;
 import com.example.damiProd.repository.OrderRepository;
 import com.example.damiProd.repository.ProductRepository;
 import com.example.damiProd.repository.SubscriptionRepository;
+import com.example.damiProd.repository.TaskRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class OrderService {
@@ -16,13 +19,16 @@ public class OrderService {
     private final ClientRepository clientRepository;
     private final ProductRepository productRepository;
     private final SubscriptionRepository subscriptionRepository;
+    private final TaskRepository taskRepository;
 
     public OrderService(OrderRepository orderRepository, ClientRepository clientRepository,
-            ProductRepository productRepository, SubscriptionRepository subscriptionRepository) {
+            ProductRepository productRepository, SubscriptionRepository subscriptionRepository,
+            TaskRepository taskRepository) {
         this.orderRepository = orderRepository;
         this.clientRepository = clientRepository;
         this.productRepository = productRepository;
         this.subscriptionRepository = subscriptionRepository;
+        this.taskRepository = taskRepository;
     }
 
     public Order createOrder(Long clientId, Order order) {
@@ -58,7 +64,10 @@ public class OrderService {
         return orderRepository.findByClientId(clientId);
     }
 
+    @Transactional
     public void deleteOrder(Long orderId) {
+        Optional<Task> task = taskRepository.findByOrder_Id(orderId);
+        task.ifPresent(t -> taskRepository.delete(t));
         orderRepository.deleteById(orderId);
     }
 

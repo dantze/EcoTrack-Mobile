@@ -2,20 +2,12 @@ import { StyleSheet, Text, View, Pressable, ScrollView, ActivityIndicator } from
 import React, { useState, useEffect } from 'react'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons';
-import { RouteService, Route } from '../../services/RouteService';
+import { RouteService } from '../../services/RouteService';
+import { Task } from '../../services/TaskService';
 import { getTaskTypeLabel, getTaskTypeColor, getStatusLabel } from '../../constants/TaskConstants';
-
-// --- 1. DEFINE DATA TYPE (Schema) - matches backend Task entity ---
-type TaskItem = {
-    id: number;
-    type: 'PLACEMENT' | 'PICKUP' | 'SANITIZATION' | 'MAINTENANCE';
-    status: 'NEW' | 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
-    scheduledTime?: string;
-    address?: string;
-    clientName?: string;
-    clientPhone?: string;
-    internalNotes?: string;
-};
+import { AppColors } from '../../constants/Colors';
+import ScreenHeader from '../../components/ScreenHeader';
+import TaskTypeLegend from '../../components/TaskTypeLegend';
 
 const RouteTasks = () => {
     const router = useRouter();
@@ -24,7 +16,7 @@ const RouteTasks = () => {
         driverName?: string;
     }>();
 
-    const [tasks, setTasks] = useState<TaskItem[]>([]);
+    const [tasks, setTasks] = useState<Task[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -48,7 +40,7 @@ const RouteTasks = () => {
         }
     };
 
-    const handleCardPress = (item: TaskItem) => {
+    const handleCardPress = (item: Task) => {
         console.log("View task details:", item.id);
         router.push({
             pathname: "/Technical/ServiceDetails",
@@ -59,25 +51,10 @@ const RouteTasks = () => {
     return (
         <View style={styles.container}>
 
-            <View style={styles.headerContainer}>
-                <Text style={styles.headerText}>{driverName}</Text>
-            </View>
+            <ScreenHeader title={driverName || 'Sarcini Rută'} />
 
             {/* LEGEND */}
-            <View style={styles.legendContainer}>
-                <View style={styles.legendItem}>
-                    <Ionicons name="location" size={20} color="#E74C3C" />
-                    <Text style={styles.legendText}>Ridicări</Text>
-                </View>
-                <View style={styles.legendItem}>
-                    <Ionicons name="location" size={20} color="#2ECC71" />
-                    <Text style={styles.legendText}>Amplasări</Text>
-                </View>
-                <View style={styles.legendItem}>
-                    <Ionicons name="location" size={20} color="#3498DB" />
-                    <Text style={styles.legendText}>Igienizări</Text>
-                </View>
-            </View>
+            <TaskTypeLegend types={['PICKUP', 'PLACEMENT', 'SANITIZATION']} />
 
             {loading ? (
                 <View style={styles.centerContent}>
@@ -153,24 +130,7 @@ export default RouteTasks
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#16283C',
-    },
-    headerContainer: {
-        marginTop: 60,
-        paddingHorizontal: 20,
-        width: '100%',
-        marginBottom: 10,
-    },
-    headerText: {
-        color: '#FFFFFF',
-        fontSize: 22,
-        fontWeight: 'bold',
-        textAlign: 'left',
-    },
-    subHeaderText: {
-        color: 'rgba(255,255,255,0.7)',
-        fontSize: 16,
-        marginTop: 4,
+        backgroundColor: AppColors.screenBackground,
     },
 
     // --- CENTER CONTENT (Loading, Error, Empty) ---
@@ -181,7 +141,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
     },
     loadingText: {
-        color: '#FFFFFF',
+        color: AppColors.textWhite,
         marginTop: 10,
         fontSize: 16,
     },
@@ -192,40 +152,20 @@ const styles = StyleSheet.create({
         marginBottom: 20,
     },
     emptyText: {
-        color: 'rgba(255,255,255,0.7)',
+        color: AppColors.subtitleText,
         fontSize: 16,
         textAlign: 'center',
     },
     retryButton: {
-        backgroundColor: '#427992',
+        backgroundColor: AppColors.buttonBackground,
         paddingHorizontal: 20,
         paddingVertical: 10,
         borderRadius: 8,
     },
     retryButtonText: {
-        color: '#FFFFFF',
+        color: AppColors.textWhite,
         fontSize: 16,
         fontWeight: 'bold',
-    },
-
-    // --- LEGEND ---
-    legendContainer: {
-        flexDirection: 'row',
-        justifyContent: 'flex-start',
-        paddingHorizontal: 25,
-        marginBottom: 20,
-        flexWrap: 'wrap',
-    },
-    legendItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginRight: 15,
-        marginBottom: 5,
-    },
-    legendText: {
-        color: '#FFFFFF',
-        fontSize: 14,
-        marginLeft: 5,
     },
 
     // --- LIST ---
@@ -239,7 +179,7 @@ const styles = StyleSheet.create({
 
     // --- TASK CARD ---
     card: {
-        backgroundColor: '#5D8AA8',
+        backgroundColor: AppColors.accentColor,
         borderRadius: 16,
         padding: 16,
         marginBottom: 16,
@@ -247,14 +187,14 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         elevation: 5,
-        shadowColor: "#000",
+        shadowColor: AppColors.shadow,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
         shadowRadius: 3.84,
     },
     cardPressed: {
         opacity: 0.9,
-        transform: [{ scale: 0.98 }]
+        transform: [{ scale: 0.98 }],
     },
     cardInfo: {
         flex: 1,
@@ -262,12 +202,12 @@ const styles = StyleSheet.create({
     clientName: {
         fontSize: 20,
         fontWeight: 'bold',
-        color: '#FFFFFF', // White (different from 'Orders')
+        color: AppColors.textWhite,
         marginBottom: 4,
     },
     statusText: {
         fontSize: 14,
-        color: '#E0E0E0', // Light gray
+        color: '#E0E0E0',
         marginBottom: 8,
     },
     phoneContainer: {
@@ -281,5 +221,5 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         marginTop: 2,
-    }
+    },
 })

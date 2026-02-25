@@ -1,18 +1,28 @@
 package com.example.damiProd.service;
 
 import com.example.damiProd.domain.Client;
+import com.example.damiProd.domain.Order;
+import com.example.damiProd.domain.Task;
 import com.example.damiProd.repository.ClientRepository;
+import com.example.damiProd.repository.OrderRepository;
+import com.example.damiProd.repository.TaskRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class ClientService {
 
     private final ClientRepository clientRepository;
+    private final OrderRepository orderRepository;
+    private final TaskRepository taskRepository;
 
-    public ClientService(ClientRepository clientRepository) {
+    public ClientService(ClientRepository clientRepository, OrderRepository orderRepository, TaskRepository taskRepository) {
         this.clientRepository = clientRepository;
+        this.orderRepository = orderRepository;
+        this.taskRepository = taskRepository;
     }
 
     public Client saveClient(Client client) {
@@ -51,7 +61,27 @@ public class ClientService {
         return clientRepository.save(existingClient);
     }
 
+    public boolean clientHasOrders(Long id) {
+        List<Order> orders = orderRepository.findByClientId(id);
+        return !orders.isEmpty();
+    }
+
     public void deleteClient(Long id) {
+        clientRepository.deleteById(id);
+    }
+
+    @Transactional
+    public void deleteClientCascade(Long id) {
+        List<Order> orders = orderRepository.findByClientId(id);
+        for (Order order : orders) {
+            Optional<Task> task = taskRepository.findByOrder_Id(order.getId());
+            task.ifPresent(t -> taskRepository.delete(t));
+        }
+        taskRepository.flush();
+        for (Order order : orders) {
+            orderRepository.delete(order);
+        }
+        orderRepository.flush();
         clientRepository.deleteById(id);
     }
 }

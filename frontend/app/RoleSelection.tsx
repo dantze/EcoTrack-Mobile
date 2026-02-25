@@ -41,7 +41,7 @@ const RoleSelection = () => {
     const handleRoleSelect = (role: RoleKey) => {
         const config = ROLE_CONFIG[role];
         if (config) {
-            router.replace(config.route as any);
+            router.push(config.route as any);
         }
     };
 

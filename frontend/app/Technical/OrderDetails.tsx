@@ -252,25 +252,75 @@ const OrderDetails = () => {
         : (order.client?.fullName || order.client?.email || 'N/A');
     const clientAddress = order.locationAddress || order.locationCoordinates || order.client?.address;
 
-    const renderDateRow = () => {
-        if (!order || !order.startDate) return null;
+    const renderDateRow = (label: string, dateStr?: string, endDateStr?: string) => {
+        if (!dateStr) return null;
         try {
-            const start = new Date(order.startDate);
+            const start = new Date(dateStr);
             if (isNaN(start.getTime())) return null;
-
-            const formatDate = (d: Date) => d.toLocaleDateString('ro-RO');
-            const startStr = formatDate(start);
-
-            if (order.endDate) {
-                const end = new Date(order.endDate);
+            const fmt = (d: Date) => d.toLocaleDateString('ro-RO');
+            if (endDateStr) {
+                const end = new Date(endDateStr);
                 if (!isNaN(end.getTime()) && start.getTime() !== end.getTime()) {
-                    return <DetailRow label="Perioadă" value={`${startStr} - ${formatDate(end)}`} />;
+                    return <DetailRow label={label} value={`${fmt(start)} - ${fmt(end)}`} />;
                 }
             }
-            return <DetailRow label="Data Comenzii" value={startStr} />;
-        } catch (e) {
-            return null;
+            return <DetailRow label={label} value={fmt(start)} />;
+        } catch { return null; }
+    };
+
+    // Renders the order-type-specific info rows
+    const renderOrderInfo = () => {
+        const type = order?.orderType;
+
+        if (type === 'Amplasari') {
+            return (
+                <>
+                    <DetailRow label="Produs" value={order.product?.name} />
+                    <DetailRow label="Cantitate" value={order.quantity?.toString()} />
+                    {renderDateRow('Perioadă / Data', order.startDate, order.endDate)}
+                    {(order.durationDays || order.isIndefinite) && (
+                        <DetailRow
+                            label="Durată"
+                            value={order.durationDays ? `${order.durationDays} zile` : 'Nedefinit'}
+                        />
+                    )}
+                    {order.igienizariPerMonth != null && (
+                        <DetailRow label="Igienizări/lună" value={`${order.igienizariPerMonth}`} />
+                    )}
+                </>
+            );
         }
+
+        if (type === 'Ridicari') {
+            return (
+                <>
+                    <DetailRow label="Produs" value={order.pickupProductName} />
+                    <DetailRow label="Cantitate" value={order.pickupQuantity?.toString()} />
+                    {renderDateRow('Data Ridicării', order.pickupDate)}
+                </>
+            );
+        }
+
+        if (type === 'Igienizari') {
+            return (
+                <>
+                    <DetailRow label="Abonament" value={order.subscription?.name} />
+                    <DetailRow
+                        label="Tip"
+                        value={order.subscription?.type === 'ONE_TIME' ? 'O singură dată' : 'Recurent'}
+                    />
+                    {order.subscription?.price != null && (
+                        <DetailRow label="Preț" value={`${order.subscription.price} RON`} />
+                    )}
+                    {order.subscription?.visitsPerMonth != null && (
+                        <DetailRow label="Vizite/lună" value={`${order.subscription.visitsPerMonth}`} />
+                    )}
+                    {renderDateRow('Data Igienizării', order.sanitationDate)}
+                </>
+            );
+        }
+
+        return null;
     };
 
     return (
@@ -292,14 +342,10 @@ const OrderDetails = () => {
                     <DetailRow label="Adresă" value={clientAddress} isMultiline />
 
                     <View style={{ height: 10 }} />
-                    <DetailRow label="Produs" value={order.product?.name} />
-                    <DetailRow label="Cantitate" value={order.quantity?.toString()} />
-                    <DetailRow label="Tip" value={order.orderType} />
-
-                    {renderDateRow()}
-                    <DetailRow label="Durată" value={order.durationDays ? `${order.durationDays} zile` : (order.isIndefinite ? 'Nedefinit' : 'N/A')} />
+                    {renderOrderInfo()}
 
                     <View style={{ height: 10 }} />
+                    <DetailRow label="Tip Comandă" value={order.orderType} />
                     <DetailRow label="Contact" value={order.contact} />
                     <DetailRow label="Detalii" value={order.details} isMultiline />
                 </View>

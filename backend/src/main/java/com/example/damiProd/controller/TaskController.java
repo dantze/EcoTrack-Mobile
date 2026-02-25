@@ -103,6 +103,7 @@ public class TaskController {
         response.put("taskId", task != null ? task.getId() : null);
         response.put("routeId", task != null && task.getRouteId() != null ? task.getRouteId() : null);
         response.put("scheduledTime", task != null ? task.getScheduledTime() : null);
+        response.put("status", task != null ? task.getStatus().name() : null);
         return ResponseEntity.ok(response);
     }
 

@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react'
 import { AntDesign } from '@expo/vector-icons';
 import DateSelector from './OrderComponents/DateSelector';
 import { ClientService } from '../../../services/ClientService';
+import { TaskService } from '../../../services/TaskService';
 import * as Location from 'expo-location';
 
 const Ridicari = ({ client, onDataChange }: { client: any, onDataChange: (data: any) => void }) => {
@@ -73,21 +74,37 @@ const Ridicari = ({ client, onDataChange }: { client: any, onDataChange: (data: 
                     groups[groupKey].orders.push(order);
                 }
 
-                // 4. Subtract units already picked up by existing Ridicare orders
-                //    Match on pickupLocationCoordinates + product name (denormalized on RidicareOrder)
+                // 4. For each Ridicare order: check task status
+                //    - COMPLETED → subtracted silently (pickup done, units gone)
+                //    - Pending (NEW / IN_PROGRESS / no task yet) → subtracted AND flagged as pending
                 for (const ro of ridicareOrders) {
                     const locKey = ro.pickupLocationCoordinates;
                     if (!locKey) continue;
 
-                    // Find the matching group by coordinates (product name used as fallback)
                     const matchingKey = Object.keys(groups).find(k => {
                         const g = groups[k];
                         return g.locationCoordinates === locKey &&
                             (g.productName === ro.pickupProductName || ro.pickupProductName == null);
                     });
 
-                    if (matchingKey) {
-                        groups[matchingKey].alreadyPickedUp += (ro.pickupQuantity || 0);
+                    if (!matchingKey) continue;
+
+                    const qty = ro.pickupQuantity || 0;
+                    groups[matchingKey].alreadyPickedUp += qty;
+
+                    // Check if the task for this Ridicare order is already COMPLETED
+                    try {
+                        const taskStatus = await TaskService.checkOrderHasTask(ro.id);
+                        const isCompleted = taskStatus.hasTask && (taskStatus as any).status === 'COMPLETED';
+                        if (!isCompleted) {
+                            // Still pending — increment the pending counter for the hint
+                            groups[matchingKey].pendingPickupCount =
+                                (groups[matchingKey].pendingPickupCount || 0) + qty;
+                        }
+                    } catch {
+                        // If we can't determine, assume pending to be safe
+                        groups[matchingKey].pendingPickupCount =
+                            (groups[matchingKey].pendingPickupCount || 0) + qty;
                     }
                 }
 
@@ -202,8 +219,8 @@ const Ridicari = ({ client, onDataChange }: { client: any, onDataChange: (data: 
 
                                     <Text style={styles.packetSubtext}>
                                         Disponibil: <Text style={{ fontWeight: 'bold', color: remaining > 0 ? '#4CAF50' : '#E53935' }}>{remaining}</Text> / {available}
-                                        {group.alreadyPickedUp > 0 && (
-                                            <Text style={{ color: '#E53935' }}>{`  (-${group.alreadyPickedUp} ridicate)`}</Text>
+                                        {group.pendingPickupCount > 0 && (
+                                            <Text style={{ color: '#E53935' }}>{`  (-${group.pendingPickupCount} urmează să fie ridicate)`}</Text>
                                         )}
                                     </Text>
                                 </View>

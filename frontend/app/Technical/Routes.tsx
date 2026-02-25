@@ -1,11 +1,13 @@
-import { StyleSheet, Text, View, Pressable, Image, ScrollView, ActivityIndicator, Modal, Alert } from 'react-native'
+import { StyleSheet, Text, View, Pressable, ScrollView, ActivityIndicator, Alert } from 'react-native'
 import React, { useState, useCallback } from 'react'
 import { useRouter, useFocusEffect } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons';
 import { RouteService, Route } from '../../services/RouteService';
 import { getAllDrivers, Employee } from '../../services/EmployeeService';
-
-const mapImageSource = require('../../assets/images/harta_romania.png');
+import ScreenHeader from '../../components/ScreenHeader';
+import DriverSelectModal from '../../modals/DriverSelectModal';
+import { AppColors } from '../../constants/Colors';
+import { getDayOfWeekLabel } from '../../constants/RouteConstants';
 
 const Routes = () => {
     const router = useRouter();
@@ -55,20 +57,6 @@ const Routes = () => {
         });
     };
 
-    // Convert dayOfWeek number to Romanian label
-    const getDayOfWeekLabel = (dayOfWeek?: number) => {
-        const days: { [key: number]: string } = {
-            1: 'Luni',
-            2: 'Marți',
-            3: 'Miercuri',
-            4: 'Joi',
-            5: 'Vineri',
-            6: 'Sâmbătă',
-            7: 'Duminică'
-        };
-        return dayOfWeek ? days[dayOfWeek] || 'N/A' : 'N/A';
-    };
-
     const handleRoutePress = (route: Route) => {
         console.log("You selected route:", route.id);
         setSelectedRoute(route);
@@ -102,13 +90,7 @@ const Routes = () => {
     return (
         <View style={styles.container}>
 
-            {/* Header */}
-            <View style={styles.headerContainer}>
-                <Pressable onPress={() => router.back()} style={styles.backButton}>
-                    <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
-                </Pressable>
-                <Text style={styles.headerText}>Rute</Text>
-            </View>
+            <ScreenHeader title="Rute" />
 
             {/* Add Route Button */}
             <View style={styles.addButtonContainer}>
@@ -158,58 +140,14 @@ const Routes = () => {
                 )}
             </View>
 
-            {/* Driver Assignment Modal */}
-            <Modal
-                animationType="slide"
-                transparent={true}
+            <DriverSelectModal
                 visible={driverModalVisible}
-                onRequestClose={handleCloseDriverModal}
-            >
-                <View style={styles.modalOverlay}>
-                    <View style={styles.modalContent}>
-                        <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Selectează Șofer</Text>
-                            <Pressable onPress={handleCloseDriverModal}>
-                                <Ionicons name="close" size={24} color="#FFFFFF" />
-                            </Pressable>
-                        </View>
-
-                        {selectedRoute && (
-                            <Text style={styles.modalSubtitle}>
-                                Rută: {selectedRoute.name || `#${selectedRoute.id}`}
-                            </Text>
-                        )}
-
-                        {driversLoading ? (
-                            <ActivityIndicator size="large" color="#ffffff" style={{ marginTop: 20 }} />
-                        ) : drivers.length === 0 ? (
-                            <View style={styles.emptyContainer}>
-                                <Ionicons name="person-outline" size={40} color="#5D8AA8" />
-                                <Text style={styles.emptyText}>Nu există șoferi disponibili</Text>
-                            </View>
-                        ) : (
-                            <ScrollView style={styles.modalList}>
-                                {drivers.map((driver) => (
-                                    <Pressable
-                                        key={driver.id}
-                                        style={({ pressed }) => [
-                                            styles.driverItem,
-                                            pressed && styles.buttonPressed
-                                        ]}
-                                        onPress={() => handleSelectDriver(driver)}
-                                    >
-                                        <Ionicons name="person-circle-outline" size={32} color="#FFFFFF" />
-                                        <View style={styles.driverInfo}>
-                                            <Text style={styles.driverName}>{driver.fullName}</Text>
-                                        </View>
-                                        <Ionicons name="chevron-forward" size={20} color="#5D8AA8" />
-                                    </Pressable>
-                                ))}
-                            </ScrollView>
-                        )}
-                    </View>
-                </View>
-            </Modal>
+                onClose={handleCloseDriverModal}
+                subtitle={selectedRoute ? `Rută: ${selectedRoute.name || `#${selectedRoute.id}`}` : undefined}
+                drivers={drivers}
+                loading={driversLoading}
+                onSelectDriver={handleSelectDriver}
+            />
 
         </View>
     )
@@ -220,32 +158,8 @@ export default Routes;
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#16283C',
+        backgroundColor: AppColors.screenBackground,
     },
-    headerContainer: {
-        marginTop: 60,
-        paddingHorizontal: 20,
-        width: '100%',
-        marginBottom: 30,
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    backButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: '#427992',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 15,
-    },
-    headerText: {
-        color: '#FFFFFF',
-        fontSize: 28,
-        fontWeight: 'bold',
-        textAlign: 'left',
-    },
-
     addButtonContainer: {
         paddingHorizontal: 20,
         marginBottom: 20,
@@ -254,23 +168,22 @@ const styles = StyleSheet.create({
     addRouteButton: {
         width: 300,
         height: 50,
-        backgroundColor: '#4CAF50',
+        backgroundColor: AppColors.successGreen,
         borderRadius: 20,
         flexDirection: 'row',
         justifyContent: 'center',
         alignItems: 'center',
         elevation: 5,
-        shadowColor: '#000',
+        shadowColor: AppColors.shadow,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.25,
         shadowRadius: 3.84,
     },
     addButtonText: {
-        color: '#FFFFFF',
+        color: AppColors.textWhite,
         fontSize: 18,
         fontWeight: 'bold',
     },
-
     listContainer: {
         flex: 1,
         alignItems: 'center',
@@ -282,18 +195,17 @@ const styles = StyleSheet.create({
     itemWrapper: {
         alignItems: 'center',
     },
-
     routeButton: {
         width: 300,
         height: 60,
-        backgroundColor: '#427992',
+        backgroundColor: AppColors.buttonBackground,
         borderRadius: 20,
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
         paddingHorizontal: 15,
         elevation: 5,
-        shadowColor: '#000',
+        shadowColor: AppColors.shadow,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.25,
         shadowRadius: 3.84,
@@ -303,16 +215,15 @@ const styles = StyleSheet.create({
         transform: [{ scale: 0.98 }]
     },
     buttonText: {
-        color: '#FFFFFF',
+        color: AppColors.textWhite,
         fontSize: 20,
         fontWeight: 'bold',
     },
     subtitleText: {
-        color: 'rgba(255, 255, 255, 0.7)',
+        color: AppColors.subtitleText,
         fontSize: 14,
         marginTop: 4,
     },
-
     separator: {
         width: 100,
         height: 1,
@@ -325,116 +236,11 @@ const styles = StyleSheet.create({
         paddingTop: 60,
     },
     emptyText: {
-        color: '#5D8AA8',
+        color: AppColors.accentColor,
         fontSize: 18,
         marginTop: 15,
     },
     routeInfo: {
         flex: 1,
-    },
-    taskCountText: {
-        color: 'rgba(255, 255, 255, 0.6)',
-        fontSize: 12,
-        marginTop: 2,
-    },
-    routeIdBadge: {
-        backgroundColor: 'rgba(255,255,255,0.2)',
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 12,
-    },
-    routeIdText: {
-        color: '#FFFFFF',
-        fontSize: 14,
-        fontWeight: 'bold',
-    },
-
-    footerContainer: {
-        width: '100%',
-        height: 250,
-        justifyContent: 'flex-end',
-        alignItems: 'center',
-        paddingBottom: 30,
-    },
-    mapImage: {
-        width: '80%',
-        height: 210,
-        opacity: 0.9,
-        marginBottom: 10,
-
-    },
-    navLink: {
-        marginTop: 10,
-        alignSelf: 'flex-end',
-        marginRight: 30,
-    },
-    navLinkText: {
-        color: '#5D8AA8',
-        fontSize: 16,
-        fontWeight: 'bold',
-    },
-    mapContainer: {
-        flex: 1,
-        width: '100%',
-        justifyContent: 'flex-end',
-        alignItems: 'center',
-        paddingBottom: 80,
-        zIndex: 1,
-    },
-
-    // Modal styles
-    modalOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(0, 0, 0, 0.7)',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    modalContent: {
-        width: '85%',
-        maxHeight: '70%',
-        backgroundColor: '#1E3A5F',
-        borderRadius: 20,
-        padding: 20,
-    },
-    modalHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: 10,
-    },
-    modalTitle: {
-        color: '#FFFFFF',
-        fontSize: 22,
-        fontWeight: 'bold',
-    },
-    modalSubtitle: {
-        color: 'rgba(255, 255, 255, 0.7)',
-        fontSize: 14,
-        marginBottom: 15,
-    },
-    modalList: {
-        marginTop: 10,
-    },
-    driverItem: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: '#427992',
-        borderRadius: 12,
-        padding: 12,
-        marginBottom: 10,
-    },
-    driverInfo: {
-        flex: 1,
-        marginLeft: 12,
-    },
-    driverName: {
-        color: '#FFFFFF',
-        fontSize: 16,
-        fontWeight: 'bold',
-    },
-    driverCounty: {
-        color: 'rgba(255, 255, 255, 0.7)',
-        fontSize: 12,
-        marginTop: 2,
     },
 })

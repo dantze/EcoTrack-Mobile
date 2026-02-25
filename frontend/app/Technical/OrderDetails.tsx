@@ -1,24 +1,25 @@
-import { StyleSheet, Text, View, Pressable, ScrollView, Image, Modal, Alert, ActivityIndicator, Platform } from 'react-native'
+import { StyleSheet, Text, View, Pressable, ScrollView, Alert, ActivityIndicator, Platform } from 'react-native'
 import React, { useState, useEffect } from 'react'
 import { useRouter, useLocalSearchParams } from 'expo-router'
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { OrderService } from '../../services/OrderService';
 import { RouteService, Route } from '../../services/RouteService';
 import { TaskService } from '../../services/TaskService';
-import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
-
-type DetailRowProps = {
-    label: string;
-    value: string;
-    isMultiline?: boolean;
-};
+import { AppColors } from '../../constants/Colors';
+import { Order } from '../../types/OrderTypes';
+import ScreenHeader from '../../components/ScreenHeader';
+import OrderInfoCard from '../../components/OrderInfoCard';
+import ScheduledDateSection from '../../components/ScheduledDateSection';
+import RouteAssignmentModal from '../../modals/RouteAssignmentModal';
+import { formatDisplayDate, toDateString } from '../../utils/dateUtils';
+import { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 
 const OrderDetails = () => {
     const router = useRouter();
     const params = useLocalSearchParams();
     const orderId = params.id ? Number(params.id) : null;
 
-    const [order, setOrder] = useState<any>(null);
+    const [order, setOrder] = useState<Order | null>(null);
     const [loading, setLoading] = useState(true);
     const [routes, setRoutes] = useState<Route[]>([]);
     const [orderTaskStatus, setOrderTaskStatus] = useState<{ hasTask: boolean; taskId: number | null; routeId: number | null; scheduledTime?: string | null }>({ hasTask: false, taskId: null, routeId: null });
@@ -79,20 +80,6 @@ const OrderDetails = () => {
     // Route selection function
     const handleSelectRoute = (route: Route) => {
         setSelectedRoute(route);
-    };
-
-    // Get day of week name
-    const getDayOfWeekName = (dayOfWeek?: number) => {
-        const daysRo: { [key: number]: string } = {
-            1: 'Luni',
-            2: 'Marți',
-            3: 'Miercuri',
-            4: 'Joi',
-            5: 'Vineri',
-            6: 'Sâmbătă',
-            7: 'Duminică'
-        };
-        return dayOfWeek ? daysRo[dayOfWeek] || null : null;
     };
 
     // Finalize function - creates a Task and assigns it to the selected Route
@@ -177,7 +164,7 @@ const OrderDetails = () => {
         if (!orderTaskStatus.taskId) return;
         try {
             setSavingDate(true);
-            const dateStr = date.toISOString().split('T')[0];
+            const dateStr = toDateString(date);
             await TaskService.updateScheduledDate(orderTaskStatus.taskId, dateStr);
             setOrderTaskStatus(prev => ({ ...prev, scheduledTime: date.toISOString() }));
             Alert.alert("Succes", `Data programată a fost setată: ${date.toLocaleDateString('ro-RO')}`);
@@ -201,27 +188,12 @@ const OrderDetails = () => {
         }
     };
 
-    const getScheduledDateDisplay = () => {
+    const getScheduledDateDisplay = (): string | null => {
         if (orderTaskStatus.scheduledTime) {
-            return new Date(orderTaskStatus.scheduledTime).toLocaleDateString('ro-RO', {
-                weekday: 'long',
-                year: 'numeric',
-                month: 'long',
-                day: 'numeric'
-            });
+            return formatDisplayDate(new Date(orderTaskStatus.scheduledTime));
         }
         return null;
     };
-
-    // Component for detail rows
-    const DetailRow = ({ label, value, isMultiline = false }: DetailRowProps) => (
-        <View style={styles.rowContainer}>
-            <Text style={styles.label}>{label}</Text>
-            <Text style={[styles.value, isMultiline && styles.multilineValue]}>
-                {value || 'N/A'}
-            </Text>
-        </View>
-    );
 
     if (loading) {
         return (
@@ -233,161 +205,25 @@ const OrderDetails = () => {
 
     if (!order) return null;
 
-    // Updated here: use 'name' instead of 'companyName', with email fallback
-    const clientName = order.client?.type === 'company'
-        ? (order.client?.name || order.client?.email || 'N/A')
-        : (order.client?.fullName || order.client?.email || 'N/A');
-    const clientAddress = order.locationAddress || order.locationCoordinates || order.client?.address;
-
-    const renderDateRow = (label: string, dateStr?: string, endDateStr?: string) => {
-        if (!dateStr) return null;
-        try {
-            const start = new Date(dateStr);
-            if (isNaN(start.getTime())) return null;
-            const fmt = (d: Date) => d.toLocaleDateString('ro-RO');
-            if (endDateStr) {
-                const end = new Date(endDateStr);
-                if (!isNaN(end.getTime()) && start.getTime() !== end.getTime()) {
-                    return <DetailRow label={label} value={`${fmt(start)} - ${fmt(end)}`} />;
-                }
-            }
-            return <DetailRow label={label} value={fmt(start)} />;
-        } catch { return null; }
-    };
-
-    // Renders the order-type-specific info rows
-    const renderOrderInfo = () => {
-        const type = order?.orderType;
-
-        if (type === 'Amplasari') {
-            return (
-                <>
-                    <DetailRow label="Produs" value={order.product?.name} />
-                    <DetailRow label="Cantitate" value={order.quantity?.toString()} />
-                    {renderDateRow('Perioadă / Data', order.startDate, order.endDate)}
-                    {(order.durationDays || order.isIndefinite) && (
-                        <DetailRow
-                            label="Durată"
-                            value={order.durationDays ? `${order.durationDays} zile` : 'Nedefinit'}
-                        />
-                    )}
-                    {order.igienizariPerMonth != null && (
-                        <DetailRow label="Igienizări/lună" value={`${order.igienizariPerMonth}`} />
-                    )}
-                </>
-            );
-        }
-
-        if (type === 'Ridicari') {
-            return (
-                <>
-                    <DetailRow label="Produs" value={order.pickupProductName} />
-                    <DetailRow label="Cantitate" value={order.pickupQuantity?.toString()} />
-                    {renderDateRow('Data Ridicării', order.pickupDate)}
-                </>
-            );
-        }
-
-        if (type === 'Igienizari') {
-            return (
-                <>
-                    <DetailRow label="Abonament" value={order.subscription?.name} />
-                    <DetailRow
-                        label="Tip"
-                        value={order.subscription?.type === 'ONE_TIME' ? 'O singură dată' : 'Recurent'}
-                    />
-                    {order.subscription?.price != null && (
-                        <DetailRow label="Preț" value={`${order.subscription.price} RON`} />
-                    )}
-                    {order.subscription?.visitsPerMonth != null && (
-                        <DetailRow label="Vizite/lună" value={`${order.subscription.visitsPerMonth}`} />
-                    )}
-                    {renderDateRow('Data Igienizării', order.sanitationDate)}
-                </>
-            );
-        }
-
-        return null;
-    };
-
     return (
         <View style={styles.container}>
 
-            <View style={styles.headerContainer}>
-                <Pressable onPress={() => router.back()} style={styles.backButton}>
-                    <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
-                </Pressable>
-                <Text style={styles.headerText}>Detalii Comandă</Text>
-            </View>
+            <ScreenHeader title="Detalii Comandă" />
 
             <ScrollView contentContainerStyle={styles.scrollContent}>
 
-                <View style={styles.detailsCard}>
-                    <DetailRow label="Nume Client" value={clientName} />
-                    <DetailRow label="Tip Client" value={order.client?.type === 'company' ? 'Firmă' : 'Persoană Fizică'} />
-                    {order.client?.cui && <DetailRow label="CUI" value={order.client.cui} />}
-                    <DetailRow label="Adresă" value={clientAddress} isMultiline />
-
-                    <View style={{ height: 10 }} />
-                    {renderOrderInfo()}
-
-                    <View style={{ height: 10 }} />
-                    <DetailRow label="Tip Comandă" value={order.orderType} />
-                    <DetailRow label="Contact" value={order.contact} />
-                    <DetailRow label="Detalii" value={order.details} isMultiline />
-                </View>
+                <OrderInfoCard order={order} />
 
                 {/* --- SCHEDULED DATE SECTION --- */}
                 {orderTaskStatus.hasTask && (
-                    <View style={styles.scheduleDateSection}>
-                        <View style={styles.scheduleDateHeader}>
-                            <Ionicons name="calendar-outline" size={20} color="#E0E0E0" />
-                            <Text style={styles.scheduleDateTitle}>Dată Programată</Text>
-                        </View>
-
-                        {getScheduledDateDisplay() ? (
-                            <View style={styles.scheduleDateDisplay}>
-                                <Ionicons name="checkmark-circle" size={18} color="#2ECC71" />
-                                <Text style={styles.scheduleDateText}>{getScheduledDateDisplay()}</Text>
-                            </View>
-                        ) : (
-                            <View style={styles.noDateNotice}>
-                                <Ionicons name="alert-circle-outline" size={18} color="#F39C12" />
-                                <Text style={styles.noDateText}>Nicio dată programată încă</Text>
-                            </View>
-                        )}
-
-                        {showDatePicker && (
-                            <DateTimePicker
-                                value={pickerDate}
-                                mode="date"
-                                display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                                onChange={handleDateChange}
-                                minimumDate={new Date()}
-                            />
-                        )}
-
-                        <Pressable
-                            style={({ pressed }) => [
-                                showDatePicker ? styles.saveDateButton : styles.setDateButton,
-                                savingDate && styles.disabledActionButton,
-                                pressed && !savingDate && styles.buttonPressed
-                            ]}
-                            onPress={handleDateButtonPress}
-                            disabled={savingDate}
-                        >
-                            {savingDate ? (
-                                <ActivityIndicator size="small" color="white" />
-                            ) : (
-                                <>
-                                    <Ionicons name={showDatePicker ? "checkmark-circle" : "calendar"} size={20} color="white" style={{ marginRight: 8 }} />
-                                    <Text style={styles.setDateButtonText}>
-                                        {showDatePicker ? 'Salvează Data' : (getScheduledDateDisplay() ? 'Schimbă Data' : 'Setează Data')}
-                                    </Text>
-                                </>
-                            )}
-                        </Pressable>
-                    </View>
+                    <ScheduledDateSection
+                        scheduledDate={getScheduledDateDisplay()}
+                        showPicker={showDatePicker}
+                        pickerDate={pickerDate}
+                        saving={savingDate}
+                        onDateChange={handleDateChange}
+                        onButtonPress={handleDateButtonPress}
+                    />
                 )}
 
                 {/* STATUS BADGE - shows if already assigned */}
@@ -430,90 +266,15 @@ const OrderDetails = () => {
             </ScrollView>
 
             {/* ================= ASSIGNMENT MODAL ================= */}
-            <Modal
-                animationType="slide"
-                transparent={true}
+            <RouteAssignmentModal
                 visible={modalVisible}
-                onRequestClose={() => setModalVisible(false)}
-            >
-                <View style={styles.modalOverlay}>
-                    <View style={styles.modalContent}>
-
-                        {/* --- HEADER: Title + Close --- */}
-                        <View style={styles.modalHeader}>
-                            <Text style={styles.modalTitle}>Selectează Ruta</Text>
-                            <Pressable onPress={() => setModalVisible(false)}>
-                                <Ionicons name="close" size={24} color="#16283C" />
-                            </Pressable>
-                        </View>
-
-                        {/* --- FINALIZE BUTTON (Top Center) --- */}
-                        <Pressable
-                            style={[
-                                styles.finalizeButton,
-                                (!selectedRoute || assigning) && styles.disabledButton
-                            ]}
-                            onPress={handleFinalize}
-                            disabled={!selectedRoute || assigning}
-                        >
-                            {assigning ? (
-                                <ActivityIndicator size="small" color="white" />
-                            ) : (
-                                <>
-                                    <Text style={styles.finalizeText}>Finalizează Atribuirea</Text>
-                                    <MaterialCommunityIcons name="truck-delivery" size={20} color="white" style={{ marginLeft: 8 }} />
-                                </>
-                            )}
-                        </Pressable>
-
-                        {/* --- SCROLLABLE ROUTES LIST --- */}
-                        <ScrollView style={styles.routesScrollView} contentContainerStyle={styles.routesScrollContent}>
-                            {routes.length > 0 ? (
-                                routes.map((route) => (
-                                    <Pressable
-                                        key={route.id}
-                                        style={[
-                                            styles.routeCard,
-                                            selectedRoute?.id === route.id && styles.activeRouteCard
-                                        ]}
-                                        onPress={() => handleSelectRoute(route)}
-                                    >
-                                        <View style={styles.routeCardContent}>
-                                            <Text style={[
-                                                styles.routeCardDriver,
-                                                selectedRoute?.id === route.id && styles.activeRouteText
-                                            ]}>
-                                                {route.employeeName || 'Șofer neasignat'}
-                                            </Text>
-                                            <Text style={[
-                                                styles.routeCardDate,
-                                                selectedRoute?.id === route.id && styles.activeRouteSubtext
-                                            ]}>
-                                                {route.name || `Ruta #${route.id}`}{getDayOfWeekName(route.dayOfWeek) ? ` • ${getDayOfWeekName(route.dayOfWeek)}` : ''}
-                                            </Text>
-                                            <Text style={[
-                                                styles.routeCardTasks,
-                                                selectedRoute?.id === route.id && styles.activeRouteSubtext
-                                            ]}>
-                                                {route.tasks?.length || 0} sarcini
-                                            </Text>
-                                        </View>
-                                        {selectedRoute?.id === route.id && (
-                                            <Ionicons name="checkmark-circle" size={24} color="white" />
-                                        )}
-                                    </Pressable>
-                                ))
-                            ) : (
-                                <View style={styles.emptyRoutes}>
-                                    <Ionicons name="alert-circle-outline" size={40} color="#999" />
-                                    <Text style={styles.emptyRoutesText}>Nu există rute disponibile</Text>
-                                </View>
-                            )}
-                        </ScrollView>
-
-                    </View>
-                </View>
-            </Modal>
+                onClose={() => setModalVisible(false)}
+                routes={routes}
+                selectedRoute={selectedRoute}
+                onSelectRoute={handleSelectRoute}
+                onFinalize={handleFinalize}
+                assigning={assigning}
+            />
 
         </View>
     )
@@ -522,21 +283,13 @@ const OrderDetails = () => {
 export default OrderDetails
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#16283C' },
-    headerContainer: { marginTop: 60, paddingHorizontal: 20, width: '100%', marginBottom: 20, flexDirection: 'row', alignItems: 'center' },
-    backButton: { marginRight: 15 },
-    headerText: { color: '#FFFFFF', fontSize: 28, fontWeight: 'bold' },
+    container: { flex: 1, backgroundColor: AppColors.screenBackground },
     scrollContent: { paddingHorizontal: 20, paddingBottom: 50, alignItems: 'center' },
-    detailsCard: { backgroundColor: '#5D8AA8', borderRadius: 20, padding: 20, width: '100%', marginBottom: 30 },
-    rowContainer: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 12 },
-    label: { color: '#E0E0E0', fontSize: 14, flex: 1, fontWeight: '600' },
-    value: { color: '#FFFFFF', fontSize: 14, fontWeight: 'bold', flex: 1, textAlign: 'right' },
-    multilineValue: { flex: 1.5 },
 
-    actionButton: { backgroundColor: '#427992', width: '100%', height: 55, borderRadius: 15, justifyContent: 'center', alignItems: 'center', elevation: 5, shadowColor: "#000", shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 4 },
+    actionButton: { backgroundColor: AppColors.buttonBackground, width: '100%', height: 55, borderRadius: 15, justifyContent: 'center', alignItems: 'center', elevation: 5, shadowColor: AppColors.shadow, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 4 },
     disabledActionButton: { backgroundColor: '#6B8A9A' },
     buttonPressed: { opacity: 0.8, transform: [{ scale: 0.98 }] },
-    actionButtonText: { color: '#FFFFFF', fontSize: 20, fontWeight: 'bold' },
+    actionButtonText: { color: AppColors.textWhite, fontSize: 20, fontWeight: 'bold' },
 
     // Assigned Badge
     assignedBadge: {
@@ -549,130 +302,10 @@ const styles = StyleSheet.create({
         marginBottom: 15,
     },
     assignedText: {
-        color: '#2ECC71',
+        color: AppColors.successGreen,
         fontSize: 14,
         fontWeight: 'bold',
         marginLeft: 8,
-    },
-
-    mapLinkContainer: { marginTop: 20, alignSelf: 'flex-end' },
-    mapLinkText: { color: '#5D8AA8', fontSize: 16, fontWeight: 'bold' },
-
-    // --- MODAL STYLES ---
-    modalOverlay: {
-        flex: 1,
-        backgroundColor: 'rgba(22, 40, 60, 0.8)', // Dark semi-transparent background
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    modalContent: {
-        width: '90%',
-        backgroundColor: 'white',
-        borderRadius: 30,
-        padding: 20,
-        alignItems: 'center',
-        elevation: 10,
-    },
-
-    // Modal Header
-    modalHeader: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        width: '100%',
-        marginBottom: 20,
-    },
-    modalTitle: {
-        fontSize: 22,
-        fontWeight: 'bold',
-        color: '#16283C',
-    },
-
-    // Finalize Button
-    finalizeButton: {
-        width: '100%',
-        height: 50,
-        backgroundColor: '#5D8AA8',
-        borderRadius: 12,
-        flexDirection: 'row',
-        justifyContent: 'center',
-        alignItems: 'center',
-        elevation: 2,
-        marginBottom: 20,
-    },
-    disabledButton: {
-        backgroundColor: '#BDC3C7', // Gray when disabled
-    },
-    finalizeText: {
-        color: 'white',
-        fontWeight: 'bold',
-        fontSize: 16,
-    },
-
-    // Routes Scroll View
-    routesScrollView: {
-        maxHeight: 300,
-        width: '100%',
-    },
-    routesScrollContent: {
-        paddingBottom: 10,
-    },
-    routeCard: {
-        backgroundColor: '#F5F5F5',
-        borderRadius: 12,
-        padding: 15,
-        marginBottom: 10,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        borderWidth: 2,
-        borderColor: 'transparent',
-    },
-    activeRouteCard: {
-        backgroundColor: '#5D8AA8',
-        borderColor: '#16283C',
-    },
-    routeCardContent: {
-        flex: 1,
-    },
-    routeCardDriver: {
-        fontSize: 16,
-        fontWeight: 'bold',
-        color: '#16283C',
-        marginBottom: 4,
-    },
-    routeCardDate: {
-        fontSize: 14,
-        color: '#666',
-        marginBottom: 2,
-    },
-    routeCardTasks: {
-        fontSize: 12,
-        color: '#888',
-    },
-    activeRouteText: {
-        color: 'white',
-    },
-    activeRouteSubtext: {
-        color: 'rgba(255,255,255,0.8)',
-    },
-    emptyRoutes: {
-        alignItems: 'center',
-        paddingVertical: 30,
-    },
-    emptyRoutesText: {
-        color: '#999',
-        fontSize: 14,
-        marginTop: 10,
-    },
-
-    closeModalButton: {
-        marginTop: 10,
-        padding: 10,
-    },
-    closeModalText: {
-        color: '#999',
-        fontWeight: 'bold',
     },
 
     // Reassign Button
@@ -688,84 +321,8 @@ const styles = StyleSheet.create({
         elevation: 3,
     },
     reassignButtonText: {
-        color: 'white',
+        color: AppColors.textWhite,
         fontWeight: 'bold',
         fontSize: 16,
-    },
-
-    // --- SCHEDULED DATE SECTION STYLES ---
-    scheduleDateSection: {
-        backgroundColor: '#5D8AA8',
-        borderRadius: 20,
-        padding: 20,
-        width: '100%',
-        marginTop: 20,
-        marginBottom: 10,
-    },
-    scheduleDateHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 12,
-    },
-    scheduleDateTitle: {
-        color: '#E0E0E0',
-        fontSize: 16,
-        fontWeight: '600',
-        marginLeft: 8,
-    },
-    scheduleDateDisplay: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: 'rgba(46, 204, 113, 0.15)',
-        paddingHorizontal: 12,
-        paddingVertical: 10,
-        borderRadius: 12,
-        marginBottom: 12,
-    },
-    scheduleDateText: {
-        color: '#FFFFFF',
-        fontSize: 15,
-        fontWeight: 'bold',
-        marginLeft: 8,
-        textTransform: 'capitalize',
-    },
-    noDateNotice: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: 'rgba(243, 156, 18, 0.15)',
-        paddingHorizontal: 12,
-        paddingVertical: 10,
-        borderRadius: 12,
-        marginBottom: 12,
-    },
-    noDateText: {
-        color: '#F39C12',
-        fontSize: 14,
-        fontWeight: '600',
-        marginLeft: 8,
-    },
-    setDateButton: {
-        backgroundColor: '#427992',
-        height: 48,
-        borderRadius: 12,
-        flexDirection: 'row',
-        justifyContent: 'center',
-        alignItems: 'center',
-        elevation: 3,
-    },
-    setDateButtonText: {
-        color: 'white',
-        fontWeight: 'bold',
-        fontSize: 15,
-    },
-    saveDateButton: {
-        backgroundColor: '#2ECC71',
-        height: 48,
-        borderRadius: 12,
-        flexDirection: 'row',
-        justifyContent: 'center',
-        alignItems: 'center',
-        elevation: 3,
-        marginTop: 10,
     },
 })

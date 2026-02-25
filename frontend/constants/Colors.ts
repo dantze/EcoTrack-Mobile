@@ -7,6 +7,14 @@ export const AppColors = {
   textWhite: '#FFFFFF',
   shadow: '#000',
   separatorColor: 'rgba(255, 255, 255, 0.3)',
+  accentColor: '#5D8AA8',
+  successGreen: '#4CAF50',
+  subtitleText: 'rgba(255, 255, 255, 0.7)',
+  modalOverlay: 'rgba(0, 0, 0, 0.7)',
+  modalBackground: '#1E3A5F',
+  inputBackground: '#2A4158',
+  placeholderText: '#888888',
+  disabledText: '#666666',
 };
 
 export default {

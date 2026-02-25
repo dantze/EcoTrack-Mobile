@@ -1,8 +1,9 @@
 import { StyleSheet, Text, View, Pressable, ScrollView, ActivityIndicator } from 'react-native'
 import React, { useEffect, useState } from 'react'
 import { useRouter } from 'expo-router'
-import { Ionicons } from '@expo/vector-icons';
 import { getAllDrivers, Employee } from '../../services/EmployeeService'
+import ScreenHeader from '../../components/ScreenHeader';
+import { AppColors } from '../../constants/Colors';
 
 const RoutesAndDrivers = () => {
     const router = useRouter();
@@ -41,16 +42,11 @@ const RoutesAndDrivers = () => {
 
     return (
         <View style={styles.container}>
-            <View style={styles.headerContainer}>
-                <Pressable onPress={() => router.back()} style={styles.backButton}>
-                    <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
-                </Pressable>
-                <Text style={styles.headerText}>Șoferi</Text>
-            </View>
+            <ScreenHeader title="Șoferi" />
 
             {loading ? (
                 <View style={styles.centerContent}>
-                    <ActivityIndicator size="large" color="#427992" />
+                    <ActivityIndicator size="large" color={AppColors.buttonBackground} />
                     <Text style={styles.loadingText}>Se încarcă șoferii...</Text>
                 </View>
             ) : error ? (
@@ -89,30 +85,7 @@ export default RoutesAndDrivers
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#16283C',
-    },
-    headerContainer: {
-        marginTop: 60,
-        paddingHorizontal: 20,
-        width: '100%',
-        marginBottom: 20,
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    backButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: '#427992',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 15,
-    },
-    headerText: {
-        color: '#FFFFFF',
-        fontSize: 22,
-        fontWeight: 'bold',
-        textAlign: 'left',
+        backgroundColor: AppColors.screenBackground,
     },
     centerContent: {
         flex: 1,
@@ -121,7 +94,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
     },
     loadingText: {
-        color: '#FFFFFF',
+        color: AppColors.textWhite,
         marginTop: 10,
         fontSize: 16,
     },
@@ -132,18 +105,18 @@ const styles = StyleSheet.create({
         marginBottom: 20,
     },
     emptyText: {
-        color: 'rgba(255,255,255,0.7)',
+        color: AppColors.subtitleText,
         fontSize: 16,
         textAlign: 'center',
     },
     retryButton: {
-        backgroundColor: '#427992',
+        backgroundColor: AppColors.buttonBackground,
         paddingHorizontal: 24,
         paddingVertical: 12,
         borderRadius: 20,
     },
     retryButtonText: {
-        color: '#FFFFFF',
+        color: AppColors.textWhite,
         fontSize: 16,
         fontWeight: 'bold',
     },
@@ -156,14 +129,14 @@ const styles = StyleSheet.create({
         gap: 12,
     },
     driverButton: {
-        backgroundColor: '#427992',
+        backgroundColor: AppColors.buttonBackground,
         borderRadius: 15,
         padding: 16,
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
         elevation: 5,
-        shadowColor: '#000',
+        shadowColor: AppColors.shadow,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.25,
         shadowRadius: 3.84,
@@ -173,7 +146,7 @@ const styles = StyleSheet.create({
         transform: [{ scale: 0.99 }],
     },
     driverName: {
-        color: '#FFFFFF',
+        color: AppColors.textWhite,
         fontSize: 18,
         fontWeight: 'bold',
     },

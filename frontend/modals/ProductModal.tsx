@@ -3,8 +3,8 @@ import {
     Modal, View, Text, TextInput, Pressable, ScrollView, ActivityIndicator, Alert,
 } from 'react-native';
 import { Ionicons, AntDesign } from '@expo/vector-icons';
-import { ProductService, Product } from '../../../services/ProductService';
-import { validateRequired, validatePositiveNumber } from '../../../utils/formatters';
+import { ProductService, Product } from '../services/ProductService';
+import { validateRequired, validatePositiveNumber } from '../utils/formatters';
 import modalStyles from './modalStyles';
 
 interface ProductModalProps {

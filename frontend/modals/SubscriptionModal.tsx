@@ -6,8 +6,8 @@ import {
 import { Ionicons, AntDesign, MaterialCommunityIcons } from '@expo/vector-icons';
 import {
     SubscriptionService, Subscription, CreateSubscriptionRequest, SubscriptionType,
-} from '../../../services/SubscriptionService';
-import { validateRequired, validatePositiveNumber, validatePositiveInt } from '../../../utils/formatters';
+} from '../services/SubscriptionService';
+import { validateRequired, validatePositiveNumber, validatePositiveInt } from '../utils/formatters';
 import modalStyles from './modalStyles';
 
 interface SubscriptionModalProps {

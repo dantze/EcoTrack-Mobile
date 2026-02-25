@@ -8,8 +8,8 @@ import { ProductService, Product } from '../../services/ProductService';
 import { Subscription, SubscriptionService, SubscriptionType } from '../../services/SubscriptionService';
 import { formatPrice } from '../../utils/formatters';
 import ActionBar from '../../components/ActionBar';
-import ProductModal from './modals/ProductModal';
-import SubscriptionModal from './modals/SubscriptionModal';
+import ProductModal from '../../modals/ProductModal';
+import SubscriptionModal from '../../modals/SubscriptionModal';
 
 // ─── Tab type ────────────────────────────────────────────────────────────────
 type ActiveTab = 'products' | 'subscriptions';

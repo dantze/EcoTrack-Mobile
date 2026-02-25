@@ -7,6 +7,9 @@ import { OrderService } from '../../services/OrderService';
 import { PhotoService } from '../../services/PhotoService';
 import * as ImagePicker from 'expo-image-picker';
 import { TASK_TYPE_LABELS, STATUS_LABELS, STATUS_COLORS } from '../../constants/TaskConstants';
+import { AppColors } from '../../constants/Colors';
+import ScreenHeader from '../../components/ScreenHeader';
+import StatusBadge from '../../components/StatusBadge';
 
 type OrderDetails = {
     productName?: string;
@@ -245,17 +248,15 @@ const TaskDetails = () => {
     return (
         <View style={styles.container}>
             {/* Header */}
-            <View style={styles.headerContainer}>
-                <Pressable onPress={() => router.back()} style={styles.backButton}>
-                    <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
-                </Pressable>
-                <View style={styles.headerTextContainer}>
-                    <Text style={styles.headerText}>Detalii Sarcină</Text>
-                    <View style={[styles.statusBadge, { backgroundColor: STATUS_COLORS[task.status] }]}>
-                        <Text style={styles.statusText}>{STATUS_LABELS[task.status]}</Text>
-                    </View>
-                </View>
-            </View>
+            <ScreenHeader
+                title="Detalii Sarcină"
+                rightElement={
+                    <StatusBadge
+                        label={STATUS_LABELS[task.status] || task.status}
+                        color={STATUS_COLORS[task.status] || '#888'}
+                    />
+                }
+            />
 
             <ScrollView
                 style={styles.scrollContainer}
@@ -493,55 +494,17 @@ const styles = StyleSheet.create({
         marginTop: 15,
         fontSize: 18,
     },
-    headerContainer: {
-        marginTop: 60,
-        paddingHorizontal: 20,
-        width: '100%',
-        marginBottom: 20,
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    backButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: '#427992',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 15,
-    },
     backButtonLarge: {
-        backgroundColor: '#427992',
-        paddingHorizontal: 30,
-        paddingVertical: 12,
-        borderRadius: 20,
         marginTop: 20,
+        backgroundColor: AppColors.buttonBackground,
+        paddingVertical: 12,
+        paddingHorizontal: 30,
+        borderRadius: 8,
     },
     backButtonText: {
-        color: '#FFFFFF',
+        color: AppColors.textWhite,
         fontSize: 16,
-        fontWeight: '600',
-    },
-    headerTextContainer: {
-        flex: 1,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-    },
-    headerText: {
-        color: '#FFFFFF',
-        fontSize: 24,
-        fontWeight: 'bold',
-    },
-    statusBadge: {
-        paddingHorizontal: 12,
-        paddingVertical: 6,
-        borderRadius: 15,
-    },
-    statusText: {
-        color: '#FFFFFF',
-        fontSize: 12,
-        fontWeight: '600',
+        fontWeight: 'bold' as const,
     },
     scrollContainer: {
         flex: 1,

@@ -7,9 +7,11 @@ import { AppColors } from '../constants/Colors';
 interface ScreenHeaderProps {
     title: string;
     onBack?: () => void;
+    /** Optional element rendered on the right side of the header (e.g. status badge). */
+    rightElement?: React.ReactNode;
 }
 
-const ScreenHeader: React.FC<ScreenHeaderProps> = ({ title, onBack }) => {
+const ScreenHeader: React.FC<ScreenHeaderProps> = ({ title, onBack, rightElement }) => {
     const router = useRouter();
 
     return (
@@ -18,6 +20,7 @@ const ScreenHeader: React.FC<ScreenHeaderProps> = ({ title, onBack }) => {
                 <Ionicons name="arrow-back" size={24} color={AppColors.textWhite} />
             </Pressable>
             <Text style={styles.headerText}>{title}</Text>
+            {rightElement && <View style={styles.rightContainer}>{rightElement}</View>}
         </View>
     );
 };
@@ -47,5 +50,9 @@ const styles = StyleSheet.create({
         fontSize: 28,
         fontWeight: 'bold',
         textAlign: 'left',
+        flex: 1,
+    },
+    rightContainer: {
+        marginLeft: 10,
     },
 });

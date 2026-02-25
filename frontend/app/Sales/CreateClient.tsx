@@ -100,6 +100,18 @@ const CreateClient = () => {
             return;
         }
 
+        // Email must be valid format: XX@XX.XX
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+            Alert.alert("Email invalid", "Adresa de email trebuie să fie în formatul exemplu@domeniu.ro.");
+            return;
+        }
+
+        // Phone must be valid Romanian format: 0XXXXXXXXX or +40XXXXXXXXX
+        if (!/^(\+40\d{9}|0\d{9})$/.test(phone.trim())) {
+            Alert.alert("Telefon invalid", "Numărul de telefon trebuie să fie în formatul 07XXXXXXXX sau +407XXXXXXXX.");
+            return;
+        }
+
         if (selectedType === "Firme") {
             if (!companyName.trim() || !cui.trim() || !adminName.trim()) {
                 Alert.alert("Lipsesc informații!");

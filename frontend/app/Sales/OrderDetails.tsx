@@ -60,6 +60,7 @@ const OrderDetails = () => {
             if (!startDate && !endDate) return "Selectați perioada de amplasare.";
             if (!location) return "Selectați locația.";
             if (!contact) return "Introduceți contactul de pe șantier.";
+            if (!/^(\+40\d{9}|0\d{9})$/.test(contact.trim())) return "Numărul de telefon trebuie să fie în formatul 07XXXXXXXX sau +407XXXXXXXX.";
             if (!igienizari) return "Selectați numărul de igienizări.";
         }
         else if (selectedType === "Ridicari") {

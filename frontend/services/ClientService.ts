@@ -147,7 +147,7 @@ export const ClientService = {
 
         if (!response.ok) {
             const errText = await response.text();
-            throw new Error(errText || 'Eșec la încărcarea fotografiei');
+            throw new Error(errText || 'Eșec la încărcarea pozei');
         }
 
         // The endpoint returns a plain string, so use .text() instead of .json()

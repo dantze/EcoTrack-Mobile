@@ -167,29 +167,45 @@ const OrderDetails = () => {
     };
 
     // Track date selection locally (no auto-save)
-    const handleDateChange = (_event: DateTimePickerEvent, selectedDate?: Date) => {
-        if (selectedDate) {
-            setPickerDate(selectedDate);
+    const handleDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
+        // On Android, the native dialog fires this on both "OK" and "Cancel"
+        // We must hide the picker here since it's a one-shot dialog on Android
+        if (Platform.OS === 'android') {
+            setShowDatePicker(false);
+            // On Android, save immediately when user confirms
+            if (event.type === 'set' && selectedDate && orderTaskStatus.taskId) {
+                setPickerDate(selectedDate);
+                saveDate(selectedDate);
+            }
+        } else {
+            // iOS: inline picker, just update the local state
+            if (selectedDate) {
+                setPickerDate(selectedDate);
+            }
+        }
+    };
+
+    // Save date to backend
+    const saveDate = async (date: Date) => {
+        if (!orderTaskStatus.taskId) return;
+        try {
+            setSavingDate(true);
+            const dateStr = date.toISOString().split('T')[0];
+            await TaskService.updateScheduledDate(orderTaskStatus.taskId, dateStr);
+            setOrderTaskStatus(prev => ({ ...prev, scheduledTime: date.toISOString() }));
+            Alert.alert("Succes", `Data programată a fost setată: ${date.toLocaleDateString('ro-RO')}`);
+        } catch (error: any) {
+            Alert.alert("Eroare", error.message || "Nu s-a putut seta data programată.");
+        } finally {
+            setSavingDate(false);
         }
     };
 
     // Toggle picker: open it or save & close it
     const handleDateButtonPress = async () => {
         if (showDatePicker) {
-            // Picker is open → save and close
-            if (orderTaskStatus.taskId) {
-                try {
-                    setSavingDate(true);
-                    const dateStr = pickerDate.toISOString().split('T')[0];
-                    await TaskService.updateScheduledDate(orderTaskStatus.taskId, dateStr);
-                    setOrderTaskStatus(prev => ({ ...prev, scheduledTime: pickerDate.toISOString() }));
-                    Alert.alert("Succes", `Data programată a fost setată: ${pickerDate.toLocaleDateString('ro-RO')}`);
-                } catch (error: any) {
-                    Alert.alert("Eroare", error.message || "Nu s-a putut seta data programată.");
-                } finally {
-                    setSavingDate(false);
-                }
-            }
+            // Picker is open (iOS only path) → save and close
+            await saveDate(pickerDate);
             setShowDatePicker(false);
         } else {
             // Picker is closed → open it, initialize with existing date or today

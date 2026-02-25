@@ -27,7 +27,7 @@ repositories {
 dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 	implementation 'org.springframework.boot:spring-boot-starter-web'
-	implementation 'com.google.cloud:google-cloud-storage:2.38.0'
+	implementation 'software.amazon.awssdk:s3:2.25.27'
 	compileOnly 'org.projectlombok:lombok'
 	runtimeOnly 'com.h2database:h2'
 	runtimeOnly 'org.postgresql:postgresql'
@@ -38,4 +38,20 @@ dependencies {
 
 tasks.named('test') {
 	useJUnitPlatform()
+}
+
+// Automatically load .env file when running locally with bootRun
+tasks.named('bootRun') {
+	def envFile = file('.env')
+	if (envFile.exists()) {
+		envFile.readLines().each { line ->
+			// Skip blank lines and comments
+			if (line && !line.startsWith('#') && line.contains('=')) {
+				def parts = line.split('=', 2)
+				def key = parts[0].trim()
+				def value = parts.length > 1 ? parts[1].trim() : ''
+				environment key, value
+			}
+		}
+	}
 }

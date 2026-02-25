@@ -65,9 +65,34 @@ export default function ClientsList() {
                     style: 'destructive',
                     onPress: async () => {
                         try {
-                            await ClientService.deleteClient(client.id);
-                            setClients((prev) => prev.filter((c) => c.id !== client.id));
-                            Alert.alert('Succes', 'Clientul a fost șters.');
+                            const hasOrders = await ClientService.checkClientHasOrders(client.id);
+                            if (hasOrders) {
+                                Alert.alert(
+                                    'Clientul are comenzi',
+                                    'Acest client are comenzi în baza de date. Dorești să continui? Toate comenzile asociate vor fi șterse.',
+                                    [
+                                        { text: 'Nu', style: 'cancel' },
+                                        {
+                                            text: 'Da',
+                                            style: 'destructive',
+                                            onPress: async () => {
+                                                try {
+                                                    await ClientService.deleteClient(client.id, true);
+                                                    setClients((prev) => prev.filter((c) => c.id !== client.id));
+                                                    Alert.alert('Succes', 'Clientul și comenzile asociate au fost șterse.');
+                                                } catch (error) {
+                                                    console.error('Error deleting client with orders:', error);
+                                                    Alert.alert('Eroare', 'Nu s-a putut șterge clientul.');
+                                                }
+                                            },
+                                        },
+                                    ]
+                                );
+                            } else {
+                                await ClientService.deleteClient(client.id);
+                                setClients((prev) => prev.filter((c) => c.id !== client.id));
+                                Alert.alert('Succes', 'Clientul a fost șters.');
+                            }
                         } catch (error) {
                             console.error('Error deleting client:', error);
                             Alert.alert('Eroare', 'Nu s-a putut șterge clientul.');

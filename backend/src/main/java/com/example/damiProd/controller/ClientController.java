@@ -5,6 +5,7 @@ import com.example.damiProd.service.ClientService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/clients")
@@ -40,9 +41,19 @@ public class ClientController {
         return ResponseEntity.ok(updatedClient);
     }
 
+    @GetMapping("/{id}/has-orders")
+    public ResponseEntity<Map<String, Boolean>> clientHasOrders(@PathVariable("id") Long id) {
+        boolean hasOrders = clientService.clientHasOrders(id);
+        return ResponseEntity.ok(Map.of("hasOrders", hasOrders));
+    }
+
     @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteClient(@PathVariable("id") Long id) {
-        clientService.deleteClient(id);
+    public ResponseEntity<Void> deleteClient(@PathVariable("id") Long id, @RequestParam(value = "cascade", defaultValue = "false") boolean cascade) {
+        if (cascade) {
+            clientService.deleteClientCascade(id);
+        } else {
+            clientService.deleteClient(id);
+        }
         return ResponseEntity.noContent().build();
     }
 }

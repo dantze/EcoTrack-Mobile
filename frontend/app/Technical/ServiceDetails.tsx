@@ -272,13 +272,8 @@ const ServiceDetails = () => {
             {/* --- FOOTER BUTTONS --- */}
             {task.status !== 'COMPLETED' && task.status !== 'CANCELLED' && (
                 <View style={styles.footerButtons}>
-                    <Pressable
-                        style={({ pressed }) => [styles.actionButton, styles.postponeButton, pressed && styles.cardPressed]}
-                        onPress={handlePostpone}
-                    >
-                        <Text style={styles.actionText}>Amână</Text>
-                    </Pressable>
-
+                    
+ 
                     <Pressable
                         style={({ pressed }) => [styles.actionButton, styles.finishButton, pressed && styles.cardPressed]}
                         onPress={handleFinalize}

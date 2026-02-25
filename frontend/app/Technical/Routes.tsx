@@ -158,14 +158,6 @@ const Routes = () => {
                 )}
             </View>
 
-            {/* <View style={styles.footerContainer}>
-                <Image
-                    source={mapImageSource}
-                    style={styles.mapImage}
-                    resizeMode="contain"
-                />
-            </View> */}
-
             {/* Driver Assignment Modal */}
             <Modal
                 animationType="slide"

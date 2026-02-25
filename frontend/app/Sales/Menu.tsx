@@ -1,15 +1,11 @@
 import { StyleSheet, Text, View, Pressable, Image } from 'react-native'
 import React from 'react'
-import { useRouter, useLocalSearchParams } from 'expo-router'
+import { useRouter } from 'expo-router'
 
 const mapImageSource = require('../../assets/images/harta_romania.png');
 
 const Menu = () => {
     const router = useRouter();
-
-    const { zone } = useLocalSearchParams<{ zone?: string }>();
-
-    const titleZone = zone ? zone : "General";
 
     const handleClient = () => {
 
@@ -23,7 +19,7 @@ const Menu = () => {
         <View style={styles.container}>
 
             <View style={styles.headerContainer}>
-                <Text style={styles.headerText}>Meniu - {titleZone}</Text>
+                <Text style={styles.headerText}>Meniu Vânzări</Text>
             </View>
 
             <View style={styles.buttonsContainer}>

@@ -1,7 +1,7 @@
 import { StyleSheet, Text, View, Pressable, Image, ScrollView } from 'react-native'
 import React, { useState } from 'react'
 import { useRouter } from 'expo-router'
-import { AntDesign } from '@expo/vector-icons';
+import { AntDesign, Ionicons } from '@expo/vector-icons';
 const mapImageSource = require('../../assets/images/harta_romania.png');
 
 const Menu = () => {
@@ -12,6 +12,15 @@ const Menu = () => {
     return (
         <View style={styles.container}>
             <View style={styles.headerContainer}>
+                <Pressable onPress={() => {
+                    if (router.canGoBack()) {
+                        router.back();
+                    } else {
+                        router.replace('/RoleSelection' as any);
+                    }
+                }} style={styles.backButton}>
+                    <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
+                </Pressable>
                 <Text style={styles.headerText}>Meniu Tehnic</Text>
             </View>
 
@@ -94,6 +103,17 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
         width: '100%',
         marginBottom: 40,
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    backButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: '#427992',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 15,
     },
     headerText: {
         color: '#FFFFFF',

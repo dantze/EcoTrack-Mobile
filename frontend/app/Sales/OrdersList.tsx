@@ -1,20 +1,24 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
-    StyleSheet,
     Text,
     View,
     FlatList,
-    Pressable,
     Alert,
     ActivityIndicator,
     RefreshControl,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { AntDesign, Feather } from '@expo/vector-icons';
 import { OrderService } from '../../services/OrderService';
+<<<<<<< refactor
 import { AppColors } from '../../constants/Colors';
 import { getOrderTypeLabel, formatDate } from '../../utils/orderUtils';
 import ScreenHeader from '../../components/ScreenHeader';
+=======
+import listStyles from '../../components/listStyles';
+import {
+    ScreenHeader, EmptyState, ListCard, InfoRow, TypeBadge,
+} from '../../components/ListComponents';
+>>>>>>> main
 
 interface OrderItem {
     id: number;
@@ -24,8 +28,6 @@ interface OrderItem {
     quantity?: number;
     locationAddress?: string;
     details?: string;
-    startDate?: string;
-    endDate?: string;
     client?: {
         id: number;
         type: string;
@@ -101,15 +103,12 @@ export default function OrdersList() {
 
     const getClientName = (order: OrderItem): string => {
         if (!order.client) return 'Client necunoscut';
-        if (order.client.type === 'individual' && order.client.fullName) {
-            return order.client.fullName;
-        }
-        if (order.client.type === 'company' && order.client.name) {
-            return order.client.name;
-        }
+        if (order.client.type === 'individual' && order.client.fullName) return order.client.fullName;
+        if (order.client.type === 'company' && order.client.name) return order.client.name;
         return `Client #${order.client.id}`;
     };
 
+<<<<<<< refactor
     const getOrderDateDisplay = (order: OrderItem): string => {
         const start = order.startDate ? formatDate(order.startDate) : null;
         const end = order.endDate ? formatDate(order.endDate) : null;
@@ -121,102 +120,72 @@ export default function OrdersList() {
         if (end) return end;
         if (order.date) return formatDate(order.date);
         return 'N/A';
+=======
+    const getOrderTypeLabel = (type: string): string => {
+        const labels: Record<string, string> = {
+            amplasari: 'Amplasare',
+            igienizari: 'Igienizare',
+            ridicari: 'Ridicare',
+        };
+        return labels[type?.toLowerCase()] || type || 'N/A';
+    };
+
+    const formatDate = (dateStr: string): string => {
+        if (!dateStr) return 'N/A';
+        try {
+            const date = new Date(dateStr);
+            return date.toLocaleDateString('ro-RO', {
+                day: '2-digit', month: '2-digit', year: 'numeric',
+            });
+        } catch {
+            return dateStr;
+        }
+>>>>>>> main
     };
 
     const renderOrder = ({ item }: { item: OrderItem }) => (
-        <View style={styles.card}>
-            <Pressable
-                style={({ pressed }) => [
-                    styles.cardContent,
-                    pressed && styles.cardPressed,
-                ]}
-                onPress={() => handleEditOrder(item)}
-            >
-                <View style={styles.cardHeader}>
-                    <Text style={styles.orderNumber}>
-                        Comanda 
-                    </Text>
-                    <View style={styles.typeBadge}>
-                        <Text style={styles.typeBadgeText}>
-                            {getOrderTypeLabel(item.orderType)}
-                        </Text>
-                    </View>
-                </View>
+        <ListCard
+            onPress={() => handleEditOrder(item)}
+            onDelete={() => handleDeleteOrder(item)}
+        >
+            <View style={listStyles.cardHeader}>
+                <Text style={listStyles.cardTitle}>Comanda #{item.number || item.id}</Text>
+                <TypeBadge label={getOrderTypeLabel(item.orderType)} />
+            </View>
 
-                <View style={styles.infoRow}>
-                    <Feather name="user" size={14} color="#8BA8BE" />
-                    <Text style={styles.infoText}>{getClientName(item)}</Text>
-                </View>
-
-                {item.product?.name ? (
-                    <View style={styles.infoRow}>
-                        <Feather name="box" size={14} color="#8BA8BE" />
-                        <Text style={styles.infoText}>{item.product.name}</Text>
-                    </View>
-                ) : null}
-
-                {item.quantity ? (
-                    <View style={styles.infoRow}>
-                        <Feather name="hash" size={14} color="#8BA8BE" />
-                        <Text style={styles.infoText}>Cantitate: {item.quantity}</Text>
-                    </View>
-                ) : null}
-
-                <View style={styles.infoRow}>
-                    <Feather name="calendar" size={14} color="#8BA8BE" />
-                    <Text style={styles.infoText}>{getOrderDateDisplay(item)}</Text>
-                </View>
-
-                {item.locationAddress ? (
-                    <View style={styles.infoRow}>
-                        <Feather name="map-pin" size={14} color="#8BA8BE" />
-                        <Text style={styles.infoText} numberOfLines={1}>
-                            {item.locationAddress}
-                        </Text>
-                    </View>
-                ) : null}
-
-                <View style={styles.editHint}>
-                    <Feather name="edit-2" size={12} color="#5A8DAB" />
-                    <Text style={styles.editHintText}>Apasă pentru editare</Text>
-                </View>
-            </Pressable>
-
-            <Pressable
-                style={({ pressed }) => [
-                    styles.deleteButton,
-                    pressed && styles.deleteButtonPressed,
-                ]}
-                onPress={() => handleDeleteOrder(item)}
-            >
-                <AntDesign name="delete" size={22} color="#FF6B6B" />
-            </Pressable>
-        </View>
+            <InfoRow icon="user" text={getClientName(item)} />
+            {item.product?.name ? <InfoRow icon="box" text={item.product.name} /> : null}
+            {item.quantity ? <InfoRow icon="hash" text={`Cantitate: ${item.quantity}`} /> : null}
+            <InfoRow icon="calendar" text={formatDate(item.date)} />
+            {item.locationAddress ? <InfoRow icon="map-pin" text={item.locationAddress} numberOfLines={1} /> : null}
+        </ListCard>
     );
 
     if (loading) {
         return (
-            <View style={styles.centered}>
+            <View style={listStyles.centered}>
                 <ActivityIndicator size="large" color="#427992" />
             </View>
         );
     }
 
     return (
+<<<<<<< refactor
         <View style={styles.container}>
             <ScreenHeader title="Lista Comenzi" />
+=======
+        <View style={listStyles.container}>
+            <ScreenHeader title="Lista Comenzi" onBack={() => router.back()} />
+>>>>>>> main
 
             {orders.length === 0 ? (
-                <View style={styles.emptyContainer}>
-                    <Feather name="inbox" size={60} color="#8BA8BE" />
-                    <Text style={styles.emptyText}>Nu există comenzi.</Text>
-                </View>
+                <EmptyState icon="inbox" message="Nu există comenzi." />
             ) : (
                 <FlatList
                     data={orders}
                     keyExtractor={(item) => item.id.toString()}
                     renderItem={renderOrder}
-                    contentContainerStyle={styles.listContent}
+                    contentContainerStyle={listStyles.listContent}
                     refreshControl={
                         <RefreshControl
                             refreshing={refreshing}
@@ -231,6 +200,7 @@ export default function OrdersList() {
     );
 }
 
+<<<<<<< refactor
 const styles = StyleSheet.create({
     container: {
         flex: 1,
@@ -326,3 +296,5 @@ const styles = StyleSheet.create({
         fontSize: 18,
     },
 });
+=======
+>>>>>>> main

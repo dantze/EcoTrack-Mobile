@@ -164,4 +164,13 @@ export const TaskService = {
         if (!response.ok) throw new Error('Eșec la actualizarea datei programate');
         return await response.json();
     },
+
+    /**
+     * Get all photo URLs for a specific task
+     */
+    getTaskPhotos: async (taskId: number): Promise<string[]> => {
+        const response = await fetch(`${API_BASE_URL}/tasks/${taskId}/photos`);
+        if (!response.ok) throw new Error('Eșec la preluarea pozelor sarcinii');
+        return await response.json();
+    },
 };

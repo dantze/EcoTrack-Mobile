@@ -71,7 +71,7 @@ const OrderDetails = () => {
         }
         else if (selectedType === "Igienizari") {
             const { subscription, location, date } = orderData;
-            if (!subscription) return "Selectați abonamentul.";
+            if (!subscription?.id) return "Selectați abonamentul.";
             if (!location) return "Selectați locația.";
             if (!date) return "Selectați data igienizării.";
         }
@@ -194,11 +194,53 @@ const OrderDetails = () => {
                                     console.error("Error submitting order:", err);
                                     alert("Eroare la salvarea comenzii: " + (err.message || "Eroare necunoscută"));
                                 }
-                            } else {
-                                // Other types (Ridicari, Igienizari) - just log for now
-                                console.log("Submit Order Type:", selectedType);
-                                console.log("Order Data:", orderData);
-                                alert(`Comanda de tip ${selectedType} nu este încă implementată complet.`);
+                            } else if (selectedType === "Ridicari") {
+                                try {
+                                    const { packetsToRemove, packetGroups, date, contact, details } = orderData;
+                                    const entries = Object.entries(packetsToRemove as { [key: string]: number });
+
+                                    for (const [groupKey, count] of entries) {
+                                        const group = (packetGroups as any[])?.find((g: any) => g.key === groupKey);
+                                        const payload = {
+                                            orderType: "Ridicari",
+                                            pickupDate: date,
+                                            pickupQuantity: count,
+                                            pickupProductName: group?.productName || groupKey,
+                                            pickupLocationAddress: group?.address || null,
+                                            pickupLocationCoordinates: group?.locationCoordinates || null,
+                                            contact,
+                                            details: details || null,
+                                        };
+                                        await ClientService.createOrder(client.id, payload);
+                                    }
+
+                                    alert("Comanda Ridicare salvată cu succes!");
+                                    router.dismiss(2);
+                                } catch (err: any) {
+                                    console.error("Error submitting Ridicari order:", err);
+                                    alert("Eroare la salvarea comenzii: " + (err.message || "Eroare necunoscută"));
+                                }
+                            } else if (selectedType === "Igienizari") {
+                                try {
+                                    const { subscription, location, date, details } = orderData;
+                                    const payload = {
+                                        orderType: "Igienizari",
+                                        subscription: { id: subscription.id },  // FK reference only
+                                        sanitationDate: date,
+                                        sanitationLocationCoordinates: location
+                                            ? `${location.latitude},${location.longitude}`
+                                            : null,
+                                        sanitationLocationAddress: location?.address || null,
+                                        details: details || null,
+                                    };
+
+                                    await ClientService.createOrder(client.id, payload);
+                                    alert("Comanda Igienizare salvată cu succes!");
+                                    router.dismiss(2);
+                                } catch (err: any) {
+                                    console.error("Error submitting Igienizari order:", err);
+                                    alert("Eroare la salvarea comenzii: " + (err.message || "Eroare necunoscută"));
+                                }
                             }
                         }}
                     >

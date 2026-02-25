@@ -154,29 +154,45 @@ const OrderDetails = () => {
     };
 
     // Track date selection locally (no auto-save)
-    const handleDateChange = (_event: DateTimePickerEvent, selectedDate?: Date) => {
-        if (selectedDate) {
-            setPickerDate(selectedDate);
+    const handleDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
+        // On Android, the native dialog fires this on both "OK" and "Cancel"
+        // We must hide the picker here since it's a one-shot dialog on Android
+        if (Platform.OS === 'android') {
+            setShowDatePicker(false);
+            // On Android, save immediately when user confirms
+            if (event.type === 'set' && selectedDate && orderTaskStatus.taskId) {
+                setPickerDate(selectedDate);
+                saveDate(selectedDate);
+            }
+        } else {
+            // iOS: inline picker, just update the local state
+            if (selectedDate) {
+                setPickerDate(selectedDate);
+            }
+        }
+    };
+
+    // Save date to backend
+    const saveDate = async (date: Date) => {
+        if (!orderTaskStatus.taskId) return;
+        try {
+            setSavingDate(true);
+            const dateStr = date.toISOString().split('T')[0];
+            await TaskService.updateScheduledDate(orderTaskStatus.taskId, dateStr);
+            setOrderTaskStatus(prev => ({ ...prev, scheduledTime: date.toISOString() }));
+            Alert.alert("Succes", `Data programată a fost setată: ${date.toLocaleDateString('ro-RO')}`);
+        } catch (error: any) {
+            Alert.alert("Eroare", error.message || "Nu s-a putut seta data programată.");
+        } finally {
+            setSavingDate(false);
         }
     };
 
     // Toggle picker: open it or save & close it
     const handleDateButtonPress = async () => {
         if (showDatePicker) {
-            // Picker is open → save and close
-            if (orderTaskStatus.taskId) {
-                try {
-                    setSavingDate(true);
-                    const dateStr = pickerDate.toISOString().split('T')[0];
-                    await TaskService.updateScheduledDate(orderTaskStatus.taskId, dateStr);
-                    setOrderTaskStatus(prev => ({ ...prev, scheduledTime: pickerDate.toISOString() }));
-                    Alert.alert("Succes", `Data programată a fost setată: ${pickerDate.toLocaleDateString('ro-RO')}`);
-                } catch (error: any) {
-                    Alert.alert("Eroare", error.message || "Nu s-a putut seta data programată.");
-                } finally {
-                    setSavingDate(false);
-                }
-            }
+            // Picker is open (iOS only path) → save and close
+            await saveDate(pickerDate);
             setShowDatePicker(false);
         } else {
             // Picker is closed → open it, initialize with existing date or today
@@ -223,25 +239,75 @@ const OrderDetails = () => {
         : (order.client?.fullName || order.client?.email || 'N/A');
     const clientAddress = order.locationAddress || order.locationCoordinates || order.client?.address;
 
-    const renderDateRow = () => {
-        if (!order || !order.startDate) return null;
+    const renderDateRow = (label: string, dateStr?: string, endDateStr?: string) => {
+        if (!dateStr) return null;
         try {
-            const start = new Date(order.startDate);
+            const start = new Date(dateStr);
             if (isNaN(start.getTime())) return null;
-
-            const formatDate = (d: Date) => d.toLocaleDateString('ro-RO');
-            const startStr = formatDate(start);
-
-            if (order.endDate) {
-                const end = new Date(order.endDate);
+            const fmt = (d: Date) => d.toLocaleDateString('ro-RO');
+            if (endDateStr) {
+                const end = new Date(endDateStr);
                 if (!isNaN(end.getTime()) && start.getTime() !== end.getTime()) {
-                    return <DetailRow label="Perioadă" value={`${startStr} - ${formatDate(end)}`} />;
+                    return <DetailRow label={label} value={`${fmt(start)} - ${fmt(end)}`} />;
                 }
             }
-            return <DetailRow label="Data Comenzii" value={startStr} />;
-        } catch (e) {
-            return null;
+            return <DetailRow label={label} value={fmt(start)} />;
+        } catch { return null; }
+    };
+
+    // Renders the order-type-specific info rows
+    const renderOrderInfo = () => {
+        const type = order?.orderType;
+
+        if (type === 'Amplasari') {
+            return (
+                <>
+                    <DetailRow label="Produs" value={order.product?.name} />
+                    <DetailRow label="Cantitate" value={order.quantity?.toString()} />
+                    {renderDateRow('Perioadă / Data', order.startDate, order.endDate)}
+                    {(order.durationDays || order.isIndefinite) && (
+                        <DetailRow
+                            label="Durată"
+                            value={order.durationDays ? `${order.durationDays} zile` : 'Nedefinit'}
+                        />
+                    )}
+                    {order.igienizariPerMonth != null && (
+                        <DetailRow label="Igienizări/lună" value={`${order.igienizariPerMonth}`} />
+                    )}
+                </>
+            );
         }
+
+        if (type === 'Ridicari') {
+            return (
+                <>
+                    <DetailRow label="Produs" value={order.pickupProductName} />
+                    <DetailRow label="Cantitate" value={order.pickupQuantity?.toString()} />
+                    {renderDateRow('Data Ridicării', order.pickupDate)}
+                </>
+            );
+        }
+
+        if (type === 'Igienizari') {
+            return (
+                <>
+                    <DetailRow label="Abonament" value={order.subscription?.name} />
+                    <DetailRow
+                        label="Tip"
+                        value={order.subscription?.type === 'ONE_TIME' ? 'O singură dată' : 'Recurent'}
+                    />
+                    {order.subscription?.price != null && (
+                        <DetailRow label="Preț" value={`${order.subscription.price} RON`} />
+                    )}
+                    {order.subscription?.visitsPerMonth != null && (
+                        <DetailRow label="Vizite/lună" value={`${order.subscription.visitsPerMonth}`} />
+                    )}
+                    {renderDateRow('Data Igienizării', order.sanitationDate)}
+                </>
+            );
+        }
+
+        return null;
     };
 
     return (
@@ -263,14 +329,10 @@ const OrderDetails = () => {
                     <DetailRow label="Adresă" value={clientAddress} isMultiline />
 
                     <View style={{ height: 10 }} />
-                    <DetailRow label="Produs" value={order.product?.name} />
-                    <DetailRow label="Cantitate" value={order.quantity?.toString()} />
-                    <DetailRow label="Tip" value={order.orderType} />
-
-                    {renderDateRow()}
-                    <DetailRow label="Durată" value={order.durationDays ? `${order.durationDays} zile` : (order.isIndefinite ? 'Nedefinit' : 'N/A')} />
+                    {renderOrderInfo()}
 
                     <View style={{ height: 10 }} />
+                    <DetailRow label="Tip Comandă" value={order.orderType} />
                     <DetailRow label="Contact" value={order.contact} />
                     <DetailRow label="Detalii" value={order.details} isMultiline />
                 </View>

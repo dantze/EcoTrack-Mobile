@@ -93,9 +93,6 @@ const DriverSelection = () => {
                             </View>
                             <View style={styles.driverInfo}>
                                 <Text style={styles.driverName}>{driver.fullName}</Text>
-                                {driver.county && (
-                                    <Text style={styles.driverCounty}>{driver.county}</Text>
-                                )}
                                 <Text style={styles.driverUsername}>@{driver.username}</Text>
                             </View>
                             <Ionicons name="chevron-forward" size={24} color="#5D8AA8" />

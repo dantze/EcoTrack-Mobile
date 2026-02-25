@@ -1,12 +1,11 @@
 import { StyleSheet, Text, View, Pressable, Image, ScrollView } from 'react-native'
 import React, { useState } from 'react'
-import { useRouter, useLocalSearchParams } from 'expo-router'
+import { useRouter } from 'expo-router'
 import { AntDesign } from '@expo/vector-icons';
 const mapImageSource = require('../../assets/images/harta_romania.png');
 
 const Menu = () => {
     const router = useRouter();
-    const { zona, county } = useLocalSearchParams<{ zona?: string; county?: string }>();
     const handlePress = () => {
         console.log('Button pressed')
     };
@@ -14,7 +13,6 @@ const Menu = () => {
         <View style={styles.container}>
             <View style={styles.headerContainer}>
                 <Text style={styles.headerText}>Meniu Tehnic</Text>
-                {county && <Text style={styles.subHeaderText}>{county}</Text>}
             </View>
 
             <View style={styles.buttonsContainer}>
@@ -25,7 +23,7 @@ const Menu = () => {
                     ]}
                     onPress={() =>
 
-                        router.push({ pathname: '/Technical/Orders', params: { zona, county } })
+                        router.push({ pathname: '/Technical/Orders' })
                     }
                 >
                     <Text style={styles.continueButtonText}>Comenzi</Text>
@@ -39,7 +37,7 @@ const Menu = () => {
                 ]}
                     onPress={() =>
 
-                        router.push({ pathname: '/Technical/Routes', params: { zona, county } })
+                        router.push({ pathname: '/Technical/Routes' })
                     }
                 >
                     <Text style={styles.continueButtonText}>Rute</Text>
@@ -53,7 +51,7 @@ const Menu = () => {
                 ]}
                     onPress={() =>
 
-                        router.push({ pathname: '/Technical/RoutesAndDrivers', params: { zona, county } })
+                        router.push({ pathname: '/Technical/RoutesAndDrivers' })
                     }
                 >
                     <Text style={styles.continueButtonText}>Rute și Șoferi</Text>
@@ -66,7 +64,7 @@ const Menu = () => {
                     pressed && { opacity: 0.8, transform: [{ scale: 0.99 }] }
                 ]}
                     onPress={() =>
-                        router.push({ pathname: '/Technical/ChangeDriver', params: { zona, county } })
+                        router.push({ pathname: '/Technical/ChangeDriver' })
                     }
                 >
                     <Text style={styles.continueButtonText}>Schimbare Șoferi și Rute</Text>

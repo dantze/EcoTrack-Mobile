@@ -15,14 +15,14 @@ const ROLE_CONFIG = {
         title: 'Vânzări',
         subtitle: 'Comenzi și clienți',
         icon: 'cart-outline' as const,
-        route: '/Sales/WestCenter',
+        route: '/Sales/Menu',
         color: '#2196F3',
     },
     TECH: {
         title: 'Tehnic',
         subtitle: 'Intervenții și service',
         icon: 'construct-outline' as const,
-        route: '/Technical/WestCenter',
+        route: '/Technical/Menu',
         color: '#FF9800',
     },
 };

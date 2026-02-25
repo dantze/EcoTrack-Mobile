@@ -1,9 +1,8 @@
 import { StyleSheet, Text, View, Pressable, Alert, Modal, ScrollView, Platform, TextInput } from 'react-native'
-import React, { useState, useEffect } from 'react'
-import { useRouter, useLocalSearchParams } from 'expo-router'
+import React, { useState } from 'react'
+import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons';
 import { RouteService } from '../../services/RouteService';
-import { getAllDrivers, getDriversByCounty, Employee } from '../../services/EmployeeService';
 
 // Lista de județe
 const COUNTIES = [
@@ -28,11 +27,10 @@ const DAYS_OF_WEEK = [
 
 const CreateRoute = () => {
     const router = useRouter();
-    const { zona, county: initialCounty } = useLocalSearchParams<{ zona?: string; county?: string }>();
 
     const [selectedDayOfWeek, setSelectedDayOfWeek] = useState<number | null>(null);
     const [showDayPicker, setShowDayPicker] = useState(false);
-    const [selectedCounty, setSelectedCounty] = useState(initialCounty || '');
+    const [selectedCounty, setSelectedCounty] = useState('');
     const [countyDropdownVisible, setCountyDropdownVisible] = useState(false);
 
     // Route name

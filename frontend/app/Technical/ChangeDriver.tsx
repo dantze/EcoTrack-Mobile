@@ -423,9 +423,6 @@ const ChangeDriver = () => {
                                             ]}>
                                                 {driver.fullName}
                                             </Text>
-                                            {driver.county && (
-                                                <Text style={styles.driverCountyText}>{driver.county}</Text>
-                                            )}
                                         </View>
                                         {sourceDriver?.id === driver.id && (
                                             <Ionicons name="checkmark" size={20} color="#4CAF50" />
@@ -472,9 +469,6 @@ const ChangeDriver = () => {
                                             ]}>
                                                 {driver.fullName}
                                             </Text>
-                                            {driver.county && (
-                                                <Text style={styles.driverCountyText}>{driver.county}</Text>
-                                            )}
                                         </View>
                                         {targetDriver?.id === driver.id && (
                                             <Ionicons name="checkmark" size={20} color="#4CAF50" />

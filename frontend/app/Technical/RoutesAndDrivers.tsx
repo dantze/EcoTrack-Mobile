@@ -1,13 +1,11 @@
 import { StyleSheet, Text, View, Pressable, ScrollView, ActivityIndicator } from 'react-native'
 import React, { useEffect, useState } from 'react'
-import { useRouter, useLocalSearchParams } from 'expo-router'
+import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons';
-import { getAllDrivers, getDriversByCounty, Employee } from '../../services/EmployeeService'
+import { getAllDrivers, Employee } from '../../services/EmployeeService'
 
 const RoutesAndDrivers = () => {
     const router = useRouter();
-    const { zona, county } = useLocalSearchParams<{ zona?: string; county?: string }>();
-    const zonaLabel = zona ?? 'Center';
 
     const [drivers, setDrivers] = useState<Employee[]>([]);
     const [loading, setLoading] = useState(true);
@@ -15,28 +13,16 @@ const RoutesAndDrivers = () => {
 
     useEffect(() => {
         loadDrivers();
-    }, [county]);
+    }, []);
 
     const loadDrivers = async () => {
         try {
             setLoading(true);
             setError(null);
-
-            let data: Employee[] = [];
-
-            if (county) {
-                data = await getDriversByCounty(county);
-                if (data.length === 0) {
-                    console.log(`No drivers found for county ${county}`);
-                }
-                data = await getAllDrivers();
-            } else {
-                setError('Alegeti un județ')
-            }
-
+            const data = await getAllDrivers();
             setDrivers(data);
         } catch (err) {
-            setError('Nu s-au putut încărca șoferii sau nu sunt șoferi în acest județ');
+            setError('Nu s-au putut încărca șoferii');
             console.error(err);
         } finally {
             setLoading(false);
@@ -49,8 +35,6 @@ const RoutesAndDrivers = () => {
             params: {
                 driverId: driver.id.toString(),
                 driverName: driver.fullName,
-                zona: zonaLabel,
-                county: county,
             },
         });
     };
@@ -61,7 +45,7 @@ const RoutesAndDrivers = () => {
                 <Pressable onPress={() => router.back()} style={styles.backButton}>
                     <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
                 </Pressable>
-                <Text style={styles.headerText}>{`Șoferi - ${county || zonaLabel}`}</Text>
+                <Text style={styles.headerText}>Șoferi</Text>
             </View>
 
             {loading ? (

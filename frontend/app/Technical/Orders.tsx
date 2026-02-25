@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View, Pressable, ScrollView, ActivityIndicator } from 'react-native'
 import React, { useEffect, useState } from 'react'
-import { useRouter, useLocalSearchParams } from 'expo-router'
+import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons';
 import { API_BASE_URL } from '../../constants/ApiConfig';
 import { TaskService } from '../../services/TaskService';
@@ -73,8 +73,6 @@ const isIgienizari = (o: Order): o is IgienizareOrder => o.orderType === 'Igieni
 type OrderTaskMap = { [orderId: number]: boolean };
 
 const Orders = () => {
-    const { zona, county } = useLocalSearchParams<{ zona?: string; county?: string }>();
-    const zonaLabel = zona ?? 'Center';
     const router = useRouter();
 
     const [orders, setOrders] = useState<Order[]>([]);
@@ -217,7 +215,6 @@ const Orders = () => {
             params: {
                 id: order.id,
                 client: getClientName(order),
-                county: county
             }
         });
     };
@@ -238,7 +235,7 @@ const Orders = () => {
                 <Pressable onPress={() => router.back()} style={styles.backButton}>
                     <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
                 </Pressable>
-                <Text style={styles.headerText}>{`Comenzi - ${zonaLabel}`}</Text>
+                <Text style={styles.headerText}>Comenzi</Text>
             </View>
 
             <ScrollView

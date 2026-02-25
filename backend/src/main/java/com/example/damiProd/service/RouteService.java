@@ -27,14 +27,6 @@ public class RouteService {
         return routeRepository.findAll();
     }
 
-    @Transactional(readOnly = true)
-    public List<Route> getRoutesByCounty(String county) {
-        List<Route> routes = routeRepository.findByCounty(county);
-        // Force loading of tasks for each route
-        routes.forEach(route -> route.getTasks().size());
-        return routes;
-    }
-
     @Transactional
     public Route createRoute(CreateRouteRequest request) {
         Route route = new Route();
@@ -80,13 +72,6 @@ public class RouteService {
         // Force loading of tasks for each route
         routes.forEach(route -> route.getTasks().size());
         return routes;
-    }
-
-    @Transactional(readOnly = true)
-    public Optional<Route> getRouteByEmployeeIdAndDateAndCounty(Long employeeId, LocalDate date, String county) {
-        Optional<Route> routeOpt = routeRepository.findByEmployee_IdAndDateAndCounty(employeeId, date, county);
-        routeOpt.ifPresent(route -> route.getTasks().size());
-        return routeOpt;
     }
 
     @Transactional

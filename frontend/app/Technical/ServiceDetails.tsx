@@ -1,9 +1,11 @@
-import { StyleSheet, Text, View, Pressable, ScrollView, Image, ActivityIndicator, Alert } from 'react-native'
+import { StyleSheet, Text, View, Pressable, ScrollView, Image, ActivityIndicator, Alert, Modal, Dimensions } from 'react-native'
 import React, { useState, useEffect } from 'react'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons';
 import { TaskService, Task } from '../../services/TaskService';
 import { OrderService } from '../../services/OrderService';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 type DetailRowProps = {
     label: string;
@@ -19,7 +21,10 @@ const ServiceDetails = () => {
     const [isExpanded, setIsExpanded] = useState(true);
     const [loading, setLoading] = useState(true);
     const [task, setTask] = useState<Task | null>(null);
-    const [additionalInfo, setAdditionalInfo] = useState<any>(null); // Order details if needed
+    const [additionalInfo, setAdditionalInfo] = useState<any>(null);
+    const [taskPhotos, setTaskPhotos] = useState<string[]>([]);
+    const [loadingPhotos, setLoadingPhotos] = useState(false);
+    const [selectedPhoto, setSelectedPhoto] = useState<string | null>(null);
 
     useEffect(() => {
         if (taskId) {
@@ -42,12 +47,27 @@ const ServiceDetails = () => {
                     console.log("Could not fetch order details:", err);
                 }
             }
+
+            // Fetch task photos
+            loadTaskPhotos();
         } catch (error) {
             console.error("Error loading task:", error);
             Alert.alert("Eroare", "Nu s-au putut încărca detaliile sarcinii");
             router.back();
         } finally {
             setLoading(false);
+        }
+    };
+
+    const loadTaskPhotos = async () => {
+        try {
+            setLoadingPhotos(true);
+            const photos = await TaskService.getTaskPhotos(taskId!);
+            setTaskPhotos(photos);
+        } catch (error) {
+            console.log("Could not fetch task photos:", error);
+        } finally {
+            setLoadingPhotos(false);
         }
     };
 
@@ -149,9 +169,6 @@ const ServiceDetails = () => {
     // Description shows order details only
     const description = additionalInfo?.details || "Fără descriere suplimentară.";
 
-    // Use a placeholder image if no photos (assuming photos not yet implemented in backend fetch)
-    const imageUrl = "https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcSCCvGfvCGF5vX0Dq2yT9YnfnvL_qVbCg4q4Q&s";
-
     return (
         <View style={styles.container}>
 
@@ -194,23 +211,41 @@ const ServiceDetails = () => {
                         <Text style={styles.value}>{taskType}</Text>
                     </View>
 
-                    <Text style={[styles.label, { marginBottom: 10, marginTop: 10 }]}>Media / Dovezi</Text>
+                    <Text style={[styles.label, { marginBottom: 10, marginTop: 10 }]}>Poze ({taskPhotos.length})</Text>
 
-                    {/* --- IMAGE AND GALLERY AREA --- */}
-                    <View style={styles.mediaContainer}>
-                        <Image
-                            source={{ uri: imageUrl }}
-                            style={styles.taskImage}
-                        />
-
-                        <Pressable
-                            style={({ pressed }) => [styles.galleryButton, pressed && styles.cardPressed]}
-                            onPress={() => Alert.alert("Galerie", "Această funcție va fi disponibilă curând.")}
+                    {/* --- PHOTO GALLERY --- */}
+                    {loadingPhotos ? (
+                        <View style={styles.photosLoadingContainer}>
+                            <ActivityIndicator size="small" color="#FFFFFF" />
+                            <Text style={styles.photosLoadingText}>Se încarcă pozele...</Text>
+                        </View>
+                    ) : taskPhotos.length > 0 ? (
+                        <ScrollView
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            style={styles.photoScrollView}
+                            contentContainerStyle={styles.photoScrollContent}
                         >
-                            <Text style={styles.galleryText}>Galerie</Text>
-                            <Ionicons name="images-outline" size={20} color="white" style={{ marginLeft: 5 }} />
-                        </Pressable>
-                    </View>
+                            {taskPhotos.map((url, index) => (
+                                <Pressable
+                                    key={index}
+                                    onPress={() => setSelectedPhoto(url)}
+                                    style={({ pressed }) => [
+                                        styles.photoCard,
+                                        pressed && { opacity: 0.8, transform: [{ scale: 0.96 }] }
+                                    ]}
+                                >
+                                    <Image source={{ uri: url }} style={styles.photoThumbnail} />
+                                    <Text style={styles.photoIndex}>{index + 1}</Text>
+                                </Pressable>
+                            ))}
+                        </ScrollView>
+                    ) : (
+                        <View style={styles.noPhotosContainer}>
+                            <Ionicons name="images-outline" size={36} color="#456276" />
+                            <Text style={styles.noPhotosText}>Nicio poză disponibilă</Text>
+                        </View>
+                    )}
 
                     {/* --- EXPANDABLE AREA --- */}
                     <Pressable
@@ -264,6 +299,28 @@ const ServiceDetails = () => {
                     </Pressable>
                 </View>
             )}
+
+            {/* --- FULL-SCREEN PHOTO MODAL --- */}
+            <Modal
+                visible={!!selectedPhoto}
+                transparent={true}
+                animationType="fade"
+                onRequestClose={() => setSelectedPhoto(null)}
+                statusBarTranslucent={true}
+            >
+                <View style={styles.photoModalOverlay}>
+                    <Pressable style={styles.photoModalClose} onPress={() => setSelectedPhoto(null)}>
+                        <Ionicons name="close" size={30} color="#FFFFFF" />
+                    </Pressable>
+                    {selectedPhoto && (
+                        <Image
+                            source={{ uri: selectedPhoto }}
+                            style={styles.photoModalImage}
+                            resizeMode="contain"
+                        />
+                    )}
+                </View>
+            </Modal>
 
         </View>
     )
@@ -361,34 +418,6 @@ const styles = StyleSheet.create({
         textAlign: 'right',
     },
 
-    // Media
-    mediaContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 20,
-    },
-    taskImage: {
-        width: 120,
-        height: 120,
-        borderRadius: 15,
-        marginRight: 15,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.2)',
-        backgroundColor: '#456276',
-    },
-    galleryButton: {
-        backgroundColor: 'rgba(0,0,0,0.2)',
-        paddingVertical: 10,
-        paddingHorizontal: 15,
-        borderRadius: 20,
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    galleryText: {
-        color: '#FFFFFF',
-        fontWeight: 'bold',
-    },
-
     // Description
     expandHeader: {
         flexDirection: 'row',
@@ -443,5 +472,85 @@ const styles = StyleSheet.create({
         color: '#FFFFFF',
         fontSize: 18,
         fontWeight: 'bold',
-    }
+    },
+
+    // Photo Gallery
+    photosLoadingContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 20,
+    },
+    photosLoadingText: {
+        color: '#FFFFFF',
+        marginLeft: 10,
+        fontSize: 14,
+    },
+    photoScrollView: {
+        marginBottom: 15,
+        marginHorizontal: -5,
+    },
+    photoScrollContent: {
+        paddingHorizontal: 5,
+        gap: 10,
+    },
+    photoCard: {
+        borderRadius: 12,
+        overflow: 'hidden',
+        position: 'relative',
+        borderWidth: 1,
+        borderColor: 'rgba(255,255,255,0.15)',
+    },
+    photoThumbnail: {
+        width: 110,
+        height: 110,
+        borderRadius: 12,
+        backgroundColor: '#456276',
+    },
+    photoIndex: {
+        position: 'absolute',
+        bottom: 4,
+        right: 6,
+        color: '#FFFFFF',
+        fontSize: 11,
+        fontWeight: 'bold',
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        paddingHorizontal: 6,
+        paddingVertical: 2,
+        borderRadius: 8,
+    },
+    noPhotosContainer: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 25,
+        backgroundColor: 'rgba(0,0,0,0.1)',
+        borderRadius: 12,
+        marginBottom: 15,
+    },
+    noPhotosText: {
+        color: '#456276',
+        fontSize: 14,
+        marginTop: 8,
+    },
+
+    // Full-screen photo modal
+    photoModalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.95)',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    photoModalClose: {
+        position: 'absolute',
+        top: 50,
+        right: 20,
+        zIndex: 10,
+        backgroundColor: 'rgba(255,255,255,0.15)',
+        borderRadius: 20,
+        padding: 8,
+    },
+    photoModalImage: {
+        width: SCREEN_WIDTH - 40,
+        height: '70%',
+    },
 })

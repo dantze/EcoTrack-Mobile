@@ -166,7 +166,8 @@ public class TaskController {
         return ResponseEntity.ok(updatedTasks);
     }
 
-    // Upload photos for a task (stored in DO Spaces under "task_photos/" folder)
+    // Upload photos for a task (stored in DO Spaces under "poze
+    // cabine/{taskId}_{clientName}/" folder)
     @PostMapping("/{id}/photos")
     public ResponseEntity<Map<String, Object>> uploadTaskPhotos(
             @PathVariable Long id,
@@ -175,15 +176,24 @@ public class TaskController {
         Task task = taskService.getTaskById(id);
         List<String> uploadedUrls = new ArrayList<>();
 
+        // Build folder name: "poze cabine/{taskId}_{clientName}"
+        String clientName = task.getClientName() != null ? task.getClientName() : "unknown";
+        String sanitizedClientName = clientName.replaceAll("[^a-zA-Z0-9\\p{L}]", "_");
+        String folderName = "poze cabine/" + id + "_" + sanitizedClientName;
+
+        // Count existing photos for this task to continue numbering
+        List<TaskPhoto> existingPhotos = taskPhotoRepository.findByTaskId(id);
+        int startIndex = existingPhotos.size() + 1;
+
         for (int i = 0; i < files.size(); i++) {
             MultipartFile file = files.get(i);
             if (file.isEmpty())
                 continue;
 
             try {
-                // Build custom filename: taskId_index (e.g. "42_1")
-                String customFileName = id + "_" + (i + 1);
-                String publicUrl = photoService.uploadPhoto(file, "poze cabine", customFileName);
+                // Simple incrementing filename: 1, 2, 3...
+                String customFileName = String.valueOf(startIndex + i);
+                String publicUrl = photoService.uploadPhoto(file, folderName, customFileName);
 
                 // Save reference in database
                 TaskPhoto taskPhoto = new TaskPhoto(publicUrl, null, task);

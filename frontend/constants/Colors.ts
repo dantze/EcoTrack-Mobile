@@ -13,6 +13,8 @@ export const AppColors = {
   modalOverlay: 'rgba(0, 0, 0, 0.7)',
   modalBackground: '#1E3A5F',
   inputBackground: '#2A4158',
+  placeholderText: '#888888',
+  disabledText: '#666666',
 };
 
 export default {

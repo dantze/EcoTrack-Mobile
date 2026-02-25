@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons';
 import { RouteService, Route } from '../../services/RouteService';
+import { getTaskTypeLabel, getTaskTypeColor, getStatusLabel } from '../../constants/TaskConstants';
 
 // --- 1. DEFINE DATA TYPE (Schema) - matches backend Task entity ---
 type TaskItem = {
@@ -44,61 +45,6 @@ const RouteTasks = () => {
             console.error(err);
         } finally {
             setLoading(false);
-        }
-    };
-
-    const formatDate = (dateString?: string) => {
-        if (!dateString) return '';
-        const date = new Date(dateString);
-        return date.toLocaleDateString('ro-RO', {
-            weekday: 'long',
-            day: 'numeric',
-            month: 'long',
-        });
-    };
-
-    const getTaskTypeColor = (taskType?: string) => {
-        switch (taskType?.toUpperCase()) {
-            case 'PICKUP':
-                return '#E74C3C'; // Red
-            case 'PLACEMENT':
-                return '#2ECC71'; // Green
-            case 'SANITIZATION':
-                return '#3498DB'; // Blue
-            case 'MAINTENANCE':
-                return '#F39C12'; // Orange
-            default:
-                return '#9B59B6'; // Purple
-        }
-    };
-
-    const getTaskTypeLabel = (taskType?: string) => {
-        switch (taskType?.toUpperCase()) {
-            case 'PICKUP':
-                return 'Ridicare';
-            case 'PLACEMENT':
-                return 'Amplasare';
-            case 'SANITIZATION':
-                return 'Igienizare';
-            case 'MAINTENANCE':
-                return 'Mentenanță';
-            default:
-                return taskType || 'Sarcină';
-        }
-    };
-
-    const getStatusLabel = (status?: string) => {
-        switch (status?.toUpperCase()) {
-            case 'NEW':
-                return 'Nou';
-            case 'IN_PROGRESS':
-                return 'În progres';
-            case 'COMPLETED':
-                return 'Finalizat';
-            case 'CANCELLED':
-                return 'Anulat';
-            default:
-                return status || 'Necunoscut';
         }
     };
 

@@ -6,27 +6,7 @@ import { TaskService, Task } from '../../services/TaskService';
 import { OrderService } from '../../services/OrderService';
 import { PhotoService } from '../../services/PhotoService';
 import * as ImagePicker from 'expo-image-picker';
-
-const TASK_TYPE_LABELS: { [key: string]: string } = {
-    'PLACEMENT': 'Amplasare',
-    'PICKUP': 'Ridicare',
-    'SANITIZATION': 'Igienizare',
-    'MAINTENANCE': 'Mentenanță',
-};
-
-const STATUS_LABELS: { [key: string]: string } = {
-    'NEW': 'Nouă',
-    'IN_PROGRESS': 'În progres',
-    'COMPLETED': 'Finalizată',
-    'CANCELLED': 'Anulată',
-};
-
-const STATUS_COLORS: { [key: string]: string } = {
-    'NEW': '#FFA500',
-    'IN_PROGRESS': '#2196F3',
-    'COMPLETED': '#4CAF50',
-    'CANCELLED': '#F44336',
-};
+import { TASK_TYPE_LABELS, STATUS_LABELS, STATUS_COLORS } from '../../constants/TaskConstants';
 
 type OrderDetails = {
     productName?: string;

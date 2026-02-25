@@ -1,9 +1,9 @@
 import { StyleSheet, Text, View, Pressable, Alert, TextInput } from 'react-native'
 import React, { useState } from 'react'
 import { useRouter } from 'expo-router'
-import { Ionicons } from '@expo/vector-icons';
 import { RouteService } from '../../services/RouteService';
 import ScreenHeader from '../../components/ScreenHeader';
+import FormPickerField from '../../components/FormPickerField';
 import ListPickerModal, { ListPickerItem } from '../../modals/ListPickerModal';
 import { AppColors } from '../../constants/Colors';
 import { DAYS_OF_WEEK, COUNTIES, getDayOfWeekLabel } from '../../constants/RouteConstants';
@@ -95,40 +95,20 @@ const CreateRoute = () => {
                     />
                 </View>
 
-                {/* Day of Week Picker */}
-                <View style={styles.inputGroup}>
-                    <Text style={styles.label}>Ziua Săptămânii</Text>
-                    <Pressable
-                        style={styles.dropdownButton}
-                        onPress={() => setShowDayPicker(true)}
-                    >
-                        <Ionicons name="calendar-outline" size={20} color={AppColors.textWhite} style={{ marginRight: 10 }} />
-                        <Text style={[
-                            styles.dropdownButtonText,
-                            !selectedDayOfWeek && styles.placeholderText
-                        ]}>
-                            {getDayOfWeekLabel(selectedDayOfWeek ?? undefined, 'Selectează ziua...')}
-                        </Text>
-                        <Ionicons name="chevron-down" size={20} color={AppColors.textWhite} />
-                    </Pressable>
-                </View>
+                <FormPickerField
+                    label="Ziua Săptămânii"
+                    value={getDayOfWeekLabel(selectedDayOfWeek ?? undefined, '')}
+                    placeholder="Selectează ziua..."
+                    icon="calendar-outline"
+                    onPress={() => setShowDayPicker(true)}
+                />
 
-                {/* County Dropdown */}
-                <View style={styles.inputGroup}>
-                    <Text style={styles.label}>Județ</Text>
-                    <Pressable
-                        style={styles.dropdownButton}
-                        onPress={() => setCountyDropdownVisible(true)}
-                    >
-                        <Text style={[
-                            styles.dropdownButtonText,
-                            !selectedCounty && styles.placeholderText
-                        ]}>
-                            {selectedCounty || 'Selectează județul...'}
-                        </Text>
-                        <Ionicons name="chevron-down" size={20} color={AppColors.textWhite} />
-                    </Pressable>
-                </View>
+                <FormPickerField
+                    label="Județ"
+                    value={selectedCounty}
+                    placeholder="Selectează județul..."
+                    onPress={() => setCountyDropdownVisible(true)}
+                />
 
             </View>
 
@@ -196,24 +176,6 @@ const styles = StyleSheet.create({
         color: AppColors.textWhite,
         borderWidth: 1,
         borderColor: AppColors.buttonBackground,
-    },
-    dropdownButton: {
-        backgroundColor: AppColors.inputBackground,
-        borderRadius: 12,
-        paddingHorizontal: 16,
-        paddingVertical: 14,
-        borderWidth: 1,
-        borderColor: AppColors.buttonBackground,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-    },
-    dropdownButtonText: {
-        fontSize: 16,
-        color: AppColors.textWhite,
-    },
-    placeholderText: {
-        color: '#888',
     },
     bottomContainer: {
         paddingHorizontal: 20,

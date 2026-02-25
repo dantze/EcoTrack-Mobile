@@ -4,6 +4,8 @@ import { useRouter, useLocalSearchParams } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons';
 import { API_BASE_URL } from '../../constants/ApiConfig';
 import { AuthService } from '../../services/AuthService';
+import { TASK_TYPE_LABELS, STATUS_LABELS, STATUS_COLORS } from '../../constants/TaskConstants';
+import { toDateString } from '../../utils/dateUtils';
 
 type Task = {
     id: number;
@@ -14,27 +16,6 @@ type Task = {
     clientPhone: string;
     scheduledTime: string;
     internalNotes: string;
-};
-
-const TASK_TYPE_LABELS: { [key: string]: string } = {
-    'PLACEMENT': 'Amplasare',
-    'PICKUP': 'Ridicare',
-    'SANITIZATION': 'Igienizare',
-    'MAINTENANCE': 'Mentenanță',
-};
-
-const STATUS_LABELS: { [key: string]: string } = {
-    'NEW': 'Nouă',
-    'IN_PROGRESS': 'În progres',
-    'COMPLETED': 'Finalizată',
-    'CANCELLED': 'Anulată',
-};
-
-const STATUS_COLORS: { [key: string]: string } = {
-    'NEW': '#FFA500',
-    'IN_PROGRESS': '#2196F3',
-    'COMPLETED': '#4CAF50',
-    'CANCELLED': '#F44336',
 };
 
 const DAY_NAMES_SHORT = ['DU', 'LU', 'MA', 'MI', 'JO', 'VI', 'SÂ'];
@@ -69,7 +50,7 @@ const RouteTasks = () => {
             }
 
             // Format date as YYYY-MM-DD
-            const dateString = selectedDate.toISOString().split('T')[0];
+            const dateString = toDateString(selectedDate);
 
             // Fetch tasks for the employee on the selected date
             const response = await fetch(`${API_BASE_URL}/tasks/employee/${employeeId}/date/${dateString}`);

@@ -4,14 +4,11 @@ import { useRouter, useLocalSearchParams } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons';
 import { TaskService, Task } from '../../services/TaskService';
 import { OrderService } from '../../services/OrderService';
+import { getTaskTypeLabel, getStatusLabel, getStatusColor } from '../../constants/TaskConstants';
+import { formatDisplayDate } from '../../utils/dateUtils';
+import DetailRow from '../../components/DetailRow';
 
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
-
-type DetailRowProps = {
-    label: string;
-    value: string | number | undefined | null;
-    isMultiline?: boolean;
-};
 
 const ServiceDetails = () => {
     const router = useRouter();
@@ -100,45 +97,6 @@ const ServiceDetails = () => {
         Alert.alert("Info", "Funcționalitatea de schimbare dată (snooze) va fi disponibilă în curând.");
     };
 
-    const getStatusColor = (status?: string) => {
-        switch (status) {
-            case 'COMPLETED': return '#2ECC71'; // Green
-            case 'IN_PROGRESS': return '#F1C40F'; // Yellow
-            case 'CANCELLED': return '#E74C3C'; // Red
-            case 'NEW': return '#3498DB'; // Blue
-            default: return '#95A5A6'; // Gray
-        }
-    };
-
-    const getStatusLabel = (status?: string) => {
-        switch (status) {
-            case 'COMPLETED': return 'Finalizat';
-            case 'IN_PROGRESS': return 'În Lucru';
-            case 'CANCELLED': return 'Anulat';
-            case 'NEW': return 'Nou';
-            default: return status || 'Necunoscut';
-        }
-    };
-
-    const getTaskTypeLabel = (type?: string) => {
-        const labels: Record<string, string> = {
-            'PLACEMENT': 'Amplasare',
-            'PICKUP': 'Ridicare',
-            'SANITIZATION': 'Igienizare',
-            'MAINTENANCE': 'Mentenanță'
-        };
-        return labels[type || ''] || type || 'Sarcină';
-    };
-
-    const DetailRow = ({ label, value, isMultiline }: DetailRowProps) => (
-        <View style={styles.rowContainer}>
-            <Text style={styles.label}>{label}</Text>
-            <Text style={[styles.value, isMultiline && { textAlign: 'right', flex: 1, marginLeft: 10 }]}>
-                {value || 'N/A'}
-            </Text>
-        </View>
-    );
-
     if (loading) {
         return (
             <View style={[styles.container, styles.centerContent]}>
@@ -157,12 +115,7 @@ const ServiceDetails = () => {
     const taskType = getTaskTypeLabel(task.type);
     const hasScheduledDate = !!task.scheduledTime;
     const scheduledDate = task.scheduledTime
-        ? new Date(task.scheduledTime).toLocaleDateString('ro-RO', {
-            weekday: 'long',
-            year: 'numeric',
-            month: 'long',
-            day: 'numeric'
-        })
+        ? formatDisplayDate(new Date(task.scheduledTime))
         : null;
 
 
@@ -194,8 +147,8 @@ const ServiceDetails = () => {
                     {hasScheduledDate ? (
                         <DetailRow label="Dată Programată" value={scheduledDate!} />
                     ) : (
-                        <View style={styles.rowContainer}>
-                            <Text style={styles.label}>Dată Programată</Text>
+                        <View style={styles.noDateRow}>
+                            <Text style={styles.sectionLabel}>Dată Programată</Text>
                             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                                 <Ionicons name="alert-circle-outline" size={16} color="#F39C12" style={{ marginRight: 4 }} />
                                 <Text style={{ color: '#F39C12', fontSize: 13, fontWeight: '600' }}>Nicio dată programată</Text>
@@ -206,12 +159,9 @@ const ServiceDetails = () => {
                     <DetailRow label="Adresă" value={address} isMultiline />
 
                     <View style={{ height: 10 }} />
-                    <View style={styles.rowContainer}>
-                        <Text style={styles.label}>Tip Sarcină</Text>
-                        <Text style={styles.value}>{taskType}</Text>
-                    </View>
+                    <DetailRow label="Tip Sarcină" value={taskType} />
 
-                    <Text style={[styles.label, { marginBottom: 10, marginTop: 10 }]}>Poze ({taskPhotos.length})</Text>
+                    <Text style={[styles.sectionLabel, { marginBottom: 10, marginTop: 10 }]}>Poze ({taskPhotos.length})</Text>
 
                     {/* --- PHOTO GALLERY --- */}
                     {loadingPhotos ? (
@@ -252,7 +202,7 @@ const ServiceDetails = () => {
                         style={styles.expandHeader}
                         onPress={() => setIsExpanded(!isExpanded)}
                     >
-                        <Text style={styles.label}>Detalii Suplimentare</Text>
+                        <Text style={styles.sectionLabel}>Detalii Suplimentare</Text>
                         <Ionicons
                             name={isExpanded ? "arrow-up" : "arrow-down"}
                             size={20}
@@ -393,24 +343,17 @@ const styles = StyleSheet.create({
         borderColor: '#3498DB',
         elevation: 4,
     },
-    rowContainer: {
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        marginBottom: 12,
-        alignItems: 'flex-start',
-    },
-    label: {
+    sectionLabel: {
         color: '#E0E0E0',
         fontSize: 14,
         fontWeight: '600',
         flex: 1,
     },
-    value: {
-        color: '#FFFFFF',
-        fontSize: 15,
-        fontWeight: 'bold',
-        flex: 1,
-        textAlign: 'right',
+    noDateRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        marginBottom: 12,
     },
 
     // Description

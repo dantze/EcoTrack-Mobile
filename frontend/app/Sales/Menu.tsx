@@ -19,6 +19,7 @@ const Menu = () => {
         <MenuScreen
             title="Meniu Vânzări"
             items={menuItems}
+            showMap
             renderButton={(item) => (
                 <MenuButton label={item.label} onPress={item.onPress} />
             )}

@@ -30,14 +30,6 @@ export const RouteService = {
         return await response.json();
     },
 
-    getRoutesByCounty: async (county: string): Promise<Route[]> => {
-        const response = await fetch(`${API_BASE_URL}/routes/county/${encodeURIComponent(county)}`);
-        if (!response.ok) {
-            throw new Error('Eșec la preluarea rutelor');
-        }
-        return await response.json();
-    },
-
     getRoutesByEmployeeId: async (employeeId: number): Promise<Route[]> => {
         const response = await fetch(`${API_BASE_URL}/routes/employee/${employeeId}`);
         if (!response.ok) {

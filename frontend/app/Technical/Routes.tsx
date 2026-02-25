@@ -1,16 +1,14 @@
 import { StyleSheet, Text, View, Pressable, Image, ScrollView, ActivityIndicator, Modal, Alert } from 'react-native'
 import React, { useState, useCallback } from 'react'
-import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router'
+import { useRouter, useFocusEffect } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons';
 import { RouteService, Route } from '../../services/RouteService';
-import { getAllDrivers, getDriversByCounty, Employee } from '../../services/EmployeeService';
+import { getAllDrivers, Employee } from '../../services/EmployeeService';
 
 const mapImageSource = require('../../assets/images/harta_romania.png');
 
 const Routes = () => {
     const router = useRouter();
-    const { zona, county } = useLocalSearchParams<{ zona?: string; county?: string }>();
-    const zonaLabel = zona ?? 'Center';
     const [routes, setRoutes] = useState<Route[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -23,20 +21,7 @@ const Routes = () => {
     const fetchRoutes = async () => {
         try {
             setLoading(true);
-            let data: Route[] = [];
-
-            // If county is provided, try to filter by county first
-            if (county) {
-                data = await RouteService.getRoutesByCounty(county);
-                // If no routes found for this county, fall back to all routes
-                if (data.length === 0) {
-                    console.log(`No routes found for county ${county}, showing all routes`);
-                    data = await RouteService.getAllRoutes();
-                }
-            } else {
-                data = await RouteService.getAllRoutes();
-            }
-
+            const data = await RouteService.getAllRoutes();
             setRoutes(data);
         } catch (error) {
             console.error('Error fetching routes:', error);
@@ -48,25 +33,14 @@ const Routes = () => {
     useFocusEffect(
         useCallback(() => {
             fetchRoutes();
-        }, [county])
+        }, [])
     );
 
-    // Fetch drivers filtered by county
+    // Fetch drivers
     const fetchDrivers = async () => {
         try {
             setDriversLoading(true);
-            let data: Employee[] = [];
-
-            if (county) {
-                data = await getDriversByCounty(county);
-                if (data.length === 0) {
-                    console.log(`No drivers found for county ${county}, showing all drivers`);
-                    data = await getAllDrivers();
-                }
-            } else {
-                data = await getAllDrivers();
-            }
-
+            const data = await getAllDrivers();
             setDrivers(data);
         } catch (error) {
             console.error('Error fetching drivers:', error);
@@ -78,7 +52,6 @@ const Routes = () => {
     const handleAddRoute = () => {
         router.push({
             pathname: "/Technical/CreateRoute",
-            params: { zona, county }
         });
     };
 
@@ -134,7 +107,7 @@ const Routes = () => {
                 <Pressable onPress={() => router.back()} style={styles.backButton}>
                     <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
                 </Pressable>
-                <Text style={styles.headerText}>{`Rute - ${county || zonaLabel}`}</Text>
+                <Text style={styles.headerText}>Rute</Text>
             </View>
 
             {/* Add Route Button */}
@@ -236,9 +209,6 @@ const Routes = () => {
                                         <Ionicons name="person-circle-outline" size={32} color="#FFFFFF" />
                                         <View style={styles.driverInfo}>
                                             <Text style={styles.driverName}>{driver.fullName}</Text>
-                                            {driver.county && (
-                                                <Text style={styles.driverCounty}>{driver.county}</Text>
-                                            )}
                                         </View>
                                         <Ionicons name="chevron-forward" size={20} color="#5D8AA8" />
                                     </Pressable>

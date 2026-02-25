@@ -40,16 +40,6 @@ public class EmployeeService {
     }
 
     /**
-     * Returnează toți șoferii dintr-un anumit județ
-     */
-    public List<Employee> getDriversByCounty(String county) {
-        return employeeRepository.findByCounty(county).stream()
-                .filter(employee -> employee.getRoles().stream()
-                        .anyMatch(role -> "DRIVER".equalsIgnoreCase(role.getRoleName())))
-                .collect(Collectors.toList());
-    }
-
-    /**
      * Returnează toți angajații cu un anumit rol
      */
     public List<Employee> getEmployeesByRole(String roleName) {

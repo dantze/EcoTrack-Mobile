@@ -17,7 +17,6 @@ const OrderDetails = () => {
     const router = useRouter();
     const params = useLocalSearchParams();
     const orderId = params.id ? Number(params.id) : null;
-    const county = params.county as string | undefined;
 
     const [order, setOrder] = useState<any>(null);
     const [loading, setLoading] = useState(true);
@@ -59,19 +58,7 @@ const OrderDetails = () => {
     const fetchRoutes = async () => {
         try {
             let data: Route[] = [];
-
-            // If county is provided, try to filter by county first
-            if (county) {
-                data = await RouteService.getRoutesByCounty(county);
-                // If no routes found for this county, fall back to all routes
-                if (data.length === 0) {
-                    console.log(`No routes found for county ${county}, showing all routes`);
-                    data = await RouteService.getAllRoutes();
-                }
-            } else {
-                data = await RouteService.getAllRoutes();
-            }
-
+            data = await RouteService.getAllRoutes();
             setRoutes(data);
         } catch (error) {
             console.error("Failed to fetch routes", error);

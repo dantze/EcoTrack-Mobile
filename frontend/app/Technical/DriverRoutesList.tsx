@@ -5,10 +5,9 @@ import { RouteService, Route } from '../../services/RouteService'
 
 const DriverRoutesList = () => {
     const router = useRouter();
-    const { driverId, driverName, zona } = useLocalSearchParams<{
+    const { driverId, driverName } = useLocalSearchParams<{
         driverId?: string;
         driverName?: string;
-        zona?: string;
     }>();
 
     const [routes, setRoutes] = useState<Route[]>([]);
@@ -55,7 +54,6 @@ const DriverRoutesList = () => {
                 routeId: route.id.toString(),
                 driverName: driverName,
                 routeDate: route.date,
-                zona: zona,
             },
         });
     };
@@ -64,7 +62,6 @@ const DriverRoutesList = () => {
         <View style={styles.container}>
             <View style={styles.headerContainer}>
                 <Text style={styles.headerText}>{`Rutele lui ${driverName || 'Șofer'}`}</Text>
-                {zona && <Text style={styles.subHeaderText}>{zona}</Text>}
             </View>
 
             {loading ? (

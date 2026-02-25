@@ -38,14 +38,6 @@ public class EmployeeController {
     }
 
     /**
-     * Endpoint pentru a obține șoferii dintr-un anumit județ
-     */
-    @GetMapping("/drivers/county/{county}")
-    public ResponseEntity<List<Employee>> getDriversByCounty(@PathVariable String county) {
-        return ResponseEntity.ok(employeeService.getDriversByCounty(county));
-    }
-
-    /**
      * Endpoint pentru a obține angajații cu un anumit rol
      */
     @GetMapping("/role/{roleName}")

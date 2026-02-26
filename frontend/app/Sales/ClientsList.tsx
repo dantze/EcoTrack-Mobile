@@ -181,7 +181,7 @@ export default function ClientsList() {
 
     return (
         <View style={listStyles.container}>
-            <ScreenHeader title="Lista Clienți" onBack={() => router.back()} />
+            <ScreenHeader title="Lista Clienți" onBack={() => router.back()} onRefresh={fetchClients} />
 
             <View style={searchStyles.searchContainer}>
                 <Ionicons name="search" size={20} color="#999" style={searchStyles.searchIcon} />

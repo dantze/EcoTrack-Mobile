@@ -75,7 +75,7 @@ const Orders = () => {
 
     return (
         <View style={styles.container}>
-            <ScreenHeader title="Comenzi" />
+            <ScreenHeader title="Comenzi" onRefresh={fetchOrders} />
 
             <ScrollView
                 style={styles.scrollContainer}

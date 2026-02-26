@@ -152,7 +152,7 @@ export default function OrdersList() {
 
     return (
         <View style={styles.container}>
-            <ScreenHeader title="Lista Comenzi" />
+            <ScreenHeader title="Lista Comenzi" onRefresh={fetchOrders} />
 
             <View style={styles.searchContainer}>
                 <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />

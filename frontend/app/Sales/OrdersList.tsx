@@ -146,7 +146,7 @@ export default function OrdersList() {
             onDelete={() => handleDeleteOrder(item)}
         >
             <View style={listStyles.cardHeader}>
-                <Text style={listStyles.cardTitle}>Comanda #{item.number || item.id}</Text>
+                <Text style={listStyles.cardTitle}>Comanda #{ item.number || item.id}</Text>
                 <TypeBadge label={getOrderTypeLabel(item.orderType)} />
             </View>
 

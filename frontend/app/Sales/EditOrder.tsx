@@ -12,11 +12,10 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { OrderService } from '../../services/OrderService';
-import { isValidPhone } from '../../utils/validation';
-import InputField from '../../components/InputField';
 import PrimaryButton from '../../components/PrimaryButton';
 import ScreenHeader from '../../components/ScreenHeader';
 import { AppColors } from '../../constants/Colors';
+import OrderForm from './OrderTypes/OrderComponents/OrderForm';
 
 export default function EditOrder() {
     const router = useRouter();
@@ -34,11 +33,11 @@ export default function EditOrder() {
 
     const getOrderTypeLabel = (type: string): string => {
         const labels: Record<string, string> = {
-            amplasari: 'Amplasare',
-            igienizari: 'Igienizare',
-            ridicari: 'Ridicare',
+            Amplasari: 'Amplasare',
+            Igienizari: 'Igienizare',
+            Ridicari: 'Ridicare',
         };
-        return labels[type?.toLowerCase()] || type || 'N/A';
+        return labels[type] || type || 'N/A';
     };
 
     const getClientName = (): string => {
@@ -52,35 +51,53 @@ export default function EditOrder() {
         return `Client #${orderData.client.id}`;
     };
 
-    // Form state initialized with existing data
-    const [quantity, setQuantity] = useState(orderData.quantity?.toString() || '');
-    const [locationAddress, setLocationAddress] = useState(orderData.locationAddress || '');
-    const [contact, setContact] = useState(orderData.contact || '');
-    const [details, setDetails] = useState(orderData.details || '');
-    const [startDate, setStartDate] = useState(orderData.startDate || '');
-    const [endDate, setEndDate] = useState(orderData.endDate || '');
-    const [igienizariPerMonth, setIgienizariPerMonth] = useState(
-        orderData.igienizariPerMonth?.toString() || ''
-    );
+    const [formData, setFormData] = useState<any>({});
     const [saving, setSaving] = useState(false);
 
-    const handleSave = async () => {
-        if (contact.trim() && !isValidPhone(contact)) {
-            Alert.alert('Telefon invalid', 'Numărul de telefon trebuie să fie în formatul 07XXXXXXXX sau +407XXXXXXXX.');
-            return;
+    const handleDeleteOrder = async () => {
+        try {
+            await OrderService.deleteOrder(orderData.id);
+            Alert.alert('Succes', 'Comanda a fost ștearsă.', [
+                { text: 'OK', onPress: () => router.back() },
+            ]);
+        } catch (error) {
+            console.error('Error deleting order:', error);
+            Alert.alert('Eroare', 'Nu s-a putut șterge comanda.');
         }
+    };
 
-        const updatedData: Record<string, any> = {};
+    const handleSave = async () => {
+        const updatedData: Record<string, any> = {
+            orderType: orderData.orderType,
+        };
 
-        // Only send fields that have values
-        if (quantity.trim()) updatedData.quantity = parseInt(quantity.trim(), 10);
-        if (locationAddress.trim()) updatedData.locationAddress = locationAddress.trim();
-        if (contact.trim()) updatedData.contact = contact.trim();
-        if (details.trim()) updatedData.details = details.trim();
-        if (startDate.trim()) updatedData.startDate = startDate.trim();
-        if (endDate.trim()) updatedData.endDate = endDate.trim();
-        if (igienizariPerMonth.trim())
-            updatedData.igienizariPerMonth = parseInt(igienizariPerMonth.trim(), 10);
+        if (orderData.orderType === 'Amplasari') {
+            if (formData.quantity) updatedData.quantity = parseInt(formData.quantity, 10);
+            if (formData.locationAddress) updatedData.locationAddress = formData.locationAddress;
+            if (formData.contact) updatedData.contact = formData.contact;
+            if (formData.details) updatedData.details = formData.details;
+            if (formData.startDate) updatedData.startDate = formData.startDate;
+            if (formData.endDate) updatedData.endDate = formData.endDate;
+            if (formData.igienizari) updatedData.igienizariPerMonth = parseInt(formData.igienizari, 10);
+            if (formData.location) {
+                updatedData.locationCoordinates = `${formData.location.latitude},${formData.location.longitude}`;
+            }
+            if (formData.duration) updatedData.durationDays = parseInt(formData.duration, 10);
+            updatedData.isIndefinite = formData.isIndefinite || false;
+            if (formData.packet) updatedData.product = { id: formData.packet.id };
+        } else if (orderData.orderType === 'Ridicari') {
+            if (formData.date) updatedData.pickupDate = formData.date;
+            if (formData.contact) updatedData.contact = formData.contact;
+            if (formData.details) updatedData.details = formData.details;
+        } else if (orderData.orderType === 'Igienizari') {
+            if (formData.date) updatedData.sanitationDate = formData.date;
+            if (formData.details) updatedData.details = formData.details;
+            if (formData.location) {
+                updatedData.sanitationLocationCoordinates = `${formData.location.latitude},${formData.location.longitude}`;
+                updatedData.sanitationLocationAddress = formData.location.address || null;
+            }
+            if (formData.subscription) updatedData.subscription = { id: formData.subscription.id };
+        }
 
         setSaving(true);
         try {
@@ -125,59 +142,16 @@ export default function EditOrder() {
                         <Text style={styles.readOnlyValue}>{getClientName()}</Text>
                     </View>
 
-                    {/* Product info (read-only) */}
-                    {orderData.product?.name && (
-                        <View style={styles.readOnlyCard}>
-                            <Text style={styles.readOnlyLabel}>Produs</Text>
-                            <Text style={styles.readOnlyValue}>{orderData.product.name}</Text>
-                        </View>
-                    )}
-
-                    {/* Editable fields */}
-                    <View style={{ width: '100%', marginTop: 20 }}>
-                        <InputField
-                            label="Cantitate"
-                            value={quantity}
-                            onChangeText={setQuantity}
-                            keyboardType="numeric"
-                        />
-                        <InputField
-                            label="Adresă locație"
-                            value={locationAddress}
-                            onChangeText={setLocationAddress}
-                        />
-                        <InputField
-                            label="Contact"
-                            value={contact}
-                            onChangeText={setContact}
-                            keyboardType="phone-pad"
-                        />
-                        <InputField
-                            label="Detalii"
-                            value={details}
-                            onChangeText={setDetails}
-                        />
-                        <InputField
-                            label="Data început"
-                            value={startDate}
-                            onChangeText={setStartDate}
-                            placeholder="ex: 2026-03-01"
-                        />
-                        <InputField
-                            label="Data sfârșit"
-                            value={endDate}
-                            onChangeText={setEndDate}
-                            placeholder="ex: 2026-06-01"
-                        />
-                        {orderData.orderType?.toLowerCase() !== 'ridicari' && (
-                            <InputField
-                                label="Igienizări / lună"
-                                value={igienizariPerMonth}
-                                onChangeText={setIgienizariPerMonth}
-                                keyboardType="numeric"
-                            />
-                        )}
-                    </View>
+                    {/* Order form — same visual as create, pre-filled with data */}
+                    <OrderForm
+                        orderType={orderData.orderType}
+                        client={orderData.client}
+                        initialData={orderData}
+                        onDataChange={setFormData}
+                        onDeleteOrder={handleDeleteOrder}
+                        mode="edit"
+                        showTitle={false}
+                    />
 
                     {/* Save button */}
                     <View style={{ width: '100%', marginTop: 30 }}>

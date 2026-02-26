@@ -6,7 +6,7 @@ export const unstable_settings = {
 
 export default function RootLayout() {
   return (
-    <Stack screenOptions={{ headerShown: false }}>
+    <Stack screenOptions={{ headerShown: false, animation: 'slide_from_right' }}>
       <Stack.Screen name="login" />
       <Stack.Screen name="Driver" />
       <Stack.Screen name="Sales" />

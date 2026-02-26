@@ -11,7 +11,7 @@ import { AppColors } from '../../constants/Colors';
 import ScreenHeader from '../../components/layout/ScreenHeader';
 import StatusBadge from '../../components/display/StatusBadge';
 import PhotoGallery from '../../components/display/PhotoGallery';
-import CloudPhotoViewer from '../../components/CloudPhotoViewer';
+import CloudPhotoViewer from '../../components/display/CloudPhotoViewer';
 
 type OrderDetails = {
     productName?: string;

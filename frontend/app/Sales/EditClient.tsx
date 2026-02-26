@@ -16,6 +16,7 @@ import { isValidEmail, isValidPhone } from '../../utils/validation';
 import InputField from '../../components/InputField';
 import PrimaryButton from '../../components/PrimaryButton';
 import ScreenHeader from '../../components/ScreenHeader';
+import CloudPhotoViewer from '../../components/CloudPhotoViewer';
 import { AppColors } from '../../constants/Colors';
 
 export default function EditClient() {
@@ -105,6 +106,17 @@ export default function EditClient() {
                             {isCompany ? 'Firmă' : 'Persoană fizică'}
                         </Text>
                     </View>
+
+                    {/* ID Photo for individual clients */}
+                    {!isCompany && clientData.idPhotoUrl && (
+                        <View style={{ width: '100%', marginTop: 16 }}>
+                            <CloudPhotoViewer
+                                photos={[clientData.idPhotoUrl]}
+                                buttonLabel="Vezi Fotografia"
+                                bannerLabel="Fotografie buletin salvată"
+                            />
+                        </View>
+                    )}
 
                     {/* Form fields */}
                     <View style={{ width: '100%', marginTop: 20 }}>

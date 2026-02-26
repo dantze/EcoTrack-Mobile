@@ -7,10 +7,10 @@ import { Ionicons, MaterialIcons, MaterialCommunityIcons } from '@expo/vector-ic
 import { ProductService, Product } from '../../services/ProductService';
 import { Subscription, SubscriptionService, SubscriptionType } from '../../services/SubscriptionService';
 import { formatPrice } from '../../utils/formatters';
-import ActionBar from '../../components/ActionBar';
+import ActionBar from '../../components/layout/ActionBar';
 import ProductModal from '../../modals/ProductModal';
 import SubscriptionModal from '../../modals/SubscriptionModal';
-import ScreenHeader from '../../components/ScreenHeader';
+import ScreenHeader from '../../components/layout/ScreenHeader';
 import { AppColors } from '../../constants/Colors';
 
 // ─── Tab type ────────────────────────────────────────────────────────────────

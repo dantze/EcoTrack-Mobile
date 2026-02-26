@@ -6,7 +6,7 @@ import { AuthService, User } from '../../services/AuthService';
 import { RouteService, Route } from '../../services/RouteService';
 import { getDayOfWeekLabel } from '../../constants/RouteConstants';
 import { AppColors } from '../../constants/Colors';
-import ScreenHeader from '../../components/ScreenHeader';
+import ScreenHeader from '../../components/layout/ScreenHeader';
 
 const DriverRoutes = () => {
     const router = useRouter();

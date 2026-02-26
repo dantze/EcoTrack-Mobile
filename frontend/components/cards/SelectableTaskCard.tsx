@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, View, Pressable, Switch } from 'react-native';
-import { AppColors } from '../constants/Colors';
-import { getTaskTypeLabel, getTaskTypeColor } from '../constants/TaskConstants';
+import { AppColors } from '../../constants/Colors';
+import { getTaskTypeLabel, getTaskTypeColor } from '../../constants/TaskConstants';
 
 interface SelectableTaskCardProps {
     taskType: string;

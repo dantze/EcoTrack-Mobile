@@ -8,7 +8,7 @@ import {
     SubscriptionService, Subscription, CreateSubscriptionRequest, SubscriptionType,
 } from '../services/SubscriptionService';
 import { validateRequired, validatePositiveNumber, validatePositiveInt } from '../utils/formatters';
-import modalStyles from './modalStyles';
+import { StyleSheet } from 'react-native';
 
 interface SubscriptionModalProps {
     visible: boolean;
@@ -127,10 +127,10 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
 
     return (
         <Modal animationType="slide" transparent visible={visible} onRequestClose={onClose}>
-            <View style={modalStyles.overlay}>
-                <View style={modalStyles.content}>
-                    <View style={modalStyles.header}>
-                        <Text style={modalStyles.title}>
+            <View style={styles.overlay}>
+                <View style={styles.content}>
+                    <View style={styles.header}>
+                        <Text style={styles.title}>
                             {editingSub ? 'Editare Abonament' : 'Abonament Nou'}
                         </Text>
                         <Pressable onPress={onClose}>
@@ -138,20 +138,20 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                         </Pressable>
                     </View>
 
-                    <ScrollView style={modalStyles.formContainer} keyboardShouldPersistTaps="handled">
-                        <View style={modalStyles.inputGroup}>
-                            <Text style={modalStyles.inputLabel}>Nume Abonament *</Text>
+                    <ScrollView style={styles.formContainer} keyboardShouldPersistTaps="handled">
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.inputLabel}>Nume Abonament *</Text>
                             <TextInput
-                                style={modalStyles.textInput} value={subName}
+                                style={styles.textInput} value={subName}
                                 onChangeText={onChangeSubName}
                                 placeholder="Ex: Igienizare Lunară" placeholderTextColor="#999"
                             />
                         </View>
 
-                        <View style={modalStyles.inputGroup}>
-                            <Text style={modalStyles.inputLabel}>Descriere (opțional)</Text>
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.inputLabel}>Descriere (opțional)</Text>
                             <TextInput
-                                style={[modalStyles.textInput, modalStyles.textArea]}
+                                style={[styles.textInput, styles.textArea]}
                                 value={subDescription} onChangeText={onChangeSubDescription}
                                 placeholder="Descriere..." placeholderTextColor="#999"
                                 multiline numberOfLines={3} textAlignVertical="top"
@@ -159,34 +159,34 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                         </View>
 
                         {/* Type selector */}
-                        <View style={modalStyles.inputGroup}>
-                            <Text style={modalStyles.inputLabel}>Tip Abonament *</Text>
-                            <View style={modalStyles.typeSelector}>
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.inputLabel}>Tip Abonament *</Text>
+                            <View style={styles.typeSelector}>
                                 <Pressable
-                                    style={[modalStyles.typeOption, subType === 'ONE_TIME' && modalStyles.typeOptionActive]}
+                                    style={[styles.typeOption, subType === 'ONE_TIME' && styles.typeOptionActive]}
                                     onPress={() => onChangeSubType('ONE_TIME')}
                                 >
                                     <Ionicons name="flash" size={16} color={subType === 'ONE_TIME' ? '#FFF' : '#7B5EA7'} />
-                                    <Text style={[modalStyles.typeOptionText, subType === 'ONE_TIME' && modalStyles.typeOptionTextActive]}>
+                                    <Text style={[styles.typeOptionText, subType === 'ONE_TIME' && styles.typeOptionTextActive]}>
                                         O singură dată
                                     </Text>
                                 </Pressable>
                                 <Pressable
-                                    style={[modalStyles.typeOption, subType === 'RECURRING' && modalStyles.typeOptionActive]}
+                                    style={[styles.typeOption, subType === 'RECURRING' && styles.typeOptionActive]}
                                     onPress={() => onChangeSubType('RECURRING')}
                                 >
                                     <MaterialCommunityIcons name="refresh" size={16} color={subType === 'RECURRING' ? '#FFF' : '#7B5EA7'} />
-                                    <Text style={[modalStyles.typeOptionText, subType === 'RECURRING' && modalStyles.typeOptionTextActive]}>
+                                    <Text style={[styles.typeOptionText, subType === 'RECURRING' && styles.typeOptionTextActive]}>
                                         Recurent
                                     </Text>
                                 </Pressable>
                             </View>
                         </View>
 
-                        <View style={modalStyles.inputGroup}>
-                            <Text style={modalStyles.inputLabel}>Preț (RON) *</Text>
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.inputLabel}>Preț (RON) *</Text>
                             <TextInput
-                                style={modalStyles.textInput} value={subPrice}
+                                style={styles.textInput} value={subPrice}
                                 onChangeText={onChangeSubPrice}
                                 placeholder="Ex: 200" placeholderTextColor="#999"
                                 keyboardType="numeric"
@@ -196,19 +196,19 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                         {/* Recurring-only fields */}
                         {subType === 'RECURRING' && (
                             <>
-                                <View style={modalStyles.inputGroup}>
-                                    <Text style={modalStyles.inputLabel}>Vizite / Lună *</Text>
+                                <View style={styles.inputGroup}>
+                                    <Text style={styles.inputLabel}>Vizite / Lună *</Text>
                                     <TextInput
-                                        style={modalStyles.textInput} value={subVisits}
+                                        style={styles.textInput} value={subVisits}
                                         onChangeText={onChangeSubVisits}
                                         placeholder="Ex: 2" placeholderTextColor="#999"
                                         keyboardType="numeric"
                                     />
                                 </View>
 
-                                <View style={modalStyles.inputGroup}>
-                                    <View style={modalStyles.switchRow}>
-                                        <Text style={modalStyles.inputLabel}>Durată nedefinită</Text>
+                                <View style={styles.inputGroup}>
+                                    <View style={styles.switchRow}>
+                                        <Text style={styles.inputLabel}>Durată nedefinită</Text>
                                         <Switch
                                             value={subIsIndefinite}
                                             onValueChange={onChangeSubIsIndefinite}
@@ -218,9 +218,9 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                                     </View>
                                     {!subIsIndefinite && (
                                         <>
-                                            <Text style={[modalStyles.inputLabel, { marginTop: 12 }]}>Durata (luni)</Text>
+                                            <Text style={[styles.inputLabel, { marginTop: 12 }]}>Durata (luni)</Text>
                                             <TextInput
-                                                style={modalStyles.textInput} value={subDuration}
+                                                style={styles.textInput} value={subDuration}
                                                 onChangeText={onChangeSubDuration}
                                                 placeholder="Ex: 12 (lasă gol pentru nedefinit)"
                                                 placeholderTextColor="#999" keyboardType="numeric"
@@ -234,10 +234,10 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
 
                     <Pressable
                         style={({ pressed }) => [
-                            modalStyles.saveButton,
+                            styles.saveButton,
                             { backgroundColor: '#7B5EA7' },
-                            pressed && modalStyles.saveButtonPressed,
-                            saving && modalStyles.saveButtonDisabled,
+                            pressed && styles.saveButtonPressed,
+                            saving && styles.saveButtonDisabled,
                         ]}
                         onPress={handleSave} disabled={saving}
                     >
@@ -245,7 +245,7 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                             ? <ActivityIndicator size="small" color="#FFF" />
                             : <>
                                 <Ionicons name="checkmark-circle" size={22} color="#FFF" style={{ marginRight: 8 }} />
-                                <Text style={modalStyles.saveButtonText}>Salvează Abonament</Text>
+                                <Text style={styles.saveButtonText}>Salvează Abonament</Text>
                             </>
                         }
                     </Pressable>
@@ -253,10 +253,10 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                     {editingSub && (
                         <Pressable
                             style={({ pressed }) => [
-                                modalStyles.deleteButton,
+                                styles.deleteButton,
                                 { backgroundColor: editingSub.isActive ? '#E53935' : '#4CAF50' },
-                                pressed && modalStyles.deleteButtonPressed,
-                                saving && modalStyles.saveButtonDisabled,
+                                pressed && styles.deleteButtonPressed,
+                                saving && styles.saveButtonDisabled,
                             ]}
                             onPress={handleToggleActive} disabled={saving}
                         >
@@ -264,7 +264,7 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                                 name={editingSub.isActive ? 'pause-circle-outline' : 'play-circle-outline'}
                                 size={20} color="#FFF" style={{ marginRight: 8 }}
                             />
-                            <Text style={modalStyles.deleteButtonText}>
+                            <Text style={styles.deleteButtonText}>
                                 {editingSub.isActive ? 'Dezactivează' : 'Reactivează'}
                             </Text>
                         </Pressable>
@@ -276,3 +276,52 @@ const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
 };
 
 export default SubscriptionModal;
+
+const styles = StyleSheet.create({
+    overlay: {
+        flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end',
+    },
+    content: {
+        backgroundColor: '#FFF', borderTopLeftRadius: 24, borderTopRightRadius: 24,
+        paddingTop: 20, paddingBottom: 30, maxHeight: '88%',
+    },
+    header: {
+        flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+        paddingHorizontal: 20, marginBottom: 16,
+    },
+    title: { fontSize: 22, fontWeight: 'bold', color: '#16283C' },
+    formContainer: { paddingHorizontal: 20 },
+    inputGroup: { marginBottom: 18 },
+    inputLabel: { fontSize: 14, fontWeight: '600', color: '#16283C', marginBottom: 8 },
+    textInput: {
+        backgroundColor: '#F5F5F5', borderRadius: 10, paddingHorizontal: 15,
+        paddingVertical: 12, fontSize: 15, color: '#16283C',
+        borderWidth: 1, borderColor: '#E0E0E0',
+    },
+    textArea: { height: 90, textAlignVertical: 'top' },
+    typeSelector: { flexDirection: 'row', gap: 10 },
+    typeOption: {
+        flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center',
+        gap: 6, paddingVertical: 12, borderRadius: 10,
+        borderWidth: 2, borderColor: '#7B5EA7', backgroundColor: '#FFF',
+    },
+    typeOptionActive: { backgroundColor: '#7B5EA7', borderColor: '#7B5EA7' },
+    typeOptionText: { color: '#7B5EA7', fontWeight: '600', fontSize: 14 },
+    typeOptionTextActive: { color: '#FFF' },
+    switchRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+    saveButton: {
+        flexDirection: 'row', backgroundColor: '#5D8AA8', paddingVertical: 15,
+        marginHorizontal: 20, borderRadius: 12, alignItems: 'center',
+        justifyContent: 'center', marginTop: 10,
+    },
+    saveButtonPressed: { backgroundColor: '#4A7A96' },
+    saveButtonDisabled: { backgroundColor: '#BDC3C7' },
+    saveButtonText: { color: '#FFF', fontSize: 16, fontWeight: 'bold' },
+    deleteButton: {
+        flexDirection: 'row', backgroundColor: '#E53935', paddingVertical: 12,
+        marginHorizontal: 20, borderRadius: 12, alignItems: 'center',
+        justifyContent: 'center', marginTop: 10,
+    },
+    deleteButtonPressed: { backgroundColor: '#C62828' },
+    deleteButtonText: { color: '#FFF', fontSize: 14, fontWeight: 'bold' },
+});

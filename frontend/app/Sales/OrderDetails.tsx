@@ -7,7 +7,7 @@ import Ridicari from './OrderTypes/Ridicari';
 import Igienizari from './OrderTypes/Igienizari';
 import { ClientService } from '../../services/ClientService';
 import { isValidPhone } from '../../utils/validation';
-import ScreenHeader from '../../components/ScreenHeader';
+import ScreenHeader from '../../components/layout/ScreenHeader';
 import { AppColors } from '../../constants/Colors';
 
 

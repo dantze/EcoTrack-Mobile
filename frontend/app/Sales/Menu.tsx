@@ -1,7 +1,7 @@
 import React from 'react';
 import { useRouter } from 'expo-router';
-import MenuScreen from '../../components/MenuScreen';
-import MenuButton from '../../components/MenuButton';
+import MenuScreen from '../../components/layout/MenuScreen';
+import MenuButton from '../../components/layout/MenuButton';
 
 const Menu = () => {
     const router = useRouter();
@@ -19,7 +19,7 @@ const Menu = () => {
         <MenuScreen
             title="Meniu Vânzări"
             items={menuItems}
-            
+            onLogout={() => router.replace('/login')}
             renderButton={(item) => (
                 <MenuButton label={item.label} onPress={item.onPress} />
             )}

@@ -1,8 +1,9 @@
 import React from 'react';
-import { StyleSheet, Text, View, Image } from 'react-native';
-import { AppColors } from '../constants/Colors';
+import { StyleSheet, Text, View, Image, Pressable } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
+import { AppColors } from '../../constants/Colors';
 
-const mapImageSource = require('../assets/images/harta_romania.png');
+const mapImageSource = require('../../assets/images/harta_romania.png');
 
 interface MenuItem {
     label: string;
@@ -13,14 +14,20 @@ interface MenuScreenProps {
     title: string;
     items: MenuItem[];
     showMap?: boolean;
+    onLogout?: () => void;
     renderButton: (item: MenuItem, index: number) => React.ReactNode;
 }
 
-const MenuScreen: React.FC<MenuScreenProps> = ({ title, items, showMap = false, renderButton }) => {
+const MenuScreen: React.FC<MenuScreenProps> = ({ title, items, showMap = false, onLogout, renderButton }) => {
     return (
         <View style={styles.container}>
             <View style={styles.headerContainer}>
                 <Text style={styles.headerText}>{title}</Text>
+                {onLogout && (
+                    <Pressable style={styles.logoutButton} onPress={onLogout}>
+                        <Ionicons name="log-out-outline" size={24} color={AppColors.errorRed} />
+                    </Pressable>
+                )}
             </View>
 
             <View style={styles.buttonsContainer}>
@@ -57,12 +64,21 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
         width: '100%',
         marginBottom: 20,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
     },
     headerText: {
         color: AppColors.textWhite,
         fontSize: 22,
         fontWeight: 'bold',
         textAlign: 'left',
+    },
+    logoutButton: {
+        width: 44,
+        height: 44,
+        justifyContent: 'center',
+        alignItems: 'center',
     },
     buttonsContainer: {
         flex: 1,

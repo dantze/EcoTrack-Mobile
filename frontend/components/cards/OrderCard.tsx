@@ -1,10 +1,10 @@
 import React from 'react';
 import { StyleSheet, Text, View, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { Order } from '../types/OrderTypes';
-import { getDateInfo, getClientName, getActionText, getLocationText } from '../utils/orderUtils';
-import DateBadge from './DateBadge';
-import { AppColors } from '../constants/Colors';
+import { Order } from '../../types/OrderTypes';
+import { getDateInfo, getClientName, getActionText, getLocationText } from '../../utils/orderUtils';
+import DateBadge from '../display/DateBadge';
+import { AppColors } from '../../constants/Colors';
 
 interface OrderCardProps {
     order: Order;

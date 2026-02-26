@@ -8,8 +8,8 @@ import { TASK_TYPE_LABELS, STATUS_LABELS, STATUS_COLORS, getTaskTypeLabel, getSt
 import { AppColors } from '../../constants/Colors';
 import { toDateString } from '../../utils/dateUtils';
 import { DAY_NAMES_SHORT } from '../../constants/RouteConstants';
-import ScreenHeader from '../../components/ScreenHeader';
-import StatusBadge from '../../components/StatusBadge';
+import ScreenHeader from '../../components/layout/ScreenHeader';
+import StatusBadge from '../../components/display/StatusBadge';
 
 const RouteTasks = () => {
     const router = useRouter();

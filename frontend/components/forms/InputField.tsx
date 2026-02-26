@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, View, TextInput } from 'react-native';
-import { AppColors } from '../constants/Colors';
+import { AppColors } from '../../constants/Colors';
 
 export interface InputFieldProps {
     label: string;

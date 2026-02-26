@@ -17,6 +17,7 @@ import { getOrderTypeLabel, formatDate } from '../../utils/orderUtils';
 import ScreenHeader from '../../components/ScreenHeader';
 import { ListCard, TypeBadge, InfoRow, EmptyState } from '../../components/ListComponents';
 import listStyles from '../../components/listStyles';
+import OrderFilterModal, { OrderFilters, EMPTY_FILTERS, hasActiveFilters } from '../../modals/OrderFilterModal';
 
 interface OrderItem {
     id: number;
@@ -25,6 +26,8 @@ interface OrderItem {
     orderType: string;
     quantity?: number;
     locationAddress?: string;
+    pickupLocationAddress?: string;
+    sanitationLocationAddress?: string;
     details?: string;
     startDate?: string;
     endDate?: string;
@@ -51,6 +54,8 @@ export default function OrdersList() {
     const [searchQuery, setSearchQuery] = useState('');
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [filterVisible, setFilterVisible] = useState(false);
+    const [filters, setFilters] = useState<OrderFilters>(EMPTY_FILTERS);
 
     const fetchOrders = useCallback(async () => {
         try {
@@ -70,19 +75,69 @@ export default function OrdersList() {
         fetchOrders();
     }, [fetchOrders]);
 
-    useEffect(() => {
-        if (!searchQuery) {
-            setFilteredOrders(orders);
-            return;
+    // ── Apply advanced filters on top of search ──────────────────────────────
+    const applyFilters = (source: OrderItem[], f: OrderFilters): OrderItem[] => {
+        let result = source;
+
+        // City filter – match against locationAddress (or pickup/sanitation address)
+        if (f.city) {
+            const lc = f.city.toLowerCase();
+            result = result.filter((o) => {
+                const addr = (o.locationAddress || o.pickupLocationAddress || o.sanitationLocationAddress || '').toLowerCase();
+                return addr.includes(lc);
+            });
         }
-        const lowerQuery = searchQuery.toLowerCase();
-        const filtered = orders.filter(order => {
-            const clientName = getClientName(order).toLowerCase();
-            const orderNumber = (order.number || order.id).toString();
-            return clientName.includes(lowerQuery) || orderNumber.includes(lowerQuery);
-        });
-        setFilteredOrders(filtered);
-    }, [searchQuery, orders]);
+
+        // Order type
+        if (f.orderType) {
+            result = result.filter((o) => o.orderType === f.orderType);
+        }
+
+        // Product name
+        if (f.productName) {
+            result = result.filter((o) => o.product?.name === f.productName);
+        }
+
+        // Date – check if the given date falls within [startDate, endDate] or matches the single date
+        if (f.date && f.date.length === 10) {
+            const parts = f.date.split('/');
+            if (parts.length === 3) {
+                const isoDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
+                const filterTime = new Date(isoDate).getTime();
+                if (!isNaN(filterTime)) {
+                    result = result.filter((o) => {
+                        const start = o.startDate || o.pickupDate || o.sanitationDate;
+                        if (!start) return false;
+                        const startTime = new Date(start).getTime();
+                        const end = o.endDate;
+                        if (end) {
+                            const endTime = new Date(end).getTime();
+                            return filterTime >= startTime && filterTime <= endTime;
+                        }
+                        // Single date – match same day
+                        const sameDay = new Date(start).toISOString().slice(0, 10) === isoDate;
+                        return sameDay;
+                    });
+                }
+            }
+        }
+
+        return result;
+    };
+
+    // Recompute displayed list whenever search or filters change
+    useEffect(() => {
+        let base = orders;
+        if (searchQuery) {
+            const lq = searchQuery.toLowerCase();
+            base = base.filter((o) => {
+                const cn = getClientName(o).toLowerCase();
+                const on = (o.number || o.id).toString();
+                return cn.includes(lq) || on.includes(lq);
+            });
+        }
+        setFilteredOrders(applyFilters(base, filters));
+    }, [searchQuery, orders, filters]);
 
     const onRefresh = () => {
         setRefreshing(true);
@@ -166,9 +221,16 @@ export default function OrdersList() {
         );
     }
 
+    const productNames = [...new Set(orders.map((o) => o.product?.name).filter(Boolean) as string[])];
+
     return (
         <View style={styles.container}>
-            <ScreenHeader title="Lista Comenzi" onRefresh={fetchOrders} />
+            <ScreenHeader
+                title="Lista Comenzi"
+                onRefresh={fetchOrders}
+                onFilter={() => setFilterVisible(true)}
+                filterActive={hasActiveFilters(filters)}
+            />
 
             <View style={styles.searchContainer}>
                 <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
@@ -199,6 +261,14 @@ export default function OrdersList() {
                     }
                 />
             )}
+
+            <OrderFilterModal
+                visible={filterVisible}
+                onClose={() => setFilterVisible(false)}
+                filters={filters}
+                onApply={setFilters}
+                productNames={productNames}
+            />
         </View>
     );
 }

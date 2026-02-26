@@ -6,7 +6,10 @@ import {
     Alert,
     ActivityIndicator,
     RefreshControl,
+    TextInput,
+    StyleSheet,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { ClientService } from '../../services/ClientService';
 import listStyles from '../../components/listStyles';
@@ -30,6 +33,8 @@ interface ClientItem {
 export default function ClientsList() {
     const router = useRouter();
     const [clients, setClients] = useState<ClientItem[]>([]);
+    const [filteredClients, setFilteredClients] = useState<ClientItem[]>([]);
+    const [searchQuery, setSearchQuery] = useState('');
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
 
@@ -37,6 +42,7 @@ export default function ClientsList() {
         try {
             const data = await ClientService.getClients();
             setClients(data);
+            setFilteredClients(data);
         } catch (error) {
             console.error('Error fetching clients:', error);
             Alert.alert('Eroare', 'Nu s-au putut prelua clienții.');
@@ -49,6 +55,22 @@ export default function ClientsList() {
     useEffect(() => {
         fetchClients();
     }, [fetchClients]);
+
+    useEffect(() => {
+        if (!searchQuery) {
+            setFilteredClients(clients);
+            return;
+        }
+        const lowerQuery = searchQuery.toLowerCase();
+        const filtered = clients.filter(client => {
+            const nameMatch = client.fullName ? client.fullName.toLowerCase().includes(lowerQuery) : false;
+            const companyNameMatch = client.name ? client.name.toLowerCase().includes(lowerQuery) : false;
+            const emailMatch = client.email ? client.email.toLowerCase().includes(lowerQuery) : false;
+            const phoneMatch = client.phone ? client.phone.includes(lowerQuery) : false;
+            return nameMatch || companyNameMatch || emailMatch || phoneMatch;
+        });
+        setFilteredClients(filtered);
+    }, [searchQuery, clients]);
 
     const onRefresh = () => {
         setRefreshing(true);
@@ -80,7 +102,15 @@ export default function ClientsList() {
                                             onPress: async () => {
                                                 try {
                                                     await ClientService.deleteClient(client.id, true);
-                                                    setClients((prev) => prev.filter((c) => c.id !== client.id));
+                                                    setClients((prev) => {
+                                                        const updated = prev.filter((c) => c.id !== client.id);
+                                                        setFilteredClients(updated.filter(c => {
+                                                            if (!searchQuery) return true;
+                                                            const lq = searchQuery.toLowerCase();
+                                                            return (c.fullName?.toLowerCase().includes(lq)) || (c.name?.toLowerCase().includes(lq)) || (c.email?.toLowerCase().includes(lq)) || (c.phone?.includes(lq));
+                                                        }));
+                                                        return updated;
+                                                    });
                                                     Alert.alert('Succes', 'Clientul și comenzile asociate au fost șterse.');
                                                 } catch (error) {
                                                     console.error('Error deleting client with orders:', error);
@@ -93,6 +123,7 @@ export default function ClientsList() {
                             } else {
                                 await ClientService.deleteClient(client.id);
                                 setClients((prev) => prev.filter((c) => c.id !== client.id));
+                                setFilteredClients((prev) => prev.filter((c) => c.id !== client.id));
                                 Alert.alert('Succes', 'Clientul a fost șters.');
                             }
                         } catch (error) {
@@ -152,11 +183,22 @@ export default function ClientsList() {
         <View style={listStyles.container}>
             <ScreenHeader title="Lista Clienți" onBack={() => router.back()} />
 
-            {clients.length === 0 ? (
-                <EmptyState icon="users" message="Nu există clienți." />
+            <View style={searchStyles.searchContainer}>
+                <Ionicons name="search" size={20} color="#999" style={searchStyles.searchIcon} />
+                <TextInput
+                    style={searchStyles.searchInput}
+                    placeholder="Caută client (Nume, Email, Telefon...)"
+                    placeholderTextColor="#999"
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                />
+            </View>
+
+            {filteredClients.length === 0 ? (
+                <EmptyState icon="users" message={searchQuery ? "Nu s-au găsit clienți." : "Nu există clienți."} />
             ) : (
                 <FlatList
-                    data={clients}
+                    data={filteredClients}
                     keyExtractor={(item) => item.id.toString()}
                     renderItem={renderClient}
                     contentContainerStyle={listStyles.listContent}
@@ -173,3 +215,25 @@ export default function ClientsList() {
         </View>
     );
 }
+
+const searchStyles = StyleSheet.create({
+    searchContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FFFFFF',
+        marginHorizontal: 20,
+        borderRadius: 12,
+        paddingHorizontal: 15,
+        height: 45,
+        marginBottom: 10,
+    },
+    searchIcon: {
+        marginRight: 10,
+    },
+    searchInput: {
+        flex: 1,
+        height: '100%',
+        color: '#16283C',
+        fontSize: 16,
+    },
+});

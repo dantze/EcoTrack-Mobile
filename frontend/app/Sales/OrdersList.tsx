@@ -7,7 +7,9 @@ import {
     ActivityIndicator,
     RefreshControl,
     StyleSheet,
+    TextInput,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { OrderService } from '../../services/OrderService';
 import { AppColors } from '../../constants/Colors';
@@ -41,6 +43,8 @@ interface OrderItem {
 export default function OrdersList() {
     const router = useRouter();
     const [orders, setOrders] = useState<OrderItem[]>([]);
+    const [filteredOrders, setFilteredOrders] = useState<OrderItem[]>([]);
+    const [searchQuery, setSearchQuery] = useState('');
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
 
@@ -48,6 +52,7 @@ export default function OrdersList() {
         try {
             const data = await OrderService.getOrders();
             setOrders(data);
+            setFilteredOrders(data);
         } catch (error) {
             console.error('Error fetching orders:', error);
             Alert.alert('Eroare', 'Nu s-au putut prelua comenzile.');
@@ -60,6 +65,20 @@ export default function OrdersList() {
     useEffect(() => {
         fetchOrders();
     }, [fetchOrders]);
+
+    useEffect(() => {
+        if (!searchQuery) {
+            setFilteredOrders(orders);
+            return;
+        }
+        const lowerQuery = searchQuery.toLowerCase();
+        const filtered = orders.filter(order => {
+            const clientName = getClientName(order).toLowerCase();
+            const orderNumber = (order.number || order.id).toString();
+            return clientName.includes(lowerQuery) || orderNumber.includes(lowerQuery);
+        });
+        setFilteredOrders(filtered);
+    }, [searchQuery, orders]);
 
     const onRefresh = () => {
         setRefreshing(true);
@@ -79,6 +98,7 @@ export default function OrdersList() {
                         try {
                             await OrderService.deleteOrder(order.id);
                             setOrders((prev) => prev.filter((o) => o.id !== order.id));
+                            setFilteredOrders((prev) => prev.filter((o) => o.id !== order.id));
                             Alert.alert('Succes', 'Comanda a fost ștearsă.');
                         } catch (error) {
                             console.error('Error deleting order:', error);
@@ -134,11 +154,22 @@ export default function OrdersList() {
         <View style={styles.container}>
             <ScreenHeader title="Lista Comenzi" />
 
-            {orders.length === 0 ? (
-                <EmptyState icon="inbox" message="Nu există comenzi." />
+            <View style={styles.searchContainer}>
+                <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
+                <TextInput
+                    style={styles.searchInput}
+                    placeholder="Caută comandă (Client, Număr...)"
+                    placeholderTextColor="#999"
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                />
+            </View>
+
+            {filteredOrders.length === 0 ? (
+                <EmptyState icon="inbox" message={searchQuery ? "Nu s-au găsit comenzi." : "Nu există comenzi."} />
             ) : (
                 <FlatList
-                    data={orders}
+                    data={filteredOrders}
                     keyExtractor={(item) => item.id.toString()}
                     renderItem={renderOrder}
                     contentContainerStyle={listStyles.listContent}
@@ -160,5 +191,24 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         backgroundColor: AppColors.screenBackground,
+    },
+    searchContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FFFFFF',
+        marginHorizontal: 20,
+        borderRadius: 12,
+        paddingHorizontal: 15,
+        height: 45,
+        marginBottom: 10,
+    },
+    searchIcon: {
+        marginRight: 10,
+    },
+    searchInput: {
+        flex: 1,
+        height: '100%',
+        color: '#16283C',
+        fontSize: 16,
     },
 });

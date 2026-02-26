@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, Pressable } from 'react-native';
-import { AppColors } from '../constants/Colors';
+import { AppColors } from '../../constants/Colors';
 
 interface MenuButtonProps {
     label: string;

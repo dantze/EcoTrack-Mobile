@@ -2,7 +2,7 @@ import React from 'react';
 import { StyleSheet, Text, View, Pressable, ActivityIndicator, Platform } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
-import { AppColors } from '../constants/Colors';
+import { AppColors } from '../../constants/Colors';
 
 interface ScheduledDateSectionProps {
     scheduledDate: string | null;

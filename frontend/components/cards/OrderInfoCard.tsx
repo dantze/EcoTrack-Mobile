@@ -1,9 +1,9 @@
 import React from 'react';
 import { StyleSheet, View } from 'react-native';
-import DetailRow from './DetailRow';
-import { Order, isAmplasare, isRidicari, isIgienizari } from '../types/OrderTypes';
-import { getLocationText } from '../utils/orderUtils';
-import { AppColors } from '../constants/Colors';
+import DetailRow from '../display/DetailRow';
+import { Order, isAmplasare, isRidicari, isIgienizari } from '../../types/OrderTypes';
+import { getLocationText } from '../../utils/orderUtils';
+import { AppColors } from '../../constants/Colors';
 
 interface OrderInfoCardProps {
     order: Order;

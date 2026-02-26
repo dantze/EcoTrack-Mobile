@@ -7,8 +7,8 @@ import { OrderService } from '../../services/OrderService';
 import { TaskService } from '../../services/TaskService';
 import { Order, OrderTaskMap, isAmplasare, isRidicari, isIgienizari } from '../../types/OrderTypes';
 import { getClientName } from '../../utils/orderUtils';
-import ScreenHeader from '../../components/ScreenHeader';
-import OrderCard from '../../components/OrderCard';
+import ScreenHeader from '../../components/layout/ScreenHeader';
+import OrderCard from '../../components/cards/OrderCard';
 import OrderFilterModal, { OrderFilters, EMPTY_FILTERS, hasActiveFilters } from '../../modals/OrderFilterModal';
 
 const Orders = () => {

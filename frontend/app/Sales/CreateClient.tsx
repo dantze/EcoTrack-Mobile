@@ -5,9 +5,9 @@ import { AntDesign, Feather } from '@expo/vector-icons';
 import { ClientService, ClientType } from '../../services/ClientService';
 import { PhotoService } from '../../services/PhotoService';
 import { isValidEmail, isValidPhone } from '../../utils/validation';
-import InputField from '../../components/InputField';
-import PrimaryButton from '../../components/PrimaryButton';
-import ScreenHeader from '../../components/ScreenHeader';
+import InputField from '../../components/forms/InputField';
+import PrimaryButton from '../../components/forms/PrimaryButton';
+import ScreenHeader from '../../components/layout/ScreenHeader';
 import { AppColors } from '../../constants/Colors';
 import * as ImagePicker from 'expo-image-picker';
 

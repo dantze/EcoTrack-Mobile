@@ -11,6 +11,7 @@ import { AppColors } from '../../constants/Colors';
 import ScreenHeader from '../../components/layout/ScreenHeader';
 import StatusBadge from '../../components/display/StatusBadge';
 import PhotoGallery from '../../components/display/PhotoGallery';
+import CloudPhotoViewer from '../../components/CloudPhotoViewer';
 
 type OrderDetails = {
     productName?: string;
@@ -31,9 +32,6 @@ const TaskDetails = () => {
     const [loading, setLoading] = useState(true);
     const [photos, setPhotos] = useState<string[]>([]);
     const [completing, setCompleting] = useState(false);
-    const [cloudPhotos, setCloudPhotos] = useState<string[]>([]);
-    const [loadingCloudPhotos, setLoadingCloudPhotos] = useState(false);
-    const [cloudPhotosLoaded, setCloudPhotosLoaded] = useState(false);
 
     useEffect(() => {
         if (taskId) {
@@ -209,20 +207,6 @@ const TaskDetails = () => {
         }
     };
 
-    const handleLoadCloudPhotos = async () => {
-        if (cloudPhotosLoaded) return;
-        try {
-            setLoadingCloudPhotos(true);
-            const urls = await TaskService.getTaskPhotos(Number(taskId));
-            setCloudPhotos(urls);
-            setCloudPhotosLoaded(true);
-        } catch (error) {
-            Alert.alert('Eroare', 'Nu s-au putut încărca pozele din cloud.');
-        } finally {
-            setLoadingCloudPhotos(false);
-        }
-    };
-
     const handleRemovePhoto = (index: number) => {
         Alert.alert(
             'Șterge Poza',
@@ -389,34 +373,11 @@ const TaskDetails = () => {
                 {/* Photos Section */}
                 <View style={styles.section}>
                     {task.status === 'COMPLETED' ? (
-                        <>
-                            <View style={styles.savedBanner}>
-                                <Ionicons name="cloud-done" size={22} color={AppColors.successGreen} />
-                                <Text style={styles.savedBannerText}>Pozele au fost salvate în cloud</Text>
-                            </View>
-
-                            {cloudPhotosLoaded ? (
-                                <PhotoGallery photos={cloudPhotos} loading={loadingCloudPhotos} />
-                            ) : (
-                                <Pressable
-                                    style={({ pressed }) => [
-                                        styles.loadPhotosButton,
-                                        pressed && { opacity: 0.7 }
-                                    ]}
-                                    onPress={handleLoadCloudPhotos}
-                                    disabled={loadingCloudPhotos}
-                                >
-                                    {loadingCloudPhotos ? (
-                                        <ActivityIndicator size="small" color={AppColors.accentColor} />
-                                    ) : (
-                                        <Ionicons name="cloud-download-outline" size={22} color={AppColors.accentColor} />
-                                    )}
-                                    <Text style={styles.loadPhotosText}>
-                                        {loadingCloudPhotos ? 'Se încarcă...' : 'Vezi Pozele'}
-                                    </Text>
-                                </Pressable>
-                            )}
-                        </>
+                        <CloudPhotoViewer
+                            loadPhotos={() => TaskService.getTaskPhotos(Number(taskId))}
+                            buttonLabel="Vezi Pozele"
+                            bannerLabel="Pozele au fost salvate în cloud"
+                        />
                     ) : (
                         <>
                             <Text style={styles.sectionTitle}>Poze ({photos.length})</Text>
@@ -737,38 +698,6 @@ const styles = StyleSheet.create({
         marginTop: 4,
     },
 
-    savedBanner: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: 'rgba(76, 175, 80, 0.1)',
-        borderRadius: 10,
-        paddingVertical: 12,
-        paddingHorizontal: 14,
-        marginBottom: 12,
-        borderWidth: 1,
-        borderColor: 'rgba(76, 175, 80, 0.3)',
-    },
-    savedBannerText: {
-        color: AppColors.successGreen,
-        fontSize: 14,
-        fontWeight: '500',
-        marginLeft: 10,
-    },
-    loadPhotosButton: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        borderWidth: 1,
-        borderColor: AppColors.buttonBackground,
-        borderRadius: 10,
-        paddingVertical: 12,
-        gap: 8,
-    },
-    loadPhotosText: {
-        color: AppColors.accentColor,
-        fontSize: 15,
-        fontWeight: '500',
-    },
     // Bottom actions
     bottomAction: {
         position: 'absolute',

@@ -1,6 +1,7 @@
 package com.example.damiProd.service;
 
 import com.example.damiProd.domain.Client;
+import com.example.damiProd.domain.Individual;
 import com.example.damiProd.domain.Order;
 import com.example.damiProd.domain.Task;
 import com.example.damiProd.domain.TaskPhoto;
@@ -75,6 +76,7 @@ public class ClientService {
     }
 
     public void deleteClient(Long id) {
+        deleteClientIdPhoto(id);
         clientRepository.deleteById(id);
     }
 
@@ -84,7 +86,7 @@ public class ClientService {
         for (Order order : orders) {
             Optional<Task> taskOpt = taskRepository.findByOrder_Id(order.getId());
             taskOpt.ifPresent(task -> {
-                // Delete photos from Digital Ocean Spaces before removing task
+                // Delete task photos from Digital Ocean Spaces before removing task
                 List<TaskPhoto> photos = taskPhotoRepository.findByTaskId(task.getId());
                 for (TaskPhoto photo : photos) {
                     photoService.deletePhoto(photo.getImageUrl());
@@ -98,6 +100,22 @@ public class ClientService {
             orderRepository.delete(order);
         }
         orderRepository.flush();
+        // Delete client's ID photo from Digital Ocean Spaces
+        deleteClientIdPhoto(id);
         clientRepository.deleteById(id);
+    }
+
+    /**
+     * Deletes the ID photo of an Individual client from Digital Ocean Spaces.
+     */
+    private void deleteClientIdPhoto(Long clientId) {
+        clientRepository.findById(clientId).ifPresent(client -> {
+            if (client instanceof Individual individual) {
+                String photoUrl = individual.getIdPhotoUrl();
+                if (photoUrl != null && !photoUrl.isEmpty()) {
+                    photoService.deletePhoto(photoUrl);
+                }
+            }
+        });
     }
 }

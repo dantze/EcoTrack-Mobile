@@ -13,9 +13,11 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { ClientService, ClientType } from '../../services/ClientService';
 import { isValidEmail, isValidPhone } from '../../utils/validation';
+import CloudPhotoViewer from '../../components/CloudPhotoViewer';
 import InputField from '../../components/forms/InputField';
 import PrimaryButton from '../../components/forms/PrimaryButton';
 import ScreenHeader from '../../components/layout/ScreenHeader';
+
 import { AppColors } from '../../constants/Colors';
 
 export default function EditClient() {
@@ -104,6 +106,16 @@ export default function EditClient() {
                         <Text style={styles.typeBadgeText}>
                             {isCompany ? 'Firmă' : 'Persoană fizică'}
                         </Text>
+                    </View>
+
+                    {/* ID Photo for individual clients */}
+
+                    <View style={{ width: '100%', marginTop: 16 }}>
+                        <CloudPhotoViewer
+                            photos={[clientData.idPhotoUrl]}
+                            buttonLabel="Vezi Fotografia"
+                            bannerLabel="Fotografie buletin salvată"
+                        />
                     </View>
 
                     {/* Form fields */}

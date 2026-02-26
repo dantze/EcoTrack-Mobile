@@ -10,6 +10,7 @@ import { TASK_TYPE_LABELS, STATUS_LABELS, STATUS_COLORS } from '../../constants/
 import { AppColors } from '../../constants/Colors';
 import ScreenHeader from '../../components/ScreenHeader';
 import StatusBadge from '../../components/StatusBadge';
+import PhotoGallery from '../../components/PhotoGallery';
 
 type OrderDetails = {
     productName?: string;
@@ -30,6 +31,9 @@ const TaskDetails = () => {
     const [loading, setLoading] = useState(true);
     const [photos, setPhotos] = useState<string[]>([]);
     const [completing, setCompleting] = useState(false);
+    const [cloudPhotos, setCloudPhotos] = useState<string[]>([]);
+    const [loadingCloudPhotos, setLoadingCloudPhotos] = useState(false);
+    const [cloudPhotosLoaded, setCloudPhotosLoaded] = useState(false);
 
     useEffect(() => {
         if (taskId) {
@@ -205,6 +209,20 @@ const TaskDetails = () => {
         }
     };
 
+    const handleLoadCloudPhotos = async () => {
+        if (cloudPhotosLoaded) return;
+        try {
+            setLoadingCloudPhotos(true);
+            const urls = await TaskService.getTaskPhotos(Number(taskId));
+            setCloudPhotos(urls);
+            setCloudPhotosLoaded(true);
+        } catch (error) {
+            Alert.alert('Eroare', 'Nu s-au putut încărca pozele din cloud.');
+        } finally {
+            setLoadingCloudPhotos(false);
+        }
+    };
+
     const handleRemovePhoto = (index: number) => {
         Alert.alert(
             'Șterge Poza',
@@ -370,39 +388,72 @@ const TaskDetails = () => {
 
                 {/* Photos Section */}
                 <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Poze ({photos.length})</Text>
+                    {task.status === 'COMPLETED' ? (
+                        <>
+                            <View style={styles.savedBanner}>
+                                <Ionicons name="cloud-done" size={22} color="#4CAF50" />
+                                <Text style={styles.savedBannerText}>Pozele au fost salvate în cloud</Text>
+                            </View>
 
-                    {hasPhotos && (
-                        <View style={styles.photoGrid}>
-                            {photos.map((uri, index) => (
+                            {cloudPhotosLoaded ? (
+                                <PhotoGallery photos={cloudPhotos} loading={loadingCloudPhotos} />
+                            ) : (
                                 <Pressable
-                                    key={index}
-                                    style={styles.photoWrapper}
-                                    onLongPress={() => handleRemovePhoto(index)}
+                                    style={({ pressed }) => [
+                                        styles.loadPhotosButton,
+                                        pressed && { opacity: 0.7 }
+                                    ]}
+                                    onPress={handleLoadCloudPhotos}
+                                    disabled={loadingCloudPhotos}
                                 >
-                                    <Image source={{ uri }} style={styles.photoImage} />
-                                    <Pressable
-                                        style={styles.removePhotoButton}
-                                        onPress={() => handleRemovePhoto(index)}
-                                    >
-                                        <Ionicons name="close-circle" size={22} color="#FF5252" />
-                                    </Pressable>
+                                    {loadingCloudPhotos ? (
+                                        <ActivityIndicator size="small" color="#5D8AA8" />
+                                    ) : (
+                                        <Ionicons name="cloud-download-outline" size={22} color="#5D8AA8" />
+                                    )}
+                                    <Text style={styles.loadPhotosText}>
+                                        {loadingCloudPhotos ? 'Se încarcă...' : 'Vezi Pozele'}
+                                    </Text>
                                 </Pressable>
-                            ))}
-                        </View>
-                    )}
+                            )}
+                        </>
+                    ) : (
+                        <>
+                            <Text style={styles.sectionTitle}>Poze ({photos.length})</Text>
 
-                    <Pressable
-                        style={({ pressed }) => [
-                            styles.addPhotoButton,
-                            pressed && { opacity: 0.7, transform: [{ scale: 0.98 }] }
-                        ]}
-                        onPress={handleAddPhotos}
-                    >
-                        <Ionicons name="camera" size={28} color="#5D8AA8" />
-                        <Text style={styles.addPhotoText}>Adaugă Poze</Text>
-                        <Text style={styles.addPhotoSubtext}>Apasă pentru a face sau selecta poze</Text>
-                    </Pressable>
+                            {hasPhotos && (
+                                <View style={styles.photoGrid}>
+                                    {photos.map((uri, index) => (
+                                        <Pressable
+                                            key={index}
+                                            style={styles.photoWrapper}
+                                            onLongPress={() => handleRemovePhoto(index)}
+                                        >
+                                            <Image source={{ uri }} style={styles.photoImage} />
+                                            <Pressable
+                                                style={styles.removePhotoButton}
+                                                onPress={() => handleRemovePhoto(index)}
+                                            >
+                                                <Ionicons name="close-circle" size={22} color="#FF5252" />
+                                            </Pressable>
+                                        </Pressable>
+                                    ))}
+                                </View>
+                            )}
+
+                            <Pressable
+                                style={({ pressed }) => [
+                                    styles.addPhotoButton,
+                                    pressed && { opacity: 0.7, transform: [{ scale: 0.98 }] }
+                                ]}
+                                onPress={handleAddPhotos}
+                            >
+                                <Ionicons name="camera" size={28} color="#5D8AA8" />
+                                <Text style={styles.addPhotoText}>Adaugă Poze</Text>
+                                <Text style={styles.addPhotoSubtext}>Apasă pentru a face sau selecta poze</Text>
+                            </Pressable>
+                        </>
+                    )}
                 </View>
 
                 <View style={{ height: 100 }} />
@@ -686,6 +737,38 @@ const styles = StyleSheet.create({
         marginTop: 4,
     },
 
+    savedBanner: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'rgba(76, 175, 80, 0.1)',
+        borderRadius: 10,
+        paddingVertical: 12,
+        paddingHorizontal: 14,
+        marginBottom: 12,
+        borderWidth: 1,
+        borderColor: 'rgba(76, 175, 80, 0.3)',
+    },
+    savedBannerText: {
+        color: '#4CAF50',
+        fontSize: 14,
+        fontWeight: '500',
+        marginLeft: 10,
+    },
+    loadPhotosButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: '#427992',
+        borderRadius: 10,
+        paddingVertical: 12,
+        gap: 8,
+    },
+    loadPhotosText: {
+        color: '#5D8AA8',
+        fontSize: 15,
+        fontWeight: '500',
+    },
     // Bottom actions
     bottomAction: {
         position: 'absolute',

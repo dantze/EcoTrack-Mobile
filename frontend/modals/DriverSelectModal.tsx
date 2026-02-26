@@ -65,7 +65,6 @@ const DriverSelectModal: React.FC<DriverSelectModalProps> = ({
                                     <View style={styles.driverInfo}>
                                         <Text style={styles.driverName}>{driver.fullName}</Text>
                                     </View>
-                                    <Ionicons name="chevron-forward" size={20} color={AppColors.accentColor} />
                                 </Pressable>
                             ))}
                         </ScrollView>

@@ -86,6 +86,12 @@ export default function EditOrder() {
     const [saving, setSaving] = useState(false);
 
     const handleSave = async () => {
+        // Validate contact phone if provided
+        if (contact.trim() && !/^(\+40\d{9}|0\d{9})$/.test(contact.trim())) {
+            Alert.alert('Telefon invalid', 'Numărul de telefon trebuie să fie în formatul 07XXXXXXXX sau +407XXXXXXXX.');
+            return;
+        }
+
         const updatedData: Record<string, any> = {};
 
         // Only send fields that have values

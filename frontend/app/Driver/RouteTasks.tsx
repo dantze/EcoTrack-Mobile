@@ -1,41 +1,13 @@
-import { StyleSheet, Text, View, Pressable, ScrollView, ActivityIndicator, Dimensions, useWindowDimensions } from 'react-native'
+import { StyleSheet, Text, View, Pressable, ScrollView, ActivityIndicator, useWindowDimensions } from 'react-native'
 import React, { useEffect, useState, useRef } from 'react'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons';
-import { API_BASE_URL } from '../../constants/ApiConfig';
 import { AuthService } from '../../services/AuthService';
-
-type Task = {
-    id: number;
-    type: string;
-    status: string;
-    address: string;
-    clientName: string;
-    clientPhone: string;
-    scheduledTime: string;
-    internalNotes: string;
-};
-
-const TASK_TYPE_LABELS: { [key: string]: string } = {
-    'PLACEMENT': 'Amplasare',
-    'PICKUP': 'Ridicare',
-    'SANITIZATION': 'Igienizare',
-    'MAINTENANCE': 'Mentenanță',
-};
-
-const STATUS_LABELS: { [key: string]: string } = {
-    'NEW': 'Nouă',
-    'IN_PROGRESS': 'În progres',
-    'COMPLETED': 'Finalizată',
-    'CANCELLED': 'Anulată',
-};
-
-const STATUS_COLORS: { [key: string]: string } = {
-    'NEW': '#FFA500',
-    'IN_PROGRESS': '#2196F3',
-    'COMPLETED': '#4CAF50',
-    'CANCELLED': '#F44336',
-};
+import { TaskService, Task } from '../../services/TaskService';
+import { TASK_TYPE_LABELS, STATUS_LABELS, STATUS_COLORS } from '../../constants/TaskConstants';
+import { AppColors } from '../../constants/Colors';
+import { toDateString } from '../../utils/dateUtils';
+import ScreenHeader from '../../components/ScreenHeader';
 
 const DAY_NAMES_SHORT = ['DU', 'LU', 'MA', 'MI', 'JO', 'VI', 'SÂ'];
 
@@ -69,14 +41,10 @@ const RouteTasks = () => {
             }
 
             // Format date as YYYY-MM-DD
-            const dateString = selectedDate.toISOString().split('T')[0];
+            const dateString = toDateString(selectedDate);
 
             // Fetch tasks for the employee on the selected date
-            const response = await fetch(`${API_BASE_URL}/tasks/employee/${employeeId}/date/${dateString}`);
-            if (!response.ok) {
-                throw new Error(`Failed to fetch tasks. Status: ${response.status}`);
-            }
-            const data: Task[] = await response.json();
+            const data = await TaskService.getTasksByEmployeeAndDate(employeeId, dateString);
             console.log('Fetched tasks for', dateString, ':', data.length);
             setTasks(data);
         } catch (error) {
@@ -195,12 +163,7 @@ const RouteTasks = () => {
     return (
         <View style={styles.container}>
             {/* Header */}
-            <View style={styles.headerContainer}>
-                <Pressable onPress={() => router.back()} style={styles.backButton}>
-                    <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
-                </Pressable>
-                <Text style={styles.headerText}>Sarcinile Mele</Text>
-            </View>
+            <ScreenHeader title="Sarcinile Mele" />
 
             {/* Date Navigation */}
             <View style={styles.dateNavContainer}>
@@ -317,38 +280,16 @@ export default RouteTasks
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#16283C',
+        backgroundColor: AppColors.screenBackground,
     },
     loadingContainer: {
         justifyContent: 'center',
         alignItems: 'center',
     },
     loadingText: {
-        color: '#FFFFFF',
+        color: AppColors.textWhite,
         marginTop: 10,
         fontSize: 16,
-    },
-    headerContainer: {
-        marginTop: 60,
-        paddingHorizontal: 20,
-        width: '100%',
-        marginBottom: 15,
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    backButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: '#427992',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 15,
-    },
-    headerText: {
-        color: '#FFFFFF',
-        fontSize: 24,
-        fontWeight: 'bold',
     },
 
     // Date Navigation
@@ -358,7 +299,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         marginHorizontal: 20,
         marginBottom: 15,
-        backgroundColor: '#1E3A52',
+        backgroundColor: AppColors.modalBackground,
         borderRadius: 14,
         paddingVertical: 12,
         paddingHorizontal: 8,
@@ -378,7 +319,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
     },
     dateNavText: {
-        color: '#FFFFFF',
+        color: AppColors.textWhite,
         fontSize: 17,
         fontWeight: '600',
         letterSpacing: 0.5,
@@ -390,7 +331,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         paddingVertical: 12,
-        backgroundColor: '#2A4158',
+        backgroundColor: AppColors.inputBackground,
         marginHorizontal: 20,
         borderRadius: 12,
         marginBottom: 12,
@@ -402,15 +343,15 @@ const styles = StyleSheet.create({
     statDivider: {
         width: 1,
         height: 30,
-        backgroundColor: '#427992',
+        backgroundColor: AppColors.buttonBackground,
     },
     statNumber: {
-        color: '#FFFFFF',
+        color: AppColors.textWhite,
         fontSize: 24,
         fontWeight: 'bold',
     },
     statLabel: {
-        color: '#5D8AA8',
+        color: AppColors.accentColor,
         fontSize: 12,
         marginTop: 2,
     },
@@ -420,7 +361,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         marginHorizontal: 20,
         marginBottom: 8,
-        backgroundColor: '#1E3A52',
+        backgroundColor: AppColors.modalBackground,
         borderRadius: 12,
         padding: 4,
     },
@@ -431,15 +372,15 @@ const styles = StyleSheet.create({
         borderRadius: 10,
     },
     tabActive: {
-        backgroundColor: '#427992',
+        backgroundColor: AppColors.buttonBackground,
     },
     tabText: {
-        color: '#5D8AA8',
+        color: AppColors.accentColor,
         fontSize: 14,
         fontWeight: '600',
     },
     tabTextActive: {
-        color: '#FFFFFF',
+        color: AppColors.textWhite,
     },
 
     // Slider
@@ -458,7 +399,7 @@ const styles = StyleSheet.create({
         paddingTop: 60,
     },
     emptyText: {
-        color: '#5D8AA8',
+        color: AppColors.accentColor,
         fontSize: 16,
         marginTop: 15,
         textAlign: 'center',
@@ -466,25 +407,25 @@ const styles = StyleSheet.create({
 
     // Task Cards
     card: {
-        backgroundColor: '#427992',
+        backgroundColor: AppColors.buttonBackground,
         borderRadius: 16,
         padding: 16,
         marginBottom: 12,
         flexDirection: 'row',
         alignItems: 'center',
-        shadowColor: "#000",
+        shadowColor: AppColors.shadow,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
         shadowRadius: 3.84,
         elevation: 5,
     },
     cardCompleted: {
-        backgroundColor: '#2A4158',
+        backgroundColor: AppColors.inputBackground,
         opacity: 0.85,
     },
     cardPressed: {
         opacity: 0.9,
-        transform: [{ scale: 0.98 }]
+        transform: [{ scale: 0.98 }],
     },
     cardInfo: {
         flex: 1,
@@ -497,7 +438,7 @@ const styles = StyleSheet.create({
     taskType: {
         fontSize: 16,
         fontWeight: 'bold',
-        color: '#FFFFFF',
+        color: AppColors.textWhite,
         marginRight: 8,
     },
     statusBadge: {
@@ -506,7 +447,7 @@ const styles = StyleSheet.create({
         borderRadius: 10,
     },
     statusText: {
-        color: '#FFFFFF',
+        color: AppColors.textWhite,
         fontSize: 10,
         fontWeight: '600',
     },
@@ -555,11 +496,11 @@ const styles = StyleSheet.create({
         width: 56,
         height: 56,
         borderRadius: 28,
-        backgroundColor: '#427992',
+        backgroundColor: AppColors.buttonBackground,
         justifyContent: 'center',
         alignItems: 'center',
         elevation: 10,
-        shadowColor: '#000',
+        shadowColor: AppColors.shadow,
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
         shadowRadius: 5,

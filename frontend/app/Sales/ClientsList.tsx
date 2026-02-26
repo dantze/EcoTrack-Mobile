@@ -1,17 +1,18 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import {
-    StyleSheet,
     Text,
     View,
     FlatList,
-    Pressable,
     Alert,
     ActivityIndicator,
     RefreshControl,
 } from 'react-native';
 import { useRouter } from 'expo-router';
-import { AntDesign, Feather } from '@expo/vector-icons';
 import { ClientService } from '../../services/ClientService';
+import listStyles from '../../components/listStyles';
+import {
+    ScreenHeader, EmptyState, ListCard, InfoRow, TypeBadge,
+} from '../../components/ListComponents';
 
 interface ClientItem {
     id: number;
@@ -111,12 +112,8 @@ export default function ClientsList() {
     };
 
     const getClientDisplayName = (client: ClientItem): string => {
-        if (client.type === 'individual' && client.fullName) {
-            return client.fullName;
-        }
-        if (client.type === 'company' && client.name) {
-            return client.name;
-        }
+        if (client.type === 'individual' && client.fullName) return client.fullName;
+        if (client.type === 'company' && client.name) return client.name;
         return `Client #${client.id}`;
     };
 
@@ -127,88 +124,41 @@ export default function ClientsList() {
     };
 
     const renderClient = ({ item }: { item: ClientItem }) => (
-        <View style={styles.card}>
-            <Pressable
-                style={({ pressed }) => [
-                    styles.cardContent,
-                    pressed && styles.cardPressed,
-                ]}
-                onPress={() => handleEditClient(item)}
-            >
-                <View style={styles.cardHeader}>
-                    <Text style={styles.clientName}>{getClientDisplayName(item)}</Text>
-                    <View style={styles.typeBadge}>
-                        <Text style={styles.typeBadgeText}>{getClientTypeLabel(item.type)}</Text>
-                    </View>
-                </View>
+        <ListCard
+            onPress={() => handleEditClient(item)}
+            onDelete={() => handleDeleteClient(item)}
+        >
+            <View style={listStyles.cardHeader}>
+                <Text style={listStyles.cardTitle}>{getClientDisplayName(item)}</Text>
+                <TypeBadge label={getClientTypeLabel(item.type)} />
+            </View>
 
-                {item.phone ? (
-                    <View style={styles.infoRow}>
-                        <Feather name="phone" size={14} color="#8BA8BE" />
-                        <Text style={styles.infoText}>{item.phone}</Text>
-                    </View>
-                ) : null}
-
-                {item.email ? (
-                    <View style={styles.infoRow}>
-                        <Feather name="mail" size={14} color="#8BA8BE" />
-                        <Text style={styles.infoText}>{item.email}</Text>
-                    </View>
-                ) : null}
-
-                {item.address ? (
-                    <View style={styles.infoRow}>
-                        <Feather name="map-pin" size={14} color="#8BA8BE" />
-                        <Text style={styles.infoText} numberOfLines={1}>{item.address}</Text>
-                    </View>
-                ) : null}
-
-                <View style={styles.editHint}>
-                    <Feather name="edit-2" size={12} color="#5A8DAB" />
-                    <Text style={styles.editHintText}>Apasă pentru editare</Text>
-                </View>
-            </Pressable>
-
-            <Pressable
-                style={({ pressed }) => [
-                    styles.deleteButton,
-                    pressed && styles.deleteButtonPressed,
-                ]}
-                onPress={() => handleDeleteClient(item)}
-            >
-                <AntDesign name="delete" size={22} color="#FF6B6B" />
-            </Pressable>
-        </View>
+            {item.phone ? <InfoRow icon="phone" text={item.phone} /> : null}
+            {item.email ? <InfoRow icon="mail" text={item.email} /> : null}
+            {item.address ? <InfoRow icon="map-pin" text={item.address} numberOfLines={1} /> : null}
+        </ListCard>
     );
 
     if (loading) {
         return (
-            <View style={styles.centered}>
+            <View style={listStyles.centered}>
                 <ActivityIndicator size="large" color="#427992" />
             </View>
         );
     }
 
     return (
-        <View style={styles.container}>
-            <View style={styles.headerContainer}>
-                <Pressable onPress={() => router.back()} style={styles.backButton}>
-                    <AntDesign name="arrow-left" size={24} color="#FFFFFF" />
-                </Pressable>
-                <Text style={styles.headerText}>Lista Clienți</Text>
-            </View>
+        <View style={listStyles.container}>
+            <ScreenHeader title="Lista Clienți" onBack={() => router.back()} />
 
             {clients.length === 0 ? (
-                <View style={styles.emptyContainer}>
-                    <Feather name="users" size={60} color="#8BA8BE" />
-                    <Text style={styles.emptyText}>Nu există clienți.</Text>
-                </View>
+                <EmptyState icon="users" message="Nu există clienți." />
             ) : (
                 <FlatList
                     data={clients}
                     keyExtractor={(item) => item.id.toString()}
                     renderItem={renderClient}
-                    contentContainerStyle={styles.listContent}
+                    contentContainerStyle={listStyles.listContent}
                     refreshControl={
                         <RefreshControl
                             refreshing={refreshing}
@@ -222,114 +172,3 @@ export default function ClientsList() {
         </View>
     );
 }
-
-const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#16283C',
-    },
-    centered: {
-        flex: 1,
-        backgroundColor: '#16283C',
-        justifyContent: 'center',
-        alignItems: 'center',
-    },
-    headerContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginTop: 60,
-        paddingHorizontal: 20,
-        marginBottom: 20,
-    },
-    backButton: {
-        marginRight: 15,
-    },
-    headerText: {
-        color: '#FFFFFF',
-        fontSize: 28,
-        fontWeight: 'bold',
-    },
-    listContent: {
-        paddingHorizontal: 16,
-        paddingBottom: 30,
-    },
-    card: {
-        backgroundColor: '#1E3A50',
-        borderRadius: 14,
-        padding: 16,
-        marginBottom: 12,
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    cardContent: {
-        flex: 1,
-    },
-    cardPressed: {
-        opacity: 0.7,
-    },
-    cardHeader: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginBottom: 8,
-        flexWrap: 'wrap',
-        gap: 8,
-    },
-    clientName: {
-        color: '#FFFFFF',
-        fontSize: 18,
-        fontWeight: '600',
-    },
-    typeBadge: {
-        backgroundColor: '#427992',
-        borderRadius: 10,
-        paddingHorizontal: 10,
-        paddingVertical: 3,
-    },
-    typeBadgeText: {
-        color: '#FFFFFF',
-        fontSize: 12,
-        fontWeight: '500',
-    },
-    infoRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginTop: 4,
-        gap: 6,
-    },
-    infoText: {
-        color: '#B0C4D4',
-        fontSize: 14,
-    },
-    deleteButton: {
-        width: 44,
-        height: 44,
-        borderRadius: 12,
-        backgroundColor: 'rgba(255, 107, 107, 0.15)',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginLeft: 12,
-    },
-    deleteButtonPressed: {
-        opacity: 0.6,
-    },
-    editHint: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginTop: 8,
-        gap: 4,
-    },
-    editHintText: {
-        color: '#5A8DAB',
-        fontSize: 12,
-    },
-    emptyContainer: {
-        flex: 1,
-        justifyContent: 'center',
-        alignItems: 'center',
-        gap: 16,
-    },
-    emptyText: {
-        color: '#8BA8BE',
-        fontSize: 18,
-    },
-});

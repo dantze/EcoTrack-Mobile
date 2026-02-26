@@ -174,7 +174,7 @@ export default function OrdersList() {
                 <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
                 <TextInput
                     style={styles.searchInput}
-                    placeholder="Caută comandă (Client, Număr...)"
+                    placeholder="Caută comandă (Client, Număr)"
                     placeholderTextColor="#999"
                     value={searchQuery}
                     onChangeText={setSearchQuery}

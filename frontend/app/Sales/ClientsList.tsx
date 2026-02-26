@@ -187,7 +187,7 @@ export default function ClientsList() {
                 <Ionicons name="search" size={20} color="#999" style={searchStyles.searchIcon} />
                 <TextInput
                     style={searchStyles.searchInput}
-                    placeholder="Caută client (Nume, Email, Telefon...)"
+                    placeholder="Caută client (Nume, Email, Telefon)"
                     placeholderTextColor="#999"
                     value={searchQuery}
                     onChangeText={setSearchQuery}

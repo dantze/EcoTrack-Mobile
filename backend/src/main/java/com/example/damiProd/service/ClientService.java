@@ -3,8 +3,10 @@ package com.example.damiProd.service;
 import com.example.damiProd.domain.Client;
 import com.example.damiProd.domain.Order;
 import com.example.damiProd.domain.Task;
+import com.example.damiProd.domain.TaskPhoto;
 import com.example.damiProd.repository.ClientRepository;
 import com.example.damiProd.repository.OrderRepository;
+import com.example.damiProd.repository.TaskPhotoRepository;
 import com.example.damiProd.repository.TaskRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,11 +20,17 @@ public class ClientService {
     private final ClientRepository clientRepository;
     private final OrderRepository orderRepository;
     private final TaskRepository taskRepository;
+    private final TaskPhotoRepository taskPhotoRepository;
+    private final PhotoService photoService;
 
-    public ClientService(ClientRepository clientRepository, OrderRepository orderRepository, TaskRepository taskRepository) {
+    public ClientService(ClientRepository clientRepository, OrderRepository orderRepository,
+                         TaskRepository taskRepository, TaskPhotoRepository taskPhotoRepository,
+                         PhotoService photoService) {
         this.clientRepository = clientRepository;
         this.orderRepository = orderRepository;
         this.taskRepository = taskRepository;
+        this.taskPhotoRepository = taskPhotoRepository;
+        this.photoService = photoService;
     }
 
     public Client saveClient(Client client) {
@@ -74,8 +82,16 @@ public class ClientService {
     public void deleteClientCascade(Long id) {
         List<Order> orders = orderRepository.findByClientId(id);
         for (Order order : orders) {
-            Optional<Task> task = taskRepository.findByOrder_Id(order.getId());
-            task.ifPresent(t -> taskRepository.delete(t));
+            Optional<Task> taskOpt = taskRepository.findByOrder_Id(order.getId());
+            taskOpt.ifPresent(task -> {
+                // Delete photos from Digital Ocean Spaces before removing task
+                List<TaskPhoto> photos = taskPhotoRepository.findByTaskId(task.getId());
+                for (TaskPhoto photo : photos) {
+                    photoService.deletePhoto(photo.getImageUrl());
+                }
+                taskPhotoRepository.deleteAll(photos);
+                taskRepository.delete(task);
+            });
         }
         taskRepository.flush();
         for (Order order : orders) {

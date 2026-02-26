@@ -5,10 +5,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { AppColors } from '../../constants/Colors';
 import { OrderService } from '../../services/OrderService';
 import { TaskService } from '../../services/TaskService';
-import { Order, OrderTaskMap } from '../../types/OrderTypes';
+import { Order, OrderTaskMap, isAmplasare, isRidicari, isIgienizari } from '../../types/OrderTypes';
 import { getClientName } from '../../utils/orderUtils';
 import ScreenHeader from '../../components/ScreenHeader';
 import OrderCard from '../../components/OrderCard';
+import OrderFilterModal, { OrderFilters, EMPTY_FILTERS, hasActiveFilters } from '../../modals/OrderFilterModal';
 
 const Orders = () => {
     const router = useRouter();
@@ -18,6 +19,8 @@ const Orders = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [loading, setLoading] = useState(true);
     const [orderTaskStatus, setOrderTaskStatus] = useState<OrderTaskMap>({});
+    const [filterVisible, setFilterVisible] = useState(false);
+    const [filters, setFilters] = useState<OrderFilters>(EMPTY_FILTERS);
 
     useEffect(() => {
         fetchOrders();
@@ -57,19 +60,83 @@ const Orders = () => {
         setOrderTaskStatus(statusMap);
     };
 
-    useEffect(() => {
-        if (!searchQuery) {
-            setFilteredOrders(orders);
-            return;
+    // ── Advanced filters ────────────────────────────────────────
+    const getOrderAddress = (order: Order): string => {
+        if (isAmplasare(order)) return order.locationAddress || '';
+        if (isRidicari(order)) return order.pickupLocationAddress || '';
+        if (isIgienizari(order)) return order.sanitationLocationAddress || '';
+        return '';
+    };
+
+    const getOrderStartDate = (order: Order): string | undefined => {
+        if (isAmplasare(order)) return order.startDate;
+        if (isRidicari(order)) return order.pickupDate;
+        if (isIgienizari(order)) return order.sanitationDate;
+        return undefined;
+    };
+
+    const getOrderEndDate = (order: Order): string | undefined => {
+        if (isAmplasare(order)) return order.endDate;
+        return undefined;
+    };
+
+    const getOrderProductName = (order: Order): string | undefined => {
+        if (isAmplasare(order) || isRidicari(order)) return order.product?.name;
+        return undefined;
+    };
+
+    const applyFilters = (source: Order[], f: OrderFilters): Order[] => {
+        let result = source;
+
+        if (f.city) {
+            const lc = f.city.toLowerCase();
+            result = result.filter((o) => getOrderAddress(o).toLowerCase().includes(lc));
         }
-        const lowerQuery = searchQuery.toLowerCase();
-        const filtered = orders.filter(order => {
-            const clientNameStr = getClientName(order).toLowerCase();
-            const orderNumber = (order.number || order.id).toString();
-            return clientNameStr.includes(lowerQuery) || orderNumber.includes(lowerQuery);
-        });
-        setFilteredOrders(filtered);
-    }, [searchQuery, orders]);
+
+        if (f.orderType) {
+            result = result.filter((o) => o.orderType === f.orderType);
+        }
+
+        if (f.productName) {
+            result = result.filter((o) => getOrderProductName(o) === f.productName);
+        }
+
+        if (f.date && f.date.length === 10) {
+            const parts = f.date.split('/');
+            if (parts.length === 3) {
+                const isoDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
+                const filterTime = new Date(isoDate).getTime();
+                if (!isNaN(filterTime)) {
+                    result = result.filter((o) => {
+                        const start = getOrderStartDate(o);
+                        if (!start) return false;
+                        const startTime = new Date(start).getTime();
+                        const end = getOrderEndDate(o);
+                        if (end) {
+                            const endTime = new Date(end).getTime();
+                            return filterTime >= startTime && filterTime <= endTime;
+                        }
+                        return new Date(start).toISOString().slice(0, 10) === isoDate;
+                    });
+                }
+            }
+        }
+
+        return result;
+    };
+
+    useEffect(() => {
+        let base = orders;
+        if (searchQuery) {
+            const lq = searchQuery.toLowerCase();
+            base = base.filter((o) => {
+                const cn = getClientName(o).toLowerCase();
+                const on = (o.number || o.id).toString();
+                return cn.includes(lq) || on.includes(lq);
+            });
+        }
+        setFilteredOrders(applyFilters(base, filters));
+    }, [searchQuery, orders, filters]);
 
     const handleCardPress = (order: Order) => {
         router.push({
@@ -90,9 +157,18 @@ const Orders = () => {
         );
     }
 
+    const productNames = [...new Set(
+        orders.map((o) => getOrderProductName(o)).filter(Boolean) as string[]
+    )];
+
     return (
         <View style={styles.container}>
-            <ScreenHeader title="Comenzi" onRefresh={fetchOrders} />
+            <ScreenHeader
+                title="Comenzi"
+                onRefresh={fetchOrders}
+                onFilter={() => setFilterVisible(true)}
+                filterActive={hasActiveFilters(filters)}
+            />
 
             <View style={styles.searchContainer}>
                 <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
@@ -128,6 +204,14 @@ const Orders = () => {
 
                 <View style={{ height: 20 }} />
             </ScrollView>
+
+            <OrderFilterModal
+                visible={filterVisible}
+                onClose={() => setFilterVisible(false)}
+                filters={filters}
+                onApply={setFilters}
+                productNames={productNames}
+            />
         </View>
     );
 };

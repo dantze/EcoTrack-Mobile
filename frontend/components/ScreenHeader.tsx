@@ -11,9 +11,13 @@ interface ScreenHeaderProps {
     rightElement?: React.ReactNode;
     /** When provided, a refresh button is shown on the right side of the header. */
     onRefresh?: () => void;
+    /** When provided, a filter button is shown on the right side of the header. */
+    onFilter?: () => void;
+    /** When true, the filter icon gets a highlight to indicate active filters. */
+    filterActive?: boolean;
 }
 
-const ScreenHeader: React.FC<ScreenHeaderProps> = ({ title, onBack, rightElement, onRefresh }) => {
+const ScreenHeader: React.FC<ScreenHeaderProps> = ({ title, onBack, rightElement, onRefresh, onFilter, filterActive }) => {
     const router = useRouter();
 
     return (
@@ -23,6 +27,11 @@ const ScreenHeader: React.FC<ScreenHeaderProps> = ({ title, onBack, rightElement
             </Pressable>
             <Text style={styles.headerText}>{title}</Text>
             {rightElement && <View style={styles.rightContainer}>{rightElement}</View>}
+            {onFilter && (
+                <Pressable onPress={onFilter} style={[styles.refreshButton, filterActive && styles.filterButtonActive]}>
+                    <Ionicons name="filter" size={22} color={AppColors.textWhite} />
+                </Pressable>
+            )}
             {onRefresh && (
                 <Pressable onPress={onRefresh} style={styles.refreshButton}>
                     <Ionicons name="refresh" size={22} color={AppColors.textWhite} />
@@ -70,5 +79,8 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         marginLeft: 10,
+    },
+    filterButtonActive: {
+        backgroundColor: AppColors.successGreen,
     },
 });

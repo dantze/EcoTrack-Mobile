@@ -16,33 +16,43 @@ LocaleConfig.locales['ro'] = {
 };
 LocaleConfig.defaultLocale = 'ro';
 
+// Extracted so it can be used in state initializer
+const getDatesInRange = (start: string, end: string) => {
+    const startD = new Date(start);
+    const endD = new Date(end);
+    const date = new Date(startD.getTime());
+    const dates: any = {};
+    while (date <= endD) {
+        const dateString = date.toISOString().split('T')[0];
+        dates[dateString] = { color: '#70d7c7', textColor: 'white' };
+        if (dateString === start) dates[dateString].startingDay = true;
+        if (dateString === end) dates[dateString].endingDay = true;
+        date.setDate(date.getDate() + 1);
+    }
+    return dates;
+};
+
 interface DateSelectorProps {
     label?: string;
     onDateChange: (startDate: string, endDate: string) => void;
     onToggle?: (isOpen: boolean) => void;
+    initialStartDate?: string;
+    initialEndDate?: string;
 }
 
-const DateSelector = ({ label = "Dată Amplasare", onDateChange, onToggle }: DateSelectorProps) => {
+const DateSelector = ({ label = "Dată Amplasare", onDateChange, onToggle, initialStartDate = '', initialEndDate = '' }: DateSelectorProps) => {
     const [isCalendarOpen, setIsCalendarOpen] = useState(false);
-    const [startDate, setStartDate] = useState('');
-    const [endDate, setEndDate] = useState('');
-    const [markedDates, setMarkedDates] = useState<any>({});
-
-    const getDatesInRange = (startDate: string, endDate: string) => {
-        const start = new Date(startDate);
-        const end = new Date(endDate);
-        const date = new Date(start.getTime());
-        const dates: any = {};
-
-        while (date <= end) {
-            const dateString = date.toISOString().split('T')[0];
-            dates[dateString] = { color: '#70d7c7', textColor: 'white' };
-            if (dateString === startDate) dates[dateString].startingDay = true;
-            if (dateString === endDate) dates[dateString].endingDay = true;
-            date.setDate(date.getDate() + 1);
+    const [startDate, setStartDate] = useState(initialStartDate);
+    const [endDate, setEndDate] = useState(initialEndDate);
+    const [markedDates, setMarkedDates] = useState<any>(() => {
+        if (initialStartDate && initialEndDate) {
+            return getDatesInRange(initialStartDate, initialEndDate);
         }
-        return dates;
-    };
+        if (initialStartDate) {
+            return { [initialStartDate]: { selected: true, startingDay: true, endingDay: true, color: '#00adf5', textColor: 'white' } };
+        }
+        return {};
+    });
 
     const handleDayPress = (day: any) => {
         let newStart = startDate;

@@ -162,7 +162,7 @@ const RouteTasks = () => {
     return (
         <View style={styles.container}>
             {/* Header */}
-            <ScreenHeader title="Sarcinile Mele" />
+            <ScreenHeader title="Sarcinile Mele" onRefresh={fetchTasks} />
 
             {/* Date Navigation */}
             <View style={styles.dateNavContainer}>
@@ -260,16 +260,6 @@ const RouteTasks = () => {
                 </View>
             )}
 
-            {/* Floating Refresh Button */}
-            <Pressable
-                style={({ pressed }) => [
-                    styles.refreshFab,
-                    pressed && styles.refreshFabPressed
-                ]}
-                onPress={fetchTasks}
-            >
-                <Ionicons name="refresh" size={24} color={AppColors.textWhite} />
-            </Pressable>
         </View>
     )
 }
@@ -485,28 +475,5 @@ const styles = StyleSheet.create({
         paddingHorizontal: 20,
         paddingVertical: 8,
         borderRadius: 20,
-    },
-
-    // Floating Refresh Button
-    refreshFab: {
-        position: 'absolute',
-        bottom: 30,
-        right: 20,
-        width: 56,
-        height: 56,
-        borderRadius: 28,
-        backgroundColor: AppColors.buttonBackground,
-        justifyContent: 'center',
-        alignItems: 'center',
-        elevation: 10,
-        shadowColor: AppColors.shadow,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 5,
-        zIndex: 999,
-    },
-    refreshFabPressed: {
-        opacity: 0.8,
-        transform: [{ scale: 0.92 }],
     },
 })

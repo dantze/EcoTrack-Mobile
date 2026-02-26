@@ -9,9 +9,11 @@ interface ScreenHeaderProps {
     onBack?: () => void;
     /** Optional element rendered on the right side of the header (e.g. status badge). */
     rightElement?: React.ReactNode;
+    /** When provided, a refresh button is shown on the right side of the header. */
+    onRefresh?: () => void;
 }
 
-const ScreenHeader: React.FC<ScreenHeaderProps> = ({ title, onBack, rightElement }) => {
+const ScreenHeader: React.FC<ScreenHeaderProps> = ({ title, onBack, rightElement, onRefresh }) => {
     const router = useRouter();
 
     return (
@@ -21,6 +23,11 @@ const ScreenHeader: React.FC<ScreenHeaderProps> = ({ title, onBack, rightElement
             </Pressable>
             <Text style={styles.headerText}>{title}</Text>
             {rightElement && <View style={styles.rightContainer}>{rightElement}</View>}
+            {onRefresh && (
+                <Pressable onPress={onRefresh} style={styles.refreshButton}>
+                    <Ionicons name="refresh" size={22} color={AppColors.textWhite} />
+                </Pressable>
+            )}
         </View>
     );
 };
@@ -53,6 +60,15 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     rightContainer: {
+        marginLeft: 10,
+    },
+    refreshButton: {
+        width: 40,
+        height: 40,
+        borderRadius: 20,
+        backgroundColor: AppColors.buttonBackground,
+        justifyContent: 'center',
+        alignItems: 'center',
         marginLeft: 10,
     },
 });

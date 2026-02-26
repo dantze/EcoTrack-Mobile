@@ -3,21 +3,6 @@ import { View, Text, Pressable } from 'react-native';
 import { Feather, AntDesign } from '@expo/vector-icons';
 import listStyles from './listStyles';
 
-// ─── ScreenHeader ────────────────────────────────────────────────────────────
-interface ScreenHeaderProps {
-    title: string;
-    onBack: () => void;
-}
-
-export const ScreenHeader: React.FC<ScreenHeaderProps> = ({ title, onBack }) => (
-    <View style={listStyles.headerContainer}>
-        <Pressable onPress={onBack} style={listStyles.backButton}>
-            <AntDesign name="arrow-left" size={24} color="#FFFFFF" />
-        </Pressable>
-        <Text style={listStyles.headerText}>{title}</Text>
-    </View>
-);
-
 // ─── EmptyState ──────────────────────────────────────────────────────────────
 interface EmptyStateProps {
     icon: React.ComponentProps<typeof Feather>['name'];

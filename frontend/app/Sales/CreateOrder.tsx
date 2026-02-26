@@ -2,8 +2,9 @@ import { StyleSheet, Text, View, TextInput, FlatList, Pressable, ActivityIndicat
 import React, { useState, useEffect } from 'react'
 import { useRouter } from 'expo-router'
 import { AntDesign, Ionicons } from '@expo/vector-icons';
-import { API_BASE_URL } from '../../constants/ApiConfig';
 import { ClientService } from '../../services/ClientService';
+import ScreenHeader from '../../components/ScreenHeader';
+import { AppColors } from '../../constants/Colors';
 
 type Client = {
     id: number;
@@ -92,12 +93,7 @@ const CreateOrder = () => {
 
     return (
         <View style={styles.container}>
-            <View style={styles.headerContainer}>
-                <Pressable onPress={() => router.back()} style={styles.backButton}>
-                    <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
-                </Pressable>
-                <Text style={styles.headerText}>Selectează Client</Text>
-            </View>
+            <ScreenHeader title="Selectează Client" />
 
             <View style={styles.searchContainer}>
                 <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
@@ -150,22 +146,7 @@ export default CreateOrder
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#16283C',
-    },
-    headerContainer: {
-        marginTop: 75,
-        paddingHorizontal: 20,
-        marginBottom: 20,
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    backButton: {
-        marginRight: 15,
-    },
-    headerText: {
-        color: '#FFFFFF',
-        fontSize: 24,
-        fontWeight: 'bold',
+        backgroundColor: AppColors.screenBackground,
     },
     searchContainer: {
         flexDirection: 'row',
@@ -227,14 +208,14 @@ const styles = StyleSheet.create({
         bottom: 0,
         left: 0,
         right: 0,
-        backgroundColor: '#16283C',
+        backgroundColor: AppColors.screenBackground,
         padding: 20,
         paddingBottom: 50, // Lift button up
         borderTopWidth: 1,
         borderTopColor: '#2A3E55',
     },
     nextButton: {
-        backgroundColor: '#427992',
+        backgroundColor: AppColors.buttonBackground,
         borderRadius: 12,
         height: 50,
         justifyContent: 'center',

@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { StyleSheet, Text, View, Pressable, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { AppColors } from '../constants/Colors';
+import { AppColors } from '../../constants/Colors';
 import PhotoGallery from './PhotoGallery';
 
 interface CloudPhotoViewerProps {

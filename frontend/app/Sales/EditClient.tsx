@@ -13,7 +13,7 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { ClientService, ClientType } from '../../services/ClientService';
 import { isValidEmail, isValidPhone } from '../../utils/validation';
-import CloudPhotoViewer from '../../components/CloudPhotoViewer';
+import CloudPhotoViewer from '../../components/display/CloudPhotoViewer';
 import InputField from '../../components/forms/InputField';
 import PrimaryButton from '../../components/forms/PrimaryButton';
 import ScreenHeader from '../../components/layout/ScreenHeader';

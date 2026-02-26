@@ -1,35 +1,17 @@
-import { StyleSheet, Text, View, Pressable, TextInput, ScrollView, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard, Alert, Image } from 'react-native'
+import { StyleSheet, Text, View, Pressable, ScrollView, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard, Alert, Image } from 'react-native'
 import React, { useState } from 'react'
 import { useRouter } from 'expo-router'
-import { AntDesign, Feather, Ionicons } from '@expo/vector-icons';
-import { API_BASE_URL } from '../../constants/ApiConfig';
+import { AntDesign, Feather } from '@expo/vector-icons';
 import { ClientService, ClientType } from '../../services/ClientService';
 import { PhotoService } from '../../services/PhotoService';
+import { isValidEmail, isValidPhone } from '../../utils/validation';
+import InputField from '../../components/InputField';
+import PrimaryButton from '../../components/PrimaryButton';
+import ScreenHeader from '../../components/ScreenHeader';
+import { AppColors } from '../../constants/Colors';
 import * as ImagePicker from 'expo-image-picker';
 
 const TIP_CLIENT = ["Persoană fizică", "Firme"];
-
-type InputFieldProps = {
-    label: string;
-    value: string;
-    onChangeText: (text: string) => void;
-    placeholder?: string;
-    keyboardType?: 'default' | 'email-address' | 'numeric' | 'phone-pad';
-};
-
-const InputField = ({ label, value, onChangeText, placeholder = "", keyboardType = 'default' }: InputFieldProps) => (
-    <View style={styles.inputWrapper}>
-        <Text style={styles.label}>{label}</Text>
-        <TextInput
-            style={styles.input}
-            value={value}
-            onChangeText={onChangeText}
-            placeholder={placeholder}
-            placeholderTextColor="#999"
-            keyboardType={keyboardType}
-        />
-    </View>
-);
 
 const CreateClient = () => {
     const router = useRouter();
@@ -100,14 +82,12 @@ const CreateClient = () => {
             return;
         }
 
-        // Email must be valid format: XX@XX.XX
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+        if (!isValidEmail(email)) {
             Alert.alert("Email invalid", "Adresa de email trebuie să fie în formatul exemplu@domeniu.ro.");
             return;
         }
 
-        // Phone must be valid Romanian format: 0XXXXXXXXX or +40XXXXXXXXX
-        if (!/^(\+40\d{9}|0\d{9})$/.test(phone.trim())) {
+        if (!isValidPhone(phone)) {
             Alert.alert("Telefon invalid", "Numărul de telefon trebuie să fie în formatul 07XXXXXXXX sau +407XXXXXXXX.");
             return;
         }
@@ -174,12 +154,7 @@ const CreateClient = () => {
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={styles.container}
             >
-                <View style={styles.headerContainer}>
-                    <Pressable onPress={() => router.back()} style={styles.backButton}>
-                        <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
-                    </Pressable>
-                    <Text style={styles.headerText}>Creare Client</Text>
-                </View>
+                <ScreenHeader title="Creare Client" />
 
                 <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
 
@@ -262,20 +237,8 @@ const CreateClient = () => {
 
                     {/* --- CREATE BUTTONS --- */}
                     <View style={{ width: '100%', marginTop: 30 }}>
-                        <Pressable
-                            style={({ pressed }) => [styles.createButton, pressed && { opacity: 0.9 }]}
-                            onPress={() => handleCreate(false)}
-                        >
-                            <Text style={styles.createButtonText}>Finalizare</Text>
-                        </Pressable>
-
-                        {/* create order after client creation */}
-                        <Pressable
-                            style={({ pressed }) => [styles.createButton, pressed && { opacity: 0.9 }]}
-                            onPress={() => handleCreate(true)}
-                        >
-                            <Text style={styles.createButtonText}>Creare Comanda Client</Text>
-                        </Pressable>
+                        <PrimaryButton label="Finalizare" onPress={() => handleCreate(false)} />
+                        <PrimaryButton label="Creare Comanda Client" onPress={() => handleCreate(true)} />
                     </View>
                 </ScrollView>
 
@@ -289,22 +252,7 @@ export default CreateClient
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#16283C',
-    },
-    headerContainer: {
-        marginTop: 75,
-        paddingHorizontal: 20,
-        marginBottom: 20,
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    backButton: {
-        marginRight: 15,
-    },
-    headerText: {
-        color: '#FFFFFF',
-        fontSize: 28,
-        fontWeight: 'bold',
+        backgroundColor: AppColors.screenBackground,
     },
     scrollContent: {
         paddingHorizontal: 20,
@@ -356,43 +304,13 @@ const styles = StyleSheet.create({
         width: '100%',
     },
 
-    // Inputs
-    inputWrapper: {
-        marginBottom: 15,
-        width: '100%',
-    },
+    // Photo label (still needed locally for the "Buletin" label outside InputField)
     label: {
-        color: '#FFFFFF',
+        color: AppColors.textWhite,
         fontSize: 14,
         fontWeight: 'bold',
         marginBottom: 8,
         marginLeft: 5,
-    },
-    input: {
-        width: '100%',
-        height: 45,
-        backgroundColor: '#FFFFFF',
-        borderRadius: 12,
-        paddingHorizontal: 15,
-        fontSize: 16,
-        color: '#16283C',
-    },
-
-    // Create Button
-    createButton: {
-        width: '100%',
-        height: 55,
-        backgroundColor: '#427992',
-        borderRadius: 15,
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: 10,
-        elevation: 5,
-    },
-    createButtonText: {
-        color: '#FFFFFF',
-        fontSize: 18,
-        fontWeight: 'bold',
     },
 
     // Photo Upload Styles
@@ -423,12 +341,7 @@ const styles = StyleSheet.create({
         marginTop: 10,
         textAlign: 'center',
     },
-    uploadSubtext: {
-        color: '#A0A0A0',
-        fontSize: 12,
-        marginTop: 5,
-        textAlign: 'center',
-    },
+
     previewImage: {
         width: 200,
         height: 120,

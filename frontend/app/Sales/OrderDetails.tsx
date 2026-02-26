@@ -1,11 +1,14 @@
 import { StyleSheet, Text, View, Pressable, ScrollView, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard } from 'react-native'
-import React, { useState, useEffect } from 'react'
+import React, { useState } from 'react'
 import { useLocalSearchParams, useRouter } from 'expo-router'
 import { AntDesign, Ionicons } from '@expo/vector-icons';
 import Amplasari from './OrderTypes/Amplasari';
 import Ridicari from './OrderTypes/Ridicari';
 import Igienizari from './OrderTypes/Igienizari';
 import { ClientService } from '../../services/ClientService';
+import { isValidPhone } from '../../utils/validation';
+import ScreenHeader from '../../components/ScreenHeader';
+import { AppColors } from '../../constants/Colors';
 
 
 const ORDER_TYPES = ["Amplasari", "Ridicari", "Igienizari"];
@@ -18,9 +21,6 @@ const OrderDetails = () => {
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [selectedType, setSelectedType] = useState(ORDER_TYPES[0]);
     const [orderData, setOrderData] = useState<any>({});
-
-    // Route State
-
 
     const toggleDropdown = () => {
         setIsDropdownOpen(!isDropdownOpen);
@@ -60,7 +60,7 @@ const OrderDetails = () => {
             if (!startDate && !endDate) return "Selectați perioada de amplasare.";
             if (!location) return "Selectați locația.";
             if (!contact) return "Introduceți contactul de pe șantier.";
-            if (!/^(\+40\d{9}|0\d{9})$/.test(contact.trim())) return "Numărul de telefon trebuie să fie în formatul 07XXXXXXXX sau +407XXXXXXXX.";
+            if (!isValidPhone(contact)) return "Numărul de telefon trebuie să fie în formatul 07XXXXXXXX sau +407XXXXXXXX.";
             if (!igienizari) return "Selectați numărul de igienizări.";
         }
         else if (selectedType === "Ridicari") {
@@ -97,12 +97,7 @@ const OrderDetails = () => {
             keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
         >
             <View style={{ flex: 1 }}>
-                <View style={styles.headerContainer}>
-                    <Pressable onPress={() => router.back()} style={styles.backButton}>
-                        <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
-                    </Pressable>
-                    <Text style={styles.headerText}>Detalii Comandă</Text>
-                </View>
+                <ScreenHeader title="Detalii Comandă" />
 
                 <ScrollView
                     style={styles.scrollContent}
@@ -258,7 +253,7 @@ export default OrderDetails
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#16283C',
+        backgroundColor: AppColors.screenBackground,
     },
     headerContainer: {
         marginTop: 60,
@@ -271,7 +266,7 @@ const styles = StyleSheet.create({
         marginRight: 15,
     },
     headerText: {
-        color: '#FFFFFF',
+        color: AppColors.textWhite,
         fontSize: 24,
         fontWeight: 'bold',
     },
@@ -353,7 +348,7 @@ const styles = StyleSheet.create({
         width: '100%',
     },
     submitButton: {
-        backgroundColor: '#427992',
+        backgroundColor: AppColors.buttonBackground,
         paddingVertical: 15,
         borderRadius: 12,
         alignItems: 'center',

@@ -11,21 +11,6 @@ const listStyles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
     },
-    headerContainer: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginTop: 60,
-        paddingHorizontal: 20,
-        marginBottom: 20,
-    },
-    backButton: {
-        marginRight: 15,
-    },
-    headerText: {
-        color: '#FFFFFF',
-        fontSize: 28,
-        fontWeight: 'bold',
-    },
     listContent: {
         paddingHorizontal: 16,
         paddingBottom: 30,

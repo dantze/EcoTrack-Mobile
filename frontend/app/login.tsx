@@ -39,9 +39,9 @@ const login = () => {
           if (role === 'DRIVER') {
             router.replace('/Driver/DriverRoutes');
           } else if (role === 'SALES') {
-            router.replace('/Sales/WestCenter');
+            router.replace('/Sales/Menu');
           } else if (role === 'TECH') {
-            router.replace('/Technical/WestCenter');
+            router.replace('/Technical/Menu');
           } else {
             Alert.alert('Eroare', 'Rolul utilizatorului nu este recunoscut.');
           }

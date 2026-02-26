@@ -10,6 +10,8 @@ import { formatPrice } from '../../utils/formatters';
 import ActionBar from '../../components/ActionBar';
 import ProductModal from '../../modals/ProductModal';
 import SubscriptionModal from '../../modals/SubscriptionModal';
+import ScreenHeader from '../../components/ScreenHeader';
+import { AppColors } from '../../constants/Colors';
 
 // ─── Tab type ────────────────────────────────────────────────────────────────
 type ActiveTab = 'products' | 'subscriptions';
@@ -93,12 +95,7 @@ const ProductsAndSubscriptions = () => {
     return (
         <View style={styles.container}>
             {/* Header */}
-            <View style={styles.headerContainer}>
-                <Pressable onPress={() => router.back()} style={styles.backButton}>
-                    <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
-                </Pressable>
-                <Text style={styles.headerText}>Produse și Abonamente</Text>
-            </View>
+            <ScreenHeader title="Produse și Abonamente" />
 
             {/* Tab Bar */}
             <View style={styles.tabBar}>
@@ -290,13 +287,7 @@ const ProductsAndSubscriptions = () => {
 export default ProductsAndSubscriptions;
 
 const styles = StyleSheet.create({
-    container: { flex: 1, backgroundColor: '#16283C' },
-    headerContainer: {
-        marginTop: 60, paddingHorizontal: 20, marginBottom: 16,
-        flexDirection: 'row', alignItems: 'center',
-    },
-    backButton: { marginRight: 15 },
-    headerText: { color: '#FFFFFF', fontSize: 22, fontWeight: 'bold' },
+    container: { flex: 1, backgroundColor: AppColors.screenBackground },
 
     // Tab bar
     tabBar: {

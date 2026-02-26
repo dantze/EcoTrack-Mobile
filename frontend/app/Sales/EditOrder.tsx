@@ -3,41 +3,20 @@ import {
     StyleSheet,
     Text,
     View,
-    Pressable,
-    TextInput,
     ScrollView,
     KeyboardAvoidingView,
     Platform,
     TouchableWithoutFeedback,
     Keyboard,
     Alert,
-    ActivityIndicator,
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
-import { Ionicons } from '@expo/vector-icons';
 import { OrderService } from '../../services/OrderService';
-
-type InputFieldProps = {
-    label: string;
-    value: string;
-    onChangeText: (text: string) => void;
-    placeholder?: string;
-    keyboardType?: 'default' | 'email-address' | 'numeric' | 'phone-pad';
-};
-
-const InputField = ({ label, value, onChangeText, placeholder = '', keyboardType = 'default' }: InputFieldProps) => (
-    <View style={styles.inputWrapper}>
-        <Text style={styles.label}>{label}</Text>
-        <TextInput
-            style={styles.input}
-            value={value}
-            onChangeText={onChangeText}
-            placeholder={placeholder}
-            placeholderTextColor="#999"
-            keyboardType={keyboardType}
-        />
-    </View>
-);
+import { isValidPhone } from '../../utils/validation';
+import InputField from '../../components/InputField';
+import PrimaryButton from '../../components/PrimaryButton';
+import ScreenHeader from '../../components/ScreenHeader';
+import { AppColors } from '../../constants/Colors';
 
 export default function EditOrder() {
     const router = useRouter();
@@ -86,8 +65,7 @@ export default function EditOrder() {
     const [saving, setSaving] = useState(false);
 
     const handleSave = async () => {
-        // Validate contact phone if provided
-        if (contact.trim() && !/^(\+40\d{9}|0\d{9})$/.test(contact.trim())) {
+        if (contact.trim() && !isValidPhone(contact)) {
             Alert.alert('Telefon invalid', 'Numărul de telefon trebuie să fie în formatul 07XXXXXXXX sau +407XXXXXXXX.');
             return;
         }
@@ -124,12 +102,7 @@ export default function EditOrder() {
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 style={styles.container}
             >
-                <View style={styles.headerContainer}>
-                    <Pressable onPress={() => router.back()} style={styles.backButton}>
-                        <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
-                    </Pressable>
-                    <Text style={styles.headerText}>Editare Comandă</Text>
-                </View>
+                <ScreenHeader title="Editare Comandă" />
 
                 <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                     {/* Order info badges */}
@@ -208,21 +181,11 @@ export default function EditOrder() {
 
                     {/* Save button */}
                     <View style={{ width: '100%', marginTop: 30 }}>
-                        <Pressable
-                            style={({ pressed }) => [
-                                styles.saveButton,
-                                pressed && { opacity: 0.9 },
-                                saving && { opacity: 0.6 },
-                            ]}
+                        <PrimaryButton
+                            label="Salvează Modificările"
                             onPress={handleSave}
-                            disabled={saving}
-                        >
-                            {saving ? (
-                                <ActivityIndicator color="#FFFFFF" />
-                            ) : (
-                                <Text style={styles.saveButtonText}>Salvează Modificările</Text>
-                            )}
-                        </Pressable>
+                            loading={saving}
+                        />
                     </View>
                 </ScrollView>
             </KeyboardAvoidingView>
@@ -233,28 +196,13 @@ export default function EditOrder() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#16283C',
+        backgroundColor: AppColors.screenBackground,
     },
     centered: {
         flex: 1,
-        backgroundColor: '#16283C',
+        backgroundColor: AppColors.screenBackground,
         justifyContent: 'center',
         alignItems: 'center',
-    },
-    headerContainer: {
-        marginTop: 75,
-        paddingHorizontal: 20,
-        marginBottom: 20,
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    backButton: {
-        marginRight: 15,
-    },
-    headerText: {
-        color: '#FFFFFF',
-        fontSize: 28,
-        fontWeight: 'bold',
     },
     scrollContent: {
         paddingHorizontal: 20,
@@ -267,13 +215,13 @@ const styles = StyleSheet.create({
         alignSelf: 'flex-start',
     },
     typeBadge: {
-        backgroundColor: '#427992',
+        backgroundColor: AppColors.buttonBackground,
         borderRadius: 12,
         paddingHorizontal: 16,
         paddingVertical: 8,
     },
     typeBadgeText: {
-        color: '#FFFFFF',
+        color: AppColors.textWhite,
         fontSize: 16,
         fontWeight: '600',
     },
@@ -291,41 +239,7 @@ const styles = StyleSheet.create({
         marginBottom: 4,
     },
     readOnlyValue: {
-        color: '#FFFFFF',
+        color: AppColors.textWhite,
         fontSize: 16,
-    },
-    inputWrapper: {
-        marginBottom: 15,
-        width: '100%',
-    },
-    label: {
-        color: '#FFFFFF',
-        fontSize: 14,
-        fontWeight: 'bold',
-        marginBottom: 8,
-        marginLeft: 5,
-    },
-    input: {
-        width: '100%',
-        height: 45,
-        backgroundColor: '#FFFFFF',
-        borderRadius: 12,
-        paddingHorizontal: 15,
-        fontSize: 16,
-        color: '#16283C',
-    },
-    saveButton: {
-        width: '100%',
-        height: 55,
-        backgroundColor: '#427992',
-        borderRadius: 15,
-        justifyContent: 'center',
-        alignItems: 'center',
-        elevation: 5,
-    },
-    saveButtonText: {
-        color: '#FFFFFF',
-        fontSize: 18,
-        fontWeight: 'bold',
     },
 });

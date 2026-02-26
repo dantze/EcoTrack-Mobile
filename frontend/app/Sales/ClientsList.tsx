@@ -11,8 +11,9 @@ import { useRouter } from 'expo-router';
 import { ClientService } from '../../services/ClientService';
 import listStyles from '../../components/listStyles';
 import {
-    ScreenHeader, EmptyState, ListCard, InfoRow, TypeBadge,
+    EmptyState, ListCard, InfoRow, TypeBadge,
 } from '../../components/ListComponents';
+import ScreenHeader from '../../components/ScreenHeader';
 
 interface ClientItem {
     id: number;

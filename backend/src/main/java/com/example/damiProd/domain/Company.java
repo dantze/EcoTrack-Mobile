@@ -1,5 +1,6 @@
 package com.example.damiProd.domain;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import jakarta.persistence.Entity;
 import lombok.Getter;
 import lombok.Setter;
@@ -13,6 +14,7 @@ public class Company extends Client {
 
     private String name;
 
+    @JsonProperty("CUI")
     private String CUI;
 
     private String adminName;

@@ -13,17 +13,11 @@ import java.util.Optional;
 public interface OrderRepository extends JpaRepository<Order, Long> {
     List<Order> findByClientId(Long clientId);
 
-    List<Order> findByRouteDefinitionId(Long routeDefinitionId);
-
-    // Product is now on subtypes — join only on client & routeDefinition from the
-    // base
-    @Query("SELECT o FROM Order o LEFT JOIN FETCH o.client LEFT JOIN FETCH o.routeDefinition")
+    @Query("SELECT o FROM Order o LEFT JOIN FETCH o.client")
     List<Order> findAllWithClientAndProduct();
 
-    @Query("SELECT o FROM Order o LEFT JOIN FETCH o.client LEFT JOIN FETCH o.routeDefinition WHERE o.id = :id")
+    @Query("SELECT o FROM Order o LEFT JOIN FETCH o.client WHERE o.id = :id")
     Optional<Order> findByIdWithClientAndProduct(@Param("id") Long id);
-
-    boolean existsByRouteDefinitionId(Long routeDefinitionId);
 
     // Used by ProductService to prevent deleting a product still in use
     @Query("SELECT COUNT(o) > 0 FROM AmplasareOrder o WHERE o.product.id = :productId")

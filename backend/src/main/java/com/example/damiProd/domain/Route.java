@@ -37,6 +37,16 @@ public class Route {
     @JsonIgnoreProperties("route")
     private List<Task> tasks = new ArrayList<>();
 
+    public Route() {
+    }
+
+    public Route(String name, LocalDate date, String county, Employee employee) {
+        this.name = name;
+        this.date = date;
+        this.county = county;
+        this.employee = employee;
+    }
+
     // Transient field for JSON serialization
     @Transient
     public Long getEmployeeId() {
@@ -46,15 +56,5 @@ public class Route {
     @Transient
     public String getEmployeeName() {
         return employee != null ? employee.getFullName() : null;
-    }
-
-    public Route() {
-    }
-
-    public Route(String name, LocalDate date, String county, Employee employee) {
-        this.name = name;
-        this.date = date;
-        this.county = county;
-        this.employee = employee;
     }
 }

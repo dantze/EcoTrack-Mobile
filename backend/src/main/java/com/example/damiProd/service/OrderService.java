@@ -89,8 +89,6 @@ public class OrderService {
             existingOrder.setContact(orderDetails.getContact());
         if (orderDetails.getDetails() != null)
             existingOrder.setDetails(orderDetails.getDetails());
-        if (orderDetails.getRouteDefinition() != null)
-            existingOrder.setRouteDefinition(orderDetails.getRouteDefinition());
 
         // ─── Amplasare-specific fields ───
         if (existingOrder instanceof AmplasareOrder existing && orderDetails instanceof AmplasareOrder updates) {
@@ -155,9 +153,5 @@ public class OrderService {
         }
 
         return orderRepository.save(existingOrder);
-    }
-
-    public List<Order> getOrdersByRoute(Long routeDefinitionId) {
-        return orderRepository.findByRouteDefinitionId(routeDefinitionId);
     }
 }

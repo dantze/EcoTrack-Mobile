@@ -36,10 +36,6 @@ public abstract class Order {
     @JoinColumn(name = "client_id")
     private Client client;
 
-    @ManyToOne
-    @JoinColumn(name = "route_definition_id")
-    private RouteDefinition routeDefinition;
-
     // ─── Shared fields (meaningful for all order types) ───
     private String contact; // Contact person on site
     private String details; // Optional free-text notes

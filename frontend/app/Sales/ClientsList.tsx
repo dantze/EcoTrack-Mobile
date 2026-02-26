@@ -12,11 +12,11 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { ClientService } from '../../services/ClientService';
-import listStyles from '../../components/listStyles';
+//import listStyles from '../../components/list/listStyles';
 import {
     EmptyState, ListCard, InfoRow, TypeBadge,
-} from '../../components/ListComponents';
-import ScreenHeader from '../../components/ScreenHeader';
+} from '../../components/list/ListComponents';
+import ScreenHeader from '../../components/layout/ScreenHeader';
 
 interface ClientItem {
     id: number;
@@ -160,8 +160,8 @@ export default function ClientsList() {
             onPress={() => handleEditClient(item)}
             onDelete={() => handleDeleteClient(item)}
         >
-            <View style={listStyles.cardHeader}>
-                <Text style={listStyles.cardTitle}>{getClientDisplayName(item)}</Text>
+            <View style={searchStyles.cardHeader}>
+                <Text style={searchStyles.cardTitle}>{getClientDisplayName(item)}</Text>
                 <TypeBadge label={getClientTypeLabel(item.type)} />
             </View>
 
@@ -173,14 +173,14 @@ export default function ClientsList() {
 
     if (loading) {
         return (
-            <View style={listStyles.centered}>
+            <View style={searchStyles.centered}>
                 <ActivityIndicator size="large" color="#427992" />
             </View>
         );
     }
 
     return (
-        <View style={listStyles.container}>
+        <View style={searchStyles.container}>
             <ScreenHeader title="Lista Clienți" onBack={() => router.back()} onRefresh={fetchClients} />
 
             <View style={searchStyles.searchContainer}>
@@ -201,7 +201,7 @@ export default function ClientsList() {
                     data={filteredClients}
                     keyExtractor={(item) => item.id.toString()}
                     renderItem={renderClient}
-                    contentContainerStyle={listStyles.listContent}
+                    contentContainerStyle={searchStyles.listContent}
                     refreshControl={
                         <RefreshControl
                             refreshing={refreshing}
@@ -235,5 +235,56 @@ const searchStyles = StyleSheet.create({
         height: '100%',
         color: '#16283C',
         fontSize: 16,
+    },
+    container: {
+        flex: 1,
+        backgroundColor: '#16283C',
+    },
+    centered: {
+        flex: 1,
+        backgroundColor: '#16283C',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    listContent: {
+        paddingHorizontal: 16,
+        paddingBottom: 30,
+    },
+    emptyContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+        gap: 16,
+    },
+    emptyText: {
+        color: '#8BA8BE',
+        fontSize: 18,
+    },
+    // Card
+    card: {
+        backgroundColor: '#1E3A50',
+        borderRadius: 14,
+        padding: 16,
+        marginBottom: 12,
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    cardContent: {
+        flex: 1,
+    },
+    cardPressed: {
+        opacity: 0.7,
+    },
+    cardHeader: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 8,
+        flexWrap: 'wrap',
+        gap: 8,
+    },
+    cardTitle: {
+        color: '#FFFFFF',
+        fontSize: 18,
+        fontWeight: '600',
     },
 });

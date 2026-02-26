@@ -7,10 +7,10 @@ import { OrderService } from '../../services/OrderService';
 import { getTaskTypeLabel, getStatusLabel, getStatusColor } from '../../constants/TaskConstants';
 import { formatDisplayDate } from '../../utils/dateUtils';
 import { AppColors } from '../../constants/Colors';
-import DetailRow from '../../components/DetailRow';
-import ScreenHeader from '../../components/ScreenHeader';
-import StatusBadge from '../../components/StatusBadge';
-import PhotoGallery from '../../components/PhotoGallery';
+import DetailRow from '../../components/display/DetailRow';
+import ScreenHeader from '../../components/layout/ScreenHeader';
+import StatusBadge from '../../components/display/StatusBadge';
+import PhotoGallery from '../../components/display/PhotoGallery';
 
 const ServiceDetails = () => {
     const router = useRouter();

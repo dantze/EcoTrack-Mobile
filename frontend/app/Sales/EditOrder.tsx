@@ -12,8 +12,8 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { OrderService } from '../../services/OrderService';
-import PrimaryButton from '../../components/PrimaryButton';
-import ScreenHeader from '../../components/ScreenHeader';
+import PrimaryButton from '../../components/forms/PrimaryButton';
+import ScreenHeader from '../../components/layout/ScreenHeader';
 import { AppColors } from '../../constants/Colors';
 import OrderForm from './OrderTypes/OrderComponents/OrderForm';
 

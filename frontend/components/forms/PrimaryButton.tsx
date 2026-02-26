@@ -1,6 +1,6 @@
 import React from 'react';
 import { StyleSheet, Text, Pressable, ActivityIndicator, ViewStyle } from 'react-native';
-import { AppColors } from '../constants/Colors';
+import { AppColors } from '../../constants/Colors';
 
 interface PrimaryButtonProps {
     label: string;

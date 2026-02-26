@@ -8,9 +8,9 @@ import { PhotoService } from '../../services/PhotoService';
 import * as ImagePicker from 'expo-image-picker';
 import { TASK_TYPE_LABELS, STATUS_LABELS, STATUS_COLORS, getTaskTypeLabel, getStatusLabel, getStatusColor } from '../../constants/TaskConstants';
 import { AppColors } from '../../constants/Colors';
-import ScreenHeader from '../../components/ScreenHeader';
-import StatusBadge from '../../components/StatusBadge';
-import PhotoGallery from '../../components/PhotoGallery';
+import ScreenHeader from '../../components/layout/ScreenHeader';
+import StatusBadge from '../../components/display/StatusBadge';
+import PhotoGallery from '../../components/display/PhotoGallery';
 import CloudPhotoViewer from '../../components/CloudPhotoViewer';
 
 type OrderDetails = {

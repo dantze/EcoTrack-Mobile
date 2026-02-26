@@ -1,8 +1,8 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { TASK_TYPE_COLORS, TASK_TYPE_LABELS } from '../constants/TaskConstants';
-import { AppColors } from '../constants/Colors';
+import { TASK_TYPE_COLORS, TASK_TYPE_LABELS } from '../../constants/TaskConstants';
+import { AppColors } from '../../constants/Colors';
 
 interface TaskTypeLegendProps {
     /** Task type keys to display. Defaults to all known types. */

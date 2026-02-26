@@ -2,7 +2,7 @@ import React from 'react';
 import { StyleSheet, Text, View, Pressable } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
-import { AppColors } from '../constants/Colors';
+import { AppColors } from '../../constants/Colors';
 
 interface ScreenHeaderProps {
     title: string;

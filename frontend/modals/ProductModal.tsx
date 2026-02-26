@@ -3,9 +3,9 @@ import {
     Modal, View, Text, TextInput, Pressable, ScrollView, ActivityIndicator, Alert,
 } from 'react-native';
 import { Ionicons, AntDesign } from '@expo/vector-icons';
+import { StyleSheet } from 'react-native';
 import { ProductService, Product } from '../services/ProductService';
 import { validateRequired, validatePositiveNumber } from '../utils/formatters';
-import modalStyles from './modalStyles';
 
 interface ProductModalProps {
     visible: boolean;
@@ -90,10 +90,10 @@ const ProductModal: React.FC<ProductModalProps> = ({
 
     return (
         <Modal animationType="slide" transparent visible={visible} onRequestClose={onClose}>
-            <View style={modalStyles.overlay}>
-                <View style={modalStyles.content}>
-                    <View style={modalStyles.header}>
-                        <Text style={modalStyles.title}>
+            <View style={styles.overlay}>
+                <View style={styles.content}>
+                    <View style={styles.header}>
+                        <Text style={styles.title}>
                             {editingProduct ? 'Editare Produs' : 'Produs Nou'}
                         </Text>
                         <Pressable onPress={onClose}>
@@ -101,30 +101,30 @@ const ProductModal: React.FC<ProductModalProps> = ({
                         </Pressable>
                     </View>
 
-                    <ScrollView style={modalStyles.formContainer} keyboardShouldPersistTaps="handled">
-                        <View style={modalStyles.inputGroup}>
-                            <Text style={modalStyles.inputLabel}>Nume Produs *</Text>
+                    <ScrollView style={styles.formContainer} keyboardShouldPersistTaps="handled">
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.inputLabel}>Nume Produs *</Text>
                             <TextInput
-                                style={modalStyles.textInput} value={productName}
+                                style={styles.textInput} value={productName}
                                 onChangeText={onChangeProductName}
                                 placeholder="Ex: Toaletă Ecologică Standard"
                                 placeholderTextColor="#999"
                             />
                         </View>
-                        <View style={modalStyles.inputGroup}>
-                            <Text style={modalStyles.inputLabel}>Descriere (opțional)</Text>
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.inputLabel}>Descriere (opțional)</Text>
                             <TextInput
-                                style={[modalStyles.textInput, modalStyles.textArea]}
+                                style={[styles.textInput, styles.textArea]}
                                 value={productDescription} onChangeText={onChangeProductDescription}
                                 placeholder="Descriere detaliată..."
                                 placeholderTextColor="#999" multiline numberOfLines={4}
                                 textAlignVertical="top"
                             />
                         </View>
-                        <View style={modalStyles.inputGroup}>
-                            <Text style={modalStyles.inputLabel}>Preț (RON) *</Text>
+                        <View style={styles.inputGroup}>
+                            <Text style={styles.inputLabel}>Preț (RON) *</Text>
                             <TextInput
-                                style={modalStyles.textInput} value={productPrice}
+                                style={styles.textInput} value={productPrice}
                                 onChangeText={onChangeProductPrice}
                                 placeholder="Ex: 150" placeholderTextColor="#999"
                                 keyboardType="numeric"
@@ -134,10 +134,10 @@ const ProductModal: React.FC<ProductModalProps> = ({
 
                     <Pressable
                         style={({ pressed }) => [
-                            modalStyles.saveButton,
+                            styles.saveButton,
                             { backgroundColor: '#5D8AA8' },
-                            pressed && modalStyles.saveButtonPressed,
-                            saving && modalStyles.saveButtonDisabled,
+                            pressed && styles.saveButtonPressed,
+                            saving && styles.saveButtonDisabled,
                         ]}
                         onPress={handleSave} disabled={saving}
                     >
@@ -145,7 +145,7 @@ const ProductModal: React.FC<ProductModalProps> = ({
                             ? <ActivityIndicator size="small" color="#FFF" />
                             : <>
                                 <Ionicons name="checkmark-circle" size={22} color="#FFF" style={{ marginRight: 8 }} />
-                                <Text style={modalStyles.saveButtonText}>Salvează Produs</Text>
+                                <Text style={styles.saveButtonText}>Salvează Produs</Text>
                             </>
                         }
                     </Pressable>
@@ -153,15 +153,15 @@ const ProductModal: React.FC<ProductModalProps> = ({
                     {editingProduct && (
                         <Pressable
                             style={({ pressed }) => [
-                                modalStyles.deleteButton,
+                                styles.deleteButton,
                                 { backgroundColor: '#E53935' },
-                                pressed && modalStyles.deleteButtonPressed,
-                                saving && modalStyles.saveButtonDisabled,
+                                pressed && styles.deleteButtonPressed,
+                                saving && styles.saveButtonDisabled,
                             ]}
                             onPress={handleDelete} disabled={saving}
                         >
                             <Ionicons name="trash-outline" size={20} color="#FFF" style={{ marginRight: 8 }} />
-                            <Text style={modalStyles.deleteButtonText}>Șterge Produs</Text>
+                            <Text style={styles.deleteButtonText}>Șterge Produs</Text>
                         </Pressable>
                     )}
                 </View>
@@ -171,3 +171,42 @@ const ProductModal: React.FC<ProductModalProps> = ({
 };
 
 export default ProductModal;
+
+const styles = StyleSheet.create({
+    overlay: {
+        flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end',
+    },
+    content: {
+        backgroundColor: '#FFF', borderTopLeftRadius: 24, borderTopRightRadius: 24,
+        paddingTop: 20, paddingBottom: 30, maxHeight: '88%',
+    },
+    header: {
+        flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center',
+        paddingHorizontal: 20, marginBottom: 16,
+    },
+    title: { fontSize: 22, fontWeight: 'bold', color: '#16283C' },
+    formContainer: { paddingHorizontal: 20 },
+    inputGroup: { marginBottom: 18 },
+    inputLabel: { fontSize: 14, fontWeight: '600', color: '#16283C', marginBottom: 8 },
+    textInput: {
+        backgroundColor: '#F5F5F5', borderRadius: 10, paddingHorizontal: 15,
+        paddingVertical: 12, fontSize: 15, color: '#16283C',
+        borderWidth: 1, borderColor: '#E0E0E0',
+    },
+    textArea: { height: 90, textAlignVertical: 'top' },
+    saveButton: {
+        flexDirection: 'row', backgroundColor: '#5D8AA8', paddingVertical: 15,
+        marginHorizontal: 20, borderRadius: 12, alignItems: 'center',
+        justifyContent: 'center', marginTop: 10,
+    },
+    saveButtonPressed: { backgroundColor: '#4A7A96' },
+    saveButtonDisabled: { backgroundColor: '#BDC3C7' },
+    saveButtonText: { color: '#FFF', fontSize: 16, fontWeight: 'bold' },
+    deleteButton: {
+        flexDirection: 'row', backgroundColor: '#E53935', paddingVertical: 12,
+        marginHorizontal: 20, borderRadius: 12, alignItems: 'center',
+        justifyContent: 'center', marginTop: 10,
+    },
+    deleteButtonPressed: { backgroundColor: '#C62828' },
+    deleteButtonText: { color: '#FFF', fontSize: 14, fontWeight: 'bold' },
+});

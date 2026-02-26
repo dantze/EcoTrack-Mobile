@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react'
 import { useRouter } from 'expo-router'
 import { AntDesign, Ionicons } from '@expo/vector-icons';
 import { ClientService } from '../../services/ClientService';
-import ScreenHeader from '../../components/ScreenHeader';
+import ScreenHeader from '../../components/layout/ScreenHeader';
 import { AppColors } from '../../constants/Colors';
 
 type Client = {

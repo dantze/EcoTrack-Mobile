@@ -1,7 +1,7 @@
 import React from 'react';
 import { StyleSheet, Text, View } from 'react-native';
-import { DateInfo } from '../utils/orderUtils';
-import { AppColors } from '../constants/Colors';
+import { DateInfo } from '../../utils/orderUtils';
+import { AppColors } from '../../constants/Colors';
 
 interface DateBadgeProps {
     dateInfo: DateInfo;

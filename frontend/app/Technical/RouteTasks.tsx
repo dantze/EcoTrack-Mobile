@@ -6,8 +6,8 @@ import { RouteService } from '../../services/RouteService';
 import { Task } from '../../services/TaskService';
 import { getTaskTypeLabel, getTaskTypeColor, getStatusLabel } from '../../constants/TaskConstants';
 import { AppColors } from '../../constants/Colors';
-import ScreenHeader from '../../components/ScreenHeader';
-import TaskTypeLegend from '../../components/TaskTypeLegend';
+import ScreenHeader from '../../components/layout/ScreenHeader';
+import TaskTypeLegend from '../../components/display/TaskTypeLegend';
 
 const RouteTasks = () => {
     const router = useRouter();

@@ -6,7 +6,7 @@ import { TaskService, Task } from '../../services/TaskService';
 import { OrderService } from '../../services/OrderService';
 import { PhotoService } from '../../services/PhotoService';
 import * as ImagePicker from 'expo-image-picker';
-import { TASK_TYPE_LABELS, STATUS_LABELS, STATUS_COLORS } from '../../constants/TaskConstants';
+import { TASK_TYPE_LABELS, STATUS_LABELS, STATUS_COLORS, getTaskTypeLabel, getStatusLabel, getStatusColor } from '../../constants/TaskConstants';
 import { AppColors } from '../../constants/Colors';
 import ScreenHeader from '../../components/ScreenHeader';
 import StatusBadge from '../../components/StatusBadge';
@@ -243,7 +243,7 @@ const TaskDetails = () => {
     if (loading) {
         return (
             <View style={[styles.container, styles.loadingContainer]}>
-                <ActivityIndicator size="large" color="#FFFFFF" />
+                <ActivityIndicator size="large" color={AppColors.textWhite} />
                 <Text style={styles.loadingText}>Se încarcă detaliile...</Text>
             </View>
         );
@@ -252,7 +252,7 @@ const TaskDetails = () => {
     if (!task) {
         return (
             <View style={[styles.container, styles.loadingContainer]}>
-                <Ionicons name="warning" size={60} color="#F44336" />
+                <Ionicons name="warning" size={60} color={AppColors.errorRed} />
                 <Text style={styles.errorText}>Sarcina nu a fost găsită</Text>
                 <Pressable style={styles.backButtonLarge} onPress={() => router.back()}>
                     <Text style={styles.backButtonText}>Înapoi</Text>
@@ -270,8 +270,8 @@ const TaskDetails = () => {
                 title="Detalii Sarcină"
                 rightElement={
                     <StatusBadge
-                        label={STATUS_LABELS[task.status] || task.status}
-                        color={STATUS_COLORS[task.status] || '#888'}
+                        label={getStatusLabel(task.status)}
+                        color={getStatusColor(task.status)}
                     />
                 }
             />
@@ -287,13 +287,13 @@ const TaskDetails = () => {
 
                     <View style={styles.orderInfoRow}>
                         <Text style={styles.orderInfoLabel}>Tip Sarcină</Text>
-                        <Text style={styles.orderInfoValue}>{TASK_TYPE_LABELS[task.type] || task.type}</Text>
+                        <Text style={styles.orderInfoValue}>{getTaskTypeLabel(task.type)}</Text>
                     </View>
 
                     {orderDetails?.productName && (
                         <View style={styles.orderItemRow}>
                             <View style={styles.orderItemLeft}>
-                                <Ionicons name="cube-outline" size={18} color="#5D8AA8" />
+                                <Ionicons name="cube-outline" size={18} color={AppColors.accentColor} />
                                 <Text style={styles.orderItemName}>{orderDetails.productName}</Text>
                             </View>
                             {orderDetails.quantity != null && (
@@ -312,13 +312,13 @@ const TaskDetails = () => {
                             ]}
                             onPress={() => handleCall(orderDetails.contact)}
                         >
-                            <Ionicons name="call" size={20} color="#4CAF50" />
+                            <Ionicons name="call" size={20} color={AppColors.successGreen} />
                             <View style={styles.infoContent}>
                                 <Text style={styles.infoLabel}>Persoană contact</Text>
                                 <Text style={[styles.infoValue, styles.linkText]}>{orderDetails.contact}</Text>
                             </View>
                             <View style={styles.pressableArrow}>
-                                <Ionicons name="chevron-forward" size={18} color="#FFFFFF" />
+                                <Ionicons name="chevron-forward" size={18} color={AppColors.textWhite} />
                             </View>
                         </Pressable>
                     )}
@@ -335,7 +335,7 @@ const TaskDetails = () => {
                     <Text style={styles.sectionTitle}>Informații Client</Text>
 
                     <View style={styles.infoRow}>
-                        <Ionicons name="person" size={20} color="#5D8AA8" />
+                        <Ionicons name="person" size={20} color={AppColors.accentColor} />
                         <View style={styles.infoContent}>
                             <Text style={styles.infoLabel}>Nume</Text>
                             <Text style={styles.infoValue}>{task.clientName || 'Necunoscut'}</Text>
@@ -350,13 +350,13 @@ const TaskDetails = () => {
                             ]}
                             onPress={() => handleCall()}
                         >
-                            <Ionicons name="call" size={20} color="#4CAF50" />
+                            <Ionicons name="call" size={20} color={AppColors.successGreen} />
                             <View style={styles.infoContent}>
                                 <Text style={styles.infoLabel}>Telefon</Text>
                                 <Text style={[styles.infoValue, styles.linkText]}>{task.clientPhone}</Text>
                             </View>
                             <View style={styles.pressableArrow}>
-                                <Ionicons name="chevron-forward" size={18} color="#FFFFFF" />
+                                <Ionicons name="chevron-forward" size={18} color={AppColors.textWhite} />
                             </View>
                         </Pressable>
                     )}
@@ -373,13 +373,13 @@ const TaskDetails = () => {
                         ]}
                         onPress={handleNavigate}
                     >
-                        <Ionicons name="location" size={20} color="#F44336" />
+                        <Ionicons name="location" size={20} color={AppColors.errorRed} />
                         <View style={styles.infoContent}>
                             <Text style={styles.infoLabel}>Adresă</Text>
                             <Text style={[styles.infoValue, styles.linkText]}>{task.address || 'Necunoscută'}</Text>
                         </View>
                         <View style={styles.pressableArrow}>
-                            <Ionicons name="navigate" size={16} color="#FFFFFF" />
+                            <Ionicons name="navigate" size={16} color={AppColors.textWhite} />
                         </View>
                     </Pressable>
                 </View>
@@ -391,7 +391,7 @@ const TaskDetails = () => {
                     {task.status === 'COMPLETED' ? (
                         <>
                             <View style={styles.savedBanner}>
-                                <Ionicons name="cloud-done" size={22} color="#4CAF50" />
+                                <Ionicons name="cloud-done" size={22} color={AppColors.successGreen} />
                                 <Text style={styles.savedBannerText}>Pozele au fost salvate în cloud</Text>
                             </View>
 
@@ -407,9 +407,9 @@ const TaskDetails = () => {
                                     disabled={loadingCloudPhotos}
                                 >
                                     {loadingCloudPhotos ? (
-                                        <ActivityIndicator size="small" color="#5D8AA8" />
+                                        <ActivityIndicator size="small" color={AppColors.accentColor} />
                                     ) : (
-                                        <Ionicons name="cloud-download-outline" size={22} color="#5D8AA8" />
+                                        <Ionicons name="cloud-download-outline" size={22} color={AppColors.accentColor} />
                                     )}
                                     <Text style={styles.loadPhotosText}>
                                         {loadingCloudPhotos ? 'Se încarcă...' : 'Vezi Pozele'}
@@ -434,7 +434,7 @@ const TaskDetails = () => {
                                                 style={styles.removePhotoButton}
                                                 onPress={() => handleRemovePhoto(index)}
                                             >
-                                                <Ionicons name="close-circle" size={22} color="#FF5252" />
+                                                <Ionicons name="close-circle" size={22} color={AppColors.errorRed} />
                                             </Pressable>
                                         </Pressable>
                                     ))}
@@ -448,7 +448,7 @@ const TaskDetails = () => {
                                 ]}
                                 onPress={handleAddPhotos}
                             >
-                                <Ionicons name="camera" size={28} color="#5D8AA8" />
+                                <Ionicons name="camera" size={28} color={AppColors.accentColor} />
                                 <Text style={styles.addPhotoText}>Adaugă Poze</Text>
                                 <Text style={styles.addPhotoSubtext}>Apasă pentru a face sau selecta poze</Text>
                             </Pressable>
@@ -465,12 +465,12 @@ const TaskDetails = () => {
                     <Pressable
                         style={({ pressed }) => [
                             styles.actionButton,
-                            { backgroundColor: '#2196F3' },
+                            { backgroundColor: AppColors.infoBlue },
                             pressed && styles.buttonPressed
                         ]}
                         onPress={handleStartTask}
                     >
-                        <Ionicons name="play" size={24} color="#FFFFFF" />
+                        <Ionicons name="play" size={24} color={AppColors.textWhite} />
                         <Text style={styles.actionButtonText}>Începe Sarcina</Text>
                     </Pressable>
                 </View>
@@ -481,7 +481,7 @@ const TaskDetails = () => {
                     <Pressable
                         style={({ pressed }) => [
                             styles.actionButton,
-                            { backgroundColor: '#4CAF50' },
+                            { backgroundColor: AppColors.successGreen },
                             pressed && !completing && styles.buttonPressed,
                             completing && { opacity: 0.7 }
                         ]}
@@ -490,12 +490,12 @@ const TaskDetails = () => {
                     >
                         {completing ? (
                             <>
-                                <ActivityIndicator size="small" color="#FFFFFF" />
+                                <ActivityIndicator size="small" color={AppColors.textWhite} />
                                 <Text style={styles.actionButtonText}>Se încarcă pozele...</Text>
                             </>
                         ) : (
                             <>
-                                <Ionicons name="checkmark-circle" size={24} color="#FFFFFF" />
+                                <Ionicons name="checkmark-circle" size={24} color={AppColors.textWhite} />
                                 <Text style={styles.actionButtonText}>Finalizează Sarcina</Text>
                             </>
                         )}
@@ -506,7 +506,7 @@ const TaskDetails = () => {
             {task.status === 'IN_PROGRESS' && !hasPhotos && (
                 <View style={styles.bottomAction}>
                     <View style={styles.noPhotosWarning}>
-                        <Ionicons name="camera-outline" size={20} color="#FFA500" />
+                        <Ionicons name="camera-outline" size={20} color={AppColors.warningOrange} />
                         <Text style={styles.noPhotosWarningText}>Adaugă poze pentru a putea finaliza sarcina</Text>
                     </View>
                 </View>
@@ -515,7 +515,7 @@ const TaskDetails = () => {
             {task.status === 'COMPLETED' && (
                 <View style={styles.bottomAction}>
                     <View style={styles.completedBanner}>
-                        <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
+                        <Ionicons name="checkmark-circle" size={24} color={AppColors.successGreen} />
                         <Text style={styles.completedBannerText}>Sarcină Finalizată</Text>
                     </View>
                 </View>
@@ -529,19 +529,19 @@ export default TaskDetails
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#16283C',
+        backgroundColor: AppColors.screenBackground,
     },
     loadingContainer: {
         justifyContent: 'center',
         alignItems: 'center',
     },
     loadingText: {
-        color: '#FFFFFF',
+        color: AppColors.textWhite,
         marginTop: 10,
         fontSize: 16,
     },
     errorText: {
-        color: '#F44336',
+        color: AppColors.errorRed,
         marginTop: 15,
         fontSize: 18,
     },
@@ -565,13 +565,13 @@ const styles = StyleSheet.create({
         paddingBottom: 40,
     },
     section: {
-        backgroundColor: '#2A4158',
+        backgroundColor: AppColors.inputBackground,
         borderRadius: 12,
         padding: 16,
         marginBottom: 16,
     },
     sectionTitle: {
-        color: '#5D8AA8',
+        color: AppColors.accentColor,
         fontSize: 12,
         fontWeight: '600',
         textTransform: 'uppercase',
@@ -589,11 +589,11 @@ const styles = StyleSheet.create({
         borderBottomColor: 'rgba(93, 138, 168, 0.15)',
     },
     orderInfoLabel: {
-        color: '#5D8AA8',
+        color: AppColors.accentColor,
         fontSize: 14,
     },
     orderInfoValue: {
-        color: '#FFFFFF',
+        color: AppColors.textWhite,
         fontSize: 15,
         fontWeight: '600',
     },
@@ -601,7 +601,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        backgroundColor: '#1E3A52',
+        backgroundColor: AppColors.modalBackground,
         borderRadius: 10,
         paddingVertical: 12,
         paddingHorizontal: 14,
@@ -613,31 +613,31 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     orderItemName: {
-        color: '#FFFFFF',
+        color: AppColors.textWhite,
         fontSize: 15,
         fontWeight: '500',
         marginLeft: 10,
     },
     quantityBadge: {
-        backgroundColor: '#427992',
+        backgroundColor: AppColors.buttonBackground,
         borderRadius: 8,
         paddingHorizontal: 12,
         paddingVertical: 4,
         marginLeft: 10,
     },
     quantityText: {
-        color: '#FFFFFF',
+        color: AppColors.textWhite,
         fontSize: 14,
         fontWeight: '700',
     },
     orderDetailsBox: {
-        backgroundColor: '#16283C',
+        backgroundColor: AppColors.screenBackground,
         borderRadius: 8,
         padding: 12,
         marginTop: 10,
     },
     orderDetailsText: {
-        color: '#E0E0E0',
+        color: AppColors.lightText,
         fontSize: 14,
         lineHeight: 20,
     },
@@ -653,16 +653,16 @@ const styles = StyleSheet.create({
         marginLeft: 12,
     },
     infoLabel: {
-        color: '#5D8AA8',
+        color: AppColors.accentColor,
         fontSize: 11,
     },
     infoValue: {
-        color: '#FFFFFF',
+        color: AppColors.textWhite,
         fontSize: 16,
         marginTop: 2,
     },
     linkText: {
-        color: '#64B5F6',
+        color: AppColors.linkBlue,
     },
 
     // Pressable rows (phone, address)
@@ -683,7 +683,7 @@ const styles = StyleSheet.create({
         width: 30,
         height: 30,
         borderRadius: 15,
-        backgroundColor: '#427992',
+        backgroundColor: AppColors.buttonBackground,
         justifyContent: 'center',
         alignItems: 'center',
     },
@@ -718,7 +718,7 @@ const styles = StyleSheet.create({
     },
     addPhotoButton: {
         borderWidth: 2,
-        borderColor: '#427992',
+        borderColor: AppColors.buttonBackground,
         borderStyle: 'dashed',
         borderRadius: 12,
         paddingVertical: 20,
@@ -726,7 +726,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     addPhotoText: {
-        color: '#5D8AA8',
+        color: AppColors.accentColor,
         fontSize: 16,
         fontWeight: '600',
         marginTop: 8,
@@ -749,7 +749,7 @@ const styles = StyleSheet.create({
         borderColor: 'rgba(76, 175, 80, 0.3)',
     },
     savedBannerText: {
-        color: '#4CAF50',
+        color: AppColors.successGreen,
         fontSize: 14,
         fontWeight: '500',
         marginLeft: 10,
@@ -759,13 +759,13 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         borderWidth: 1,
-        borderColor: '#427992',
+        borderColor: AppColors.buttonBackground,
         borderRadius: 10,
         paddingVertical: 12,
         gap: 8,
     },
     loadPhotosText: {
-        color: '#5D8AA8',
+        color: AppColors.accentColor,
         fontSize: 15,
         fontWeight: '500',
     },
@@ -776,7 +776,7 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         padding: 20,
-        backgroundColor: '#16283C',
+        backgroundColor: AppColors.screenBackground,
     },
     actionButton: {
         flexDirection: 'row',
@@ -790,7 +790,7 @@ const styles = StyleSheet.create({
         transform: [{ scale: 0.97 }],
     },
     actionButtonText: {
-        color: '#FFFFFF',
+        color: AppColors.textWhite,
         fontSize: 18,
         fontWeight: 'bold',
         marginLeft: 10,
@@ -799,14 +799,14 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#2A4158',
+        backgroundColor: AppColors.inputBackground,
         paddingVertical: 16,
         borderRadius: 16,
         borderWidth: 1,
-        borderColor: '#4CAF50',
+        borderColor: AppColors.successGreen,
     },
     completedBannerText: {
-        color: '#4CAF50',
+        color: AppColors.successGreen,
         fontSize: 16,
         fontWeight: '600',
         marginLeft: 8,
@@ -815,14 +815,14 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'center',
-        backgroundColor: '#2A4158',
+        backgroundColor: AppColors.inputBackground,
         paddingVertical: 14,
         borderRadius: 16,
         borderWidth: 1,
-        borderColor: '#FFA500',
+        borderColor: AppColors.warningOrange,
     },
     noPhotosWarningText: {
-        color: '#FFA500',
+        color: AppColors.warningOrange,
         fontSize: 13,
         fontWeight: '500',
         marginLeft: 8,

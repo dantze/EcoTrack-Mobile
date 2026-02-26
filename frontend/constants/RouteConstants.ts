@@ -29,6 +29,9 @@ export const getDayOfWeekLabel = (dayOfWeek?: number, fallback: string = 'N/A'):
     return DAYS_MAP[dayOfWeek] || fallback;
 };
 
+/** Short Romanian day names (Sunday-first, matching JS Date.getDay()) */
+export const DAY_NAMES_SHORT = ['DU', 'LU', 'MA', 'MI', 'JO', 'VI', 'SÂ'] as const;
+
 /** Romanian counties list */
 export const COUNTIES = [
     'Alba', 'Arad', 'Argeș', 'Bacău', 'Bihor', 'Bistrița-Năsăud', 'Botoșani',

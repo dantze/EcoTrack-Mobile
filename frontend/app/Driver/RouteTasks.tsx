@@ -4,12 +4,12 @@ import { useRouter, useLocalSearchParams } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons';
 import { AuthService } from '../../services/AuthService';
 import { TaskService, Task } from '../../services/TaskService';
-import { TASK_TYPE_LABELS, STATUS_LABELS, STATUS_COLORS } from '../../constants/TaskConstants';
+import { TASK_TYPE_LABELS, STATUS_LABELS, STATUS_COLORS, getTaskTypeLabel, getStatusLabel, getStatusColor } from '../../constants/TaskConstants';
 import { AppColors } from '../../constants/Colors';
 import { toDateString } from '../../utils/dateUtils';
+import { DAY_NAMES_SHORT } from '../../constants/RouteConstants';
 import ScreenHeader from '../../components/ScreenHeader';
-
-const DAY_NAMES_SHORT = ['DU', 'LU', 'MA', 'MI', 'JO', 'VI', 'SÂ'];
+import StatusBadge from '../../components/StatusBadge';
 
 const RouteTasks = () => {
     const router = useRouter();
@@ -114,19 +114,18 @@ const RouteTasks = () => {
             <View style={styles.cardInfo}>
                 <View style={styles.taskTypeRow}>
                     <Text style={styles.taskType}>
-                        {TASK_TYPE_LABELS[task.type] || task.type}
+                        {getTaskTypeLabel(task.type)}
                     </Text>
-                    <View style={[styles.statusBadge, { backgroundColor: STATUS_COLORS[task.status] || '#888' }]}>
-                        <Text style={styles.statusText}>
-                            {STATUS_LABELS[task.status] || task.status}
-                        </Text>
-                    </View>
+                    <StatusBadge
+                        label={getStatusLabel(task.status)}
+                        color={getStatusColor(task.status)}
+                    />
                 </View>
 
                 <Text style={styles.clientName}>{task.clientName || 'Client necunoscut'}</Text>
 
                 <View style={styles.addressRow}>
-                    <Ionicons name="location-sharp" size={14} color="#E0E0E0" />
+                    <Ionicons name="location-sharp" size={14} color={AppColors.lightText} />
                     <Text style={styles.addressText} numberOfLines={1}>
                         {task.address || 'Adresă necunoscută'}
                     </Text>
@@ -134,19 +133,19 @@ const RouteTasks = () => {
 
                 {task.clientPhone && (
                     <View style={styles.phoneRow}>
-                        <Ionicons name="call" size={14} color="#E0E0E0" />
+                        <Ionicons name="call" size={14} color={AppColors.lightText} />
                         <Text style={styles.phoneText}>{task.clientPhone}</Text>
                     </View>
                 )}
             </View>
 
-            <Ionicons name="chevron-forward" size={22} color="#FFFFFF" style={{ marginLeft: 8 }} />
+            <Ionicons name="chevron-forward" size={22} color={AppColors.textWhite} style={{ marginLeft: 8 }} />
         </Pressable>
     );
 
     const renderEmptyState = (message: string) => (
         <View style={styles.emptyContainer}>
-            <Ionicons name="clipboard-outline" size={60} color="#5D8AA8" />
+            <Ionicons name="clipboard-outline" size={60} color={AppColors.accentColor} />
             <Text style={styles.emptyText}>{message}</Text>
         </View>
     );
@@ -154,7 +153,7 @@ const RouteTasks = () => {
     if (loading && tasks.length === 0) {
         return (
             <View style={[styles.container, styles.loadingContainer]}>
-                <ActivityIndicator size="large" color="#FFFFFF" />
+                <ActivityIndicator size="large" color={AppColors.textWhite} />
                 <Text style={styles.loadingText}>Se încarcă sarcinile...</Text>
             </View>
         );
@@ -168,28 +167,28 @@ const RouteTasks = () => {
             {/* Date Navigation */}
             <View style={styles.dateNavContainer}>
                 <Pressable onPress={goToPreviousDay} style={styles.dateNavArrow}>
-                    <Ionicons name="chevron-back" size={22} color="#FFFFFF" />
+                    <Ionicons name="chevron-back" size={22} color={AppColors.textWhite} />
                 </Pressable>
                 <View style={styles.dateNavCenter}>
-                    <Ionicons name="calendar-outline" size={18} color="#5D8AA8" style={{ marginRight: 8 }} />
+                    <Ionicons name="calendar-outline" size={18} color={AppColors.accentColor} style={{ marginRight: 8 }} />
                     <Text style={styles.dateNavText}>{formatDateNav(selectedDate)}</Text>
                 </View>
                 <Pressable onPress={goToNextDay} style={styles.dateNavArrow}>
-                    <Ionicons name="chevron-forward" size={22} color="#FFFFFF" />
+                    <Ionicons name="chevron-forward" size={22} color={AppColors.textWhite} />
                 </Pressable>
             </View>
 
             {/* Stats - only Rămase and Finalizate */}
             <View style={styles.statsContainer}>
                 <View style={styles.statItem}>
-                    <Text style={[styles.statNumber, { color: '#FFA500' }]}>
+                    <Text style={[styles.statNumber, { color: AppColors.warningOrange }]}>
                         {remainingTasks.length}
                     </Text>
                     <Text style={styles.statLabel}>Rămase</Text>
                 </View>
                 <View style={styles.statDivider} />
                 <View style={styles.statItem}>
-                    <Text style={[styles.statNumber, { color: '#4CAF50' }]}>
+                    <Text style={[styles.statNumber, { color: AppColors.successGreen }]}>
                         {completedTasks.length}
                     </Text>
                     <Text style={styles.statLabel}>Finalizate</Text>
@@ -257,9 +256,10 @@ const RouteTasks = () => {
             {/* Loading overlay when changing dates */}
             {loading && (
                 <View style={styles.loadingOverlay}>
-                    <ActivityIndicator size="small" color="#FFFFFF" />
+                    <ActivityIndicator size="small" color={AppColors.textWhite} />
                 </View>
             )}
+
         </View>
     )
 }
@@ -293,7 +293,7 @@ const styles = StyleSheet.create({
         paddingVertical: 12,
         paddingHorizontal: 8,
         borderWidth: 1,
-        borderColor: '#2A4A65',
+        borderColor: AppColors.inputBackground,
     },
     dateNavArrow: {
         width: 36,
@@ -442,7 +442,7 @@ const styles = StyleSheet.create({
     },
     clientName: {
         fontSize: 14,
-        color: '#E0E0E0',
+        color: AppColors.lightText,
         marginBottom: 4,
     },
     addressRow: {
@@ -452,7 +452,7 @@ const styles = StyleSheet.create({
     },
     addressText: {
         fontSize: 12,
-        color: '#B0B0B0',
+        color: AppColors.mutedText,
         marginLeft: 4,
         flex: 1,
     },
@@ -462,7 +462,7 @@ const styles = StyleSheet.create({
     },
     phoneText: {
         fontSize: 12,
-        color: '#B0B0B0',
+        color: AppColors.mutedText,
         marginLeft: 4,
     },
 
@@ -471,7 +471,7 @@ const styles = StyleSheet.create({
         position: 'absolute',
         top: 130,
         alignSelf: 'center',
-        backgroundColor: 'rgba(22, 40, 60, 0.85)',
+        backgroundColor: `${AppColors.screenBackground}D9`,
         paddingHorizontal: 20,
         paddingVertical: 8,
         borderRadius: 20,

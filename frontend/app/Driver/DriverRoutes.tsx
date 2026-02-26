@@ -2,26 +2,11 @@ import { StyleSheet, Text, View, Pressable, ScrollView, ActivityIndicator } from
 import React, { useEffect, useState } from 'react'
 import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons';
-import { API_BASE_URL } from '../../constants/ApiConfig';
 import { AuthService, User } from '../../services/AuthService';
-
-type Task = {
-    id: number;
-    type: string;
-    status: string;
-    address: string;
-    clientName: string;
-    clientPhone: string;
-    scheduledTime: string;
-    internalNotes: string;
-};
-
-type Route = {
-    id: number;
-    date?: string;
-    dayOfWeek?: number; // 1=Luni, 2=Marți, ..., 7=Duminică
-    tasks: Task[];
-};
+import { RouteService, Route } from '../../services/RouteService';
+import { getDayOfWeekLabel } from '../../constants/RouteConstants';
+import { AppColors } from '../../constants/Colors';
+import ScreenHeader from '../../components/ScreenHeader';
 
 const DriverRoutes = () => {
     const router = useRouter();
@@ -42,18 +27,14 @@ const DriverRoutes = () => {
                 return;
             }
 
-            // Check if this user is an admin (has more than one role)
             const userIsAdmin = user.roles && user.roles.length > 1;
             setIsAdmin(userIsAdmin);
 
-            // Check if an admin selected a specific driver to view as
             const activeDriver = await AuthService.getActiveDriver();
             if (activeDriver) {
-                // Admin is impersonating a driver
                 setCurrentUser({ ...user, id: activeDriver.id, fullName: activeDriver.fullName });
                 await fetchDriverRoutes(activeDriver.id);
             } else {
-                // Regular driver viewing their own routes
                 setCurrentUser(user);
                 await fetchDriverRoutes(user.id);
             }
@@ -65,11 +46,7 @@ const DriverRoutes = () => {
 
     const fetchDriverRoutes = async (employeeId: number) => {
         try {
-            const response = await fetch(`${API_BASE_URL}/routes/employee/${employeeId}`);
-            if (!response.ok) {
-                throw new Error(`Failed to fetch routes. Status: ${response.status}`);
-            }
-            const data: Route[] = await response.json();
+            const data = await RouteService.getRoutesByEmployeeId(employeeId);
             console.log('Fetched driver routes:', data.length);
             setRoutes(data);
         } catch (error) {
@@ -79,39 +56,27 @@ const DriverRoutes = () => {
         }
     };
 
-    // Convert dayOfWeek number to Romanian day name
     const getDayOfWeekInfo = (dayOfWeek?: number, dateString?: string) => {
-        const daysRo: { [key: number]: string } = {
-            1: 'Luni',
-            2: 'Marți',
-            3: 'Miercuri',
-            4: 'Joi',
-            5: 'Vineri',
-            6: 'Sâmbătă',
-            7: 'Duminică'
-        };
-
-        // If dayOfWeek is available, use it
-        if (dayOfWeek && daysRo[dayOfWeek]) {
+        if (dayOfWeek) {
             return {
-                dayName: daysRo[dayOfWeek],
+                dayName: getDayOfWeekLabel(dayOfWeek),
                 date: 'Săptămânal'
             };
         }
 
-        // Fallback to date parsing if no dayOfWeek
         if (!dateString) return { dayName: 'N/A', date: '--' };
 
         try {
             const date = new Date(dateString);
             if (isNaN(date.getTime())) return { dayName: 'N/A', date: '--' };
 
-            const days = ['Duminică', 'Luni', 'Marți', 'Miercuri', 'Joi', 'Vineri', 'Sâmbătă'];
-            const months = ['Ian', 'Feb', 'Mar', 'Apr', 'Mai', 'Iun', 'Iul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+            // Convert JS getDay() (0=Sunday) to RouteConstants (1=Mon..7=Sun)
+            const jsDay = date.getDay();
+            const routeDay = jsDay === 0 ? 7 : jsDay;
 
             return {
-                dayName: days[date.getDay()],
-                date: `${date.getDate()} ${months[date.getMonth()]}`
+                dayName: getDayOfWeekLabel(routeDay),
+                date: date.toLocaleDateString('ro-RO', { day: 'numeric', month: 'short' })
             };
         } catch {
             return { dayName: 'N/A', date: '--' };
@@ -120,7 +85,7 @@ const DriverRoutes = () => {
 
     const getTasksCount = (route: Route) => {
         const total = route.tasks?.length || 0;
-        const completed = route.tasks?.filter(t => t.status === 'COMPLETED').length || 0;
+        const completed = route.tasks?.filter((t: any) => t.status === 'COMPLETED').length || 0;
         return { total, completed };
     };
 
@@ -134,10 +99,15 @@ const DriverRoutes = () => {
         });
     };
 
+    const handleBack = async () => {
+        await AuthService.clearActiveDriver();
+        router.replace('/Driver/DriverSelection');
+    };
+
     if (loading) {
         return (
             <View style={[styles.container, styles.loadingContainer]}>
-                <ActivityIndicator size="large" color="#FFFFFF" />
+                <ActivityIndicator size="large" color={AppColors.textWhite} />
                 <Text style={styles.loadingText}>Se încarcă rutele...</Text>
             </View>
         );
@@ -149,26 +119,22 @@ const DriverRoutes = () => {
                 <View style={styles.headerTop}>
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                         {isAdmin && (
-                            <Pressable
-                                onPress={async () => {
-                                    await AuthService.clearActiveDriver();
-                                    router.replace('/Driver/DriverSelection');
-                                }}
-                                style={styles.backButton}
-                            >
-                                <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
+                            <Pressable onPress={handleBack} style={styles.backButton}>
+                                <Ionicons name="arrow-back" size={22} color={AppColors.textWhite} />
                             </Pressable>
                         )}
                         <View>
                             <Text style={styles.headerText}>Rutele Mele</Text>
-                            <Text style={styles.subHeaderText}>Bine ai venit, {currentUser?.fullName?.split(' ')[0] || 'Șofer'}!</Text>
+                            <Text style={styles.subHeaderText}>
+                                Bine ai venit, {currentUser?.fullName?.split(' ')[0] || 'Șofer'}!
+                            </Text>
                         </View>
                     </View>
                     <Pressable
                         style={styles.logoutButton}
                         onPress={() => router.replace('/login')}
                     >
-                        <Ionicons name="log-out-outline" size={24} color="#FF5252" />
+                        <Ionicons name="log-out-outline" size={24} color={AppColors.errorRed} />
                     </Pressable>
                 </View>
             </View>
@@ -180,7 +146,7 @@ const DriverRoutes = () => {
             >
                 {routes.length === 0 ? (
                     <View style={styles.emptyContainer}>
-                        <Ionicons name="car-outline" size={60} color="#5D8AA8" />
+                        <Ionicons name="car-outline" size={60} color={AppColors.accentColor} />
                         <Text style={styles.emptyText}>Nu ai rute asignate</Text>
                         <Text style={styles.emptySubText}>Contactează dispeceratul</Text>
                     </View>
@@ -209,7 +175,7 @@ const DriverRoutes = () => {
 
                                 <View style={styles.cardRight}>
                                     <View style={styles.tasksInfo}>
-                                        <Ionicons name="list" size={18} color="#FFFFFF" />
+                                        <Ionicons name="list" size={18} color={AppColors.textWhite} />
                                         <Text style={styles.tasksText}>
                                             {completed}/{total} sarcini
                                         </Text>
@@ -217,11 +183,11 @@ const DriverRoutes = () => {
 
                                     {isCompleted ? (
                                         <View style={styles.completedBadge}>
-                                            <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
+                                            <Ionicons name="checkmark-circle" size={20} color={AppColors.successGreen} />
                                             <Text style={styles.completedText}>Finalizată</Text>
                                         </View>
                                     ) : (
-                                        <Ionicons name="chevron-forward" size={24} color="#FFFFFF" />
+                                        <Ionicons name="chevron-forward" size={24} color={AppColors.textWhite} />
                                     )}
                                 </View>
                             </Pressable>
@@ -240,7 +206,7 @@ const DriverRoutes = () => {
                 ]}
                 onPress={() => currentUser && fetchDriverRoutes(currentUser.id)}
             >
-                <Ionicons name="refresh" size={24} color="#FFFFFF" />
+                <Ionicons name="refresh" size={24} color={AppColors.textWhite} />
                 <Text style={styles.refreshText}>Reîmprospătează</Text>
             </Pressable>
         </View>
@@ -252,14 +218,14 @@ export default DriverRoutes
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#16283C',
+        backgroundColor: AppColors.screenBackground,
     },
     loadingContainer: {
         justifyContent: 'center',
         alignItems: 'center',
     },
     loadingText: {
-        color: '#FFFFFF',
+        color: AppColors.textWhite,
         marginTop: 10,
         fontSize: 16,
     },
@@ -281,19 +247,19 @@ const styles = StyleSheet.create({
         width: 38,
         height: 38,
         borderRadius: 19,
-        backgroundColor: '#427992',
+        backgroundColor: AppColors.buttonBackground,
         justifyContent: 'center' as const,
         alignItems: 'center' as const,
         marginRight: 12,
     },
     headerText: {
-        color: '#FFFFFF',
+        color: AppColors.textWhite,
         fontSize: 28,
         fontWeight: 'bold',
         textAlign: 'left',
     },
     subHeaderText: {
-        color: '#5D8AA8',
+        color: AppColors.accentColor,
         fontSize: 16,
         marginTop: 5,
     },
@@ -310,34 +276,34 @@ const styles = StyleSheet.create({
         paddingTop: 60,
     },
     emptyText: {
-        color: '#5D8AA8',
+        color: AppColors.accentColor,
         fontSize: 18,
         marginTop: 15,
     },
     emptySubText: {
-        color: '#5D8AA8',
+        color: AppColors.accentColor,
         fontSize: 14,
         marginTop: 5,
         opacity: 0.7,
     },
     card: {
-        backgroundColor: '#427992',
+        backgroundColor: AppColors.buttonBackground,
         borderRadius: 16,
         padding: 16,
         marginBottom: 16,
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        shadowColor: "#000",
+        shadowColor: AppColors.shadow,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
         shadowRadius: 3.84,
         elevation: 5,
     },
     cardCompleted: {
-        backgroundColor: '#2A4158',
+        backgroundColor: AppColors.inputBackground,
         borderWidth: 1,
-        borderColor: '#4CAF50',
+        borderColor: AppColors.successGreen,
     },
     cardPressed: {
         opacity: 0.9,
@@ -352,11 +318,11 @@ const styles = StyleSheet.create({
     dayName: {
         fontSize: 18,
         fontWeight: 'bold',
-        color: '#FFFFFF',
+        color: AppColors.textWhite,
     },
     dateText: {
         fontSize: 14,
-        color: '#E0E0E0',
+        color: AppColors.lightText,
         marginTop: 2,
     },
     cardRight: {
@@ -368,7 +334,7 @@ const styles = StyleSheet.create({
         marginBottom: 8,
     },
     tasksText: {
-        color: '#FFFFFF',
+        color: AppColors.textWhite,
         fontSize: 14,
         marginLeft: 6,
     },
@@ -377,7 +343,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     completedText: {
-        color: '#4CAF50',
+        color: AppColors.successGreen,
         fontSize: 12,
         marginLeft: 4,
         fontWeight: '600',
@@ -387,7 +353,7 @@ const styles = StyleSheet.create({
         bottom: 30,
         left: 20,
         right: 20,
-        backgroundColor: '#5D8AA8',
+        backgroundColor: AppColors.accentColor,
         borderRadius: 16,
         paddingVertical: 14,
         flexDirection: 'row',
@@ -400,7 +366,7 @@ const styles = StyleSheet.create({
         transform: [{ scale: 0.98 }]
     },
     refreshText: {
-        color: '#FFFFFF',
+        color: AppColors.textWhite,
         fontSize: 16,
         fontWeight: '600',
         marginLeft: 8,

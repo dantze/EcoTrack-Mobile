@@ -4,6 +4,8 @@ import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons';
 import { Employee, getAllDrivers } from '@/services/EmployeeService';
 import { AuthService } from '@/services/AuthService';
+import ScreenHeader from '../../components/ScreenHeader';
+import { AppColors } from '../../constants/Colors';
 
 const DriverSelection = () => {
     const router = useRouter();
@@ -26,20 +28,9 @@ const DriverSelection = () => {
     };
 
     const handleDriverSelect = async (driver: Employee) => {
-        // Store the selected driver as the active driver
         await AuthService.setActiveDriver(driver.id, driver.fullName);
-        // Navigate to DriverRoutes
         router.replace('/Driver/DriverRoutes');
     };
-
-    if (loading) {
-        return (
-            <View style={[styles.container, styles.loadingContainer]}>
-                <ActivityIndicator size="large" color="#FFFFFF" />
-                <Text style={styles.loadingText}>Se încarcă șoferii...</Text>
-            </View>
-        );
-    }
 
     const handleGoBack = async () => {
         const user = await AuthService.getCurrentUser();
@@ -56,17 +47,19 @@ const DriverSelection = () => {
         }
     };
 
+    if (loading) {
+        return (
+            <View style={[styles.container, styles.loadingContainer]}>
+                <ActivityIndicator size="large" color={AppColors.textWhite} />
+                <Text style={styles.loadingText}>Se încarcă șoferii...</Text>
+            </View>
+        );
+    }
+
     return (
         <View style={styles.container}>
-            <View style={styles.headerContainer}>
-                <Pressable onPress={handleGoBack} style={styles.backButton}>
-                    <Ionicons name="arrow-back" size={24} color="#FFFFFF" />
-                </Pressable>
-                <View>
-                    <Text style={styles.headerText}>Selectează Șoferul</Text>
-                    <Text style={styles.subHeaderText}>Vezi aplicația din perspectiva unui șofer</Text>
-                </View>
-            </View>
+            <ScreenHeader title="Selectează Șoferul" onBack={handleGoBack} />
+            <Text style={styles.subHeaderText}>Vezi aplicația din perspectiva unui șofer</Text>
 
             <ScrollView
                 style={styles.scrollContainer}
@@ -75,7 +68,7 @@ const DriverSelection = () => {
             >
                 {drivers.length === 0 ? (
                     <View style={styles.emptyContainer}>
-                        <Ionicons name="people-outline" size={60} color="#5D8AA8" />
+                        <Ionicons name="people-outline" size={60} color={AppColors.accentColor} />
                         <Text style={styles.emptyText}>Nu există șoferi înregistrați</Text>
                     </View>
                 ) : (
@@ -89,13 +82,13 @@ const DriverSelection = () => {
                             onPress={() => handleDriverSelect(driver)}
                         >
                             <View style={styles.avatarContainer}>
-                                <Ionicons name="person" size={28} color="#FFFFFF" />
+                                <Ionicons name="person" size={28} color={AppColors.textWhite} />
                             </View>
                             <View style={styles.driverInfo}>
                                 <Text style={styles.driverName}>{driver.fullName}</Text>
                                 <Text style={styles.driverUsername}>@{driver.username}</Text>
                             </View>
-                            <Ionicons name="chevron-forward" size={24} color="#5D8AA8" />
+                            <Ionicons name="chevron-forward" size={24} color={AppColors.accentColor} />
                         </Pressable>
                     ))
                 )}
@@ -110,43 +103,23 @@ export default DriverSelection;
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: '#16283C',
+        backgroundColor: AppColors.screenBackground,
     },
     loadingContainer: {
         justifyContent: 'center',
         alignItems: 'center',
     },
     loadingText: {
-        color: '#FFFFFF',
+        color: AppColors.textWhite,
         marginTop: 10,
         fontSize: 16,
     },
-    headerContainer: {
-        marginTop: 60,
-        paddingHorizontal: 20,
-        width: '100%',
-        marginBottom: 20,
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    backButton: {
-        width: 40,
-        height: 40,
-        borderRadius: 20,
-        backgroundColor: '#427992',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 15,
-    },
-    headerText: {
-        color: '#FFFFFF',
-        fontSize: 24,
-        fontWeight: 'bold',
-    },
     subHeaderText: {
-        color: '#5D8AA8',
+        color: AppColors.accentColor,
         fontSize: 14,
-        marginTop: 4,
+        marginTop: -10,
+        marginBottom: 10,
+        paddingHorizontal: 75,
     },
     scrollContainer: {
         flex: 1,
@@ -161,30 +134,30 @@ const styles = StyleSheet.create({
         paddingTop: 60,
     },
     emptyText: {
-        color: '#5D8AA8',
+        color: AppColors.accentColor,
         fontSize: 18,
         marginTop: 15,
     },
     driverCard: {
-        backgroundColor: '#1E3A52',
+        backgroundColor: AppColors.modalBackground,
         borderRadius: 16,
         padding: 18,
         marginBottom: 12,
         flexDirection: 'row',
         alignItems: 'center',
         borderWidth: 1,
-        borderColor: '#2A4A65',
+        borderColor: AppColors.inputBackground,
     },
     cardPressed: {
         opacity: 0.85,
         transform: [{ scale: 0.98 }],
-        borderColor: '#4CAF50',
+        borderColor: AppColors.successGreen,
     },
     avatarContainer: {
         width: 50,
         height: 50,
         borderRadius: 25,
-        backgroundColor: '#427992',
+        backgroundColor: AppColors.buttonBackground,
         justifyContent: 'center',
         alignItems: 'center',
         marginRight: 14,
@@ -193,18 +166,13 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     driverName: {
-        color: '#FFFFFF',
+        color: AppColors.textWhite,
         fontSize: 17,
         fontWeight: '600',
         marginBottom: 2,
     },
-    driverCounty: {
-        color: '#A5A5A5',
-        fontSize: 13,
-        marginBottom: 2,
-    },
     driverUsername: {
-        color: '#5D8AA8',
+        color: AppColors.accentColor,
         fontSize: 12,
     },
 });

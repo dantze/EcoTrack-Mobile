@@ -15,6 +15,12 @@ export const AppColors = {
   inputBackground: '#2A4158',
   placeholderText: '#888888',
   disabledText: '#666666',
+  errorRed: '#F44336',
+  warningOrange: '#FFA500',
+  linkBlue: '#64B5F6',
+  lightText: '#E0E0E0',
+  mutedText: '#B0B0B0',
+  infoBlue: '#2196F3',
 };
 
 export default {

@@ -108,15 +108,14 @@ export default function EditClient() {
                     </View>
 
                     {/* ID Photo for individual clients */}
-                    {!isCompany && clientData.idPhotoUrl && (
-                        <View style={{ width: '100%', marginTop: 16 }}>
-                            <CloudPhotoViewer
-                                photos={[clientData.idPhotoUrl]}
-                                buttonLabel="Vezi Fotografia"
-                                bannerLabel="Fotografie buletin salvată"
-                            />
-                        </View>
-                    )}
+
+                    <View style={{ width: '100%', marginTop: 16 }}>
+                        <CloudPhotoViewer
+                            photos={[clientData.idPhotoUrl]}
+                            buttonLabel="Vezi Fotografia"
+                            bannerLabel="Fotografie buletin salvată"
+                        />
+                    </View>
 
                     {/* Form fields */}
                     <View style={{ width: '100%', marginTop: 20 }}>

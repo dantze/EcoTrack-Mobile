@@ -8,7 +8,7 @@ const ROLE_CONFIG = {
         title: 'Șofer',
         subtitle: 'Rute și livrări',
         icon: 'car-outline' as const,
-        route: '/Driver/Menu',
+        route: '/Driver/DriverSelection',
         color: '#4CAF50',
     },
     SALES: {
@@ -41,7 +41,7 @@ const RoleSelection = () => {
     const handleRoleSelect = (role: RoleKey) => {
         const config = ROLE_CONFIG[role];
         if (config) {
-            router.push(config.route as any);
+            router.replace(config.route as any);
         }
     };
 

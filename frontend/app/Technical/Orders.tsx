@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View, ScrollView, ActivityIndicator } from 'react-native';
+import { StyleSheet, Text, View, ScrollView, ActivityIndicator, TextInput } from 'react-native';
 import React, { useEffect, useState } from 'react';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
@@ -14,6 +14,8 @@ const Orders = () => {
     const router = useRouter();
 
     const [orders, setOrders] = useState<Order[]>([]);
+    const [filteredOrders, setFilteredOrders] = useState<Order[]>([]);
+    const [searchQuery, setSearchQuery] = useState('');
     const [loading, setLoading] = useState(true);
     const [orderTaskStatus, setOrderTaskStatus] = useState<OrderTaskMap>({});
 
@@ -32,6 +34,7 @@ const Orders = () => {
             const data: Order[] = await OrderService.getOrders();
             console.log('Fetched orders:', data.length);
             setOrders(data);
+            setFilteredOrders(data);
         } catch (error) {
             console.error('Error fetching orders:', error);
         } finally {
@@ -53,6 +56,20 @@ const Orders = () => {
         );
         setOrderTaskStatus(statusMap);
     };
+
+    useEffect(() => {
+        if (!searchQuery) {
+            setFilteredOrders(orders);
+            return;
+        }
+        const lowerQuery = searchQuery.toLowerCase();
+        const filtered = orders.filter(order => {
+            const clientNameStr = getClientName(order).toLowerCase();
+            const orderNumber = (order.number || order.id).toString();
+            return clientNameStr.includes(lowerQuery) || orderNumber.includes(lowerQuery);
+        });
+        setFilteredOrders(filtered);
+    }, [searchQuery, orders]);
 
     const handleCardPress = (order: Order) => {
         router.push({
@@ -77,18 +94,29 @@ const Orders = () => {
         <View style={styles.container}>
             <ScreenHeader title="Comenzi" onRefresh={fetchOrders} />
 
+            <View style={styles.searchContainer}>
+                <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
+                <TextInput
+                    style={styles.searchInput}
+                    placeholder="Caută comandă (Client, Număr...)"
+                    placeholderTextColor="#999"
+                    value={searchQuery}
+                    onChangeText={setSearchQuery}
+                />
+            </View>
+
             <ScrollView
                 style={styles.scrollContainer}
                 contentContainerStyle={styles.scrollContent}
                 showsVerticalScrollIndicator={false}
             >
-                {orders.length === 0 ? (
+                {filteredOrders.length === 0 ? (
                     <View style={styles.emptyContainer}>
                         <Ionicons name="clipboard-outline" size={60} color="#5D8AA8" />
-                        <Text style={styles.emptyText}>Nu există comenzi</Text>
+                        <Text style={styles.emptyText}>{searchQuery ? 'Nu s-au găsit comenzi' : 'Nu există comenzi'}</Text>
                     </View>
                 ) : (
-                    orders.map((order) => (
+                    filteredOrders.map((order) => (
                         <OrderCard
                             key={order.id}
                             order={order}
@@ -136,5 +164,24 @@ const styles = StyleSheet.create({
         color: '#5D8AA8',
         fontSize: 18,
         marginTop: 15,
+    },
+    searchContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FFFFFF',
+        marginHorizontal: 20,
+        borderRadius: 12,
+        paddingHorizontal: 15,
+        height: 45,
+        marginBottom: 10,
+    },
+    searchIcon: {
+        marginRight: 10,
+    },
+    searchInput: {
+        flex: 1,
+        height: '100%',
+        color: '#16283C',
+        fontSize: 16,
     },
 });

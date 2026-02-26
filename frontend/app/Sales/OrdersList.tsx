@@ -26,6 +26,10 @@ interface OrderItem {
     quantity?: number;
     locationAddress?: string;
     details?: string;
+    startDate?: string;
+    endDate?: string;
+    pickupDate?: string;
+    sanitationDate?: string;
     client?: {
         id: number;
         type: string;
@@ -124,6 +128,18 @@ export default function OrdersList() {
         return `Client #${order.client.id}`;
     };
 
+    const formatOrderDate = (order: OrderItem): string => {
+        const start = order.startDate || order.pickupDate || order.sanitationDate;
+        const end = order.endDate;
+        if (!start) return 'N/A';
+        const startFormatted = formatDate(start);
+        if (end && end !== start) {
+            const endFormatted = formatDate(end);
+            return `${startFormatted} - ${endFormatted}`;
+        }
+        return startFormatted;
+    };
+
     const renderOrder = ({ item }: { item: OrderItem }) => (
         <ListCard
             onPress={() => handleEditOrder(item)}
@@ -137,7 +153,7 @@ export default function OrdersList() {
             <InfoRow icon="user" text={getClientName(item)} />
             {item.product?.name ? <InfoRow icon="box" text={item.product.name} /> : null}
             {item.quantity ? <InfoRow icon="hash" text={`Cantitate: ${item.quantity}`} /> : null}
-            <InfoRow icon="calendar" text={formatDate(item.date)} />
+            <InfoRow icon="calendar" text={formatOrderDate(item)} />
             {item.locationAddress ? <InfoRow icon="map-pin" text={item.locationAddress} numberOfLines={1} /> : null}
         </ListCard>
     );

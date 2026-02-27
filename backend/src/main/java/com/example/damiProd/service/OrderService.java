@@ -48,6 +48,25 @@ public class OrderService {
             rid.setProduct(product);
         }
 
+        // ─── Ridicare: validate available quantity before saving ─────────────
+        if (order instanceof RidicareOrder rid
+                && rid.getPickupLocationCoordinates() != null
+                && rid.getPickupProductName() != null
+                && rid.getPickupQuantity() != null) {
+
+            int totalPlaced = orderRepository.sumAmplasareQuantityByClientLocationAndProduct(
+                    clientId, rid.getPickupLocationCoordinates(), rid.getPickupProductName());
+            int alreadyClaimed = orderRepository.sumRidicareQuantityByClientLocationAndProduct(
+                    clientId, rid.getPickupLocationCoordinates(), rid.getPickupProductName());
+            int available = totalPlaced - alreadyClaimed;
+
+            if (rid.getPickupQuantity() > available) {
+                throw new InsufficientQuantityException(
+                        "Cantitate insuficientă la locație. Disponibil: " + available
+                        + ", solicitat: " + rid.getPickupQuantity() + ".");
+            }
+        }
+
         // ─── Link subscription for Igienizare ───
         if (order instanceof IgienizareOrder igi && igi.getSubscription() != null
                 && igi.getSubscription().getId() != null) {

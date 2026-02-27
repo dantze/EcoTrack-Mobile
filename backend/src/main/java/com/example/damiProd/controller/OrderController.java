@@ -1,7 +1,9 @@
 package com.example.damiProd.controller;
 
 import com.example.damiProd.domain.Order;
+import com.example.damiProd.service.InsufficientQuantityException;
 import com.example.damiProd.service.OrderService;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -50,5 +52,10 @@ public class OrderController {
     public ResponseEntity<Order> updateOrder(@PathVariable("orderId") Long orderId, @RequestBody Order orderDetails) {
         Order updatedOrder = orderService.updateOrder(orderId, orderDetails);
         return ResponseEntity.ok(updatedOrder);
+    }
+
+    @ExceptionHandler(InsufficientQuantityException.class)
+    public ResponseEntity<String> handleInsufficientQuantity(InsufficientQuantityException ex) {
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(ex.getMessage());
     }
 }

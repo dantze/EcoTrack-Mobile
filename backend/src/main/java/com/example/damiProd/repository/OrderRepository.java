@@ -22,4 +22,17 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     // Used by ProductService to prevent deleting a product still in use
     @Query("SELECT COUNT(o) > 0 FROM AmplasareOrder o WHERE o.product.id = :productId")
     boolean existsByAmplasareOrderProductId(@Param("productId") Long productId);
+
+    // ─── Ridicare availability checks ───────────────────────────────────────
+    @Query("SELECT COALESCE(SUM(o.quantity), 0) FROM AmplasareOrder o " +
+           "WHERE o.client.id = :clientId AND o.locationCoordinates = :coords AND o.product.name = :productName")
+    int sumAmplasareQuantityByClientLocationAndProduct(@Param("clientId") Long clientId,
+                                                       @Param("coords") String coords,
+                                                       @Param("productName") String productName);
+
+    @Query("SELECT COALESCE(SUM(o.pickupQuantity), 0) FROM RidicareOrder o " +
+           "WHERE o.client.id = :clientId AND o.pickupLocationCoordinates = :coords AND o.pickupProductName = :productName")
+    int sumRidicareQuantityByClientLocationAndProduct(@Param("clientId") Long clientId,
+                                                      @Param("coords") String coords,
+                                                      @Param("productName") String productName);
 }

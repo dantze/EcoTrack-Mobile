@@ -40,8 +40,9 @@ const MAP_STYLE = [
 ];
 
 interface OrderSummary {
-    name: string;
+    orderNumber: number | null;
     clientName: string;
+    name: string;
     orderType: string;
     itemCount: number;
     address: string;
@@ -97,8 +98,9 @@ export default function AllOrdersMap() {
                     const coords = getCoords(o);
                     const parts = coords.split(',');
                     const orderSummary: OrderSummary = {
-                        name: o.product?.name || o.subscription?.name || 'Comanda #' + o.id,
+                        orderNumber: o.number || o.id,
                         clientName: o.client?.fullName || o.client?.name || 'Necunoscut',
+                        name: o.product?.name || o.subscription?.name || '',
                         address: getAddress(o),
                         orderType: o.orderType || 'Amplasari',
                         itemCount: o.quantity || o.pickupQuantity || 1,
@@ -156,9 +158,8 @@ export default function AllOrdersMap() {
                 customMapStyle={MAP_STYLE}
             >
                 {placements.map((placement) => {
-                    const title = `${placement.orderCount} ${placement.orderCount === 1 ? 'comandă' : 'comenzi'} — ${placement.itemCount} ${placement.itemCount === 1 ? 'produs' : 'produse'}`;
-                    const description = placement.orders.map((o, i) =>
-                        `${i + 1}. ${o.name} (${o.orderType})\n   Client: ${o.clientName}, Cant: ${o.itemCount}${o.address ? '\n   Adresă: ' + o.address : ''}`
+                    const description = placement.orders.map((o) =>
+                        `#${o.orderNumber} - ${o.clientName}`
                     ).join('\n');
                     return (
                         <Marker
@@ -167,7 +168,7 @@ export default function AllOrdersMap() {
                                 latitude: placement.latitude,
                                 longitude: placement.longitude
                             }}
-                            title={title}
+                            title={`${placement.orderCount} ${placement.orderCount === 1 ? 'comandă' : 'comenzi'}`}
                             description={description}
                         >
                             <View style={styles.clusterMarker}>

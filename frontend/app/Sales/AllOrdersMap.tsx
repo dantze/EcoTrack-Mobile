@@ -8,19 +8,19 @@ import {
     Dimensions,
     Pressable
 } from 'react-native';
-import MapView, { Marker, Callout, PROVIDER_GOOGLE, Region } from 'react-native-maps';
+import MapView, { Marker, PROVIDER_GOOGLE, Region } from 'react-native-maps';
 import { API_BASE_URL } from '../../constants/ApiConfig';
 import { useRouter } from 'expo-router';
 import { AntDesign } from '@expo/vector-icons';
 
 const { width, height } = Dimensions.get('window');
 
-// Default to Bucharest (same as LocationPicker)
+// Default to center of Romania, zoomed out to show the whole country
 const DEFAULT_REGION: Region = {
-    latitude: 44.4268,
-    longitude: 26.1025,
-    latitudeDelta: 0.3,
-    longitudeDelta: 0.3,
+    latitude: 45.9432,
+    longitude: 24.9668,
+    latitudeDelta: 5.5,
+    longitudeDelta: 5.5,
 };
 
 // Custom Map Style to remove POIs and simplify (same as LocationPicker)
@@ -39,13 +39,21 @@ const MAP_STYLE = [
     }
 ];
 
+interface OrderSummary {
+    name: string;
+    clientName: string;
+    orderType: string;
+    itemCount: number;
+    address: string;
+}
+
 interface ExistingPlacement {
     id: number;
     latitude: number;
     longitude: number;
-    orderCount: number;  // Number of orders at this location
-    itemCount: number;   // Total quantity of items across all orders
-    name: string;
+    orderCount: number;
+    itemCount: number;
+    orders: OrderSummary[];
 }
 
 export default function AllOrdersMap() {
@@ -68,18 +76,40 @@ export default function AllOrdersMap() {
 
             console.log('Fetched orders:', orders.length);
 
-            // Transform orders - now tracking both order count and item count
+            // Helper to extract coordinates based on order type
+            const getCoords = (o: any) => {
+                if (o.orderType === 'Ridicari') return o.pickupLocationCoordinates;
+                if (o.orderType === 'Igienizari') return o.sanitationLocationCoordinates;
+                return o.locationCoordinates;
+            };
+            const getAddress = (o: any) => {
+                if (o.orderType === 'Ridicari') return o.pickupLocationAddress || '';
+                if (o.orderType === 'Igienizari') return o.sanitationLocationAddress || '';
+                return o.locationAddress || '';
+            };
+
             const rawPlacements = orders
-                .filter((o: any) => o.locationCoordinates && o.locationCoordinates.includes(','))
+                .filter((o: any) => {
+                    const coords = getCoords(o);
+                    return coords && coords.includes(',');
+                })
                 .map((o: any) => {
-                    const parts = o.locationCoordinates.split(',');
+                    const coords = getCoords(o);
+                    const parts = coords.split(',');
+                    const orderSummary: OrderSummary = {
+                        name: o.product?.name || o.subscription?.name || 'Comanda #' + o.id,
+                        clientName: o.client?.fullName || o.client?.name || 'Necunoscut',
+                        address: getAddress(o),
+                        orderType: o.orderType || 'Amplasari',
+                        itemCount: o.quantity || o.pickupQuantity || 1,
+                    };
                     return {
                         id: o.id,
                         latitude: parseFloat(parts[0]),
                         longitude: parseFloat(parts[1]),
-                        orderCount: 1,  // Each raw placement represents 1 order
-                        itemCount: o.quantity || 1,
-                        name: o.product?.name || 'Comanda #' + o.id
+                        orderCount: 1,
+                        itemCount: orderSummary.itemCount,
+                        orders: [orderSummary],
                     };
                 });
 
@@ -96,8 +126,9 @@ export default function AllOrdersMap() {
                 );
 
                 if (existing) {
-                    existing.orderCount += 1;  // Increment order count
-                    existing.itemCount += p.itemCount;  // Add items from this order
+                    existing.orderCount += 1;
+                    existing.itemCount += p.itemCount;
+                    existing.orders.push(...p.orders);
                 } else {
                     clustered.push({ ...p });
                 }
@@ -124,28 +155,27 @@ export default function AllOrdersMap() {
                 initialRegion={DEFAULT_REGION}
                 customMapStyle={MAP_STYLE}
             >
-                {/* Render markers exactly like LocationPicker.tsx */}
-                {placements.map((placement) => (
-                    <Marker
-                        key={placement.id}
-                        coordinate={{
-                            latitude: placement.latitude,
-                            longitude: placement.longitude
-                        }}
-                    >
-                        <View style={styles.clusterMarker}>
-                            <Text style={styles.clusterText}>{placement.orderCount}</Text>
-                        </View>
-                        <Callout>
-                            <View style={styles.calloutContainer}>
-                                <Text style={styles.calloutTitle}>
-                                    {placement.orderCount} {placement.orderCount === 1 ? 'comandă' : 'comenzi'} cu {placement.itemCount} {placement.itemCount === 1 ? 'produs' : 'produse'}
-                                </Text>
-                                <Text style={styles.calloutText}>{placement.name}</Text>
+                {placements.map((placement) => {
+                    const title = `${placement.orderCount} ${placement.orderCount === 1 ? 'comandă' : 'comenzi'} — ${placement.itemCount} ${placement.itemCount === 1 ? 'produs' : 'produse'}`;
+                    const description = placement.orders.map((o, i) =>
+                        `${i + 1}. ${o.name} (${o.orderType})\n   Client: ${o.clientName}, Cant: ${o.itemCount}${o.address ? '\n   Adresă: ' + o.address : ''}`
+                    ).join('\n');
+                    return (
+                        <Marker
+                            key={placement.id}
+                            coordinate={{
+                                latitude: placement.latitude,
+                                longitude: placement.longitude
+                            }}
+                            title={title}
+                            description={description}
+                        >
+                            <View style={styles.clusterMarker}>
+                                <Text style={styles.clusterText}>{placement.orderCount}</Text>
                             </View>
-                        </Callout>
-                    </Marker>
-                ))}
+                        </Marker>
+                    );
+                })}
             </MapView>
 
             {/* Header / Close Button - same style as LocationPicker */}
@@ -233,20 +263,6 @@ const styles = StyleSheet.create({
         color: 'white',
         fontWeight: 'bold',
         fontSize: 12,
-    },
-    calloutContainer: {
-        width: 200,
-        padding: 10,
-    },
-    calloutTitle: {
-        fontWeight: 'bold',
-        fontSize: 14,
-        marginBottom: 5,
-    },
-    calloutText: {
-        fontSize: 12,
-        color: '#555',
-        marginBottom: 2,
     },
     loadingOverlay: {
         position: 'absolute',

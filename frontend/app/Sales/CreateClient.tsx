@@ -88,7 +88,7 @@ const CreateClient = () => {
         }
 
         if (!isValidPhone(phone)) {
-            Alert.alert("Telefon invalid", "Numărul de telefon trebuie să fie în formatul 07XXXXXXXX sau +407XXXXXXXX.");
+            Alert.alert("Telefon invalid", "Numărul de telefon trebuie să fie în formatul 07XXXXXXXX, 407XXXXXXXX, +407XXXXXXXX sau 0407XXXXXXXX.");
             return;
         }
 

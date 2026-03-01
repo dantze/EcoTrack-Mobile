@@ -36,12 +36,11 @@ interface PlacePrediction {
 
 const { width, height } = Dimensions.get('window');
 
-// Default to Bucharest
 const DEFAULT_REGION = {
-    latitude: 44.4268,
-    longitude: 26.1025,
-    latitudeDelta: 0.05,
-    longitudeDelta: 0.05,
+    latitude: 45.9432,
+    longitude: 24.9668,
+    latitudeDelta: 6.0,
+    longitudeDelta: 8.0,
 };
 
 // Custom Map Style to remove POIs and simplify

@@ -63,6 +63,7 @@ public class DataLoader implements CommandLineRunner {
                 Employee halalaiTudor = createEmployee("halalai_tudor", "tehnic133413", "Halalai Tudor", null, null,
                                 techRole);
                 halalaiTudor.getRoles().add(salesRole);
+
                 employeeRepository.save(halalaiTudor);
 
                 // ==================== SOFERI (DRIVERS) ====================

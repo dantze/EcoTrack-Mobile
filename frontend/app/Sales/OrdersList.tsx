@@ -12,10 +12,11 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { OrderService } from '../../services/OrderService';
+import { TaskService } from '../../services/TaskService';
 import { AppColors } from '../../constants/Colors';
 import { getOrderTypeLabel, formatDate } from '../../utils/orderUtils';
 import ScreenHeader from '../../components/layout/ScreenHeader';
-import { ListCard, TypeBadge, InfoRow, EmptyState, listStyles } from '../../components/list/ListComponents';
+import { ListCard, TypeBadge, OrderStatusBadge, InfoRow, EmptyState, listStyles } from '../../components/list/ListComponents';
 import OrderFilterModal, { OrderFilters, EMPTY_FILTERS, hasActiveFilters } from '../../modals/OrderFilterModal';
 
 interface OrderItem {
@@ -55,12 +56,15 @@ export default function OrdersList() {
     const [refreshing, setRefreshing] = useState(false);
     const [filterVisible, setFilterVisible] = useState(false);
     const [filters, setFilters] = useState<OrderFilters>(EMPTY_FILTERS);
+    const [orderStatuses, setOrderStatuses] = useState<Record<number, string>>({});
 
     const fetchOrders = useCallback(async () => {
         try {
             const data = await OrderService.getOrders();
             setOrders(data);
             setFilteredOrders(data);
+            // Fetch task statuses for all orders in parallel
+            fetchOrderStatuses(data);
         } catch (error) {
             console.error('Error fetching orders:', error);
             Alert.alert('Eroare', 'Nu s-au putut prelua comenzile.');
@@ -69,6 +73,31 @@ export default function OrdersList() {
             setRefreshing(false);
         }
     }, []);
+
+    const fetchOrderStatuses = async (orderList: OrderItem[]) => {
+        try {
+            const statusMap: Record<number, string> = {};
+            const results = await Promise.allSettled(
+                orderList.map(async (order) => {
+                    const taskStatus = await TaskService.checkOrderHasTask(order.id);
+                    return { id: order.id, taskStatus };
+                })
+            );
+            for (const result of results) {
+                if (result.status === 'fulfilled') {
+                    const { id, taskStatus } = result.value;
+                    if (taskStatus.hasTask && (taskStatus as any).status) {
+                        statusMap[id] = (taskStatus as any).status;
+                    } else {
+                        statusMap[id] = 'NO_TASK';
+                    }
+                }
+            }
+            setOrderStatuses(statusMap);
+        } catch (error) {
+            console.error('Error fetching order statuses:', error);
+        }
+    };
 
     useEffect(() => {
         fetchOrders();
@@ -194,23 +223,37 @@ export default function OrdersList() {
         return startFormatted;
     };
 
-    const renderOrder = ({ item }: { item: OrderItem }) => (
-        <ListCard
-            onPress={() => handleEditOrder(item)}
-            onDelete={() => handleDeleteOrder(item)}
-        >
-            <View style={listStyles.cardHeader}>
-                <Text style={listStyles.cardTitle}>Comanda #{ item.number || item.id}</Text>
-                <TypeBadge label={getOrderTypeLabel(item.orderType)} />
-            </View>
+    const getOrderStatusInfo = (orderId: number): { label: string; color: string } => {
+        const status = orderStatuses[orderId];
+        if (status === 'COMPLETED') return { label: 'Finalizat', color: '#2ECC71' };
+        if (status === 'CANCELLED') return { label: 'Anulat', color: '#95A5A6' };
+        if (status === 'IN_PROGRESS') return { label: 'În progres', color: '#F1C40F' };
+        if (status === 'NEW') return { label: 'Nefinalizat', color: '#E74C3C' };
+        // NO_TASK or not yet loaded
+        return { label: 'Nefinalizat', color: '#E74C3C' };
+    };
 
-            <InfoRow icon="user" text={getClientName(item)} />
-            {item.product?.name ? <InfoRow icon="box" text={item.product.name} /> : null}
-            {item.quantity ? <InfoRow icon="hash" text={`Cantitate: ${item.quantity}`} /> : null}
-            <InfoRow icon="calendar" text={formatOrderDate(item)} />
-            {item.locationAddress ? <InfoRow icon="map-pin" text={item.locationAddress} numberOfLines={1} /> : null}
-        </ListCard>
-    );
+    const renderOrder = ({ item }: { item: OrderItem }) => {
+        const statusInfo = getOrderStatusInfo(item.id);
+        return (
+            <ListCard
+                onPress={() => handleEditOrder(item)}
+                onDelete={() => handleDeleteOrder(item)}
+            >
+                <View style={listStyles.cardHeader}>
+                    <Text style={listStyles.cardTitle}>Comanda #{ item.number || item.id}</Text>
+                    <TypeBadge label={getOrderTypeLabel(item.orderType)} />
+                    <OrderStatusBadge label={statusInfo.label} color={statusInfo.color} />
+                </View>
+
+                <InfoRow icon="user" text={getClientName(item)} />
+                {item.product?.name ? <InfoRow icon="box" text={item.product.name} /> : null}
+                {item.quantity ? <InfoRow icon="hash" text={`Cantitate: ${item.quantity}`} /> : null}
+                <InfoRow icon="calendar" text={formatOrderDate(item)} />
+                {item.locationAddress ? <InfoRow icon="map-pin" text={item.locationAddress} numberOfLines={1} /> : null}
+            </ListCard>
+        );
+    };
 
     if (loading) {
         return (

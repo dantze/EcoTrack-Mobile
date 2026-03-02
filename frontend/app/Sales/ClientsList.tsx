@@ -12,11 +12,12 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import { ClientService } from '../../services/ClientService';
-//import listStyles from '../../components/list/listStyles';
+import { OrderService } from '../../services/OrderService';
 import {
     EmptyState, ListCard, InfoRow, TypeBadge,
 } from '../../components/list/ListComponents';
 import ScreenHeader from '../../components/layout/ScreenHeader';
+import { Order, isAmplasare, isRidicari, isIgienizari } from '../../types/OrderTypes';
 
 interface ClientItem {
     id: number;
@@ -37,12 +38,14 @@ export default function ClientsList() {
     const [searchQuery, setSearchQuery] = useState('');
     const [loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
+    const [clientOrderSummary, setClientOrderSummary] = useState<Record<number, { orderTypes: string[]; items: string[] }>>({});
 
     const fetchClients = useCallback(async () => {
         try {
             const data = await ClientService.getClients();
             setClients(data);
             setFilteredClients(data);
+            fetchOrderSummaries(data);
         } catch (error) {
             console.error('Error fetching clients:', error);
             Alert.alert('Eroare', 'Nu s-au putut prelua clienții.');
@@ -51,6 +54,45 @@ export default function ClientsList() {
             setRefreshing(false);
         }
     }, []);
+
+    const fetchOrderSummaries = async (clientsList: ClientItem[]) => {
+        try {
+            const allOrders: Order[] = await OrderService.getOrders();
+            const summaryMap: Record<number, { orderTypes: string[]; items: string[] }> = {};
+
+            for (const order of allOrders) {
+                const clientId = order.client?.id;
+                if (!clientId) continue;
+
+                if (!summaryMap[clientId]) {
+                    summaryMap[clientId] = { orderTypes: [], items: [] };
+                }
+
+                const summary = summaryMap[clientId];
+
+                // Track order type
+                if (!summary.orderTypes.includes(order.orderType)) {
+                    summary.orderTypes.push(order.orderType);
+                }
+
+                // Extract product/subscription name
+                if (isAmplasare(order) && order.product?.name) {
+                    const label = `${order.product.name}${order.quantity && order.quantity > 1 ? ' x' + order.quantity : ''}`;
+                    if (!summary.items.includes(label)) summary.items.push(label);
+                } else if (isRidicari(order)) {
+                    const name = order.product?.name || order.pickupProductName;
+                    if (name && !summary.items.includes(name)) summary.items.push(name);
+                } else if (isIgienizari(order) && order.subscription?.name) {
+                    const label = `${order.subscription.name}`;
+                    if (!summary.items.includes(label)) summary.items.push(label);
+                }
+            }
+
+            setClientOrderSummary(summaryMap);
+        } catch (error) {
+            console.error('Error fetching order summaries:', error);
+        }
+    };
 
     useEffect(() => {
         fetchClients();
@@ -155,6 +197,15 @@ export default function ClientsList() {
         return type;
     };
 
+    const getOrderTypeLabel = (type: string): { label: string; color: string } => {
+        switch (type) {
+            case 'Amplasari': return { label: 'Amplasare', color: '#2980B9' };
+            case 'Ridicari': return { label: 'Ridicare', color: '#E67E22' };
+            case 'Igienizari': return { label: 'Igienizare', color: '#27AE60' };
+            default: return { label: type, color: '#7F8C8D' };
+        }
+    };
+
     const renderClient = ({ item }: { item: ClientItem }) => (
         <ListCard
             onPress={() => handleEditClient(item)}
@@ -167,7 +218,30 @@ export default function ClientsList() {
 
             {item.phone ? <InfoRow icon="phone" text={item.phone} /> : null}
             {item.email ? <InfoRow icon="mail" text={item.email} /> : null}
-            {item.address ? <InfoRow icon="map-pin" text={item.address} numberOfLines={1} /> : null}
+            {item.address ? <InfoRow icon="map-pin" text={item.address} /> : null}
+
+            {/* ─── Orders / Services Summary ─── */}
+            {clientOrderSummary[item.id] ? (
+                <View style={searchStyles.ordersSummary}>
+                    <View style={searchStyles.orderTypesRow}>
+                        {clientOrderSummary[item.id].orderTypes.map((type) => {
+                            const { label, color } = getOrderTypeLabel(type);
+                            return (
+                                <View key={type} style={[searchStyles.orderTypeBadge, { backgroundColor: color }]}> 
+                                    <Text style={searchStyles.orderTypeBadgeText}>{label}</Text>
+                                </View>
+                            );
+                        })}
+                    </View>
+                    {clientOrderSummary[item.id].items.length > 0 && (
+                        <InfoRow icon="package" text={clientOrderSummary[item.id].items.join(', ')} />
+                    )}
+                </View>
+            ) : (
+                <View style={searchStyles.noOrdersContainer}>
+                    <InfoRow icon="info" text="Nu are comenzi momentan" />
+                </View>
+            )}
         </ListCard>
     );
 
@@ -286,5 +360,32 @@ const searchStyles = StyleSheet.create({
         color: '#FFFFFF',
         fontSize: 18,
         fontWeight: '600',
+    },
+    // Orders summary
+    ordersSummary: {
+        marginTop: 8,
+        paddingTop: 8,
+        borderTopWidth: 1,
+        borderTopColor: 'rgba(139, 168, 190, 0.2)',
+    },
+    orderTypesRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 6,
+        marginBottom: 4,
+    },
+    orderTypeBadge: {
+        borderRadius: 8,
+        paddingHorizontal: 8,
+        paddingVertical: 2,
+    },
+    orderTypeBadgeText: {
+        color: '#FFFFFF',
+        fontSize: 11,
+        fontWeight: '600',
+    },
+    noOrdersContainer: {
+        marginTop: 6,
+        opacity: 0.6,
     },
 });

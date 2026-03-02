@@ -19,6 +19,7 @@ const Orders = () => {
     const [searchQuery, setSearchQuery] = useState('');
     const [loading, setLoading] = useState(true);
     const [orderTaskStatus, setOrderTaskStatus] = useState<OrderTaskMap>({});
+    const [orderTaskStatusStr, setOrderTaskStatusStr] = useState<Record<number, string>>({});
     const [filterVisible, setFilterVisible] = useState(false);
     const [filters, setFilters] = useState<OrderFilters>(EMPTY_FILTERS);
 
@@ -47,17 +48,22 @@ const Orders = () => {
 
     const checkAllOrderTaskStatus = async () => {
         const statusMap: OrderTaskMap = {};
+        const statusStrMap: Record<number, string> = {};
         await Promise.all(
             orders.map(async (order) => {
                 try {
                     const status = await TaskService.checkOrderHasTask(order.id);
                     statusMap[order.id] = status.hasTask;
+                    if (status.hasTask && (status as any).status) {
+                        statusStrMap[order.id] = (status as any).status;
+                    }
                 } catch {
                     statusMap[order.id] = false;
                 }
             })
         );
         setOrderTaskStatus(statusMap);
+        setOrderTaskStatusStr(statusStrMap);
     };
 
     // ── Advanced filters ────────────────────────────────────────
@@ -197,6 +203,7 @@ const Orders = () => {
                             key={order.id}
                             order={order}
                             hasTask={orderTaskStatus[order.id] || false}
+                            taskStatus={orderTaskStatusStr[order.id]}
                             onPress={handleCardPress}
                         />
                     ))

@@ -53,6 +53,7 @@ export default function EditOrder() {
 
     const [formData, setFormData] = useState<any>({});
     const [saving, setSaving] = useState(false);
+    const [parentScrollEnabled, setParentScrollEnabled] = useState(true);
 
     const handleDeleteOrder = async () => {
         try {
@@ -121,7 +122,7 @@ export default function EditOrder() {
             >
                 <ScreenHeader title="Editare Comandă" />
 
-                <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+                <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false} scrollEnabled={parentScrollEnabled}>
                     {/* Order info badges */}
                     <View style={styles.badgeRow}>
                         <View style={styles.typeBadge}>
@@ -151,6 +152,7 @@ export default function EditOrder() {
                         onDeleteOrder={handleDeleteOrder}
                         mode="edit"
                         showTitle={false}
+                        onDropdownToggle={(isOpen) => setParentScrollEnabled(!isOpen)}
                     />
 
                     {/* Save button */}

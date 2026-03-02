@@ -22,7 +22,7 @@ const OrderDetails = () => {
     const [order, setOrder] = useState<Order | null>(null);
     const [loading, setLoading] = useState(true);
     const [routes, setRoutes] = useState<Route[]>([]);
-    const [orderTaskStatus, setOrderTaskStatus] = useState<{ hasTask: boolean; taskId: number | null; routeId: number | null; scheduledTime?: string | null }>({ hasTask: false, taskId: null, routeId: null });
+    const [orderTaskStatus, setOrderTaskStatus] = useState<{ hasTask: boolean; taskId: number | null; routeId: number | null; scheduledTime?: string | null; status?: string | null }>({ hasTask: false, taskId: null, routeId: null, status: null });
 
     // --- STATE FOR MODAL ---
     const [modalVisible, setModalVisible] = useState(false);
@@ -69,9 +69,18 @@ const OrderDetails = () => {
     const checkTaskStatus = async () => {
         try {
             const status = await TaskService.checkOrderHasTask(orderId!);
-            setOrderTaskStatus({ hasTask: status.hasTask, taskId: status.taskId, routeId: status.routeId, scheduledTime: status.scheduledTime });
+            setOrderTaskStatus({ hasTask: status.hasTask, taskId: status.taskId, routeId: status.routeId, scheduledTime: status.scheduledTime, status: (status as any).status || null });
         } catch (error) {
             console.error("Failed to check task status", error);
+        }
+    };
+
+    const getTaskStatusInfo = () => {
+        switch (orderTaskStatus.status) {
+            case 'COMPLETED': return { label: 'Finalizat', color: '#2ECC71', icon: 'checkmark-circle' as const };
+            case 'IN_PROGRESS': return { label: 'În progres', color: '#F1C40F', icon: 'time' as const };
+            case 'CANCELLED': return { label: 'Anulat', color: '#95A5A6', icon: 'close-circle' as const };
+            case 'NEW': default: return { label: 'Nefinalizat', color: '#E74C3C', icon: 'alert-circle' as const };
         }
     };
 
@@ -226,11 +235,17 @@ const OrderDetails = () => {
                     />
                 )}
 
-                {/* STATUS BADGE - shows if already assigned */}
+                {/* STATUS BADGES */}
                 {orderTaskStatus.hasTask && (
-                    <View style={styles.assignedBadge}>
-                        <Ionicons name="checkmark-circle" size={20} color="#2ECC71" />
-                        <Text style={styles.assignedText}>Asociată unei rute</Text>
+                    <View style={styles.statusBadgesRow}>
+                        <View style={styles.assignedBadge}>
+                            <Ionicons name="checkmark-circle" size={20} color="#2ECC71" />
+                            <Text style={styles.assignedText}>Asociată unei rute</Text>
+                        </View>
+                        <View style={[styles.taskStatusBadge, { backgroundColor: getTaskStatusInfo().color + '33' }]}>
+                            <Ionicons name={getTaskStatusInfo().icon} size={20} color={getTaskStatusInfo().color} />
+                            <Text style={[styles.taskStatusText, { color: getTaskStatusInfo().color }]}>{getTaskStatusInfo().label}</Text>
+                        </View>
                     </View>
                 )}
 
@@ -291,7 +306,14 @@ const styles = StyleSheet.create({
     buttonPressed: { opacity: 0.8, transform: [{ scale: 0.98 }] },
     actionButtonText: { color: AppColors.textWhite, fontSize: 20, fontWeight: 'bold' },
 
-    // Assigned Badge
+    // Status Badges Row
+    statusBadgesRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 10,
+        marginBottom: 15,
+        justifyContent: 'center',
+    },
     assignedBadge: {
         flexDirection: 'row',
         alignItems: 'center',
@@ -299,10 +321,21 @@ const styles = StyleSheet.create({
         paddingHorizontal: 15,
         paddingVertical: 8,
         borderRadius: 20,
-        marginBottom: 15,
     },
     assignedText: {
         color: AppColors.successGreen,
+        fontSize: 14,
+        fontWeight: 'bold',
+        marginLeft: 8,
+    },
+    taskStatusBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 15,
+        paddingVertical: 8,
+        borderRadius: 20,
+    },
+    taskStatusText: {
         fontSize: 14,
         fontWeight: 'bold',
         marginLeft: 8,

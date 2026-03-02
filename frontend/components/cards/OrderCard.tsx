@@ -9,10 +9,22 @@ import { AppColors } from '../../constants/Colors';
 interface OrderCardProps {
     order: Order;
     hasTask: boolean;
+    taskStatus?: string;
     onPress: (order: Order) => void;
 }
 
-const OrderCard: React.FC<OrderCardProps> = ({ order, hasTask, onPress }) => {
+const getTaskStatusInfo = (hasTask: boolean, taskStatus?: string): { label: string; color: string; bgColor: string } => {
+    if (!hasTask || !taskStatus) return { label: 'Nefinalizat', color: '#E74C3C', bgColor: 'rgba(231, 76, 60, 0.3)' };
+    switch (taskStatus) {
+        case 'COMPLETED': return { label: 'Finalizat', color: '#2ECC71', bgColor: 'rgba(46, 204, 113, 0.3)' };
+        case 'IN_PROGRESS': return { label: 'În progres', color: '#F1C40F', bgColor: 'rgba(241, 196, 15, 0.3)' };
+        case 'CANCELLED': return { label: 'Anulat', color: '#95A5A6', bgColor: 'rgba(149, 165, 166, 0.3)' };
+        case 'NEW': return { label: 'Nefinalizat', color: '#E74C3C', bgColor: 'rgba(231, 76, 60, 0.3)' };
+        default: return { label: 'Nefinalizat', color: '#E74C3C', bgColor: 'rgba(231, 76, 60, 0.3)' };
+    }
+};
+
+const OrderCard: React.FC<OrderCardProps> = ({ order, hasTask, taskStatus, onPress }) => {
     const dateInfo = getDateInfo(order);
 
     return (
@@ -33,10 +45,18 @@ const OrderCard: React.FC<OrderCardProps> = ({ order, hasTask, onPress }) => {
                     </Text>
                 </View>
 
-                <View style={[styles.statusIndicator, hasTask ? styles.statusAssigned : styles.statusPending]}>
-                    <Text style={styles.statusText}>
-                        {hasTask ? 'Rută atribuită' : 'Neatribuită'}
-                    </Text>
+                <View style={styles.statusRow}>
+                    <View style={[styles.statusIndicator, hasTask ? styles.statusAssigned : styles.statusPending]}>
+                        <Text style={styles.statusText}>
+                            {hasTask ? 'Rută atribuită' : 'Neatribuită'}
+                        </Text>
+                    </View>
+                    <View style={[styles.statusIndicator, { backgroundColor: getTaskStatusInfo(hasTask, taskStatus).bgColor }]}>
+                        <View style={[styles.statusDot, { backgroundColor: getTaskStatusInfo(hasTask, taskStatus).color }]} />
+                        <Text style={styles.statusText}>
+                            {getTaskStatusInfo(hasTask, taskStatus).label}
+                        </Text>
+                    </View>
                 </View>
             </View>
 
@@ -102,7 +122,19 @@ const styles = StyleSheet.create({
         paddingHorizontal: 10,
         paddingVertical: 4,
         borderRadius: 12,
-        alignSelf: 'flex-start',
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+    },
+    statusRow: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 6,
+    },
+    statusDot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
     },
     statusAssigned: {
         backgroundColor: 'rgba(46, 204, 113, 0.3)',

@@ -41,6 +41,19 @@ export const TypeBadge: React.FC<TypeBadgeProps> = ({ label }) => (
     </View>
 );
 
+// ─── OrderStatusBadge ────────────────────────────────────────────────────────
+interface OrderStatusBadgeProps {
+    label: string;
+    color: string;
+}
+
+export const OrderStatusBadge: React.FC<OrderStatusBadgeProps> = ({ label, color }) => (
+    <View style={[listStyles.orderStatusBadge, { backgroundColor: color }]}>
+        <View style={[listStyles.orderStatusDot, { backgroundColor: '#FFFFFF' }]} />
+        <Text style={listStyles.orderStatusBadgeText}>{label}</Text>
+    </View>
+);
+
 // ─── ListCard ────────────────────────────────────────────────────────────────
 interface ListCardProps {
     onPress: () => void;
@@ -140,6 +153,25 @@ export const listStyles = StyleSheet.create({
         paddingVertical: 3,
     },
     typeBadgeText: {
+        color: '#FFFFFF',
+        fontSize: 12,
+        fontWeight: '500',
+    },
+    // Order status badge
+    orderStatusBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        borderRadius: 10,
+        paddingHorizontal: 10,
+        paddingVertical: 3,
+        gap: 5,
+    },
+    orderStatusDot: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+    },
+    orderStatusBadgeText: {
         color: '#FFFFFF',
         fontSize: 12,
         fontWeight: '500',

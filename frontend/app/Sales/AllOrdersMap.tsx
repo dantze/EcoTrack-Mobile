@@ -46,6 +46,7 @@ interface OrderSummary {
     orderType: string;
     itemCount: number;
     address: string;
+    rawOrder: any; // full order object for navigation
 }
 
 interface ExistingPlacement {
@@ -104,6 +105,7 @@ export default function AllOrdersMap() {
                         address: getAddress(o),
                         orderType: o.orderType || 'Amplasari',
                         itemCount: o.quantity || o.pickupQuantity || 1,
+                        rawOrder: o,
                     };
                     return {
                         id: o.id,
@@ -148,6 +150,32 @@ export default function AllOrdersMap() {
         }
     };
 
+    const handleMarkerPress = (placement: ExistingPlacement) => {
+        if (placement.orders.length === 1) {
+            const order = placement.orders[0].rawOrder;
+            router.push({
+                pathname: '/Sales/EditOrder',
+                params: { order: JSON.stringify(order) },
+            });
+        } else {
+            const buttons = placement.orders.map((o) => ({
+                text: `#${o.orderNumber} - ${o.clientName} (${o.orderType})`,
+                onPress: () => {
+                    router.push({
+                        pathname: '/Sales/EditOrder',
+                        params: { order: JSON.stringify(o.rawOrder) },
+                    });
+                },
+            }));
+            buttons.push({ text: 'Anulează', onPress: () => {} });
+            Alert.alert(
+                `${placement.orders.length} comenzi la această locație`,
+                'Selectează comanda:',
+                buttons
+            );
+        }
+    };
+
     return (
         <View style={styles.modalContainer}>
             <MapView
@@ -158,9 +186,6 @@ export default function AllOrdersMap() {
                 customMapStyle={MAP_STYLE}
             >
                 {placements.map((placement) => {
-                    const description = placement.orders.map((o) =>
-                        `#${o.orderNumber} - ${o.clientName}`
-                    ).join('\n');
                     return (
                         <Marker
                             key={placement.id}
@@ -168,8 +193,7 @@ export default function AllOrdersMap() {
                                 latitude: placement.latitude,
                                 longitude: placement.longitude
                             }}
-                            title={`${placement.orderCount} ${placement.orderCount === 1 ? 'comandă' : 'comenzi'}`}
-                            description={description}
+                            onPress={() => handleMarkerPress(placement)}
                         >
                             <View style={styles.clusterMarker}>
                                 <Text style={styles.clusterText}>{placement.orderCount}</Text>

@@ -21,6 +21,7 @@ const OrderDetails = () => {
     const [isDropdownOpen, setIsDropdownOpen] = useState(false);
     const [selectedType, setSelectedType] = useState(ORDER_TYPES[0]);
     const [orderData, setOrderData] = useState<any>({});
+    const [parentScrollEnabled, setParentScrollEnabled] = useState(true);
 
     const toggleDropdown = () => {
         setIsDropdownOpen(!isDropdownOpen);
@@ -36,14 +37,18 @@ const OrderDetails = () => {
         setOrderData(data);
     };
 
+    const handleDropdownToggle = (isOpen: boolean) => {
+        setParentScrollEnabled(!isOpen);
+    };
+
     const renderOrderComponent = () => {
         switch (selectedType) {
             case "Amplasari":
-                return <Amplasari client={client} onDataChange={handleDataChange} />;
+                return <Amplasari client={client} onDataChange={handleDataChange} onDropdownToggle={handleDropdownToggle} />;
             case "Ridicari":
-                return <Ridicari client={client} onDataChange={handleDataChange} />;
+                return <Ridicari client={client} onDataChange={handleDataChange} onDropdownToggle={handleDropdownToggle} />;
             case "Igienizari":
-                return <Igienizari client={client} onDataChange={handleDataChange} />;
+                return <Igienizari client={client} onDataChange={handleDataChange} onDropdownToggle={handleDropdownToggle} />;
             default:
                 return null;
         }
@@ -105,6 +110,7 @@ const OrderDetails = () => {
                     contentContainerStyle={{ paddingBottom: 50 }}
                     showsVerticalScrollIndicator={false}
                     keyboardShouldPersistTaps="handled"
+                    scrollEnabled={parentScrollEnabled}
                 >
                     {/* Client Info Summary */}
                     <View style={styles.clientSummary}>

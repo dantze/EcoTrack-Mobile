@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import {
     StyleSheet, Text, View, Pressable, Switch,
     ScrollView, TextInput, ActivityIndicator, Alert,
+    Modal, FlatList, TouchableOpacity,
 } from 'react-native';
 import { AntDesign } from '@expo/vector-icons';
 import DateSelector from './DateSelector';
@@ -35,6 +36,8 @@ interface OrderFormProps {
     showTitle?: boolean;
     /** Called when all pickup packets are removed in edit mode (order should be deleted). */
     onDeleteOrder?: () => void;
+    /** Called when a dropdown opens/closes — used to disable parent ScrollView on Android. */
+    onDropdownToggle?: (isOpen: boolean) => void;
 }
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
@@ -53,6 +56,7 @@ const OrderForm: React.FC<OrderFormProps> = ({
     mode = 'create',
     showTitle = true,
     onDeleteOrder,
+    onDropdownToggle,
 }) => {
     const isEdit = mode === 'edit';
 
@@ -316,7 +320,9 @@ const OrderForm: React.FC<OrderFormProps> = ({
         setIsQuantityDropdownOpen(false);
         setIsIgienizariDropdownOpen(false);
         setIsSubscriptionDropdownOpen(false);
-        if (!currentValue) setter(true);
+        const willOpen = !currentValue;
+        if (willOpen) setter(true);
+        onDropdownToggle?.(willOpen);
     };
 
     const handleIncrement = (groupKey: string, max: number) => {
@@ -396,9 +402,9 @@ const OrderForm: React.FC<OrderFormProps> = ({
         <>
             {/* ─── Product & Quantity ─── */}
             <Text style={styles.label}>Pachet Servicii & Cantitate</Text>
-            <View style={[styles.row, { zIndex: 300 }]}>
+            <View style={styles.row}>
                 {/* Product Dropdown */}
-                <View style={styles.productDropdownContainer}>
+                <View style={[styles.productDropdownContainer]}>
                     <Pressable style={styles.dropdownButton} onPress={() => {
                         toggleDropdown(setIsPacketDropdownOpen, isPacketDropdownOpen);
                     }}>
@@ -407,20 +413,6 @@ const OrderForm: React.FC<OrderFormProps> = ({
                         </Text>
                         <AntDesign name={isPacketDropdownOpen ? 'up' : 'down'} size={16} color="#16283C" />
                     </Pressable>
-                    {isPacketDropdownOpen && (
-                        <View style={styles.dropdownList}>
-                            <ScrollView nestedScrollEnabled style={{ maxHeight: 200 }} showsVerticalScrollIndicator={false}>
-                                {products.map((p, i) => (
-                                    <Pressable key={p.id}
-                                        style={({ pressed }) => [styles.dropdownItem, pressed && { backgroundColor: '#F5F5F5' }]}
-                                        onPress={() => { setSelectedPacket(p); setIsPacketDropdownOpen(false); }}>
-                                        <Text style={styles.dropdownItemText}>{p.name}</Text>
-                                        {i < products.length - 1 && <View style={styles.divider} />}
-                                    </Pressable>
-                                ))}
-                            </ScrollView>
-                        </View>
-                    )}
                 </View>
 
                 {/* Quantity Dropdown */}
@@ -431,22 +423,52 @@ const OrderForm: React.FC<OrderFormProps> = ({
                         <Text style={styles.dropdownText}>{quantity}</Text>
                         <AntDesign name={isQuantityDropdownOpen ? 'up' : 'down'} size={16} color="#16283C" />
                     </Pressable>
-                    {isQuantityDropdownOpen && (
-                        <View style={styles.dropdownList}>
-                            <ScrollView nestedScrollEnabled style={{ maxHeight: 200 }} showsVerticalScrollIndicator={false}>
-                                {QUANTITY_OPTIONS.map((q, i) => (
-                                    <Pressable key={q}
-                                        style={({ pressed }) => [styles.dropdownItem, pressed && { backgroundColor: '#F5F5F5' }]}
-                                        onPress={() => { setQuantity(q); setIsQuantityDropdownOpen(false); }}>
-                                        <Text style={styles.dropdownItemText}>{q}</Text>
-                                        {i < QUANTITY_OPTIONS.length - 1 && <View style={styles.divider} />}
-                                    </Pressable>
-                                ))}
-                            </ScrollView>
-                        </View>
-                    )}
                 </View>
             </View>
+
+            {/* Product Dropdown Modal */}
+            <Modal visible={isPacketDropdownOpen} transparent animationType="fade" onRequestClose={() => { setIsPacketDropdownOpen(false); onDropdownToggle?.(false); }}>
+                <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => { setIsPacketDropdownOpen(false); onDropdownToggle?.(false); }}>
+                    <View style={styles.modalContent}>
+                        <Text style={styles.modalTitle}>Selectează pachet</Text>
+                        <FlatList
+                            data={products}
+                            keyExtractor={(item) => item.id.toString()}
+                            style={{ maxHeight: 300 }}
+                            renderItem={({ item, index }) => (
+                                <Pressable
+                                    style={({ pressed }) => [styles.dropdownItem, pressed && { backgroundColor: '#F5F5F5' }]}
+                                    onPress={() => { setSelectedPacket(item); setIsPacketDropdownOpen(false); onDropdownToggle?.(false); }}>
+                                    <Text style={styles.dropdownItemText}>{item.name}</Text>
+                                    {index < products.length - 1 && <View style={styles.divider} />}
+                                </Pressable>
+                            )}
+                        />
+                    </View>
+                </TouchableOpacity>
+            </Modal>
+
+            {/* Quantity Dropdown Modal */}
+            <Modal visible={isQuantityDropdownOpen} transparent animationType="fade" onRequestClose={() => { setIsQuantityDropdownOpen(false); onDropdownToggle?.(false); }}>
+                <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => { setIsQuantityDropdownOpen(false); onDropdownToggle?.(false); }}>
+                    <View style={styles.modalContent}>
+                        <Text style={styles.modalTitle}>Selectează cantitate</Text>
+                        <FlatList
+                            data={QUANTITY_OPTIONS}
+                            keyExtractor={(item) => item}
+                            style={{ maxHeight: 300 }}
+                            renderItem={({ item, index }) => (
+                                <Pressable
+                                    style={({ pressed }) => [styles.dropdownItem, pressed && { backgroundColor: '#F5F5F5' }]}
+                                    onPress={() => { setQuantity(item); setIsQuantityDropdownOpen(false); onDropdownToggle?.(false); }}>
+                                    <Text style={styles.dropdownItemText}>{item}</Text>
+                                    {index < QUANTITY_OPTIONS.length - 1 && <View style={styles.divider} />}
+                                </Pressable>
+                            )}
+                        />
+                    </View>
+                </TouchableOpacity>
+            </Modal>
 
             {/* Price Display */}
             {selectedPacket && (
@@ -502,31 +524,37 @@ const OrderForm: React.FC<OrderFormProps> = ({
             />
 
             {/* ─── Igienizări / lună ─── */}
-            <View style={{ marginTop: 15, zIndex: 200 }}>
+            <View style={{ marginTop: 15 }}>
                 <Text style={styles.label}>Igienizări pe lună</Text>
-                <View style={{ position: 'relative' }}>
-                    <Pressable style={styles.dropdownButton} onPress={() => {
-                        toggleDropdown(setIsIgienizariDropdownOpen, isIgienizariDropdownOpen);
-                    }}>
-                        <Text style={styles.dropdownText}>{igienizariPerMonth}</Text>
-                        <AntDesign name={isIgienizariDropdownOpen ? 'up' : 'down'} size={16} color="#16283C" />
-                    </Pressable>
-                    {isIgienizariDropdownOpen && (
-                        <View style={styles.dropdownList}>
-                            <ScrollView nestedScrollEnabled style={{ maxHeight: 150 }} showsVerticalScrollIndicator={false}>
-                                {IGIENIZARI_OPTIONS.map((v, i) => (
-                                    <Pressable key={v}
-                                        style={({ pressed }) => [styles.dropdownItem, pressed && { backgroundColor: '#F5F5F5' }]}
-                                        onPress={() => { setIgienizariPerMonth(v); setIsIgienizariDropdownOpen(false); }}>
-                                        <Text style={styles.dropdownItemText}>{v}</Text>
-                                        {i < IGIENIZARI_OPTIONS.length - 1 && <View style={styles.divider} />}
-                                    </Pressable>
-                                ))}
-                            </ScrollView>
-                        </View>
-                    )}
-                </View>
+                <Pressable style={styles.dropdownButton} onPress={() => {
+                    toggleDropdown(setIsIgienizariDropdownOpen, isIgienizariDropdownOpen);
+                }}>
+                    <Text style={styles.dropdownText}>{igienizariPerMonth}</Text>
+                    <AntDesign name={isIgienizariDropdownOpen ? 'up' : 'down'} size={16} color="#16283C" />
+                </Pressable>
             </View>
+
+            {/* Igienizări Dropdown Modal */}
+            <Modal visible={isIgienizariDropdownOpen} transparent animationType="fade" onRequestClose={() => { setIsIgienizariDropdownOpen(false); onDropdownToggle?.(false); }}>
+                <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => { setIsIgienizariDropdownOpen(false); onDropdownToggle?.(false); }}>
+                    <View style={styles.modalContent}>
+                        <Text style={styles.modalTitle}>Igienizări pe lună</Text>
+                        <FlatList
+                            data={IGIENIZARI_OPTIONS}
+                            keyExtractor={(item) => item}
+                            style={{ maxHeight: 300 }}
+                            renderItem={({ item, index }) => (
+                                <Pressable
+                                    style={({ pressed }) => [styles.dropdownItem, pressed && { backgroundColor: '#F5F5F5' }]}
+                                    onPress={() => { setIgienizariPerMonth(item); setIsIgienizariDropdownOpen(false); onDropdownToggle?.(false); }}>
+                                    <Text style={styles.dropdownItemText}>{item}</Text>
+                                    {index < IGIENIZARI_OPTIONS.length - 1 && <View style={styles.divider} />}
+                                </Pressable>
+                            )}
+                        />
+                    </View>
+                </TouchableOpacity>
+            </Modal>
 
             {/* ─── Contact & Details ─── */}
             {renderContactField('Contact Șantier', 'Număr telefon')}
@@ -610,7 +638,7 @@ const OrderForm: React.FC<OrderFormProps> = ({
         <>
             {/* ─── Subscription Dropdown ─── */}
             <Text style={styles.label}>Abonament Igienizări</Text>
-            <View style={[styles.subscriptionDropdownContainer, { zIndex: 300 }]}>
+            <View style={styles.subscriptionDropdownContainer}>
                 <Pressable style={styles.dropdownButton} onPress={() => {
                     toggleDropdown(setIsSubscriptionDropdownOpen, isSubscriptionDropdownOpen);
                 }}>
@@ -619,19 +647,26 @@ const OrderForm: React.FC<OrderFormProps> = ({
                     </Text>
                     <AntDesign name={isSubscriptionDropdownOpen ? 'up' : 'down'} size={16} color="#16283C" />
                 </Pressable>
+            </View>
 
-                {isSubscriptionDropdownOpen && (
-                    <View style={styles.dropdownList}>
+            {/* Subscription Dropdown Modal */}
+            <Modal visible={isSubscriptionDropdownOpen} transparent animationType="fade" onRequestClose={() => { setIsSubscriptionDropdownOpen(false); onDropdownToggle?.(false); }}>
+                <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => { setIsSubscriptionDropdownOpen(false); onDropdownToggle?.(false); }}>
+                    <View style={styles.modalContent}>
+                        <Text style={styles.modalTitle}>Selectează abonament</Text>
                         {loadingSubscriptions ? (
                             <ActivityIndicator size="small" color="#427992" style={{ padding: 15 }} />
                         ) : subscriptions.length === 0 ? (
                             <Text style={styles.emptyText}>Nu există abonamente active.</Text>
                         ) : (
-                            <ScrollView nestedScrollEnabled style={{ maxHeight: 220 }} showsVerticalScrollIndicator={false}>
-                                {subscriptions.map((sub, index) => (
-                                    <Pressable key={sub.id}
+                            <FlatList
+                                data={subscriptions}
+                                keyExtractor={(item) => item.id.toString()}
+                                style={{ maxHeight: 400 }}
+                                renderItem={({ item: sub, index }) => (
+                                    <Pressable
                                         style={({ pressed }) => [styles.dropdownItem, pressed && { backgroundColor: '#F5F5F5' }]}
-                                        onPress={() => { setSelectedSubscription(sub); setIsSubscriptionDropdownOpen(false); }}>
+                                        onPress={() => { setSelectedSubscription(sub); setIsSubscriptionDropdownOpen(false); onDropdownToggle?.(false); }}>
                                         <Text style={styles.dropdownItemTextBold}>{sub.name}</Text>
                                         <View style={[styles.typeBadge, sub.type === 'ONE_TIME' ? styles.badgeOneTime : styles.badgeRecurring]}>
                                             <Text style={styles.typeBadgeText}>
@@ -645,12 +680,12 @@ const OrderForm: React.FC<OrderFormProps> = ({
                                         </Text>
                                         {index < subscriptions.length - 1 && <View style={styles.divider} />}
                                     </Pressable>
-                                ))}
-                            </ScrollView>
+                                )}
+                            />
                         )}
                     </View>
-                )}
-            </View>
+                </TouchableOpacity>
+            </Modal>
 
             {/* ─── Location ─── */}
             <LocationPicker
@@ -913,5 +948,29 @@ const styles = StyleSheet.create({
         color: '#16283C',
     },
 
-
+    // ─── Modal dropdown ─────────────────────────────────────────────────
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 30,
+    },
+    modalContent: {
+        backgroundColor: '#FFFFFF',
+        borderRadius: 12,
+        width: '100%',
+        maxHeight: '70%',
+        paddingVertical: 10,
+        elevation: 10,
+    },
+    modalTitle: {
+        color: '#16283C',
+        fontSize: 16,
+        fontWeight: 'bold',
+        paddingHorizontal: 15,
+        paddingVertical: 10,
+        borderBottomWidth: 1,
+        borderBottomColor: '#EEEEEE',
+    },
 });

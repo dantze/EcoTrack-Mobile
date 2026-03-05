@@ -118,6 +118,13 @@ const OrderForm: React.FC<OrderFormProps> = ({
     });
     const [igiExistingPlacements, setIgiExistingPlacements] = useState<any[]>([]);
 
+    // ─── Igienizari: Recurring ──────────────────────────────────────────
+    const [isRecurring, setIsRecurring] = useState(false);
+    const [frequencyDays, setFrequencyDays] = useState('30');
+    const [isFrequencyDropdownOpen, setIsFrequencyDropdownOpen] = useState(false);
+    const [recurrenceEndDate, setRecurrenceEndDate] = useState('');
+    const [isRecurrenceIndefinite, setIsRecurrenceIndefinite] = useState(false);
+
     // ═══════════════════════════════════════════════════════════════════════
     // DATA FETCHING EFFECTS
     // ═══════════════════════════════════════════════════════════════════════
@@ -329,12 +336,17 @@ const OrderForm: React.FC<OrderFormProps> = ({
             onDataChange({
                 subscription: selectedSubscription,
                 location: igiLocation, date: dateStart, details,
+                isRecurring,
+                frequencyDays: isRecurring ? parseInt(frequencyDays) : undefined,
+                recurrenceEndDate: isRecurring && !isRecurrenceIndefinite ? recurrenceEndDate : undefined,
+                isRecurrenceIndefinite: isRecurring ? isRecurrenceIndefinite : undefined,
             });
         }
     }, [selectedPacket, quantity, isIndefinite, durationDays, igienizariPerMonth,
         contact, details, dateStart, dateEnd, ampLocation,
         packetsToRemove, clientPackets,
-        selectedSubscription, igiLocation]);
+        selectedSubscription, igiLocation,
+        isRecurring, frequencyDays, recurrenceEndDate, isRecurrenceIndefinite]);
 
     // ═══════════════════════════════════════════════════════════════════════
     // HELPERS
@@ -347,6 +359,7 @@ const OrderForm: React.FC<OrderFormProps> = ({
         setIsQuantityDropdownOpen(false);
         setIsIgienizariDropdownOpen(false);
         setIsSubscriptionDropdownOpen(false);
+        setIsFrequencyDropdownOpen(false);
         const willOpen = !currentValue;
         if (willOpen) setter(true);
         onDropdownToggle?.(willOpen);
@@ -723,11 +736,92 @@ const OrderForm: React.FC<OrderFormProps> = ({
 
             {/* ─── Date ─── */}
             <DateSelector
-                label="Dată Igienizare"
+                label={isRecurring ? "Dată Începere" : "Dată Igienizare"}
                 initialStartDate={dateStart}
                 onDateChange={(s) => setDateStart(s)}
                 onToggle={(open) => { if (open) toggleDropdown(() => {}, false); }}
             />
+
+            {/* ─── Recurring toggle ─── */}
+            <View style={{ marginTop: 15 }}>
+                <View style={styles.row}>
+                    <Text style={styles.label}>Igienizare Recurentă</Text>
+                    <Switch
+                        trackColor={{ false: '#767577', true: '#427992' }}
+                        thumbColor={isRecurring ? '#FFFFFF' : '#f4f3f4'}
+                        onValueChange={setIsRecurring}
+                        value={isRecurring}
+                    />
+                </View>
+            </View>
+
+            {isRecurring && (
+                <>
+                    {/* ─── Frequency ─── */}
+                    <View style={{ marginTop: 15 }}>
+                        <Text style={styles.label}>Frecvență</Text>
+                        <Pressable style={styles.dropdownButton} onPress={() => {
+                            toggleDropdown(setIsFrequencyDropdownOpen, isFrequencyDropdownOpen);
+                        }}>
+                            <Text style={styles.dropdownText}>
+                                {frequencyDays === '7' ? 'Săptămânal (7 zile)' :
+                                 frequencyDays === '14' ? 'Bisăptămânal (14 zile)' :
+                                 frequencyDays === '21' ? 'La 3 săptămâni (21 zile)' :
+                                 'Lunar (30 zile)'}
+                            </Text>
+                            <AntDesign name={isFrequencyDropdownOpen ? 'up' : 'down'} size={16} color="#16283C" />
+                        </Pressable>
+                    </View>
+
+                    {/* Frequency Dropdown Modal */}
+                    <Modal visible={isFrequencyDropdownOpen} transparent animationType="fade" onRequestClose={() => { setIsFrequencyDropdownOpen(false); onDropdownToggle?.(false); }}>
+                        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => { setIsFrequencyDropdownOpen(false); onDropdownToggle?.(false); }}>
+                            <View style={styles.modalContent}>
+                                <Text style={styles.modalTitle}>Selectează frecvența</Text>
+                                <FlatList
+                                    data={[
+                                        { value: '7', label: 'Săptămânal (7 zile)' },
+                                        { value: '14', label: 'Bisăptămânal (14 zile)' },
+                                        { value: '21', label: 'La 3 săptămâni (21 zile)' },
+                                        { value: '30', label: 'Lunar (30 zile)' },
+                                    ]}
+                                    keyExtractor={(item) => item.value}
+                                    renderItem={({ item, index }) => (
+                                        <Pressable
+                                            style={({ pressed }) => [styles.dropdownItem, pressed && { backgroundColor: '#F5F5F5' }]}
+                                            onPress={() => { setFrequencyDays(item.value); setIsFrequencyDropdownOpen(false); onDropdownToggle?.(false); }}>
+                                            <Text style={styles.dropdownItemText}>{item.label}</Text>
+                                            {index < 3 && <View style={styles.divider} />}
+                                        </Pressable>
+                                    )}
+                                />
+                            </View>
+                        </TouchableOpacity>
+                    </Modal>
+
+                    {/* ─── Recurrence End ─── */}
+                    <View style={{ marginTop: 15 }}>
+                        <View style={styles.row}>
+                            <Text style={styles.label}>Termen Nedeterminat</Text>
+                            <Switch
+                                trackColor={{ false: '#767577', true: '#427992' }}
+                                thumbColor={isRecurrenceIndefinite ? '#FFFFFF' : '#f4f3f4'}
+                                onValueChange={setIsRecurrenceIndefinite}
+                                value={isRecurrenceIndefinite}
+                            />
+                        </View>
+                    </View>
+
+                    {!isRecurrenceIndefinite && (
+                        <DateSelector
+                            label="Dată Sfârșit Recurență"
+                            initialStartDate={recurrenceEndDate}
+                            onDateChange={(s) => setRecurrenceEndDate(s)}
+                            onToggle={(open) => { if (open) toggleDropdown(() => {}, false); }}
+                        />
+                    )}
+                </>
+            )}
 
             {/* ─── Details ─── */}
             {renderDetailsField()}

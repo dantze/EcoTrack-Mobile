@@ -116,6 +116,7 @@ const OrderForm: React.FC<OrderFormProps> = ({
         const parsed = parseCoordinates(initialData.sanitationLocationCoordinates);
         return parsed ? { ...parsed, address: initialData.sanitationLocationAddress } : null;
     });
+    const [igiExistingPlacements, setIgiExistingPlacements] = useState<any[]>([]);
 
     // ═══════════════════════════════════════════════════════════════════════
     // DATA FETCHING EFFECTS
@@ -162,6 +163,32 @@ const OrderForm: React.FC<OrderFormProps> = ({
                 setExistingPlacements(clustered);
             })
             .catch(err => console.error('Failed to fetch client orders', err));
+    }, [orderType, client]);
+
+    // Igienizari → Fetch existing placements for map markers
+    useEffect(() => {
+        if (orderType !== 'Igienizari' || !client?.id) return;
+        ClientService.getOrders(client.id)
+            .then(orders => {
+                const raw = orders
+                    .filter((o: any) => o.locationCoordinates?.includes(','))
+                    .map((o: any) => {
+                        const [lat, lng] = o.locationCoordinates.split(',').map(Number);
+                        return { id: o.id, latitude: lat, longitude: lng, count: o.quantity || 1, name: o.product?.name || 'Produs' };
+                    });
+                const clustered: any[] = [];
+                const THRESHOLD = 0.0002;
+                raw.forEach((p: any) => {
+                    const existing = clustered.find(c =>
+                        Math.abs(c.latitude - p.latitude) < THRESHOLD &&
+                        Math.abs(c.longitude - p.longitude) < THRESHOLD
+                    );
+                    if (existing) existing.count += p.count;
+                    else clustered.push({ ...p });
+                });
+                setIgiExistingPlacements(clustered);
+            })
+            .catch(err => console.error('Failed to fetch client orders for Igienizari', err));
     }, [orderType, client]);
 
     // Ridicari → Fetch & group client packets
@@ -691,6 +718,7 @@ const OrderForm: React.FC<OrderFormProps> = ({
             <LocationPicker
                 onLocationSelect={(loc) => setIgiLocation(loc)}
                 initialLocation={igiLocation || undefined}
+                existingPlacements={igiExistingPlacements}
             />
 
             {/* ─── Date ─── */}

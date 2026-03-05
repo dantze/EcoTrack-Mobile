@@ -544,7 +544,7 @@ const styles = StyleSheet.create({
     },
     // Cluster Marker Styles
     clusterMarker: {
-        backgroundColor: '#2196F3',
+        backgroundColor: '#4CAF50',
         minWidth: 30,
         height: 30,
         borderRadius: 15,

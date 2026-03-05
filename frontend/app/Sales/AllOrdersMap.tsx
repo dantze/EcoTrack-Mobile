@@ -58,6 +58,17 @@ interface ExistingPlacement {
     orders: OrderSummary[];
 }
 
+const getClusterColor = (orders: OrderSummary[]): string => {
+    const types = new Set(orders.map(o => o.orderType));
+    if (types.size === 1) {
+        const type = types.values().next().value;
+        if (type === 'Amplasari') return '#4CAF50';
+        if (type === 'Ridicari') return '#F44336';
+        if (type === 'Igienizari') return '#9E9E9E';
+    }
+    return '#2196F3'; // default blue for mixed
+};
+
 export default function AllOrdersMap() {
     const [placements, setPlacements] = useState<ExistingPlacement[]>([]);
     const [loading, setLoading] = useState(true);
@@ -195,7 +206,7 @@ export default function AllOrdersMap() {
                             }}
                             onPress={() => handleMarkerPress(placement)}
                         >
-                            <View style={styles.clusterMarker}>
+                            <View style={[styles.clusterMarker, { backgroundColor: getClusterColor(placement.orders) }]}>
                                 <Text style={styles.clusterText}>{placement.orderCount}</Text>
                             </View>
                         </Marker>

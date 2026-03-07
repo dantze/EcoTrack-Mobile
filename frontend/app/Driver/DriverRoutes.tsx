@@ -94,7 +94,8 @@ const DriverRoutes = () => {
             pathname: "/Driver/RouteTasks",
             params: {
                 routeId: route.id,
-                routeDate: route.date
+                routeDate: route.date,
+                routeName: route.name
             }
         });
     };

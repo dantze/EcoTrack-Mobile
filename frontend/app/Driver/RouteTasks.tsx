@@ -13,7 +13,7 @@ import StatusBadge from '../../components/display/StatusBadge';
 
 const RouteTasks = () => {
     const router = useRouter();
-    const { routeId, routeDate } = useLocalSearchParams<{ routeId: string; routeDate?: string }>();
+    const { routeId, routeDate, routeName } = useLocalSearchParams<{ routeId: string; routeDate?: string; routeName?: string }>();
     const { width: screenWidth } = useWindowDimensions();
 
     const [tasks, setTasks] = useState<Task[]>([]);
@@ -162,7 +162,7 @@ const RouteTasks = () => {
     return (
         <View style={styles.container}>
             {/* Header */}
-            <ScreenHeader title="Sarcinile Mele" onRefresh={fetchTasks} />
+            <ScreenHeader title={routeName || 'Sarcinile Mele'} onRefresh={fetchTasks} />
 
             {/* Date Navigation */}
             <View style={styles.dateNavContainer}>

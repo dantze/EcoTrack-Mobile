@@ -126,28 +126,29 @@ export default function OrdersList() {
             result = result.filter((o) => o.product?.name === f.productName);
         }
 
-        // Date – check if the given date falls within [startDate, endDate] or matches the single date
-        if (f.date && f.date.length === 10) {
-            const parts = f.date.split('/');
-            if (parts.length === 3) {
-                const isoDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
-                const filterTime = new Date(isoDate).getTime();
-                if (!isNaN(filterTime)) {
-                    result = result.filter((o) => {
-                        const start = o.startDate || o.pickupDate || o.sanitationDate;
-                        if (!start) return false;
-                        const startTime = new Date(start).getTime();
-                        const end = o.endDate;
-                        if (end) {
-                            const endTime = new Date(end).getTime();
-                            return filterTime >= startTime && filterTime <= endTime;
-                        }
-                        // Single date – match same day
-                        const sameDay = new Date(start).toISOString().slice(0, 10) === isoDate;
-                        return sameDay;
-                    });
-                }
-            }
+        // Date range – filter orders whose date falls within [startDate, endDate]
+        const parseFilterDate = (d: string): number | null => {
+            if (!d || d.length !== 10) return null;
+            const parts = d.split('/');
+            if (parts.length !== 3) return null;
+            const iso = `${parts[2]}-${parts[1]}-${parts[0]}`;
+            const t = new Date(iso).getTime();
+            return isNaN(t) ? null : t;
+        };
+
+        const filterStart = parseFilterDate(f.startDate);
+        const filterEnd = parseFilterDate(f.endDate);
+
+        if (filterStart || filterEnd) {
+            result = result.filter((o) => {
+                const orderDate = o.startDate || o.pickupDate || o.sanitationDate;
+                if (!orderDate) return false;
+                const orderTime = new Date(orderDate).getTime();
+                if (isNaN(orderTime)) return false;
+                if (filterStart && orderTime < filterStart) return false;
+                if (filterEnd && orderTime > filterEnd + 86400000 - 1) return false;
+                return true;
+            });
         }
 
         return result;

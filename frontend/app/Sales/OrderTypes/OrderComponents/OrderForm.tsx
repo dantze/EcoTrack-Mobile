@@ -742,7 +742,8 @@ const OrderForm: React.FC<OrderFormProps> = ({
                 onToggle={(open) => { if (open) toggleDropdown(() => {}, false); }}
             />
 
-            {/* ─── Recurring toggle ─── */}
+            {/* ─── Recurring toggle (only in create mode) ─── */}
+            {!isEdit && (
             <View style={{ marginTop: 15 }}>
                 <View style={styles.row}>
                     <Text style={styles.label}>Igienizare Recurentă</Text>
@@ -754,8 +755,9 @@ const OrderForm: React.FC<OrderFormProps> = ({
                     />
                 </View>
             </View>
+            )}
 
-            {isRecurring && (
+            {isRecurring && !isEdit && (
                 <>
                     {/* ─── Frequency ─── */}
                     <View style={{ marginTop: 15 }}>

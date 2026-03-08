@@ -123,7 +123,6 @@ const OrderForm: React.FC<OrderFormProps> = ({
     const [frequencyDays, setFrequencyDays] = useState('30');
     const [isFrequencyDropdownOpen, setIsFrequencyDropdownOpen] = useState(false);
     const [recurrenceEndDate, setRecurrenceEndDate] = useState('');
-    const [isRecurrenceIndefinite, setIsRecurrenceIndefinite] = useState(false);
 
     // ═══════════════════════════════════════════════════════════════════════
     // DATA FETCHING EFFECTS
@@ -338,15 +337,14 @@ const OrderForm: React.FC<OrderFormProps> = ({
                 location: igiLocation, date: dateStart, details,
                 isRecurring,
                 frequencyDays: isRecurring ? parseInt(frequencyDays) : undefined,
-                recurrenceEndDate: isRecurring && !isRecurrenceIndefinite ? recurrenceEndDate : undefined,
-                isRecurrenceIndefinite: isRecurring ? isRecurrenceIndefinite : undefined,
+                recurrenceEndDate: isRecurring ? recurrenceEndDate : undefined,
             });
         }
     }, [selectedPacket, quantity, isIndefinite, durationDays, igienizariPerMonth,
         contact, details, dateStart, dateEnd, ampLocation,
         packetsToRemove, clientPackets,
         selectedSubscription, igiLocation,
-        isRecurring, frequencyDays, recurrenceEndDate, isRecurrenceIndefinite]);
+        isRecurring, frequencyDays, recurrenceEndDate]);
 
     // ═══════════════════════════════════════════════════════════════════════
     // HELPERS
@@ -740,6 +738,7 @@ const OrderForm: React.FC<OrderFormProps> = ({
                 initialStartDate={dateStart}
                 onDateChange={(s) => setDateStart(s)}
                 onToggle={(open) => { if (open) toggleDropdown(() => {}, false); }}
+                singleDate
             />
 
             {/* ─── Recurring toggle (only in create mode) ─── */}
@@ -801,27 +800,14 @@ const OrderForm: React.FC<OrderFormProps> = ({
                         </TouchableOpacity>
                     </Modal>
 
-                    {/* ─── Recurrence End ─── */}
-                    <View style={{ marginTop: 15 }}>
-                        <View style={styles.row}>
-                            <Text style={styles.label}>Termen Nedeterminat</Text>
-                            <Switch
-                                trackColor={{ false: '#767577', true: '#427992' }}
-                                thumbColor={isRecurrenceIndefinite ? '#FFFFFF' : '#f4f3f4'}
-                                onValueChange={setIsRecurrenceIndefinite}
-                                value={isRecurrenceIndefinite}
-                            />
-                        </View>
-                    </View>
-
-                    {!isRecurrenceIndefinite && (
-                        <DateSelector
-                            label="Dată Sfârșit Recurență"
-                            initialStartDate={recurrenceEndDate}
-                            onDateChange={(s) => setRecurrenceEndDate(s)}
-                            onToggle={(open) => { if (open) toggleDropdown(() => {}, false); }}
-                        />
-                    )}
+                    {/* ─── Recurrence End Date ─── */}
+                    <DateSelector
+                        label="Dată Sfârșit Recurență"
+                        initialStartDate={recurrenceEndDate}
+                        onDateChange={(s) => setRecurrenceEndDate(s)}
+                        onToggle={(open) => { if (open) toggleDropdown(() => {}, false); }}
+                        singleDate
+                    />
                 </>
             )}
 

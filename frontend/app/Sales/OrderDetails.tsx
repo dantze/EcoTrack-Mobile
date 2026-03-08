@@ -78,11 +78,12 @@ const OrderDetails = () => {
             if (!isValidPhone(contact)) return "Numărul de telefon trebuie să fie în formatul 07XXXXXXXX, 407XXXXXXXX, +407XXXXXXXX sau 0407XXXXXXXX.";
         }
         else if (selectedType === "Igienizari") {
-            const { subscription, location, date, isRecurring, recurrenceEndDate, isRecurrenceIndefinite } = orderData;
+            const { subscription, location, date, isRecurring, recurrenceEndDate } = orderData;
             if (!subscription?.id) return "Selectați abonamentul.";
             if (!location) return "Selectați locația.";
             if (!date) return "Selectați data igienizării.";
-            if (isRecurring && !isRecurrenceIndefinite && !recurrenceEndDate) return "Selectați data de sfârșit a recurenței sau marcați ca nedeterminată.";
+            if (isRecurring && !recurrenceEndDate) return "Selectați data de sfârșit a recurenței.";
+            if (isRecurring && recurrenceEndDate && date && recurrenceEndDate <= date) return "Data de sfârșit trebuie să fie după data de începere.";
         }
         return null; // No errors
     };
@@ -227,7 +228,7 @@ const OrderDetails = () => {
                                 }
                             } else if (selectedType === "Igienizari") {
                                 try {
-                                    const { subscription, location, date, details, isRecurring, frequencyDays, recurrenceEndDate, isRecurrenceIndefinite } = orderData;
+                                    const { subscription, location, date, details, isRecurring, frequencyDays, recurrenceEndDate } = orderData;
 
                                     if (isRecurring) {
                                         // Create a recurring igienizare plan
@@ -235,8 +236,8 @@ const OrderDetails = () => {
                                             subscription: { id: subscription.id },
                                             frequencyDays: frequencyDays || 30,
                                             startDate: date,
-                                            endDate: !isRecurrenceIndefinite ? recurrenceEndDate : null,
-                                            isIndefinite: isRecurrenceIndefinite || false,
+                                            endDate: recurrenceEndDate,
+                                            isIndefinite: false,
                                             sanitationLocationCoordinates: location
                                                 ? `${location.latitude},${location.longitude}`
                                                 : null,

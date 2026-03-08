@@ -38,9 +38,10 @@ interface DateSelectorProps {
     onToggle?: (isOpen: boolean) => void;
     initialStartDate?: string;
     initialEndDate?: string;
+    singleDate?: boolean;
 }
 
-const DateSelector = ({ label = "Dată Amplasare", onDateChange, onToggle, initialStartDate = '', initialEndDate = '' }: DateSelectorProps) => {
+const DateSelector = ({ label = "Dată Amplasare", onDateChange, onToggle, initialStartDate = '', initialEndDate = '', singleDate = false }: DateSelectorProps) => {
     const [isCalendarOpen, setIsCalendarOpen] = useState(false);
     const [startDate, setStartDate] = useState(initialStartDate);
     const [endDate, setEndDate] = useState(initialEndDate);
@@ -55,6 +56,17 @@ const DateSelector = ({ label = "Dată Amplasare", onDateChange, onToggle, initi
     });
 
     const handleDayPress = (day: any) => {
+        if (singleDate) {
+            const picked = day.dateString;
+            setStartDate(picked);
+            setEndDate('');
+            setMarkedDates({
+                [picked]: { selected: true, startingDay: true, endingDay: true, color: '#00adf5', textColor: 'white' }
+            });
+            onDateChange(picked, '');
+            return;
+        }
+
         let newStart = startDate;
         let newEnd = endDate;
 

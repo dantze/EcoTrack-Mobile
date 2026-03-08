@@ -24,7 +24,7 @@ public class RecurringIgienizareScheduler {
      * Runs daily at 23:59 Bucharest time — generates occurrences for the next 30 days
      * for all active recurring plans.
      */
-    @Scheduled(cron = "0 59 23 * * *", zone = "Europe/Bucharest")
+    @Scheduled(cron = "0 30 23 * * *", zone = "Europe/Bucharest")
     public void generateUpcomingOccurrences() {
         List<RecurringIgienizare> activePlans = recurringRepo.findByActiveTrue();
         LocalDate horizon = LocalDate.now().plusDays(30);

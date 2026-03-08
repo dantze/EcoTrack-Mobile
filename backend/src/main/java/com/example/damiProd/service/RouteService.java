@@ -2,9 +2,11 @@ package com.example.damiProd.service;
 
 import com.example.damiProd.domain.Employee;
 import com.example.damiProd.domain.Route;
+import com.example.damiProd.domain.Task;
 import com.example.damiProd.dto.CreateRouteRequest;
 import com.example.damiProd.repository.EmployeeRepository;
 import com.example.damiProd.repository.RouteRepository;
+import com.example.damiProd.repository.TaskRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -16,10 +18,12 @@ public class RouteService {
 
     private final RouteRepository routeRepository;
     private final EmployeeRepository employeeRepository;
+    private final TaskRepository taskRepository;
 
-    public RouteService(RouteRepository routeRepository, EmployeeRepository employeeRepository) {
+    public RouteService(RouteRepository routeRepository, EmployeeRepository employeeRepository, TaskRepository taskRepository) {
         this.routeRepository = routeRepository;
         this.employeeRepository = employeeRepository;
+        this.taskRepository = taskRepository;
     }
 
     public List<Route> getAllRoutes() {
@@ -82,5 +86,29 @@ public class RouteService {
 
         route.setEmployee(employee);
         return routeRepository.save(route);
+    }
+
+    @Transactional
+    public Route reorderTasks(Long routeId, List<Long> taskIds) {
+        Route route = routeRepository.findById(routeId)
+                .orElseThrow(() -> new RuntimeException("Ruta nu a fost găsită"));
+
+        List<Task> tasks = taskRepository.findByRoute_Id(routeId);
+
+        for (int i = 0; i < taskIds.size(); i++) {
+            final Long taskId = taskIds.get(i);
+            final int newIndex = i;
+            tasks.stream()
+                    .filter(t -> t.getId().equals(taskId))
+                    .findFirst()
+                    .ifPresent(t -> t.setOrderIndex(newIndex));
+        }
+
+        taskRepository.saveAll(tasks);
+
+        // Reload route with ordered tasks
+        Route reloaded = routeRepository.findById(routeId).orElseThrow();
+        reloaded.getTasks().size(); // force load
+        return reloaded;
     }
 }

@@ -58,7 +58,16 @@ const Routes = () => {
     };
 
     const handleRoutePress = (route: Route) => {
-        console.log("You selected route:", route.id);
+        router.push({
+            pathname: '/Technical/RouteTasks',
+            params: {
+                routeId: route.id.toString(),
+                driverName: route.name || `Ruta #${route.id}`,
+            },
+        });
+    };
+
+    const handleDriverAssign = (route: Route) => {
         setSelectedRoute(route);
         fetchDrivers();
         setDriverModalVisible(true);
@@ -119,18 +128,31 @@ const Routes = () => {
                         {routes.map((route, index) => (
                             <View key={route.id} style={styles.itemWrapper}>
 
-                                <Pressable
-                                    style={({ pressed }) => [
-                                        styles.routeButton,
-                                        pressed && styles.buttonPressed
-                                    ]}
-                                    onPress={() => handleRoutePress(route)}
-                                >
-                                    <View style={styles.routeInfo}>
-                                        <Text style={styles.buttonText}>{route.name || `Ruta #${route.id}`}</Text>
-                                        <Text style={styles.subtitleText}>{getDayOfWeekLabel(route.dayOfWeek)}</Text>
-                                    </View>
-                                </Pressable>
+                                <View style={styles.routeRow}>
+                                    <Pressable
+                                        style={({ pressed }) => [
+                                            styles.routeButton,
+                                            pressed && styles.buttonPressed
+                                        ]}
+                                        onPress={() => handleRoutePress(route)}
+                                    >
+                                        <View style={styles.routeInfo}>
+                                            <Text style={styles.buttonText}>{route.name || `Ruta #${route.id}`}</Text>
+                                            <Text style={styles.subtitleText}>{getDayOfWeekLabel(route.dayOfWeek)}</Text>
+                                        </View>
+                                        <Ionicons name="chevron-forward" size={22} color={AppColors.textWhite} />
+                                    </Pressable>
+
+                                    <Pressable
+                                        style={({ pressed }) => [
+                                            styles.driverButton,
+                                            pressed && styles.buttonPressed
+                                        ]}
+                                        onPress={() => handleDriverAssign(route)}
+                                    >
+                                        <Ionicons name="person-add" size={22} color={AppColors.textWhite} />
+                                    </Pressable>
+                                </View>
 
                                 {index < routes.length - 1 && <View style={styles.separator} />}
 
@@ -195,8 +217,14 @@ const styles = StyleSheet.create({
     itemWrapper: {
         alignItems: 'center',
     },
+    routeRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        width: 340,
+        gap: 10,
+    },
     routeButton: {
-        width: 300,
+        flex: 1,
         height: 60,
         backgroundColor: AppColors.buttonBackground,
         borderRadius: 20,
@@ -204,6 +232,19 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         paddingHorizontal: 15,
+        elevation: 5,
+        shadowColor: AppColors.shadow,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 3.84,
+    },
+    driverButton: {
+        width: 50,
+        height: 50,
+        backgroundColor: AppColors.successGreen,
+        borderRadius: 25,
+        justifyContent: 'center',
+        alignItems: 'center',
         elevation: 5,
         shadowColor: AppColors.shadow,
         shadowOffset: { width: 0, height: 2 },

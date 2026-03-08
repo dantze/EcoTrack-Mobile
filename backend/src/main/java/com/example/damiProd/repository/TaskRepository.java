@@ -16,6 +16,8 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
 
     List<Task> findByRoute_Id(Long routeId);
 
+    List<Task> findByRoute_IdOrderByOrderIndexAsc(Long routeId);
+
     List<Task> findByRoute_IdAndStatus(Long routeId, TaskStatus status);
 
     // Find task by order ID
@@ -25,12 +27,12 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
     boolean existsByOrder_Id(Long orderId);
 
     // Find tasks by the route's employee and scheduled time range
-    @Query("SELECT t FROM Task t WHERE t.route.employee.id = :employeeId AND t.scheduledTime >= :startOfDay AND t.scheduledTime < :endOfDay")
+    @Query("SELECT t FROM Task t WHERE t.route.employee.id = :employeeId AND t.scheduledTime >= :startOfDay AND t.scheduledTime < :endOfDay ORDER BY t.orderIndex ASC")
     List<Task> findByEmployeeAndScheduledDate(
             @Param("employeeId") Long employeeId,
             @Param("startOfDay") LocalDateTime startOfDay,
             @Param("endOfDay") LocalDateTime endOfDay);
 
     // Find all tasks belonging to a specific employee (via route)
-    List<Task> findByRoute_Employee_Id(Long employeeId);
+    List<Task> findByRoute_Employee_IdOrderByOrderIndexAsc(Long employeeId);
 }

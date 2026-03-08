@@ -16,18 +16,20 @@ export interface OrderFilters {
     city: string;
     orderType: string; // '' | 'Amplasari' | 'Ridicari' | 'Igienizari'
     productName: string;
-    date: string; // ISO date string (yyyy-mm-dd) or ''
+    startDate: string; // dd/mm/yyyy or ''
+    endDate: string;   // dd/mm/yyyy or ''
 }
 
 export const EMPTY_FILTERS: OrderFilters = {
     city: '',
     orderType: '',
     productName: '',
-    date: '',
+    startDate: '',
+    endDate: '',
 };
 
 export const hasActiveFilters = (f: OrderFilters): boolean =>
-    !!(f.city || f.orderType || f.productName || f.date);
+    !!(f.city || f.orderType || f.productName || f.startDate || f.endDate);
 
 // ─── Props ───────────────────────────────────────────────────────────────────
 interface Props {
@@ -149,29 +151,54 @@ const OrderFilterModal: React.FC<Props> = ({
                             </View>
                         )}
 
-                        {/* ── Date ─────────────────────────────────────── */}
-                        <Text style={styles.sectionLabel}>Dată (se încadrează în perioada comenzii)</Text>
-                        <TextInput
-                            style={styles.textInput}
-                            placeholder="zz/ll/aaaa"
-                            placeholderTextColor={AppColors.placeholderText}
-                            value={local.date}
-                            onChangeText={(t) => {
-                                // Auto-format: add slashes as user types digits
-                                const digits = t.replace(/[^0-9]/g, '').slice(0, 8);
-                                let formatted = digits;
-                                if (digits.length > 4) {
-                                    formatted = `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
-                                } else if (digits.length > 2) {
-                                    formatted = `${digits.slice(0, 2)}/${digits.slice(2)}`;
-                                }
-                                setLocal((p) => ({ ...p, date: formatted }));
-                            }}
-                            keyboardType="number-pad"
-                            maxLength={10}
-                        />
+                        {/* ── Date range ────────────────────────────────── */}
+                        <Text style={styles.sectionLabel}>Perioadă</Text>
+                        <View style={styles.dateRangeRow}>
+                            <View style={styles.dateInputWrapper}>
+                                <Text style={styles.dateLabel}>De la</Text>
+                                <TextInput
+                                    style={styles.textInput}
+                                    placeholder="zz/ll/aaaa"
+                                    placeholderTextColor={AppColors.placeholderText}
+                                    value={local.startDate}
+                                    onChangeText={(t) => {
+                                        const digits = t.replace(/[^0-9]/g, '').slice(0, 8);
+                                        let formatted = digits;
+                                        if (digits.length > 4) {
+                                            formatted = `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+                                        } else if (digits.length > 2) {
+                                            formatted = `${digits.slice(0, 2)}/${digits.slice(2)}`;
+                                        }
+                                        setLocal((p) => ({ ...p, startDate: formatted }));
+                                    }}
+                                    keyboardType="number-pad"
+                                    maxLength={10}
+                                />
+                            </View>
+                            <View style={styles.dateInputWrapper}>
+                                <Text style={styles.dateLabel}>Până la</Text>
+                                <TextInput
+                                    style={styles.textInput}
+                                    placeholder="zz/ll/aaaa"
+                                    placeholderTextColor={AppColors.placeholderText}
+                                    value={local.endDate}
+                                    onChangeText={(t) => {
+                                        const digits = t.replace(/[^0-9]/g, '').slice(0, 8);
+                                        let formatted = digits;
+                                        if (digits.length > 4) {
+                                            formatted = `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
+                                        } else if (digits.length > 2) {
+                                            formatted = `${digits.slice(0, 2)}/${digits.slice(2)}`;
+                                        }
+                                        setLocal((p) => ({ ...p, endDate: formatted }));
+                                    }}
+                                    keyboardType="number-pad"
+                                    maxLength={10}
+                                />
+                            </View>
+                        </View>
                         <Text style={styles.hint}>
-                            Introduceți o dată și vor fi afișate comenzile care se încadrează în acea perioadă
+                            Vor fi afișate comenzile din intervalul selectat
                         </Text>
 
                         <View style={{ height: 20 }} />
@@ -251,6 +278,18 @@ const styles = StyleSheet.create({
         color: AppColors.placeholderText,
         fontSize: 12,
         marginTop: 6,
+    },
+    dateRangeRow: {
+        flexDirection: 'row',
+        gap: 10,
+    },
+    dateInputWrapper: {
+        flex: 1,
+    },
+    dateLabel: {
+        color: AppColors.lightText,
+        fontSize: 12,
+        marginBottom: 4,
     },
     chipRow: {
         flexDirection: 'row',

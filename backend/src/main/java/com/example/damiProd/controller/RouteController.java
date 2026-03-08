@@ -68,4 +68,13 @@ public class RouteController {
         Route updatedRoute = routeService.assignDriverToRoute(routeId, employeeId);
         return ResponseEntity.ok(updatedRoute);
     }
+
+    // Reorder tasks within a route
+    @PutMapping("/{routeId}/reorder-tasks")
+    public ResponseEntity<Route> reorderTasks(
+            @PathVariable Long routeId,
+            @RequestBody List<Long> taskIds) {
+        Route updatedRoute = routeService.reorderTasks(routeId, taskIds);
+        return ResponseEntity.ok(updatedRoute);
+    }
 }

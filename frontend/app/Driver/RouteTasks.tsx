@@ -13,7 +13,7 @@ import StatusBadge from '../../components/display/StatusBadge';
 
 const RouteTasks = () => {
     const router = useRouter();
-    const { routeId, routeDate } = useLocalSearchParams<{ routeId: string; routeDate?: string }>();
+    const { routeId, routeDate, routeName } = useLocalSearchParams<{ routeId: string; routeDate?: string; routeName?: string }>();
     const { width: screenWidth } = useWindowDimensions();
 
     const [tasks, setTasks] = useState<Task[]>([]);
@@ -100,6 +100,7 @@ const RouteTasks = () => {
     // Filter tasks
     const remainingTasks = tasks.filter(t => t.status === 'NEW' || t.status === 'IN_PROGRESS');
     const completedTasks = tasks.filter(t => t.status === 'COMPLETED');
+    const remainingSanitizations = remainingTasks.filter(t => t.type?.toUpperCase() === 'SANITIZATION');
 
     const renderTaskCard = (task: Task) => (
         <Pressable
@@ -162,7 +163,7 @@ const RouteTasks = () => {
     return (
         <View style={styles.container}>
             {/* Header */}
-            <ScreenHeader title="Sarcinile Mele" onRefresh={fetchTasks} />
+            <ScreenHeader title={routeName || 'Sarcinile Mele'} onRefresh={fetchTasks} />
 
             {/* Date Navigation */}
             <View style={styles.dateNavContainer}>
@@ -178,13 +179,20 @@ const RouteTasks = () => {
                 </Pressable>
             </View>
 
-            {/* Stats - only Rămase and Finalizate */}
+            {/* Stats - Rămase, Igienizări rămase, Finalizate */}
             <View style={styles.statsContainer}>
                 <View style={styles.statItem}>
                     <Text style={[styles.statNumber, { color: AppColors.warningOrange }]}>
                         {remainingTasks.length}
                     </Text>
                     <Text style={styles.statLabel}>Rămase</Text>
+                </View>
+                <View style={styles.statDivider} />
+                <View style={styles.statItem}>
+                    <Text style={[styles.statNumber, { color: '#3498DB' }]}>
+                        {remainingSanitizations.length}
+                    </Text>
+                    <Text style={styles.statLabel}>Igienizări</Text>
                 </View>
                 <View style={styles.statDivider} />
                 <View style={styles.statItem}>

@@ -35,6 +35,7 @@ public class Route {
 
     @OneToMany(mappedBy = "route", cascade = CascadeType.ALL, orphanRemoval = true)
     @JsonIgnoreProperties("route")
+    @OrderBy("orderIndex ASC")
     private List<Task> tasks = new ArrayList<>();
 
     public Route() {

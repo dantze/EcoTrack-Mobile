@@ -38,6 +38,9 @@ public class Task {
     private Integer quantity;
     private String internalNotes;
 
+    @Column(name = "order_index")
+    private Integer orderIndex = 0;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "route_id")
     @JsonIgnore

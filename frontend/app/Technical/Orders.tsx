@@ -107,25 +107,33 @@ const Orders = () => {
             result = result.filter((o) => getOrderProductName(o) === f.productName);
         }
 
-        if (f.date && f.date.length === 10) {
-            const parts = f.date.split('/');
-            if (parts.length === 3) {
-                const isoDate = `${parts[2]}-${parts[1]}-${parts[0]}`;
-                const filterTime = new Date(isoDate).getTime();
-                if (!isNaN(filterTime)) {
-                    result = result.filter((o) => {
-                        const start = getOrderStartDate(o);
-                        if (!start) return false;
-                        const startTime = new Date(start).getTime();
-                        const end = getOrderEndDate(o);
-                        if (end) {
-                            const endTime = new Date(end).getTime();
-                            return filterTime >= startTime && filterTime <= endTime;
-                        }
-                        return new Date(start).toISOString().slice(0, 10) === isoDate;
-                    });
+        const parseDate = (d: string): number | null => {
+            if (!d || d.length !== 10) return null;
+            const parts = d.split('/');
+            if (parts.length !== 3) return null;
+            const t = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`).getTime();
+            return isNaN(t) ? null : t;
+        };
+
+        const filterStart = parseDate(f.startDate);
+        const filterEnd = parseDate(f.endDate);
+
+        if (filterStart !== null || filterEnd !== null) {
+            result = result.filter((o) => {
+                const orderStart = getOrderStartDate(o);
+                if (!orderStart) return false;
+                const orderStartTime = new Date(orderStart).getTime();
+                const orderEnd = getOrderEndDate(o);
+                const orderEndTime = orderEnd ? new Date(orderEnd).getTime() : orderStartTime;
+
+                if (filterStart !== null && filterEnd !== null) {
+                    return orderEndTime >= filterStart && orderStartTime <= filterEnd;
                 }
-            }
+                if (filterStart !== null) {
+                    return orderEndTime >= filterStart;
+                }
+                return orderStartTime <= filterEnd!;
+            });
         }
 
         return result;

@@ -36,7 +36,7 @@ public class TaskService {
     }
 
     public List<Task> getTasksByRouteId(Long routeId) {
-        return taskRepository.findByRoute_Id(routeId);
+        return taskRepository.findByRoute_IdOrderByOrderIndexAsc(routeId);
     }
 
     /**
@@ -52,7 +52,7 @@ public class TaskService {
      * Get all tasks belonging to an employee (via route), regardless of date
      */
     public List<Task> getTasksByEmployee(Long employeeId) {
-        return taskRepository.findByRoute_Employee_Id(employeeId);
+        return taskRepository.findByRoute_Employee_IdOrderByOrderIndexAsc(employeeId);
     }
 
     public Task createTask(Task task) {

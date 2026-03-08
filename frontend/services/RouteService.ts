@@ -79,5 +79,20 @@ export const RouteService = {
             throw new Error('Eșec la asignarea șoferului');
         }
         return await response.json();
-    }
+    },
+
+    reorderTasks: async (routeId: number, taskIds: number[]): Promise<Route> => {
+        const response = await fetch(`${API_BASE_URL}/routes/${routeId}/reorder-tasks`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(taskIds),
+        });
+
+        if (!response.ok) {
+            throw new Error('Eșec la reordonarea sarcinilor');
+        }
+        return await response.json();
+    },
 };

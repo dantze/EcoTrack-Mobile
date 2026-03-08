@@ -1,4 +1,4 @@
-import { StyleSheet, Text, View, Pressable, ScrollView, ActivityIndicator } from 'react-native'
+import { StyleSheet, Text, View, Pressable, ScrollView, ActivityIndicator, Alert } from 'react-native'
 import React, { useState, useEffect } from 'react'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons';
@@ -19,6 +19,8 @@ const RouteTasks = () => {
     const [tasks, setTasks] = useState<Task[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [reordering, setReordering] = useState(false);
+    const [hasChanges, setHasChanges] = useState(false);
 
     useEffect(() => {
         if (routeId) {
@@ -32,6 +34,7 @@ const RouteTasks = () => {
             setError(null);
             const route = await RouteService.getRouteById(Number(routeId));
             setTasks(route.tasks || []);
+            setHasChanges(false);
         } catch (err) {
             setError('Nu s-au putut încărca sarcinile');
             console.error(err);
@@ -48,6 +51,34 @@ const RouteTasks = () => {
         });
     };
 
+    const moveTask = (index: number, direction: 'up' | 'down') => {
+        const newIndex = direction === 'up' ? index - 1 : index + 1;
+        if (newIndex < 0 || newIndex >= tasks.length) return;
+
+        const newTasks = [...tasks];
+        const temp = newTasks[index];
+        newTasks[index] = newTasks[newIndex];
+        newTasks[newIndex] = temp;
+        setTasks(newTasks);
+        setHasChanges(true);
+    };
+
+    const saveOrder = async () => {
+        if (!routeId) return;
+        try {
+            setReordering(true);
+            const taskIds = tasks.map(t => t.id);
+            await RouteService.reorderTasks(Number(routeId), taskIds);
+            setHasChanges(false);
+            Alert.alert('Succes', 'Ordinea sarcinilor a fost salvată');
+        } catch (err) {
+            console.error('Error saving order:', err);
+            Alert.alert('Eroare', 'Nu s-a putut salva ordinea sarcinilor');
+        } finally {
+            setReordering(false);
+        }
+    };
+
     return (
         <View style={styles.container}>
 
@@ -55,6 +86,26 @@ const RouteTasks = () => {
 
             {/* LEGEND */}
             <TaskTypeLegend types={['PICKUP', 'PLACEMENT', 'SANITIZATION']} />
+
+            {/* Save Order Button */}
+            {hasChanges && (
+                <View style={styles.saveButtonContainer}>
+                    <Pressable
+                        style={({ pressed }) => [styles.saveButton, pressed && styles.buttonPressed]}
+                        onPress={saveOrder}
+                        disabled={reordering}
+                    >
+                        {reordering ? (
+                            <ActivityIndicator size="small" color="#FFFFFF" />
+                        ) : (
+                            <>
+                                <Ionicons name="save-outline" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+                                <Text style={styles.saveButtonText}>Salvează ordinea</Text>
+                            </>
+                        )}
+                    </Pressable>
+                </View>
+            )}
 
             {loading ? (
                 <View style={styles.centerContent}>
@@ -78,46 +129,77 @@ const RouteTasks = () => {
                     contentContainerStyle={styles.scrollContent}
                     showsVerticalScrollIndicator={false}
                 >
-                    {tasks.map((item) => (
-                        <Pressable
-                            key={item.id}
-                            style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
-                            onPress={() => handleCardPress(item)}
-                        >
-                            {/* Left Info */}
-                            <View style={styles.cardInfo}>
-                                <Text style={styles.clientName}>
-                                    {item.clientName || 'Client necunoscut'}
-                                </Text>
-                                <Text style={styles.statusText}>
-                                    Tip: {getTaskTypeLabel(item.type)}
-                                </Text>
-                                <Text style={styles.statusText}>
-                                    Status: {getStatusLabel(item.status)}
-                                </Text>
-                                {item.address && (
-                                    <View style={styles.addressContainer}>
-                                        <Ionicons name="location-outline" size={14} color="#E0E0E0" style={{ marginRight: 5 }} />
-                                        <Text style={styles.statusText} numberOfLines={1}>{item.address}</Text>
-                                    </View>
-                                )}
-                                {item.clientPhone && (
-                                    <View style={styles.phoneContainer}>
-                                        <Ionicons name="call" size={14} color="#E0E0E0" style={{ marginRight: 5 }} />
-                                        <Text style={styles.statusText}>{item.clientPhone}</Text>
-                                    </View>
-                                )}
+                    {tasks.map((item, index) => (
+                        <View key={item.id} style={styles.taskRow}>
+                            {/* Order number */}
+                            <View style={styles.orderBadge}>
+                                <Text style={styles.orderBadgeText}>{index + 1}</Text>
                             </View>
 
-                            {/* Right Pin */}
-                            <View style={styles.pinContainer}>
-                                <Ionicons
-                                    name="location"
-                                    size={28}
-                                    color={getTaskTypeColor(item.type)}
-                                />
+                            {/* Up/Down arrows */}
+                            <View style={styles.arrowsContainer}>
+                                <Pressable
+                                    onPress={() => moveTask(index, 'up')}
+                                    style={({ pressed }) => [
+                                        styles.arrowButton,
+                                        index === 0 && styles.arrowDisabled,
+                                        pressed && index > 0 && styles.arrowPressed,
+                                    ]}
+                                    disabled={index === 0}
+                                >
+                                    <Ionicons name="chevron-up" size={20} color={index === 0 ? '#555' : '#FFF'} />
+                                </Pressable>
+                                <Pressable
+                                    onPress={() => moveTask(index, 'down')}
+                                    style={({ pressed }) => [
+                                        styles.arrowButton,
+                                        index === tasks.length - 1 && styles.arrowDisabled,
+                                        pressed && index < tasks.length - 1 && styles.arrowPressed,
+                                    ]}
+                                    disabled={index === tasks.length - 1}
+                                >
+                                    <Ionicons name="chevron-down" size={20} color={index === tasks.length - 1 ? '#555' : '#FFF'} />
+                                </Pressable>
                             </View>
-                        </Pressable>
+
+                            {/* Task Card */}
+                            <Pressable
+                                style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
+                                onPress={() => handleCardPress(item)}
+                            >
+                                <View style={styles.cardInfo}>
+                                    <Text style={styles.clientName}>
+                                        {item.clientName || 'Client necunoscut'}
+                                    </Text>
+                                    <Text style={styles.statusText}>
+                                        Tip: {getTaskTypeLabel(item.type)}
+                                    </Text>
+                                    <Text style={styles.statusText}>
+                                        Status: {getStatusLabel(item.status)}
+                                    </Text>
+                                    {item.address && (
+                                        <View style={styles.addressContainer}>
+                                            <Ionicons name="location-outline" size={14} color="#E0E0E0" style={{ marginRight: 5 }} />
+                                            <Text style={styles.statusText} numberOfLines={1}>{item.address}</Text>
+                                        </View>
+                                    )}
+                                    {item.clientPhone && (
+                                        <View style={styles.phoneContainer}>
+                                            <Ionicons name="call" size={14} color="#E0E0E0" style={{ marginRight: 5 }} />
+                                            <Text style={styles.statusText}>{item.clientPhone}</Text>
+                                        </View>
+                                    )}
+                                </View>
+
+                                <View style={styles.pinContainer}>
+                                    <Ionicons
+                                        name="location"
+                                        size={28}
+                                        color={getTaskTypeColor(item.type)}
+                                    />
+                                </View>
+                            </Pressable>
+                        </View>
                     ))}
                 </ScrollView>
             )}
@@ -171,18 +253,82 @@ const styles = StyleSheet.create({
     // --- LIST ---
     scrollContainer: {
         flex: 1,
-        paddingHorizontal: 20,
+        paddingHorizontal: 10,
     },
     scrollContent: {
         paddingBottom: 40,
     },
 
+    // --- SAVE BUTTON ---
+    saveButtonContainer: {
+        paddingHorizontal: 20,
+        marginBottom: 10,
+        alignItems: 'center',
+    },
+    saveButton: {
+        flexDirection: 'row',
+        backgroundColor: AppColors.successGreen,
+        paddingHorizontal: 24,
+        paddingVertical: 12,
+        borderRadius: 20,
+        alignItems: 'center',
+        justifyContent: 'center',
+        elevation: 5,
+        shadowColor: AppColors.shadow,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 3.84,
+    },
+    saveButtonText: {
+        color: '#FFFFFF',
+        fontSize: 16,
+        fontWeight: 'bold',
+    },
+    buttonPressed: {
+        opacity: 0.8,
+    },
+
+    // --- TASK ROW ---
+    taskRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginBottom: 12,
+    },
+    orderBadge: {
+        width: 26,
+        height: 26,
+        borderRadius: 13,
+        backgroundColor: AppColors.buttonBackground,
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 6,
+    },
+    orderBadgeText: {
+        color: AppColors.textWhite,
+        fontSize: 13,
+        fontWeight: 'bold',
+    },
+    arrowsContainer: {
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 6,
+    },
+    arrowButton: {
+        padding: 4,
+    },
+    arrowDisabled: {
+        opacity: 0.3,
+    },
+    arrowPressed: {
+        opacity: 0.6,
+    },
+
     // --- TASK CARD ---
     card: {
+        flex: 1,
         backgroundColor: AppColors.accentColor,
         borderRadius: 16,
-        padding: 16,
-        marginBottom: 16,
+        padding: 14,
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',

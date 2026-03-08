@@ -19,6 +19,7 @@ module.exports = {
         },
         android: {
             package: "com.damiprod.ecotrack",
+            versionCode: 2,
             adaptiveIcon: {
                 foregroundImage: "./assets/images/adaptive-icon.png",
                 backgroundColor: "#ffffff"

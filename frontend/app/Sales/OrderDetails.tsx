@@ -6,6 +6,7 @@ import Amplasari from './OrderTypes/Amplasari';
 import Ridicari from './OrderTypes/Ridicari';
 import Igienizari from './OrderTypes/Igienizari';
 import { ClientService } from '../../services/ClientService';
+import { RecurringIgienizareService } from '../../services/RecurringIgienizareService';
 import { isValidPhone } from '../../utils/validation';
 import ScreenHeader from '../../components/layout/ScreenHeader';
 import { AppColors } from '../../constants/Colors';
@@ -77,10 +78,12 @@ const OrderDetails = () => {
             if (!isValidPhone(contact)) return "Numărul de telefon trebuie să fie în formatul 07XXXXXXXX, 407XXXXXXXX, +407XXXXXXXX sau 0407XXXXXXXX.";
         }
         else if (selectedType === "Igienizari") {
-            const { subscription, location, date } = orderData;
+            const { subscription, location, date, isRecurring, recurrenceEndDate } = orderData;
             if (!subscription?.id) return "Selectați abonamentul.";
             if (!location) return "Selectați locația.";
             if (!date) return "Selectați data igienizării.";
+            if (isRecurring && !recurrenceEndDate) return "Selectați data de sfârșit a recurenței.";
+            if (isRecurring && recurrenceEndDate && date && recurrenceEndDate <= date) return "Data de sfârșit trebuie să fie după data de începere.";
         }
         return null; // No errors
     };
@@ -225,20 +228,41 @@ const OrderDetails = () => {
                                 }
                             } else if (selectedType === "Igienizari") {
                                 try {
-                                    const { subscription, location, date, details } = orderData;
-                                    const payload = {
-                                        orderType: "Igienizari",
-                                        subscription: { id: subscription.id },  // FK reference only
-                                        sanitationDate: date,
-                                        sanitationLocationCoordinates: location
-                                            ? `${location.latitude},${location.longitude}`
-                                            : null,
-                                        sanitationLocationAddress: location?.address || null,
-                                        details: details || null,
-                                    };
+                                    const { subscription, location, date, details, isRecurring, frequencyDays, recurrenceEndDate } = orderData;
 
-                                    await ClientService.createOrder(client.id, payload);
-                                    alert("Comanda Igienizare salvată cu succes!");
+                                    if (isRecurring) {
+                                        // Create a recurring igienizare plan
+                                        const payload = {
+                                            subscription: { id: subscription.id },
+                                            frequencyDays: frequencyDays || 30,
+                                            startDate: date,
+                                            endDate: recurrenceEndDate,
+                                            isIndefinite: false,
+                                            sanitationLocationCoordinates: location
+                                                ? `${location.latitude},${location.longitude}`
+                                                : null,
+                                            sanitationLocationAddress: location?.address || null,
+                                            details: details || null,
+                                        };
+
+                                        await RecurringIgienizareService.create(client.id, payload);
+                                        alert("Igienizare recurentă creată cu succes!");
+                                    } else {
+                                        // Create a normal one-time igienizare order
+                                        const payload = {
+                                            orderType: "Igienizari",
+                                            subscription: { id: subscription.id },
+                                            sanitationDate: date,
+                                            sanitationLocationCoordinates: location
+                                                ? `${location.latitude},${location.longitude}`
+                                                : null,
+                                            sanitationLocationAddress: location?.address || null,
+                                            details: details || null,
+                                        };
+
+                                        await ClientService.createOrder(client.id, payload);
+                                        alert("Comanda Igienizare salvată cu succes!");
+                                    }
                                     router.dismiss(2);
                                 } catch (err: any) {
                                     console.error("Error submitting Igienizari order:", err);

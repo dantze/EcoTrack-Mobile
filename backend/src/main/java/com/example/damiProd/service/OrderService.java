@@ -4,6 +4,7 @@ import com.example.damiProd.domain.*;
 import com.example.damiProd.repository.ClientRepository;
 import com.example.damiProd.repository.OrderRepository;
 import com.example.damiProd.repository.ProductRepository;
+import com.example.damiProd.repository.RecurringOccurrenceRepository;
 import com.example.damiProd.repository.SubscriptionRepository;
 import com.example.damiProd.repository.TaskRepository;
 import org.springframework.stereotype.Service;
@@ -20,15 +21,17 @@ public class OrderService {
     private final ProductRepository productRepository;
     private final SubscriptionRepository subscriptionRepository;
     private final TaskRepository taskRepository;
+    private final RecurringOccurrenceRepository recurringOccurrenceRepository;
 
     public OrderService(OrderRepository orderRepository, ClientRepository clientRepository,
             ProductRepository productRepository, SubscriptionRepository subscriptionRepository,
-            TaskRepository taskRepository) {
+            TaskRepository taskRepository, RecurringOccurrenceRepository recurringOccurrenceRepository) {
         this.orderRepository = orderRepository;
         this.clientRepository = clientRepository;
         this.productRepository = productRepository;
         this.subscriptionRepository = subscriptionRepository;
         this.taskRepository = taskRepository;
+        this.recurringOccurrenceRepository = recurringOccurrenceRepository;
     }
 
     public Order createOrder(Long clientId, Order order) {
@@ -87,6 +90,8 @@ public class OrderService {
     public void deleteOrder(Long orderId) {
         Optional<Task> task = taskRepository.findByOrder_Id(orderId);
         task.ifPresent(t -> taskRepository.delete(t));
+        // Remove recurring occurrence reference (if any) before deleting the order
+        recurringOccurrenceRepository.deleteByOrderId(orderId);
         orderRepository.deleteById(orderId);
     }
 

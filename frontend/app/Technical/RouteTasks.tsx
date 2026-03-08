@@ -130,14 +130,9 @@ const RouteTasks = () => {
                     showsVerticalScrollIndicator={false}
                 >
                     {tasks.map((item, index) => (
-                        <View key={item.id} style={styles.taskRow}>
-                            {/* Order number */}
-                            <View style={styles.orderBadge}>
-                                <Text style={styles.orderBadgeText}>{index + 1}</Text>
-                            </View>
-
-                            {/* Up/Down arrows */}
-                            <View style={styles.arrowsContainer}>
+                        <View key={item.id} style={styles.taskWrapper}>
+                            {/* Reorder bar: up arrow | number | down arrow */}
+                            <View style={styles.reorderBar}>
                                 <Pressable
                                     onPress={() => moveTask(index, 'up')}
                                     style={({ pressed }) => [
@@ -147,8 +142,13 @@ const RouteTasks = () => {
                                     ]}
                                     disabled={index === 0}
                                 >
-                                    <Ionicons name="chevron-up" size={20} color={index === 0 ? '#555' : '#FFF'} />
+                                    <Ionicons name="chevron-up" size={22} color={index === 0 ? 'rgba(255,255,255,0.3)' : '#FFF'} />
                                 </Pressable>
+
+                                <View style={styles.orderBadge}>
+                                    <Text style={styles.orderBadgeText}>{index + 1}</Text>
+                                </View>
+
                                 <Pressable
                                     onPress={() => moveTask(index, 'down')}
                                     style={({ pressed }) => [
@@ -158,7 +158,7 @@ const RouteTasks = () => {
                                     ]}
                                     disabled={index === tasks.length - 1}
                                 >
-                                    <Ionicons name="chevron-down" size={20} color={index === tasks.length - 1 ? '#555' : '#FFF'} />
+                                    <Ionicons name="chevron-down" size={22} color={index === tasks.length - 1 ? 'rgba(255,255,255,0.3)' : '#FFF'} />
                                 </Pressable>
                             </View>
 
@@ -253,7 +253,7 @@ const styles = StyleSheet.create({
     // --- LIST ---
     scrollContainer: {
         flex: 1,
-        paddingHorizontal: 10,
+        paddingHorizontal: 20,
     },
     scrollContent: {
         paddingBottom: 40,
@@ -288,33 +288,35 @@ const styles = StyleSheet.create({
         opacity: 0.8,
     },
 
-    // --- TASK ROW ---
-    taskRow: {
+    // --- TASK WRAPPER ---
+    taskWrapper: {
+        marginBottom: 14,
+    },
+    reorderBar: {
         flexDirection: 'row',
         alignItems: 'center',
-        marginBottom: 12,
+        justifyContent: 'center',
+        backgroundColor: AppColors.accentColor,
+        borderTopLeftRadius: 14,
+        borderTopRightRadius: 14,
+        paddingVertical: 4,
+        gap: 12,
     },
     orderBadge: {
-        width: 26,
-        height: 26,
-        borderRadius: 13,
+        width: 28,
+        height: 28,
+        borderRadius: 14,
         backgroundColor: AppColors.buttonBackground,
         justifyContent: 'center',
         alignItems: 'center',
-        marginRight: 6,
     },
     orderBadgeText: {
         color: AppColors.textWhite,
-        fontSize: 13,
+        fontSize: 14,
         fontWeight: 'bold',
     },
-    arrowsContainer: {
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginRight: 6,
-    },
     arrowButton: {
-        padding: 4,
+        padding: 6,
     },
     arrowDisabled: {
         opacity: 0.3,
@@ -325,9 +327,9 @@ const styles = StyleSheet.create({
 
     // --- TASK CARD ---
     card: {
-        flex: 1,
         backgroundColor: AppColors.accentColor,
-        borderRadius: 16,
+        borderBottomLeftRadius: 14,
+        borderBottomRightRadius: 14,
         padding: 14,
         flexDirection: 'row',
         justifyContent: 'space-between',

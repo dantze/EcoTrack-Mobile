@@ -70,62 +70,52 @@ const RouteTasks = () => {
     };
 
     const renderItem = ({ item, drag, isActive, getIndex }: RenderItemParams<Task>) => {
-        const index = getIndex() ?? 0;
+        const index = (getIndex() ?? 0) + 1;
         return (
             <ScaleDecorator activeScale={1.03}>
-                <View style={[styles.taskWrapper, isActive && styles.taskWrapperActive]}>
-                    {/* Order badge + drag handle row */}
-                    <View style={styles.dragRow}>
-                        <View style={styles.orderBadge}>
-                            <Text style={styles.orderBadgeText}>{index + 1}</Text>
-                        </View>
-                        <Pressable
-                            onLongPress={drag}
-                            delayLongPress={150}
-                            style={styles.dragHandle}
-                        >
-                            <Ionicons name="reorder-three-outline" size={24} color="rgba(255,255,255,0.7)" />
-                        </Pressable>
+                <Pressable
+                    style={({ pressed }) => [styles.card, pressed && styles.cardPressed, isActive && styles.cardActive]}
+                    onPress={() => handleCardPress(item)}
+                    onLongPress={drag}
+                    delayLongPress={150}
+                >
+                    {/* Order number badge - top left */}
+                    <View style={styles.orderBadge}>
+                        <Text style={styles.orderBadgeText}>{index}</Text>
                     </View>
 
-                    {/* Task Card */}
-                    <Pressable
-                        style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
-                        onPress={() => handleCardPress(item)}
-                    >
-                        <View style={styles.cardInfo}>
-                            <Text style={styles.clientName}>
-                                {item.clientName || 'Client necunoscut'}
-                            </Text>
-                            <Text style={styles.statusText}>
-                                Tip: {getTaskTypeLabel(item.type)}
-                            </Text>
-                            <Text style={styles.statusText}>
-                                Status: {getStatusLabel(item.status)}
-                            </Text>
-                            {item.address && (
-                                <View style={styles.addressContainer}>
-                                    <Ionicons name="location-outline" size={14} color="#E0E0E0" style={{ marginRight: 5 }} />
-                                    <Text style={styles.statusText} numberOfLines={1}>{item.address}</Text>
-                                </View>
-                            )}
-                            {item.clientPhone && (
-                                <View style={styles.phoneContainer}>
-                                    <Ionicons name="call" size={14} color="#E0E0E0" style={{ marginRight: 5 }} />
-                                    <Text style={styles.statusText}>{item.clientPhone}</Text>
-                                </View>
-                            )}
-                        </View>
+                    <View style={styles.cardInfo}>
+                        <Text style={styles.clientName}>
+                            {item.clientName || 'Client necunoscut'}
+                        </Text>
+                        <Text style={styles.statusText}>
+                            Tip: {getTaskTypeLabel(item.type)}
+                        </Text>
+                        <Text style={styles.statusText}>
+                            Status: {getStatusLabel(item.status)}
+                        </Text>
+                        {item.address && (
+                            <View style={styles.addressContainer}>
+                                <Ionicons name="location-outline" size={14} color="#E0E0E0" style={{ marginRight: 5 }} />
+                                <Text style={styles.statusText} numberOfLines={1}>{item.address}</Text>
+                            </View>
+                        )}
+                        {item.clientPhone && (
+                            <View style={styles.phoneContainer}>
+                                <Ionicons name="call" size={14} color="#E0E0E0" style={{ marginRight: 5 }} />
+                                <Text style={styles.statusText}>{item.clientPhone}</Text>
+                            </View>
+                        )}
+                    </View>
 
-                        <View style={styles.pinContainer}>
-                            <Ionicons
-                                name="location"
-                                size={28}
-                                color={getTaskTypeColor(item.type)}
-                            />
-                        </View>
-                    </Pressable>
-                </View>
+                    <View style={styles.pinContainer}>
+                        <Ionicons
+                            name="location"
+                            size={28}
+                            color={getTaskTypeColor(item.type)}
+                        />
+                    </View>
+                </Pressable>
             </ScaleDecorator>
         );
     };
@@ -138,25 +128,7 @@ const RouteTasks = () => {
             {/* LEGEND */}
             <TaskTypeLegend types={['PICKUP', 'PLACEMENT', 'SANITIZATION']} />
 
-            {/* Save Order Button */}
-            {hasChanges && (
-                <View style={styles.saveButtonContainer}>
-                    <Pressable
-                        style={({ pressed }) => [styles.saveButton, pressed && styles.buttonPressed]}
-                        onPress={saveOrder}
-                        disabled={saving}
-                    >
-                        {saving ? (
-                            <ActivityIndicator size="small" color="#FFFFFF" />
-                        ) : (
-                            <>
-                                <Ionicons name="save-outline" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
-                                <Text style={styles.saveButtonText}>Salvează ordinea</Text>
-                            </>
-                        )}
-                    </Pressable>
-                </View>
-            )}
+
 
             {loading ? (
                 <View style={styles.centerContent}>
@@ -187,6 +159,28 @@ const RouteTasks = () => {
                     showsVerticalScrollIndicator={false}
                 />
             )}
+
+            {/* Save Order Button - always at the bottom */}
+            <View style={styles.saveButtonContainer}>
+                <Pressable
+                    style={({ pressed }) => [
+                        styles.saveButton,
+                        hasChanges && styles.saveButtonPending,
+                        pressed && styles.buttonPressed,
+                    ]}
+                    onPress={saveOrder}
+                    disabled={saving || !hasChanges}
+                >
+                    {saving ? (
+                        <ActivityIndicator size="small" color="#FFFFFF" />
+                    ) : (
+                        <>
+                            <Ionicons name="save-outline" size={20} color="#FFFFFF" style={{ marginRight: 8 }} />
+                            <Text style={styles.saveButtonText}>Salvează ordinea</Text>
+                        </>
+                    )}
+                </Pressable>
+            </View>
         </GestureHandlerRootView>
     )
 }
@@ -243,22 +237,26 @@ const styles = StyleSheet.create({
     // --- SAVE BUTTON ---
     saveButtonContainer: {
         paddingHorizontal: 20,
-        marginBottom: 10,
+        paddingVertical: 12,
         alignItems: 'center',
     },
     saveButton: {
         flexDirection: 'row',
         backgroundColor: AppColors.successGreen,
         paddingHorizontal: 24,
-        paddingVertical: 12,
+        paddingVertical: 14,
         borderRadius: 20,
         alignItems: 'center',
         justifyContent: 'center',
+        width: '100%',
         elevation: 5,
         shadowColor: AppColors.shadow,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.25,
         shadowRadius: 3.84,
+    },
+    saveButtonPending: {
+        backgroundColor: AppColors.warningOrange,
     },
     saveButtonText: {
         color: '#FFFFFF',
@@ -269,59 +267,41 @@ const styles = StyleSheet.create({
         opacity: 0.8,
     },
 
-    // --- TASK WRAPPER ---
-    taskWrapper: {
-        marginBottom: 14,
+    // --- TASK CARD ---
+    card: {
+        backgroundColor: AppColors.accentColor,
         borderRadius: 14,
-        overflow: 'hidden',
+        padding: 14,
+        marginBottom: 14,
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
         elevation: 5,
         shadowColor: AppColors.shadow,
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,
         shadowRadius: 3.84,
     },
-    taskWrapperActive: {
+    cardActive: {
         elevation: 10,
         shadowOpacity: 0.3,
     },
-
-    // --- DRAG ROW (replaces old reorderBar) ---
-    dragRow: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        backgroundColor: AppColors.accentColor,
-        borderTopLeftRadius: 14,
-        borderTopRightRadius: 14,
-        paddingVertical: 6,
-        paddingHorizontal: 12,
-    },
     orderBadge: {
-        width: 28,
-        height: 28,
-        borderRadius: 14,
+        position: 'absolute',
+        top: 10,
+        right: 10,
+        width: 26,
+        height: 26,
+        borderRadius: 13,
         backgroundColor: AppColors.buttonBackground,
         justifyContent: 'center',
         alignItems: 'center',
+        zIndex: 1,
     },
     orderBadgeText: {
         color: AppColors.textWhite,
-        fontSize: 14,
+        fontSize: 13,
         fontWeight: 'bold',
-    },
-    dragHandle: {
-        padding: 4,
-    },
-
-    // --- TASK CARD ---
-    card: {
-        backgroundColor: AppColors.accentColor,
-        borderBottomLeftRadius: 14,
-        borderBottomRightRadius: 14,
-        padding: 14,
-        flexDirection: 'row',
-        justifyContent: 'space-between',
-        alignItems: 'center',
     },
     cardPressed: {
         opacity: 0.9,

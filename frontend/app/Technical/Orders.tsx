@@ -38,7 +38,7 @@ const Orders = () => {
             const data: Order[] = await OrderService.getOrders();
             // const nonRecurringOrder: Order[] = data;
             const nonRecurringOrder: Order[] = data.filter(
-                o => !(isIgienizari(o) && o.subscription != null)
+                o => !(isIgienizari(o) && o.subscription?.type === 'RECURRING')
             );
             console.log('Fetched orders:', nonRecurringOrder.length);
             setOrders(nonRecurringOrder);

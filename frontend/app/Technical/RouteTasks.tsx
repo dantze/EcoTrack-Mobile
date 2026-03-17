@@ -147,17 +147,19 @@ const RouteTasks = () => {
                     <Text style={styles.emptyText}>Această rută nu are sarcini</Text>
                 </View>
             ) : (
-                <DraggableFlatList
-                    data={tasks}
-                    keyExtractor={(item) => String(item.id)}
-                    renderItem={renderItem}
-                    onDragEnd={({ data }) => {
-                        setTasks(data);
-                        setHasChanges(true);
-                    }}
-                    contentContainerStyle={styles.listContent}
-                    showsVerticalScrollIndicator={false}
-                />
+                <View style={styles.listWrapper}>
+                    <DraggableFlatList
+                        data={tasks}
+                        keyExtractor={(item) => String(item.id)}
+                        renderItem={renderItem}
+                        onDragEnd={({ data }) => {
+                            setTasks(data);
+                            setHasChanges(true);
+                        }}
+                        contentContainerStyle={styles.listContent}
+                        showsVerticalScrollIndicator={false}
+                    />
+                </View>
             )}
 
             {/* Save Order Button - always at the bottom */}
@@ -229,15 +231,19 @@ const styles = StyleSheet.create({
     },
 
     // --- LIST ---
+    listWrapper: {
+        flex: 1,
+    },
     listContent: {
         paddingHorizontal: 20,
-        paddingBottom: 40,
+        paddingBottom: 20,
     },
 
     // --- SAVE BUTTON ---
     saveButtonContainer: {
         paddingHorizontal: 20,
-        paddingVertical: 12,
+        paddingTop: 12,
+        paddingBottom: 30,
         alignItems: 'center',
     },
     saveButton: {

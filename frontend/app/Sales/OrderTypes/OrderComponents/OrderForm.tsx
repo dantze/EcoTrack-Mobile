@@ -12,6 +12,7 @@ import { TaskService } from '../../../../services/TaskService';
 import { SubscriptionService, Subscription } from '../../../../services/SubscriptionService';
 import { API_BASE_URL } from '../../../../constants/ApiConfig';
 import * as Location from 'expo-location';
+import PhoneInputField from '../../../../components/forms/PhoneInputField';
 
 // ─── Constants ──────────────────────────────────────────────────────────────
 const QUANTITY_OPTIONS = Array.from({ length: 20 }, (_, i) => (i + 1).toString());
@@ -66,6 +67,7 @@ const OrderForm: React.FC<OrderFormProps> = ({
 
     // ─── Shared ─────────────────────────────────────────────────────────
     const [contact, setContact] = useState(initialData?.contact || '');
+    const [contactCountryCode, setContactCountryCode] = useState('+40');
     const [details, setDetails] = useState(initialData?.details || '');
 
     const [dateStart, setDateStart] = useState(() => {
@@ -322,7 +324,7 @@ const OrderForm: React.FC<OrderFormProps> = ({
         if (orderType === 'Amplasari') {
             onDataChange({
                 packet: selectedPacket, quantity, isIndefinite, duration: durationDays,
-                igienizari: igienizariPerMonth, contact, details,
+                igienizari: igienizariPerMonth, contact: contactCountryCode + contact, details,
                 startDate: dateStart, endDate: dateEnd,
                 location: ampLocation, locationAddress: ampLocation?.address,
             });
@@ -341,7 +343,7 @@ const OrderForm: React.FC<OrderFormProps> = ({
             });
         }
     }, [selectedPacket, quantity, isIndefinite, durationDays, igienizariPerMonth,
-        contact, details, dateStart, dateEnd, ampLocation,
+        contact, contactCountryCode, details, dateStart, dateEnd, ampLocation,
         packetsToRemove, clientPackets,
         selectedSubscription, igiLocation,
         isRecurring, frequencyDays, recurrenceEndDate]);
@@ -405,19 +407,34 @@ const OrderForm: React.FC<OrderFormProps> = ({
             : `${sub.name} — ${sub.price} RON/lună · ${sub.visitsPerMonth}x/lună`;
 
     // ─── Shared field helpers ───────────────────────────────────────────
-    const renderContactField = (lbl: string, placeholder: string, kbType: 'phone-pad' | 'default' = 'phone-pad') => (
-        <View style={{ marginTop: 15 }}>
-            <Text style={styles.label}>{lbl}</Text>
-            <TextInput
-                style={styles.input}
-                value={contact}
-                onChangeText={setContact}
-                placeholder={placeholder}
-                placeholderTextColor="#999"
-                keyboardType={kbType}
-            />
-        </View>
-    );
+    const renderContactField = (lbl: string, placeholder: string, kbType: 'phone-pad' | 'default' = 'phone-pad') => {
+        if (kbType === 'phone-pad') {
+            return (
+                <View style={{ marginTop: 15 }}>
+                    <PhoneInputField
+                        label={lbl}
+                        phoneNumber={contact}
+                        onPhoneNumberChange={setContact}
+                        countryCode={contactCountryCode}
+                        onCountryCodeChange={setContactCountryCode}
+                    />
+                </View>
+            );
+        }
+        return (
+            <View style={{ marginTop: 15 }}>
+                <Text style={styles.label}>{lbl}</Text>
+                <TextInput
+                    style={styles.input}
+                    value={contact}
+                    onChangeText={setContact}
+                    placeholder={placeholder}
+                    placeholderTextColor="#999"
+                    keyboardType={kbType}
+                />
+            </View>
+        );
+    };
 
     const renderDetailsField = () => (
         <View style={{ marginTop: 15 }}>

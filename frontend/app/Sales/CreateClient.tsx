@@ -4,8 +4,9 @@ import { useRouter } from 'expo-router'
 import { AntDesign, Feather } from '@expo/vector-icons';
 import { ClientService, ClientType } from '../../services/ClientService';
 import { PhotoService } from '../../services/PhotoService';
-import { isValidEmail, isValidPhone } from '../../utils/validation';
+import { isValidEmail, isValidPhoneDigits } from '../../utils/validation';
 import InputField from '../../components/forms/InputField';
+import PhoneInputField from '../../components/forms/PhoneInputField';
 import PrimaryButton from '../../components/forms/PrimaryButton';
 import ScreenHeader from '../../components/layout/ScreenHeader';
 import { AppColors } from '../../constants/Colors';
@@ -24,6 +25,7 @@ const CreateClient = () => {
     const [fullName, setFullName] = useState('');
     const [email, setEmail] = useState('');
     const [phone, setPhone] = useState('');
+    const [countryCode, setCountryCode] = useState('+40');
     const [address, setAddress] = useState('');
 
     // ID Photo State
@@ -87,8 +89,8 @@ const CreateClient = () => {
             return;
         }
 
-        if (!isValidPhone(phone)) {
-            Alert.alert("Telefon invalid", "Numărul de telefon trebuie să fie în formatul 07XXXXXXXX, 407XXXXXXXX, +407XXXXXXXX sau 0407XXXXXXXX.");
+        if (!isValidPhoneDigits(phone)) {
+            Alert.alert("Telefon invalid", "Numărul de telefon trebuie să conțină doar cifre (minim 4, maxim 15).");
             return;
         }
 
@@ -103,7 +105,7 @@ const CreateClient = () => {
         const clientData = {
             type: (selectedType === "Firme" ? 'company' : 'individual') as ClientType,
             email,
-            phone,
+            phone: countryCode + phone,
             address,
             // Include company fields only if type is 'Firme' (or always if backend expects them)
             name: selectedType === "Firme" ? companyName : '',
@@ -222,7 +224,13 @@ const CreateClient = () => {
                             </>
                         )}
                         <InputField label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" />
-                        <InputField label="Telefon" value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
+                        <PhoneInputField
+                            label="Telefon"
+                            phoneNumber={phone}
+                            onPhoneNumberChange={setPhone}
+                            countryCode={countryCode}
+                            onCountryCodeChange={setCountryCode}
+                        />
                         <InputField label="Adresa" value={address} onChangeText={setAddress} />
 
                         {/* Conditional rendering for Company fields */}

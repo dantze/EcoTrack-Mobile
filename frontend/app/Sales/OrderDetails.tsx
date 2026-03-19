@@ -7,7 +7,7 @@ import Ridicari from './OrderTypes/Ridicari';
 import Igienizari from './OrderTypes/Igienizari';
 import { ClientService } from '../../services/ClientService';
 import { RecurringIgienizareService } from '../../services/RecurringIgienizareService';
-import { isValidPhone } from '../../utils/validation';
+
 import ScreenHeader from '../../components/layout/ScreenHeader';
 import { AppColors } from '../../constants/Colors';
 
@@ -66,7 +66,7 @@ const OrderDetails = () => {
             if (!startDate && !endDate) return "Selectați perioada de amplasare.";
             if (!location) return "Selectați locația.";
             if (!contact) return "Introduceți contactul de pe șantier.";
-            if (!isValidPhone(contact)) return "Numărul de telefon trebuie să fie în formatul 07XXXXXXXX, 407XXXXXXXX, +407XXXXXXXX sau 0407XXXXXXXX.";
+
             if (!igienizari) return "Selectați numărul de igienizări.";
         }
         else if (selectedType === "Ridicari") {
@@ -75,7 +75,7 @@ const OrderDetails = () => {
             if (!hasPackets) return "Selectați cel puțin un pachet de ridicat.";
             if (!date) return "Selectați data ridicării.";
             if (!contact) return "Introduceți persoana de contact.";
-            if (!isValidPhone(contact)) return "Numărul de telefon trebuie să fie în formatul 07XXXXXXXX, 407XXXXXXXX, +407XXXXXXXX sau 0407XXXXXXXX.";
+
         }
         else if (selectedType === "Igienizari") {
             const { subscription, location, date, isRecurring, recurrenceEndDate } = orderData;

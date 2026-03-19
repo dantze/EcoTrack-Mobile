@@ -12,9 +12,11 @@ import {
 } from 'react-native';
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { ClientService, ClientType } from '../../services/ClientService';
-import { isValidEmail, isValidPhone } from '../../utils/validation';
+import { isValidEmail, isValidPhoneDigits } from '../../utils/validation';
 import CloudPhotoViewer from '../../components/display/CloudPhotoViewer';
 import InputField from '../../components/forms/InputField';
+import PhoneInputField from '../../components/forms/PhoneInputField';
+import { EUROPEAN_COUNTRIES } from '../../components/forms/PhoneInputField';
 import PrimaryButton from '../../components/forms/PrimaryButton';
 import ScreenHeader from '../../components/layout/ScreenHeader';
 
@@ -39,7 +41,29 @@ export default function EditClient() {
     // Form state initialized with existing data
     const [fullName, setFullName] = useState(clientData.fullName || '');
     const [email, setEmail] = useState(clientData.email || '');
-    const [phone, setPhone] = useState(clientData.phone || '');
+    // Parse existing phone to extract country code and number
+    const parsePhone = (raw: string) => {
+        if (!raw) return { code: '+40', number: '' };
+        // Normalise: strip spaces, dashes, parentheses — keep digits and leading +
+        const normalised = raw.replace(/[^+\d]/g, '');
+        // Try to match known country codes (longest first)
+        const sorted = [...EUROPEAN_COUNTRIES].sort((a, b) => b.code.length - a.code.length);
+        for (const c of sorted) {
+            if (normalised.startsWith(c.code)) {
+                return { code: c.code, number: normalised.slice(c.code.length) };
+            }
+        }
+        // Legacy Romanian local format: 07XXXXXXXX / 02XXXXXXXX (starts with 0, not 00)
+        // Strip leading 0 → +40, e.g. 0730712100 → +40 + 730712100
+        if (!normalised.startsWith('00') && normalised.startsWith('0')) {
+            return { code: '+40', number: normalised.slice(1) };
+        }
+        return { code: '+40', number: normalised };
+    };
+
+    const parsed = parsePhone(clientData.phone || '');
+    const [phone, setPhone] = useState(parsed.number);
+    const [countryCode, setCountryCode] = useState(parsed.code);
     const [address, setAddress] = useState(clientData.address || '');
     const [companyName, setCompanyName] = useState(clientData.name || '');
     const [cui, setCui] = useState(clientData.cui || clientData.CUI || '');
@@ -57,8 +81,8 @@ export default function EditClient() {
             return;
         }
 
-        if (!isValidPhone(phone)) {
-            Alert.alert('Telefon invalid', 'Numărul de telefon trebuie să fie în formatul 07XXXXXXXX, 407XXXXXXXX, +407XXXXXXXX sau 0407XXXXXXXX.');
+        if (!isValidPhoneDigits(phone)) {
+            Alert.alert('Telefon invalid', 'Numărul de telefon trebuie să conțină doar cifre (minim 4, maxim 15).');
             return;
         }
 
@@ -70,7 +94,7 @@ export default function EditClient() {
         const updatedData = {
             type: (isCompany ? 'company' : 'individual') as ClientType,
             email: email.trim(),
-            phone: phone.trim(),
+            phone: countryCode + phone.trim(),
             address: address.trim(),
             name: isCompany ? companyName.trim() : '',
             CUI: isCompany ? cui.trim() : '',
@@ -125,7 +149,13 @@ export default function EditClient() {
                         )}
 
                         <InputField label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" />
-                        <InputField label="Telefon" value={phone} onChangeText={setPhone} keyboardType="phone-pad" />
+                        <PhoneInputField
+                            label="Telefon"
+                            phoneNumber={phone}
+                            onPhoneNumberChange={setPhone}
+                            countryCode={countryCode}
+                            onCountryCodeChange={setCountryCode}
+                        />
                         <InputField label="Adresa" value={address} onChangeText={setAddress} />
 
                         {isCompany && (

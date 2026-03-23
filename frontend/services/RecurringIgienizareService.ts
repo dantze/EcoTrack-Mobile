@@ -56,16 +56,4 @@ export const RecurringIgienizareService = {
         if (!response.ok) throw new Error('Eșec la dezactivarea igienizării recurente');
         return await response.json();
     },
-
-    getOccurrences: async (planId: number) => {
-        const response = await fetch(`${API_BASE_URL}/recurring-igienizari/${planId}/occurrences`);
-        if (!response.ok) throw new Error('Eșec la preluarea ocurențelor');
-        return await response.json();
-    },
-
-    isRecurringOrder: async (orderId: number) => {
-        const response = await fetch(`${API_BASE_URL}/recurring-igienizari/is-recurring-order/${orderId}`);
-        if (!response.ok) throw new Error('Eșec la verificare');
-        return await response.json();
-    },
 };

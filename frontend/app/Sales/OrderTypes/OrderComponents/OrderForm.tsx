@@ -125,6 +125,7 @@ const OrderForm: React.FC<OrderFormProps> = ({
     const [frequencyDays, setFrequencyDays] = useState('30');
     const [isFrequencyDropdownOpen, setIsFrequencyDropdownOpen] = useState(false);
     const [recurrenceEndDate, setRecurrenceEndDate] = useState('');
+    const [recurrenceIndefinite, setRecurrenceIndefinite] = useState(false);
 
     // ═══════════════════════════════════════════════════════════════════════
     // DATA FETCHING EFFECTS
@@ -338,15 +339,15 @@ const OrderForm: React.FC<OrderFormProps> = ({
                 subscription: selectedSubscription,
                 location: igiLocation, date: dateStart, details,
                 isRecurring,
-                frequencyDays: isRecurring ? parseInt(frequencyDays) : undefined,
-                recurrenceEndDate: isRecurring ? recurrenceEndDate : undefined,
+                recurrenceEndDate: isRecurring && !recurrenceIndefinite ? recurrenceEndDate : undefined,
+                isIndefinite: isRecurring ? recurrenceIndefinite : undefined,
             });
         }
     }, [selectedPacket, quantity, isIndefinite, durationDays, igienizariPerMonth,
         contact, contactCountryCode, details, dateStart, dateEnd, ampLocation,
         packetsToRemove, clientPackets,
         selectedSubscription, igiLocation,
-        isRecurring, frequencyDays, recurrenceEndDate]);
+        isRecurring, recurrenceEndDate, recurrenceIndefinite]);
 
     // ═══════════════════════════════════════════════════════════════════════
     // HELPERS
@@ -359,7 +360,7 @@ const OrderForm: React.FC<OrderFormProps> = ({
         setIsQuantityDropdownOpen(false);
         setIsIgienizariDropdownOpen(false);
         setIsSubscriptionDropdownOpen(false);
-        setIsFrequencyDropdownOpen(false);
+
         const willOpen = !currentValue;
         if (willOpen) setter(true);
         onDropdownToggle?.(willOpen);
@@ -775,7 +776,7 @@ const OrderForm: React.FC<OrderFormProps> = ({
 
             {isRecurring && !isEdit && (
                 <>
-                    {/* ─── Frequency ─── */}
+                    {/* ─── Frequency (display only) ─── */}
                     <View style={{ marginTop: 15 }}>
                         <Text style={styles.label}>Frecvență</Text>
                         <Pressable style={styles.dropdownButton} onPress={() => {
@@ -817,14 +818,32 @@ const OrderForm: React.FC<OrderFormProps> = ({
                         </TouchableOpacity>
                     </Modal>
 
-                    {/* ─── Recurrence End Date ─── */}
-                    <DateSelector
-                        label="Dată Sfârșit Recurență"
-                        initialStartDate={recurrenceEndDate}
-                        onDateChange={(s) => setRecurrenceEndDate(s)}
-                        onToggle={(open) => { if (open) toggleDropdown(() => {}, false); }}
-                        singleDate
-                    />
+                    {/* ─── Indefinite toggle ─── */}
+                    <View style={{ marginTop: 10 }}>
+                        <View style={styles.row}>
+                            <Text style={styles.label}>Nedeterminat</Text>
+                            <Switch
+                                trackColor={{ false: '#767577', true: '#427992' }}
+                                thumbColor={recurrenceIndefinite ? '#FFFFFF' : '#f4f3f4'}
+                                onValueChange={(val) => {
+                                    setRecurrenceIndefinite(val);
+                                    if (val) setRecurrenceEndDate('');
+                                }}
+                                value={recurrenceIndefinite}
+                            />
+                        </View>
+                    </View>
+
+                    {/* ─── Recurrence End Date (only if not indefinite) ─── */}
+                    {!recurrenceIndefinite && (
+                        <DateSelector
+                            label="Dată Sfârșit"
+                            initialStartDate={recurrenceEndDate}
+                            onDateChange={(s) => setRecurrenceEndDate(s)}
+                            onToggle={(open) => { if (open) toggleDropdown(() => {}, false); }}
+                            singleDate
+                        />
+                    )}
                 </>
             )}
 

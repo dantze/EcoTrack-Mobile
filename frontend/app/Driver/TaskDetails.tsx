@@ -314,37 +314,7 @@ const TaskDetails = () => {
                     )}
                 </View>
 
-                {/* Client Info */}
-                <View style={styles.section}>
-                    <Text style={styles.sectionTitle}>Informații Client</Text>
 
-                    <View style={styles.infoRow}>
-                        <Ionicons name="person" size={20} color={AppColors.accentColor} />
-                        <View style={styles.infoContent}>
-                            <Text style={styles.infoLabel}>Nume</Text>
-                            <Text style={styles.infoValue}>{task.clientName || 'Necunoscut'}</Text>
-                        </View>
-                    </View>
-
-                    {task.clientPhone && (
-                        <Pressable
-                            style={({ pressed }) => [
-                                styles.pressableRow,
-                                pressed && styles.pressableRowPressed
-                            ]}
-                            onPress={() => handleCall()}
-                        >
-                            <Ionicons name="call" size={20} color={AppColors.successGreen} />
-                            <View style={styles.infoContent}>
-                                <Text style={styles.infoLabel}>Telefon</Text>
-                                <Text style={[styles.infoValue, styles.linkText]}>{task.clientPhone}</Text>
-                            </View>
-                            <View style={styles.pressableArrow}>
-                                <Ionicons name="chevron-forward" size={18} color={AppColors.textWhite} />
-                            </View>
-                        </Pressable>
-                    )}
-                </View>
 
                 {/* Location Info */}
                 <View style={styles.section}>

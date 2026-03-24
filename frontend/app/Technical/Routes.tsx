@@ -152,6 +152,15 @@ const Routes = () => {
                                     >
                                         <Ionicons name="person-add" size={22} color={AppColors.textWhite} />
                                     </Pressable>
+
+                                    <Pressable
+                                        style={({ pressed }) => [
+                                            styles.addTaskButton,
+                                            pressed && styles.buttonPressed
+                                        ]}
+                                    >
+                                        <Ionicons name="add" size={26} color={AppColors.textWhite} />
+                                    </Pressable>
                                 </View>
 
                                 {index < routes.length - 1 && <View style={styles.separator} />}
@@ -239,6 +248,19 @@ const styles = StyleSheet.create({
         shadowRadius: 3.84,
     },
     driverButton: {
+        width: 50,
+        height: 50,
+        backgroundColor: AppColors.successGreen,
+        borderRadius: 25,
+        justifyContent: 'center',
+        alignItems: 'center',
+        elevation: 5,
+        shadowColor: AppColors.shadow,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 3.84,
+    },
+    addTaskButton: {
         width: 50,
         height: 50,
         backgroundColor: AppColors.successGreen,

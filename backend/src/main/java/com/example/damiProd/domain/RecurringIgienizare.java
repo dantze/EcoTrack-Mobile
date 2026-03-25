@@ -24,8 +24,8 @@ public class RecurringIgienizare {
     @JoinColumn(name = "subscription_id")
     private Subscription subscription;
 
-    // How often to generate an occurrence (in days): 7, 14, 21, 30
-    private Integer frequencyDays;
+    // Kept for DB compatibility (column still exists); not used in logic
+    private Integer frequencyDays = 30;
 
     private LocalDate startDate;
 

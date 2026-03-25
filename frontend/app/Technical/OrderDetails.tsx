@@ -5,7 +5,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { OrderService } from '../../services/OrderService';
 import { RouteService, Route } from '../../services/RouteService';
 import { TaskService } from '../../services/TaskService';
-import { RecurringIgienizareService } from '../../services/RecurringIgienizareService';
+
 import { AppColors } from '../../constants/Colors';
 import { Order } from '../../types/OrderTypes';
 import ScreenHeader from '../../components/layout/ScreenHeader';
@@ -35,58 +35,17 @@ const OrderDetails = () => {
     const [savingDate, setSavingDate] = useState(false);
     const [pickerDate, setPickerDate] = useState<Date>(new Date());
 
-    // --- RECURRING STATE ---
-    const [isRecurringOrder, setIsRecurringOrder] = useState(false);
-    const [recurringPlanId, setRecurringPlanId] = useState<number | null>(null);
-    const [deactivating, setDeactivating] = useState(false);
+
 
     useEffect(() => {
         if (orderId) {
             fetchOrderDetails();
             fetchRoutes();
             checkTaskStatus();
-            checkIfRecurring();
         }
     }, [orderId]);
 
-    const checkIfRecurring = async () => {
-        try {
-            const result = await RecurringIgienizareService.isRecurringOrder(orderId!);
-            setIsRecurringOrder(result.isRecurring === true);
-            if (result.isRecurring && result.planId) {
-                setRecurringPlanId(result.planId);
-            }
-        } catch (error) {
-            console.error('Failed to check recurring status:', error);
-        }
-    };
 
-    const handleDeactivateRecurrence = () => {
-        Alert.alert(
-            'Oprire recurență',
-            'Sigur dorești să oprești recurența? Nu se vor mai crea comenzi noi automat din acest plan recurent.',
-            [
-                { text: 'Anulează', style: 'cancel' },
-                {
-                    text: 'Oprește',
-                    style: 'destructive',
-                    onPress: async () => {
-                        try {
-                            setDeactivating(true);
-                            await RecurringIgienizareService.deactivate(recurringPlanId!);
-                            setIsRecurringOrder(false);
-                            setRecurringPlanId(null);
-                            Alert.alert('Succes', 'Recurența a fost oprită. Nu se vor mai genera comenzi noi.');
-                        } catch (error: any) {
-                            Alert.alert('Eroare', error.message || 'Nu s-a putut opri recurența.');
-                        } finally {
-                            setDeactivating(false);
-                        }
-                    },
-                },
-            ]
-        );
-    };
 
     const fetchOrderDetails = async () => {
         try {
@@ -269,33 +228,7 @@ const OrderDetails = () => {
 
                 <OrderInfoCard order={order} />
 
-                {/* --- RECURRING BADGE + DEACTIVATE --- */}
-                {isRecurringOrder && recurringPlanId && (
-                    <View style={styles.recurringSection}>
-                        <View style={styles.recurringBadge}>
-                            <Ionicons name="repeat" size={18} color="#F39C12" />
-                            <Text style={styles.recurringBadgeText}>Comandă recurentă</Text>
-                        </View>
-                        <Pressable
-                            style={({ pressed }) => [
-                                styles.deactivateButton,
-                                pressed && styles.buttonPressed,
-                                deactivating && { opacity: 0.6 },
-                            ]}
-                            onPress={handleDeactivateRecurrence}
-                            disabled={deactivating}
-                        >
-                            {deactivating ? (
-                                <ActivityIndicator size="small" color="white" />
-                            ) : (
-                                <>
-                                    <Ionicons name="stop-circle" size={20} color="white" style={{ marginRight: 8 }} />
-                                    <Text style={styles.deactivateButtonText}>Oprește recurența</Text>
-                                </>
-                            )}
-                        </Pressable>
-                    </View>
-                )}
+
 
                 {/* --- SCHEDULED DATE SECTION --- */}
                 {orderTaskStatus.hasTask && (
@@ -429,43 +362,6 @@ const styles = StyleSheet.create({
     },
     reassignButtonText: {
         color: AppColors.textWhite,
-        fontWeight: 'bold',
-        fontSize: 16,
-    },
-
-    // Recurring section
-    recurringSection: {
-        width: '100%',
-        marginBottom: 15,
-        alignItems: 'center',
-        gap: 10,
-    },
-    recurringBadge: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        backgroundColor: 'rgba(243, 156, 18, 0.2)',
-        paddingHorizontal: 15,
-        paddingVertical: 8,
-        borderRadius: 20,
-    },
-    recurringBadgeText: {
-        color: '#F39C12',
-        fontSize: 14,
-        fontWeight: 'bold',
-        marginLeft: 8,
-    },
-    deactivateButton: {
-        width: '100%',
-        height: 50,
-        backgroundColor: '#E74C3C',
-        borderRadius: 15,
-        flexDirection: 'row',
-        justifyContent: 'center',
-        alignItems: 'center',
-        elevation: 3,
-    },
-    deactivateButtonText: {
-        color: '#FFFFFF',
         fontWeight: 'bold',
         fontSize: 16,
     },

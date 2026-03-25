@@ -36,13 +36,9 @@ const Orders = () => {
     const fetchOrders = async () => {
         try {
             const data: Order[] = await OrderService.getOrders();
-            // const nonRecurringOrder: Order[] = data;
-            const nonRecurringOrder: Order[] = data.filter(
-                o => !(isIgienizari(o) && o.subscription?.type === 'RECURRING')
-            );
-            console.log('Fetched orders:', nonRecurringOrder.length);
-            setOrders(nonRecurringOrder);
-            setFilteredOrders(nonRecurringOrder);
+            console.log('Fetched orders:', data.length);
+            setOrders(data);
+            setFilteredOrders(data);
         } catch (error) {
             console.error('Error fetching orders:', error);
         } finally {

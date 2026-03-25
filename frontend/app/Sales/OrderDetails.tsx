@@ -78,12 +78,12 @@ const OrderDetails = () => {
 
         }
         else if (selectedType === "Igienizari") {
-            const { subscription, location, date, isRecurring, recurrenceEndDate } = orderData;
+            const { subscription, location, date, isRecurring, recurrenceEndDate, isIndefinite } = orderData;
             if (!subscription?.id) return "Selectați abonamentul.";
             if (!location) return "Selectați locația.";
             if (!date) return "Selectați data igienizării.";
-            if (isRecurring && !recurrenceEndDate) return "Selectați data de sfârșit a recurenței.";
-            if (isRecurring && recurrenceEndDate && date && recurrenceEndDate <= date) return "Data de sfârșit trebuie să fie după data de începere.";
+            if (isRecurring && !isIndefinite && !recurrenceEndDate) return "Selectați data de sfârșit a recurenței sau bifați Nedeterminat.";
+            if (isRecurring && !isIndefinite && recurrenceEndDate && date && recurrenceEndDate <= date) return "Data de sfârșit trebuie să fie după data de începere.";
         }
         return null; // No errors
     };
@@ -228,16 +228,15 @@ const OrderDetails = () => {
                                 }
                             } else if (selectedType === "Igienizari") {
                                 try {
-                                    const { subscription, location, date, details, isRecurring, frequencyDays, recurrenceEndDate } = orderData;
+                                    const { subscription, location, date, details, isRecurring, recurrenceEndDate, isIndefinite } = orderData;
 
                                     if (isRecurring) {
-                                        // Create a recurring igienizare plan
+                                        // Create a recurring igienizare plan (single order)
                                         const payload = {
                                             subscription: { id: subscription.id },
-                                            frequencyDays: frequencyDays || 30,
                                             startDate: date,
-                                            endDate: recurrenceEndDate,
-                                            isIndefinite: false,
+                                            endDate: isIndefinite ? '2100-01-01' : recurrenceEndDate,
+                                            isIndefinite: isIndefinite || false,
                                             sanitationLocationCoordinates: location
                                                 ? `${location.latitude},${location.longitude}`
                                                 : null,

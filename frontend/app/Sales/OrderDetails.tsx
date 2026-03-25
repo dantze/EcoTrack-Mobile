@@ -235,7 +235,7 @@ const OrderDetails = () => {
                                         const payload = {
                                             subscription: { id: subscription.id },
                                             startDate: date,
-                                            endDate: isIndefinite ? null : recurrenceEndDate,
+                                            endDate: isIndefinite ? '2100-01-01' : recurrenceEndDate,
                                             isIndefinite: isIndefinite || false,
                                             sanitationLocationCoordinates: location
                                                 ? `${location.latitude},${location.longitude}`

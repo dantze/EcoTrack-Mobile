@@ -11,6 +11,7 @@ export interface ClientData {
     CUI?: string; // For companies
     adminName?: string; // For companies
     fullName?: string; // For individuals
+    cnp?: string | null; // For individuals (CNP)
 }
 
 export const ClientService = {

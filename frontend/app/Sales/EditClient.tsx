@@ -40,6 +40,7 @@ export default function EditClient() {
 
     // Form state initialized with existing data
     const [fullName, setFullName] = useState(clientData.fullName || '');
+    const [cnp, setCnp] = useState(clientData.cnp || '');
     const [email, setEmail] = useState(clientData.email || '');
     // Parse existing phone to extract country code and number
     const parsePhone = (raw: string) => {
@@ -100,6 +101,7 @@ export default function EditClient() {
             CUI: isCompany ? cui.trim() : '',
             adminName: isCompany ? adminName.trim() : '',
             fullName: !isCompany ? fullName.trim() : '',
+            cnp: !isCompany && cnp.trim() ? cnp.trim() : null,
         };
 
         setSaving(true);
@@ -145,7 +147,10 @@ export default function EditClient() {
                     {/* Form fields */}
                     <View style={{ width: '100%', marginTop: 20 }}>
                         {!isCompany && (
-                            <InputField label="Nume Complet" value={fullName} onChangeText={setFullName} />
+                            <>
+                                <InputField label="Nume Complet" value={fullName} onChangeText={setFullName} />
+                                <InputField label="CNP" value={cnp} onChangeText={setCnp} placeholder="Opțional" keyboardType="numeric" />
+                            </>
                         )}
 
                         <InputField label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" />

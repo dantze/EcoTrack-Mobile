@@ -26,6 +26,7 @@ interface ClientItem {
     phone: string;
     address: string;
     fullName?: string;
+    cnp?: string | null;
     name?: string;
     cui?: string;
     adminName?: string;

@@ -58,6 +58,7 @@ public class ClientService {
         if (existingClient instanceof com.example.damiProd.domain.Individual individual) {
             if (clientDetails instanceof com.example.damiProd.domain.Individual individualDetails) {
                 individual.setFullName(individualDetails.getFullName());
+                individual.setCNP(individualDetails.getCNP());
             }
         } else if (existingClient instanceof com.example.damiProd.domain.Company company) {
             if (clientDetails instanceof com.example.damiProd.domain.Company companyDetails) {

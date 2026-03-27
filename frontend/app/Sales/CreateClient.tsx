@@ -23,6 +23,7 @@ const CreateClient = () => {
 
     // Form Data
     const [fullName, setFullName] = useState('');
+    const [cnp, setCnp] = useState('');
     const [email, setEmail] = useState('');
     const [phone, setPhone] = useState('');
     const [countryCode, setCountryCode] = useState('+40');
@@ -112,7 +113,8 @@ const CreateClient = () => {
 
             CUI: selectedType === "Firme" ? cui : '',
             adminName: selectedType === "Firme" ? adminName : '',
-            fullName: selectedType === "Persoană fizică" ? fullName : ''
+            fullName: selectedType === "Persoană fizică" ? fullName : '',
+            cnp: selectedType === "Persoană fizică" && cnp.trim() ? cnp.trim() : null,
         };
 
         console.log("Creating client with data:", clientData);
@@ -191,6 +193,7 @@ const CreateClient = () => {
                         {selectedType === "Persoană fizică" && (
                             <>
                                 <InputField label="Nume Complet" value={fullName} onChangeText={setFullName} />
+                                <InputField label="CNP" value={cnp} onChangeText={setCnp} placeholder="Opțional" keyboardType="numeric" />
 
                                 {/* Photo Upload Section */}
                                 <Text style={styles.label}>Buletin</Text>

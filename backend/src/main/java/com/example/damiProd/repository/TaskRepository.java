@@ -35,4 +35,8 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
 
     // Find all tasks belonging to a specific employee (via route)
     List<Task> findByRoute_Employee_IdOrderByOrderIndexAsc(Long employeeId);
+
+    // ─── Recurring plan queries ─────────────────────────────────────────
+    List<Task> findByRecurringPlan_Id(Long planId);
+    boolean existsByRecurringPlan_IdAndScheduledDate(Long planId, java.time.LocalDate scheduledDate);
 }

@@ -339,6 +339,7 @@ const OrderForm: React.FC<OrderFormProps> = ({
                 subscription: selectedSubscription,
                 location: igiLocation, date: dateStart, details,
                 isRecurring,
+                frequencyDays: isRecurring ? parseInt(frequencyDays) : undefined,
                 recurrenceEndDate: isRecurring && !recurrenceIndefinite ? recurrenceEndDate : undefined,
                 isIndefinite: isRecurring ? recurrenceIndefinite : undefined,
             });
@@ -347,7 +348,7 @@ const OrderForm: React.FC<OrderFormProps> = ({
         contact, contactCountryCode, details, dateStart, dateEnd, ampLocation,
         packetsToRemove, clientPackets,
         selectedSubscription, igiLocation,
-        isRecurring, recurrenceEndDate, recurrenceIndefinite]);
+        isRecurring, frequencyDays, recurrenceEndDate, recurrenceIndefinite]);
 
     // ═══════════════════════════════════════════════════════════════════════
     // HELPERS

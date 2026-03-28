@@ -24,7 +24,7 @@ public class RecurringIgienizare {
     @JoinColumn(name = "subscription_id")
     private Subscription subscription;
 
-    // Kept for DB compatibility (column still exists); not used in logic
+    // Generation interval in days (7 = weekly, 14 = bi-weekly, etc.)
     private Integer frequencyDays = 30;
 
     private LocalDate startDate;
@@ -46,6 +46,9 @@ public class RecurringIgienizare {
     private Route route;
 
     private Boolean active = true;
+
+    // Tracks how far tasks have been generated for this plan
+    private LocalDate lastGeneratedDate;
 
     public RecurringIgienizare() {
     }

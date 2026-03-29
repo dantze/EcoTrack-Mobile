@@ -18,6 +18,16 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
 
     List<Task> findByRoute_IdOrderByOrderIndexAsc(Long routeId);
 
+    // Find tasks on a route for a specific day (matches either scheduledDate OR scheduledTime within the day)
+    @Query("SELECT t FROM Task t WHERE t.route.id = :routeId AND " +
+           "(t.scheduledDate = :date OR (t.scheduledTime >= :startOfDay AND t.scheduledTime < :endOfDay)) " +
+           "ORDER BY t.orderIndex ASC")
+    List<Task> findByRouteAndDay(
+            @Param("routeId") Long routeId,
+            @Param("date") java.time.LocalDate date,
+            @Param("startOfDay") LocalDateTime startOfDay,
+            @Param("endOfDay") LocalDateTime endOfDay);
+
     List<Task> findByRoute_IdAndStatus(Long routeId, TaskStatus status);
 
     // Find task by order ID

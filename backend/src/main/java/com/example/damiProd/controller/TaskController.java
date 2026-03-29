@@ -52,6 +52,16 @@ public class TaskController {
         return ResponseEntity.ok(tasks);
     }
 
+    // Get tasks for a specific route on a specific date
+    @GetMapping("/route/{routeId}/date/{date}")
+    public ResponseEntity<List<Task>> getTasksByRouteAndDate(
+            @PathVariable Long routeId,
+            @PathVariable String date) {
+        LocalDate localDate = LocalDate.parse(date);
+        List<Task> tasks = taskService.getTasksByRouteAndDate(routeId, localDate);
+        return ResponseEntity.ok(tasks);
+    }
+
     // Get tasks by employee and scheduled date
     @GetMapping("/employee/{employeeId}/date/{date}")
     public ResponseEntity<List<Task>> getTasksByEmployeeAndDate(

@@ -41,6 +41,12 @@ public class TaskService {
         return taskRepository.findByRoute_IdOrderByOrderIndexAsc(routeId);
     }
 
+    public List<Task> getTasksByRouteAndDate(Long routeId, LocalDate date) {
+        LocalDateTime startOfDay = date.atStartOfDay();
+        LocalDateTime endOfDay = date.plusDays(1).atStartOfDay();
+        return taskRepository.findByRouteAndDay(routeId, date, startOfDay, endOfDay);
+    }
+
     /**
      * Get all tasks for an employee on a specific scheduled date
      */

@@ -14,17 +14,20 @@ public class RecurringIgienizareService {
     private static final int LOOKAHEAD_DAYS = 90; // For indefinite plans, generate 90 days ahead
 
     private final RecurringIgienizareRepository recurringRepo;
+    private final OrderRepository orderRepository;
     private final TaskRepository taskRepository;
     private final ClientRepository clientRepository;
     private final SubscriptionRepository subscriptionRepository;
     private final RouteRepository routeRepository;
 
     public RecurringIgienizareService(RecurringIgienizareRepository recurringRepo,
+                                      OrderRepository orderRepository,
                                       TaskRepository taskRepository,
                                       ClientRepository clientRepository,
                                       SubscriptionRepository subscriptionRepository,
                                       RouteRepository routeRepository) {
         this.recurringRepo = recurringRepo;
+        this.orderRepository = orderRepository;
         this.taskRepository = taskRepository;
         this.clientRepository = clientRepository;
         this.subscriptionRepository = subscriptionRepository;
@@ -53,8 +56,8 @@ public class RecurringIgienizareService {
     // ─── CREATE ──────────────────────────────────────────────────────────
 
     /**
-     * Create a recurring igienizare plan.
-     * If a route is assigned, generates tasks automatically.
+     * Create a recurring igienizare plan and an initial IgienizareOrder (visible in orders list).
+     * If a route is assigned, generates recurring tasks automatically.
      */
     @Transactional
     public RecurringIgienizare create(Long clientId, RecurringIgienizare plan) {
@@ -86,7 +89,21 @@ public class RecurringIgienizareService {
 
         RecurringIgienizare saved = recurringRepo.save(plan);
 
-        // If a route is already assigned, generate tasks immediately
+        // Create the initial IgienizareOrder (visible in orders list)
+        IgienizareOrder order = new IgienizareOrder();
+        order.setOrderType("Igienizari");
+        order.setDate(new java.util.Date());
+        order.setClient(client);
+        order.setSubscription(plan.getSubscription());
+        order.setSanitationDate(plan.getStartDate() != null ? plan.getStartDate().toString() : null);
+        order.setSanitationLocationAddress(plan.getSanitationLocationAddress());
+        order.setSanitationLocationCoordinates(plan.getSanitationLocationCoordinates());
+        order.setContact(plan.getContact());
+        order.setDetails(plan.getDetails());
+        order.setRecurringPlan(saved);
+        orderRepository.save(order);
+
+        // If a route is already assigned, generate recurring tasks immediately
         if (saved.getRoute() != null) {
             generateTasksForPlan(saved);
         }

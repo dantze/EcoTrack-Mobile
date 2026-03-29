@@ -18,12 +18,14 @@ public class TaskService {
     private final TaskRepository taskRepository;
     private final OrderRepository orderRepository;
     private final RouteRepository routeRepository;
+    private final RecurringIgienizareService recurringIgienizareService;
 
     public TaskService(TaskRepository taskRepository, OrderRepository orderRepository,
-            RouteRepository routeRepository) {
+            RouteRepository routeRepository, RecurringIgienizareService recurringIgienizareService) {
         this.taskRepository = taskRepository;
         this.orderRepository = orderRepository;
         this.routeRepository = routeRepository;
+        this.recurringIgienizareService = recurringIgienizareService;
     }
 
     public List<Task> getAllTasks() {
@@ -163,7 +165,18 @@ public class TaskService {
         task.setRoute(route);
         task.setOrder(order);
 
-        return taskRepository.save(task);
+        Task savedTask = taskRepository.save(task);
+
+        // If this order belongs to a recurring plan, assign the route and generate recurring tasks
+        if (order instanceof IgienizareOrder igi && igi.getRecurringPlan() != null) {
+            try {
+                recurringIgienizareService.assignRoute(igi.getRecurringPlan().getId(), routeId);
+            } catch (RuntimeException e) {
+                System.err.println("Warning: could not generate recurring tasks: " + e.getMessage());
+            }
+        }
+
+        return savedTask;
     }
 
     /**

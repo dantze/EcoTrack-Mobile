@@ -36,9 +36,11 @@ const Orders = () => {
     const fetchOrders = async () => {
         try {
             const data: Order[] = await OrderService.getOrders();
-            console.log('Fetched orders:', data.length);
-            setOrders(data);
-            setFilteredOrders(data);
+            // Exclude recurring igienizare orders — those are assigned via the route screen
+            const filtered = data.filter((o: any) => !o.recurringPlanId);
+            console.log('Fetched orders:', filtered.length);
+            setOrders(filtered);
+            setFilteredOrders(filtered);
         } catch (error) {
             console.error('Error fetching orders:', error);
         } finally {

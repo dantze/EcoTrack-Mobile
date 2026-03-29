@@ -9,5 +9,6 @@ import java.util.List;
 @Repository
 public interface RecurringIgienizareRepository extends JpaRepository<RecurringIgienizare, Long> {
     List<RecurringIgienizare> findByActiveTrue();
+    List<RecurringIgienizare> findByActiveTrueAndRouteIsNull();
     List<RecurringIgienizare> findByClientId(Long clientId);
 }

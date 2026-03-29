@@ -44,6 +44,10 @@ public class RecurringIgienizareService {
         return recurringRepo.findByActiveTrue();
     }
 
+    public List<RecurringIgienizare> getUnassigned() {
+        return recurringRepo.findByActiveTrueAndRouteIsNull();
+    }
+
     public List<RecurringIgienizare> getByClient(Long clientId) {
         return recurringRepo.findByClientId(clientId);
     }

@@ -49,4 +49,12 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
     // ─── Recurring plan queries ─────────────────────────────────────────
     List<Task> findByRecurringPlan_Id(Long planId);
     boolean existsByRecurringPlan_IdAndScheduledDate(Long planId, java.time.LocalDate scheduledDate);
+
+    // Delete all non-completed tasks for a recurring plan
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("DELETE FROM Task t WHERE t.recurringPlan.id = :planId AND t.status <> 'COMPLETED'")
+    void deleteNonCompletedByRecurringPlanId(@Param("planId") Long planId);
+
+    // Delete ALL tasks for a recurring plan (used when deleting the plan entirely)
+    void deleteByRecurringPlan_Id(Long planId);
 }

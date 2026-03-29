@@ -18,6 +18,16 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
 
     List<Task> findByRoute_IdOrderByOrderIndexAsc(Long routeId);
 
+    // Find tasks on a route for a specific day (matches either scheduledDate OR scheduledTime within the day)
+    @Query("SELECT t FROM Task t WHERE t.route.id = :routeId AND " +
+           "(t.scheduledDate = :date OR (t.scheduledTime >= :startOfDay AND t.scheduledTime < :endOfDay)) " +
+           "ORDER BY t.orderIndex ASC")
+    List<Task> findByRouteAndDay(
+            @Param("routeId") Long routeId,
+            @Param("date") java.time.LocalDate date,
+            @Param("startOfDay") LocalDateTime startOfDay,
+            @Param("endOfDay") LocalDateTime endOfDay);
+
     List<Task> findByRoute_IdAndStatus(Long routeId, TaskStatus status);
 
     // Find task by order ID
@@ -35,4 +45,16 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
 
     // Find all tasks belonging to a specific employee (via route)
     List<Task> findByRoute_Employee_IdOrderByOrderIndexAsc(Long employeeId);
+
+    // ─── Recurring plan queries ─────────────────────────────────────────
+    List<Task> findByRecurringPlan_Id(Long planId);
+    boolean existsByRecurringPlan_IdAndScheduledDate(Long planId, java.time.LocalDate scheduledDate);
+
+    // Delete all non-completed tasks for a recurring plan
+    @org.springframework.data.jpa.repository.Modifying
+    @Query("DELETE FROM Task t WHERE t.recurringPlan.id = :planId AND t.status <> 'COMPLETED'")
+    void deleteNonCompletedByRecurringPlanId(@Param("planId") Long planId);
+
+    // Delete ALL tasks for a recurring plan (used when deleting the plan entirely)
+    void deleteByRecurringPlan_Id(Long planId);
 }

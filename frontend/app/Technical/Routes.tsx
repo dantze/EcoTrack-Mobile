@@ -158,6 +158,13 @@ const Routes = () => {
                                             styles.addTaskButton,
                                             pressed && styles.buttonPressed
                                         ]}
+                                        onPress={() => router.push({
+                                            pathname: '/Technical/UnassignedRecurring',
+                                            params: {
+                                                routeId: route.id.toString(),
+                                                routeName: route.name || `Ruta #${route.id}`,
+                                            },
+                                        })}
                                     >
                                         <Ionicons name="add" size={26} color={AppColors.textWhite} />
                                     </Pressable>

@@ -1,5 +1,6 @@
 package com.example.damiProd.domain;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
@@ -18,6 +19,18 @@ public class IgienizareOrder extends Order {
     private String sanitationDate;
     private String sanitationLocationAddress;
     private String sanitationLocationCoordinates; // "lat,long"
+
+    // Link to the recurring plan (null for one-time igienizare orders)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "recurring_plan_id")
+    @JsonIgnore
+    private RecurringIgienizare recurringPlan;
+
+    // Expose recurring plan ID in JSON
+    @Transient
+    public Long getRecurringPlanId() {
+        return recurringPlan != null ? recurringPlan.getId() : null;
+    }
 
     public IgienizareOrder() {
         super();

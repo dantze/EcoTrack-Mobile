@@ -2,10 +2,12 @@ import { StyleSheet, Text, View, Pressable, ActivityIndicator, Alert } from 'rea
 import React, { useState, useEffect } from 'react'
 import { useRouter, useLocalSearchParams } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons';
-import { RouteService } from '../../services/RouteService';
-import { Task } from '../../services/TaskService';
+import { TaskService, Task } from '../../services/TaskService';
 import { getTaskTypeLabel, getTaskTypeColor, getStatusLabel } from '../../constants/TaskConstants';
 import { AppColors } from '../../constants/Colors';
+import { toDateString } from '../../utils/dateUtils';
+import { DAY_NAMES_SHORT } from '../../constants/RouteConstants';
+import { RouteService } from '../../services/RouteService';
 import ScreenHeader from '../../components/layout/ScreenHeader';
 import TaskTypeLegend from '../../components/display/TaskTypeLegend';
 import DraggableFlatList, { RenderItemParams, ScaleDecorator } from 'react-native-draggable-flatlist';
@@ -20,7 +22,7 @@ const RouteTasks = () => {
 
     const [tasks, setTasks] = useState<Task[]>([]);
     const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+    const [selectedDate, setSelectedDate] = useState(new Date());
     const [saving, setSaving] = useState(false);
     const [hasChanges, setHasChanges] = useState(false);
 
@@ -28,25 +30,44 @@ const RouteTasks = () => {
         if (routeId) {
             loadRouteTasks();
         }
-    }, [routeId]);
+    }, [routeId, selectedDate]);
 
     const loadRouteTasks = async () => {
         try {
             setLoading(true);
-            setError(null);
-            const route = await RouteService.getRouteById(Number(routeId));
-            setTasks(route.tasks || []);
+            const dateString = toDateString(selectedDate);
+            const data = await TaskService.getTasksByRouteAndDate(Number(routeId), dateString);
+            setTasks(data);
             setHasChanges(false);
         } catch (err) {
-            setError('Nu s-au putut încărca sarcinile');
-            console.error(err);
+            console.error('Error loading route tasks:', err);
+            setTasks([]);
         } finally {
             setLoading(false);
         }
     };
 
+    // Date navigation
+    const goToPreviousDay = () => {
+        const newDate = new Date(selectedDate);
+        newDate.setDate(newDate.getDate() - 1);
+        setSelectedDate(newDate);
+    };
+
+    const goToNextDay = () => {
+        const newDate = new Date(selectedDate);
+        newDate.setDate(newDate.getDate() + 1);
+        setSelectedDate(newDate);
+    };
+
+    const formatDateNav = (date: Date) => {
+        const day = String(date.getDate()).padStart(2, '0');
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const dayName = DAY_NAMES_SHORT[date.getDay()];
+        return `${day}/${month} ${dayName}`;
+    };
+
     const handleCardPress = (item: Task) => {
-        console.log("View task details:", item.id);
         router.push({
             pathname: "/Technical/ServiceDetails",
             params: { id: item.id }
@@ -79,7 +100,7 @@ const RouteTasks = () => {
                     onLongPress={drag}
                     delayLongPress={150}
                 >
-                    {/* Order number badge - top left */}
+                    {/* Order number badge - top right */}
                     <View style={styles.orderBadge}>
                         <Text style={styles.orderBadgeText}>{index}</Text>
                     </View>
@@ -125,26 +146,32 @@ const RouteTasks = () => {
 
             <ScreenHeader title={driverName || 'Sarcini Rută'} />
 
+            {/* Date Navigation */}
+            <View style={styles.dateNavContainer}>
+                <Pressable onPress={goToPreviousDay} style={styles.dateNavArrow}>
+                    <Ionicons name="chevron-back" size={22} color={AppColors.textWhite} />
+                </Pressable>
+                <View style={styles.dateNavCenter}>
+                    <Ionicons name="calendar-outline" size={18} color={AppColors.accentColor} style={{ marginRight: 8 }} />
+                    <Text style={styles.dateNavText}>{formatDateNav(selectedDate)}</Text>
+                </View>
+                <Pressable onPress={goToNextDay} style={styles.dateNavArrow}>
+                    <Ionicons name="chevron-forward" size={22} color={AppColors.textWhite} />
+                </Pressable>
+            </View>
+
             {/* LEGEND */}
             <TaskTypeLegend types={['PICKUP', 'PLACEMENT', 'SANITIZATION']} />
-
-
 
             {loading ? (
                 <View style={styles.centerContent}>
                     <ActivityIndicator size="large" color="#427992" />
                     <Text style={styles.loadingText}>Se încarcă sarcinile...</Text>
                 </View>
-            ) : error ? (
-                <View style={styles.centerContent}>
-                    <Text style={styles.errorText}>{error}</Text>
-                    <Pressable style={styles.retryButton} onPress={loadRouteTasks}>
-                        <Text style={styles.retryButtonText}>Încearcă din nou</Text>
-                    </Pressable>
-                </View>
             ) : tasks.length === 0 ? (
                 <View style={styles.centerContent}>
-                    <Text style={styles.emptyText}>Această rută nu are sarcini</Text>
+                    <Ionicons name="clipboard-outline" size={60} color={AppColors.accentColor} />
+                    <Text style={styles.emptyText}>Nicio sarcină pentru această zi</Text>
                 </View>
             ) : (
                 <View style={styles.listWrapper}>
@@ -162,7 +189,7 @@ const RouteTasks = () => {
                 </View>
             )}
 
-            {/* Save Order Button - always at the bottom */}
+            {/* Save Order Button */}
             <View style={styles.saveButtonContainer}>
                 <Pressable
                     style={({ pressed }) => [
@@ -195,6 +222,39 @@ const styles = StyleSheet.create({
         backgroundColor: AppColors.screenBackground,
     },
 
+    // --- DATE NAVIGATION ---
+    dateNavContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginHorizontal: 20,
+        marginBottom: 15,
+        backgroundColor: AppColors.modalBackground,
+        borderRadius: 14,
+        paddingVertical: 12,
+        paddingHorizontal: 8,
+        borderWidth: 1,
+        borderColor: AppColors.inputBackground,
+    },
+    dateNavArrow: {
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    dateNavCenter: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+    },
+    dateNavText: {
+        color: AppColors.textWhite,
+        fontSize: 17,
+        fontWeight: '600',
+        letterSpacing: 0.5,
+    },
+
     // --- CENTER CONTENT (Loading, Error, Empty) ---
     centerContent: {
         flex: 1,
@@ -214,9 +274,10 @@ const styles = StyleSheet.create({
         marginBottom: 20,
     },
     emptyText: {
-        color: AppColors.subtitleText,
+        color: AppColors.accentColor,
         fontSize: 16,
         textAlign: 'center',
+        marginTop: 15,
     },
     retryButton: {
         backgroundColor: AppColors.buttonBackground,

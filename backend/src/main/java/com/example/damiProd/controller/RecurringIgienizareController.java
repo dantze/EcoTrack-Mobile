@@ -27,6 +27,11 @@ public class RecurringIgienizareController {
         return service.getActiveOnly();
     }
 
+    @GetMapping("/unassigned")
+    public List<RecurringIgienizare> getUnassigned() {
+        return service.getUnassigned();
+    }
+
     @GetMapping("/{id}")
     public RecurringIgienizare getById(@PathVariable Long id) {
         return service.getById(id);

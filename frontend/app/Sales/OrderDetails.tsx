@@ -228,12 +228,13 @@ const OrderDetails = () => {
                                 }
                             } else if (selectedType === "Igienizari") {
                                 try {
-                                    const { subscription, location, date, details, isRecurring, recurrenceEndDate, isIndefinite } = orderData;
+                                    const { subscription, location, date, details, isRecurring, frequencyDays, recurrenceEndDate, isIndefinite } = orderData;
 
                                     if (isRecurring) {
                                         // Create a recurring igienizare plan (single order)
                                         const payload = {
                                             subscription: { id: subscription.id },
+                                            frequencyDays: frequencyDays || 30,
                                             startDate: date,
                                             endDate: isIndefinite ? '2100-01-01' : recurrenceEndDate,
                                             isIndefinite: isIndefinite || false,

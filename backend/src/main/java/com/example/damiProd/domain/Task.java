@@ -5,6 +5,7 @@ import jakarta.persistence.*;
 import lombok.Getter;
 import lombok.Setter;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -56,6 +57,15 @@ public class Task {
     @JsonIgnore
     private List<TaskPhoto> photos = new ArrayList<>();
 
+    // Link to the recurring plan that generated this task (null for order-based tasks)
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "recurring_plan_id")
+    @JsonIgnore
+    private RecurringIgienizare recurringPlan;
+
+    // The date this task is scheduled for (used by recurring tasks)
+    private LocalDate scheduledDate;
+
     // Transient field to expose route ID in JSON
     @Transient
     public Long getRouteId() {
@@ -66,6 +76,12 @@ public class Task {
     @Transient
     public Long getOrderId() {
         return order != null ? order.getId() : null;
+    }
+
+    // Transient field to expose recurring plan ID in JSON
+    @Transient
+    public Long getRecurringPlanId() {
+        return recurringPlan != null ? recurringPlan.getId() : null;
     }
 
     public Task() {

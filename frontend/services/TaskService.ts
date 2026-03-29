@@ -5,6 +5,7 @@ export interface Task {
     type: string;
     status: string;
     scheduledTime?: string;
+    scheduledDate?: string; // "YYYY-MM-DD"
     address?: string;
     coordinates?: string;
     clientName?: string;
@@ -15,6 +16,7 @@ export interface Task {
     internalNotes?: string;
     routeId?: number;
     orderId?: number;
+    recurringPlanId?: number;
 }
 
 export interface OrderTaskStatus {
@@ -49,6 +51,15 @@ export const TaskService = {
     getTasksByRouteId: async (routeId: number): Promise<Task[]> => {
         const response = await fetch(`${API_BASE_URL}/tasks/route/${routeId}`);
         if (!response.ok) throw new Error('Eșec la preluarea sarcinilor rutei');
+        return await response.json();
+    },
+
+    /**
+     * Get tasks for a specific route on a specific date
+     */
+    getTasksByRouteAndDate: async (routeId: number, date: string): Promise<Task[]> => {
+        const response = await fetch(`${API_BASE_URL}/tasks/route/${routeId}/date/${date}`);
+        if (!response.ok) throw new Error('Eșec la preluarea sarcinilor rutei pentru data specificată');
         return await response.json();
     },
 

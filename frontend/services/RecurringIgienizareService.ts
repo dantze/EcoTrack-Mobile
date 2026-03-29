@@ -14,6 +14,12 @@ export const RecurringIgienizareService = {
         return await response.json();
     },
 
+    getUnassigned: async () => {
+        const response = await fetch(`${API_BASE_URL}/recurring-igienizari/unassigned`);
+        if (!response.ok) throw new Error('Eșec la preluarea igienizărilor recurente neasignate');
+        return await response.json();
+    },
+
     getById: async (id: number) => {
         const response = await fetch(`${API_BASE_URL}/recurring-igienizari/${id}`);
         if (!response.ok) throw new Error('Igienizare recurentă nu a fost găsită');

@@ -407,41 +407,45 @@ const TaskDetails = () => {
                 </View>
             )}
 
-            {task.status === 'IN_PROGRESS' && hasPhotos && (
-                <View style={styles.bottomAction}>
-                    <Pressable
-                        style={({ pressed }) => [
-                            styles.actionButton,
-                            { backgroundColor: AppColors.successGreen },
-                            pressed && !completing && styles.buttonPressed,
-                            completing && { opacity: 0.7 }
-                        ]}
-                        onPress={handleCompleteTask}
-                        disabled={completing}
-                    >
-                        {completing ? (
-                            <>
-                                <ActivityIndicator size="small" color={AppColors.textWhite} />
-                                <Text style={styles.actionButtonText}>Se încarcă pozele...</Text>
-                            </>
-                        ) : (
-                            <>
-                                <Ionicons name="checkmark-circle" size={24} color={AppColors.textWhite} />
-                                <Text style={styles.actionButtonText}>Finalizează Sarcina</Text>
-                            </>
-                        )}
-                    </Pressable>
-                </View>
-            )}
+            {task.status === 'IN_PROGRESS' && (() => {
+                // Recurring sanitization tasks: photos are optional
+                const isRecurringSanitization = task.type === 'SANITIZATION' && task.recurringPlanId;
+                const canComplete = hasPhotos || isRecurringSanitization;
 
-            {task.status === 'IN_PROGRESS' && !hasPhotos && (
-                <View style={styles.bottomAction}>
-                    <View style={styles.noPhotosWarning}>
-                        <Ionicons name="camera-outline" size={20} color={AppColors.warningOrange} />
-                        <Text style={styles.noPhotosWarningText}>Adaugă poze pentru a putea finaliza sarcina</Text>
+                return canComplete ? (
+                    <View style={styles.bottomAction}>
+                        <Pressable
+                            style={({ pressed }) => [
+                                styles.actionButton,
+                                { backgroundColor: AppColors.successGreen },
+                                pressed && !completing && styles.buttonPressed,
+                                completing && { opacity: 0.7 }
+                            ]}
+                            onPress={handleCompleteTask}
+                            disabled={completing}
+                        >
+                            {completing ? (
+                                <>
+                                    <ActivityIndicator size="small" color={AppColors.textWhite} />
+                                    <Text style={styles.actionButtonText}>Se încarcă pozele...</Text>
+                                </>
+                            ) : (
+                                <>
+                                    <Ionicons name="checkmark-circle" size={24} color={AppColors.textWhite} />
+                                    <Text style={styles.actionButtonText}>Finalizează Sarcina</Text>
+                                </>
+                            )}
+                        </Pressable>
                     </View>
-                </View>
-            )}
+                ) : (
+                    <View style={styles.bottomAction}>
+                        <View style={styles.noPhotosWarning}>
+                            <Ionicons name="camera-outline" size={20} color={AppColors.warningOrange} />
+                            <Text style={styles.noPhotosWarningText}>Adaugă poze pentru a putea finaliza sarcina</Text>
+                        </View>
+                    </View>
+                );
+            })()}
 
             {task.status === 'COMPLETED' && (
                 <View style={styles.bottomAction}>

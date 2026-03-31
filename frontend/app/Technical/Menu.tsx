@@ -7,6 +7,8 @@ const Menu = () => {
     const router = useRouter();
 
     const menuItems = [
+        { label: 'Creare Client', onPress: () => router.push({ pathname: '/Sales/CreateClient' }) },
+        { label: 'Creare Comanda', onPress: () => router.push({ pathname: '/Sales/CreateOrder' }) },
         { label: 'Comenzi', onPress: () => router.push({ pathname: '/Technical/Orders' }) },
         { label: 'Rute', onPress: () => router.push({ pathname: '/Technical/Routes' }) },
         { label: 'Rute și Șoferi', onPress: () => router.push({ pathname: '/Technical/RoutesAndDrivers' }) },

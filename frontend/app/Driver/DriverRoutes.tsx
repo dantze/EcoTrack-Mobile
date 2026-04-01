@@ -169,7 +169,7 @@ const DriverRoutes = () => {
                             >
                                 <View style={styles.cardLeft}>
                                     <View style={styles.dateContainer}>
-                                        <Text style={styles.dayName}>{dayName}</Text>
+                                        <Text style={styles.dayName}>{dayName} - {route.name}</Text>
                                         <Text style={styles.dateText}>{date}</Text>
                                     </View>
                                 </View>

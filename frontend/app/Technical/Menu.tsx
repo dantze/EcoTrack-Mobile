@@ -11,13 +11,15 @@ const Menu = () => {
         { label: 'Rute', onPress: () => router.push({ pathname: '/Technical/Routes' }) },
         { label: 'Rute și Șoferi', onPress: () => router.push({ pathname: '/Technical/RoutesAndDrivers' }) },
         { label: 'Schimbare Șoferi și Rute', onPress: () => router.push({ pathname: '/Technical/ChangeDriver' }) },
+        { label: 'Creare Client', onPress: () => router.push({ pathname: '/Sales/CreateClient' }) },
+        { label: 'Creare Comanda', onPress: () => router.push({ pathname: '/Sales/CreateOrder' }) },
     ];
 
     return (
         <MenuScreen
             title="Meniu Tehnic"
             items={menuItems}
-            showMap
+
             onLogout={() => router.replace('/login')}
             renderButton={(item) => (
                 <MenuButton label={item.label} onPress={item.onPress} />

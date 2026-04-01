@@ -33,6 +33,9 @@ const TaskDetails = () => {
     const [photos, setPhotos] = useState<string[]>([]);
     const [completing, setCompleting] = useState(false);
 
+    // Whether this task type allows completing without photos
+    const isPhotoOptional = task?.type?.toUpperCase() === 'SANITIZATION';
+
     useEffect(() => {
         if (taskId) {
             loadTaskDetails();
@@ -312,6 +315,25 @@ const TaskDetails = () => {
                             <Text style={styles.orderDetailsText}>{orderDetails.details}</Text>
                         </View>
                     )}
+
+                    {task.contactPerson && (
+                        <Pressable
+                            style={({ pressed }) => [
+                                styles.pressableRow,
+                                pressed && styles.pressableRowPressed
+                            ]}
+                            onPress={() => handleCall(task.contactPerson)}
+                        >
+                            <Ionicons name="call" size={20} color={AppColors.successGreen} />
+                            <View style={styles.infoContent}>
+                                <Text style={styles.infoLabel}>Contact Șantier</Text>
+                                <Text style={[styles.infoValue, styles.linkText]}>{task.contactPerson}</Text>
+                            </View>
+                            <View style={styles.pressableArrow}>
+                                <Ionicons name="chevron-forward" size={18} color={AppColors.textWhite} />
+                            </View>
+                        </Pressable>
+                    )}
                 </View>
 
 
@@ -407,7 +429,7 @@ const TaskDetails = () => {
                 </View>
             )}
 
-            {task.status === 'IN_PROGRESS' && hasPhotos && (
+            {task.status === 'IN_PROGRESS' && (hasPhotos || isPhotoOptional) && (
                 <View style={styles.bottomAction}>
                     <Pressable
                         style={({ pressed }) => [
@@ -434,7 +456,7 @@ const TaskDetails = () => {
                 </View>
             )}
 
-            {task.status === 'IN_PROGRESS' && !hasPhotos && (
+            {task.status === 'IN_PROGRESS' && !hasPhotos && !isPhotoOptional && (
                 <View style={styles.bottomAction}>
                     <View style={styles.noPhotosWarning}>
                         <Ionicons name="camera-outline" size={20} color={AppColors.warningOrange} />

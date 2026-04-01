@@ -337,7 +337,8 @@ const OrderForm: React.FC<OrderFormProps> = ({
         } else if (orderType === 'Igienizari') {
             onDataChange({
                 subscription: selectedSubscription,
-                location: igiLocation, date: dateStart, details,
+                location: igiLocation, date: dateStart,
+                contact: contactCountryCode + contact, details,
                 isRecurring,
                 recurrenceEndDate: isRecurring && !recurrenceIndefinite ? recurrenceEndDate : undefined,
                 isIndefinite: isRecurring ? recurrenceIndefinite : undefined,
@@ -847,7 +848,8 @@ const OrderForm: React.FC<OrderFormProps> = ({
                 </>
             )}
 
-            {/* ─── Details ─── */}
+            {/* ─── Contact & Details ─── */}
+            {renderContactField('Contact Șantier', 'Număr telefon')}
             {renderDetailsField()}
         </>
     );

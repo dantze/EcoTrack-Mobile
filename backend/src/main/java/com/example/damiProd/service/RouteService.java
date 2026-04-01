@@ -48,7 +48,24 @@ public class RouteService {
         return routeRepository.save(route);
     }
 
+    @Transactional
     public void deleteRoute(Long id) {
+        Route route = routeRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Ruta nu a fost găsită"));
+
+        // Unassign all tasks from this route (make them unassigned, NOT deleted)
+        List<Task> tasks = taskRepository.findByRoute_Id(id);
+        for (Task task : tasks) {
+            task.setRoute(null);
+            task.setOrderIndex(0);
+        }
+        taskRepository.saveAll(tasks);
+
+        // Clear the route's task list so orphanRemoval doesn't delete them
+        route.getTasks().clear();
+        routeRepository.save(route);
+
+        // Now delete the empty route
         routeRepository.deleteById(id);
     }
 

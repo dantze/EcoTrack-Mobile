@@ -96,6 +96,31 @@ const Routes = () => {
         setSelectedRoute(null);
     };
 
+    const handleDeleteRoute = (route: Route) => {
+        const routeName = route.name || `Ruta #${route.id}`;
+        Alert.alert(
+            'Confirmare ștergere',
+            `Sigur doriți să ștergeți ${routeName}?\n\nTaskurile de pe această rută vor deveni neatribuite.`,
+            [
+                { text: 'Anulează', style: 'cancel' },
+                {
+                    text: 'Șterge',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await RouteService.deleteRoute(route.id);
+                            Alert.alert('Succes', `${routeName} a fost ștearsă. Taskurile au fost dezasignate.`);
+                            fetchRoutes();
+                        } catch (error) {
+                            console.error('Error deleting route:', error);
+                            Alert.alert('Eroare', 'Nu s-a putut șterge ruta.');
+                        }
+                    },
+                },
+            ]
+        );
+    };
+
     return (
         <View style={styles.container}>
 
@@ -160,6 +185,16 @@ const Routes = () => {
                                         ]}
                                     >
                                         <Ionicons name="add" size={26} color={AppColors.textWhite} />
+                                    </Pressable>
+
+                                    <Pressable
+                                        style={({ pressed }) => [
+                                            styles.deleteButton,
+                                            pressed && styles.buttonPressed
+                                        ]}
+                                        onPress={() => handleDeleteRoute(route)}
+                                    >
+                                        <Ionicons name="trash-outline" size={22} color={AppColors.textWhite} />
                                     </Pressable>
                                 </View>
 
@@ -264,6 +299,19 @@ const styles = StyleSheet.create({
         width: 50,
         height: 50,
         backgroundColor: AppColors.successGreen,
+        borderRadius: 25,
+        justifyContent: 'center',
+        alignItems: 'center',
+        elevation: 5,
+        shadowColor: AppColors.shadow,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 3.84,
+    },
+    deleteButton: {
+        width: 50,
+        height: 50,
+        backgroundColor: AppColors.errorRed,
         borderRadius: 25,
         justifyContent: 'center',
         alignItems: 'center',

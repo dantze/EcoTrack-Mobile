@@ -81,6 +81,16 @@ export const RouteService = {
         return await response.json();
     },
 
+    deleteRoute: async (routeId: number): Promise<void> => {
+        const response = await fetch(`${API_BASE_URL}/routes/${routeId}`, {
+            method: 'DELETE',
+        });
+
+        if (!response.ok) {
+            throw new Error('Eșec la ștergerea rutei');
+        }
+    },
+
     reorderTasks: async (routeId: number, taskIds: number[]): Promise<Route> => {
         const response = await fetch(`${API_BASE_URL}/routes/${routeId}/reorder-tasks`, {
             method: 'PUT',

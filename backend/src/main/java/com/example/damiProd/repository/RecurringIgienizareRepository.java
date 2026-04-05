@@ -11,4 +11,5 @@ public interface RecurringIgienizareRepository extends JpaRepository<RecurringIg
     List<RecurringIgienizare> findByActiveTrue();
     List<RecurringIgienizare> findByActiveTrueAndRouteIsNull();
     List<RecurringIgienizare> findByClientId(Long clientId);
+    List<RecurringIgienizare> findByRoute_Id(Long routeId);
 }

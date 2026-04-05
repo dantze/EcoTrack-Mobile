@@ -1,10 +1,12 @@
 package com.example.damiProd.service;
 
 import com.example.damiProd.domain.Employee;
+import com.example.damiProd.domain.RecurringIgienizare;
 import com.example.damiProd.domain.Route;
 import com.example.damiProd.domain.Task;
 import com.example.damiProd.dto.CreateRouteRequest;
 import com.example.damiProd.repository.EmployeeRepository;
+import com.example.damiProd.repository.RecurringIgienizareRepository;
 import com.example.damiProd.repository.RouteRepository;
 import com.example.damiProd.repository.TaskRepository;
 import org.springframework.stereotype.Service;
@@ -19,11 +21,14 @@ public class RouteService {
     private final RouteRepository routeRepository;
     private final EmployeeRepository employeeRepository;
     private final TaskRepository taskRepository;
+    private final RecurringIgienizareRepository recurringIgienizareRepository;
 
-    public RouteService(RouteRepository routeRepository, EmployeeRepository employeeRepository, TaskRepository taskRepository) {
+    public RouteService(RouteRepository routeRepository, EmployeeRepository employeeRepository,
+                        TaskRepository taskRepository, RecurringIgienizareRepository recurringIgienizareRepository) {
         this.routeRepository = routeRepository;
         this.employeeRepository = employeeRepository;
         this.taskRepository = taskRepository;
+        this.recurringIgienizareRepository = recurringIgienizareRepository;
     }
 
     public List<Route> getAllRoutes() {
@@ -48,8 +53,27 @@ public class RouteService {
         return routeRepository.save(route);
     }
 
+    @Transactional
     public void deleteRoute(Long id) {
-        routeRepository.deleteById(id);
+        Route route = routeRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Ruta nu a fost găsită"));
+
+        // Unassign all tasks from this route (set route = null so they become "neatribuite")
+        List<Task> tasks = taskRepository.findByRoute_Id(id);
+        for (Task task : tasks) {
+            task.setRoute(null);
+        }
+        taskRepository.saveAll(tasks);
+
+        // Unassign all recurring igienizare plans from this route
+        List<RecurringIgienizare> plans = recurringIgienizareRepository.findByRoute_Id(id);
+        for (RecurringIgienizare plan : plans) {
+            plan.setRoute(null);
+        }
+        recurringIgienizareRepository.saveAll(plans);
+
+        // Now delete the route (no orphan tasks will be cascade-deleted)
+        routeRepository.delete(route);
     }
 
     @Transactional(readOnly = true)

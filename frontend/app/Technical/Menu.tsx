@@ -19,7 +19,7 @@ const Menu = () => {
         <MenuScreen
             title="Meniu Tehnic"
             items={menuItems}
-            showMap
+
             onLogout={() => router.replace('/login')}
             renderButton={(item) => (
                 <MenuButton label={item.label} onPress={item.onPress} />

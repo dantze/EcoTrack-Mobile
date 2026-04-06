@@ -332,7 +332,7 @@ const OrderForm: React.FC<OrderFormProps> = ({
         } else if (orderType === 'Ridicari') {
             onDataChange({
                 packetsToRemove, packetGroups: clientPackets,
-                contact, details, date: dateStart,
+                contact: contactCountryCode + contact, details, date: dateStart,
             });
         } else if (orderType === 'Igienizari') {
             onDataChange({
@@ -684,7 +684,7 @@ const OrderForm: React.FC<OrderFormProps> = ({
             />
 
             {/* ─── Contact & Details ─── */}
-            {renderContactField('Contact Persoană Responsabilă Amplasare', 'Nume / Telefon', 'default')}
+            {renderContactField('Contact Șantier', 'Număr telefon')}
             {renderDetailsField()}
         </>
     );

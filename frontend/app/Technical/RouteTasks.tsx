@@ -121,10 +121,10 @@ const RouteTasks = () => {
                                 <Text style={styles.statusText} numberOfLines={1}>{item.address}</Text>
                             </View>
                         )}
-                        {item.clientPhone && (
+                        {(item.contactPerson || item.clientPhone) && (
                             <View style={styles.phoneContainer}>
                                 <Ionicons name="call" size={14} color="#E0E0E0" style={{ marginRight: 5 }} />
-                                <Text style={styles.statusText}>{item.clientPhone}</Text>
+                                <Text style={styles.statusText}>{item.contactPerson || item.clientPhone}</Text>
                             </View>
                         )}
                     </View>

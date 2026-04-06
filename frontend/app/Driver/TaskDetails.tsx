@@ -288,18 +288,18 @@ const TaskDetails = () => {
                         </View>
                     )}
 
-                    {orderDetails?.contact && (
+                    {(orderDetails?.contact || task.contactPerson) && (
                         <Pressable
                             style={({ pressed }) => [
                                 styles.pressableRow,
                                 pressed && styles.pressableRowPressed
                             ]}
-                            onPress={() => handleCall(orderDetails.contact)}
+                            onPress={() => handleCall(orderDetails?.contact || task.contactPerson)}
                         >
                             <Ionicons name="call" size={20} color={AppColors.successGreen} />
                             <View style={styles.infoContent}>
-                                <Text style={styles.infoLabel}>Persoană contact</Text>
-                                <Text style={[styles.infoValue, styles.linkText]}>{orderDetails.contact}</Text>
+                                <Text style={styles.infoLabel}>Contact Șantier</Text>
+                                <Text style={[styles.infoValue, styles.linkText]}>{orderDetails?.contact || task.contactPerson}</Text>
                             </View>
                             <View style={styles.pressableArrow}>
                                 <Ionicons name="chevron-forward" size={18} color={AppColors.textWhite} />
@@ -307,10 +307,13 @@ const TaskDetails = () => {
                         </Pressable>
                     )}
 
-                    {orderDetails?.details && (
-                        <View style={styles.orderDetailsBox}>
-                            <Text style={styles.orderDetailsText}>{orderDetails.details}</Text>
-                        </View>
+                    {(orderDetails?.details || task.internalNotes) && (
+                        <>
+                            <Text style={[styles.sectionTitle, { marginTop: 12, marginBottom: 6 }]}>Detalii Suplimentare</Text>
+                            <View style={styles.orderDetailsBox}>
+                                <Text style={styles.orderDetailsText}>{orderDetails?.details || task.internalNotes}</Text>
+                            </View>
+                        </>
                     )}
                 </View>
 

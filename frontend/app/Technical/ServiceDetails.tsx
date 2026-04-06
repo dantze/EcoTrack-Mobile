@@ -112,7 +112,7 @@ const ServiceDetails = () => {
     // Unified data access
     const clientName = task.clientName || additionalInfo?.client?.name || additionalInfo?.client?.fullName || 'Client Necunoscut';
     const address = task.address || additionalInfo?.locationAddress || 'Adresă indisponibilă';
-    const phone = task.clientPhone || additionalInfo?.contact || 'N/A';
+    const phone = task.contactPerson || additionalInfo?.contact || task.clientPhone || 'N/A';
     const taskType = getTaskTypeLabel(task.type);
     const hasScheduledDate = !!task.scheduledTime;
     const scheduledDate = task.scheduledTime
@@ -121,7 +121,7 @@ const ServiceDetails = () => {
 
 
     // Description shows order details only
-    const description = additionalInfo?.details || "Fără descriere suplimentară.";
+    const description = additionalInfo?.details || task.internalNotes || "Fără descriere suplimentară.";
 
     return (
         <View style={styles.container}>
@@ -155,7 +155,7 @@ const ServiceDetails = () => {
                             </View>
                         </View>
                     )}
-                    <DetailRow label="Telefon" value={phone} />
+                    <DetailRow label="Contact Șantier" value={phone} />
                     <DetailRow label="Adresă" value={address} isMultiline />
 
                     <View style={{ height: 10 }} />

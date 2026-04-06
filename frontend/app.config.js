@@ -2,7 +2,7 @@ module.exports = {
     expo: {
         name: "EcoTrack",
         slug: "frontend",
-        version: "1.1.0",
+        version: "1.2.0",
         orientation: "portrait",
         icon: "./assets/images/icon.png",
         scheme: "frontend",
@@ -19,7 +19,7 @@ module.exports = {
         },
         android: {
             package: "com.damiprod.ecotrack",
-            versionCode: 3,
+            versionCode: 4,
             adaptiveIcon: {
                 foregroundImage: "./assets/images/adaptive-icon.png",
                 backgroundColor: "#ffffff"

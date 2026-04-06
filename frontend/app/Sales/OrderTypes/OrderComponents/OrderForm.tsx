@@ -332,12 +332,13 @@ const OrderForm: React.FC<OrderFormProps> = ({
         } else if (orderType === 'Ridicari') {
             onDataChange({
                 packetsToRemove, packetGroups: clientPackets,
-                contact, details, date: dateStart,
+                contact: contactCountryCode + contact, details, date: dateStart,
             });
         } else if (orderType === 'Igienizari') {
             onDataChange({
                 subscription: selectedSubscription,
-                location: igiLocation, date: dateStart, details,
+                location: igiLocation, date: dateStart,
+                contact: contactCountryCode + contact, details,
                 isRecurring,
                 frequencyDays: isRecurring ? parseInt(frequencyDays) : undefined,
                 recurrenceEndDate: isRecurring && !recurrenceIndefinite ? recurrenceEndDate : undefined,
@@ -683,7 +684,7 @@ const OrderForm: React.FC<OrderFormProps> = ({
             />
 
             {/* ─── Contact & Details ─── */}
-            {renderContactField('Contact Persoană Responsabilă Amplasare', 'Nume / Telefon', 'default')}
+            {renderContactField('Contact Șantier', 'Număr telefon')}
             {renderDetailsField()}
         </>
     );
@@ -848,7 +849,8 @@ const OrderForm: React.FC<OrderFormProps> = ({
                 </>
             )}
 
-            {/* ─── Details ─── */}
+            {/* ─── Contact & Details ─── */}
+            {renderContactField('Contact Șantier', 'Număr telefon')}
             {renderDetailsField()}
         </>
     );

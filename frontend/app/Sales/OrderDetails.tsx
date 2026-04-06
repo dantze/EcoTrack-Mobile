@@ -242,6 +242,7 @@ const OrderDetails = () => {
                                                 ? `${location.latitude},${location.longitude}`
                                                 : null,
                                             sanitationLocationAddress: location?.address || null,
+                                            contact: orderData.contact || null,
                                             details: details || null,
                                         };
 
@@ -257,6 +258,7 @@ const OrderDetails = () => {
                                                 ? `${location.latitude},${location.longitude}`
                                                 : null,
                                             sanitationLocationAddress: location?.address || null,
+                                            contact: orderData.contact || null,
                                             details: details || null,
                                         };
 

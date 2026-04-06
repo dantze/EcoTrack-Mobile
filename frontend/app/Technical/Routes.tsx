@@ -96,6 +96,31 @@ const Routes = () => {
         setSelectedRoute(null);
     };
 
+    const handleDeleteRoute = (route: Route) => {
+        const routeName = route.name || `Ruta #${route.id}`;
+        Alert.alert(
+            'Șterge Ruta',
+            `Ești sigur că vrei să ștergi "${routeName}"? Toate comenzile de pe această rută vor deveni neatribuite.`,
+            [
+                { text: 'Anulează', style: 'cancel' },
+                {
+                    text: 'Șterge',
+                    style: 'destructive',
+                    onPress: async () => {
+                        try {
+                            await RouteService.deleteRoute(route.id);
+                            Alert.alert('Succes', `Ruta "${routeName}" a fost ștearsă.`);
+                            fetchRoutes();
+                        } catch (error) {
+                            console.error('Error deleting route:', error);
+                            Alert.alert('Eroare', 'Nu s-a putut șterge ruta.');
+                        }
+                    }
+                }
+            ]
+        );
+    };
+
     return (
         <View style={styles.container}>
 
@@ -168,6 +193,16 @@ const Routes = () => {
                                     >
                                         <Ionicons name="add" size={26} color={AppColors.textWhite} />
                                     </Pressable>
+
+                                    <Pressable
+                                        style={({ pressed }) => [
+                                            styles.deleteButton,
+                                            pressed && styles.buttonPressed
+                                        ]}
+                                        onPress={() => handleDeleteRoute(route)}
+                                    >
+                                        <Ionicons name="trash" size={22} color={AppColors.textWhite} />
+                                    </Pressable>
                                 </View>
 
                                 {index < routes.length - 1 && <View style={styles.separator} />}
@@ -236,8 +271,8 @@ const styles = StyleSheet.create({
     routeRow: {
         flexDirection: 'row',
         alignItems: 'center',
-        width: 340,
-        gap: 10,
+        width: 380,
+        gap: 8,
     },
     routeButton: {
         flex: 1,
@@ -255,10 +290,10 @@ const styles = StyleSheet.create({
         shadowRadius: 3.84,
     },
     driverButton: {
-        width: 50,
-        height: 50,
+        width: 44,
+        height: 44,
         backgroundColor: AppColors.successGreen,
-        borderRadius: 25,
+        borderRadius: 22,
         justifyContent: 'center',
         alignItems: 'center',
         elevation: 5,
@@ -268,10 +303,23 @@ const styles = StyleSheet.create({
         shadowRadius: 3.84,
     },
     addTaskButton: {
-        width: 50,
-        height: 50,
+        width: 44,
+        height: 44,
         backgroundColor: AppColors.successGreen,
-        borderRadius: 25,
+        borderRadius: 22,
+        justifyContent: 'center',
+        alignItems: 'center',
+        elevation: 5,
+        shadowColor: AppColors.shadow,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.25,
+        shadowRadius: 3.84,
+    },
+    deleteButton: {
+        width: 44,
+        height: 44,
+        backgroundColor: AppColors.errorRed,
+        borderRadius: 22,
         justifyContent: 'center',
         alignItems: 'center',
         elevation: 5,

@@ -288,18 +288,18 @@ const TaskDetails = () => {
                         </View>
                     )}
 
-                    {orderDetails?.contact && (
+                    {(orderDetails?.contact || task.contactPerson) && (
                         <Pressable
                             style={({ pressed }) => [
                                 styles.pressableRow,
                                 pressed && styles.pressableRowPressed
                             ]}
-                            onPress={() => handleCall(orderDetails.contact)}
+                            onPress={() => handleCall(orderDetails?.contact || task.contactPerson)}
                         >
                             <Ionicons name="call" size={20} color={AppColors.successGreen} />
                             <View style={styles.infoContent}>
-                                <Text style={styles.infoLabel}>Persoană contact</Text>
-                                <Text style={[styles.infoValue, styles.linkText]}>{orderDetails.contact}</Text>
+                                <Text style={styles.infoLabel}>Contact Șantier</Text>
+                                <Text style={[styles.infoValue, styles.linkText]}>{orderDetails?.contact || task.contactPerson}</Text>
                             </View>
                             <View style={styles.pressableArrow}>
                                 <Ionicons name="chevron-forward" size={18} color={AppColors.textWhite} />
@@ -307,10 +307,13 @@ const TaskDetails = () => {
                         </Pressable>
                     )}
 
-                    {orderDetails?.details && (
-                        <View style={styles.orderDetailsBox}>
-                            <Text style={styles.orderDetailsText}>{orderDetails.details}</Text>
-                        </View>
+                    {(orderDetails?.details || task.internalNotes) && (
+                        <>
+                            <Text style={[styles.sectionTitle, { marginTop: 12, marginBottom: 6 }]}>Detalii Suplimentare</Text>
+                            <View style={styles.orderDetailsBox}>
+                                <Text style={styles.orderDetailsText}>{orderDetails?.details || task.internalNotes}</Text>
+                            </View>
+                        </>
                     )}
                 </View>
 
@@ -407,41 +410,45 @@ const TaskDetails = () => {
                 </View>
             )}
 
-            {task.status === 'IN_PROGRESS' && hasPhotos && (
-                <View style={styles.bottomAction}>
-                    <Pressable
-                        style={({ pressed }) => [
-                            styles.actionButton,
-                            { backgroundColor: AppColors.successGreen },
-                            pressed && !completing && styles.buttonPressed,
-                            completing && { opacity: 0.7 }
-                        ]}
-                        onPress={handleCompleteTask}
-                        disabled={completing}
-                    >
-                        {completing ? (
-                            <>
-                                <ActivityIndicator size="small" color={AppColors.textWhite} />
-                                <Text style={styles.actionButtonText}>Se încarcă pozele...</Text>
-                            </>
-                        ) : (
-                            <>
-                                <Ionicons name="checkmark-circle" size={24} color={AppColors.textWhite} />
-                                <Text style={styles.actionButtonText}>Finalizează Sarcina</Text>
-                            </>
-                        )}
-                    </Pressable>
-                </View>
-            )}
+            {task.status === 'IN_PROGRESS' && (() => {
+                // Recurring sanitization tasks: photos are optional
+                const isRecurringSanitization = task.type === 'SANITIZATION' && task.recurringPlanId;
+                const canComplete = hasPhotos || isRecurringSanitization;
 
-            {task.status === 'IN_PROGRESS' && !hasPhotos && (
-                <View style={styles.bottomAction}>
-                    <View style={styles.noPhotosWarning}>
-                        <Ionicons name="camera-outline" size={20} color={AppColors.warningOrange} />
-                        <Text style={styles.noPhotosWarningText}>Adaugă poze pentru a putea finaliza sarcina</Text>
+                return canComplete ? (
+                    <View style={styles.bottomAction}>
+                        <Pressable
+                            style={({ pressed }) => [
+                                styles.actionButton,
+                                { backgroundColor: AppColors.successGreen },
+                                pressed && !completing && styles.buttonPressed,
+                                completing && { opacity: 0.7 }
+                            ]}
+                            onPress={handleCompleteTask}
+                            disabled={completing}
+                        >
+                            {completing ? (
+                                <>
+                                    <ActivityIndicator size="small" color={AppColors.textWhite} />
+                                    <Text style={styles.actionButtonText}>Se încarcă pozele...</Text>
+                                </>
+                            ) : (
+                                <>
+                                    <Ionicons name="checkmark-circle" size={24} color={AppColors.textWhite} />
+                                    <Text style={styles.actionButtonText}>Finalizează Sarcina</Text>
+                                </>
+                            )}
+                        </Pressable>
                     </View>
-                </View>
-            )}
+                ) : (
+                    <View style={styles.bottomAction}>
+                        <View style={styles.noPhotosWarning}>
+                            <Ionicons name="camera-outline" size={20} color={AppColors.warningOrange} />
+                            <Text style={styles.noPhotosWarningText}>Adaugă poze pentru a putea finaliza sarcina</Text>
+                        </View>
+                    </View>
+                );
+            })()}
 
             {task.status === 'COMPLETED' && (
                 <View style={styles.bottomAction}>

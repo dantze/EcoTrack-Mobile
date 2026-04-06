@@ -168,9 +168,9 @@ const DriverRoutes = () => {
                                 onPress={() => handleRoutePress(route)}
                             >
                                 <View style={styles.cardLeft}>
+                                    <Text style={styles.dayName}>{route.name || `Ruta #${route.id}`}</Text>
                                     <View style={styles.dateContainer}>
-                                        <Text style={styles.dayName}>{dayName}</Text>
-                                        <Text style={styles.dateText}>{date}</Text>
+                                        <Text style={styles.routeDay}>{dayName} • {date}</Text>
                                     </View>
                                 </View>
 
@@ -325,6 +325,11 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: AppColors.lightText,
         marginTop: 2,
+    },
+    routeDay: {
+        fontSize: 14,
+        color: AppColors.lightText,
+        fontWeight: '500',
     },
     cardRight: {
         alignItems: 'flex-end',

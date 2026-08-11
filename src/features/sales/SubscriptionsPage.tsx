@@ -1,17 +1,526 @@
 /**
- * Abonamente
+ * Abonamente — table over the Subscription model with an active/inactive
+ * filter; create and edit happen in a modal.
  *
- * TODO(sales-agent): implement. Placeholder so routing compiles and the shell is
- * navigable. Use DataTable from '@/components/ui' and the api from '@/api'.
+ * The backend has no deactivate endpoint in the contract, so "Dezactivează" is
+ * a normal update with `isActive: false` (the mobile app used a dedicated
+ * endpoint for the same effect).
  */
 
-import { EmptyState, PageHeader } from '@/components/ui';
+import { useMemo, useState } from 'react';
+import {
+  Badge,
+  Button,
+  DataTable,
+  EmptyState,
+  Modal,
+  PageHeader,
+  Select,
+  Tabs,
+  TextArea,
+  TextInput,
+  type Column,
+  type SelectOption,
+} from '@/components/ui';
+import { formatMoney } from '@/components/domain';
+import { SUBSCRIPTION_TYPES, type Subscription, type SubscriptionType } from '@/types/domain';
+import { ErrorNotice, FilterBar, FilterField, SearchInput } from './components/FilterBar';
+import { ToggleField } from './components/fields';
+import { Toaster, errorMessage, toast } from './components/Toaster';
+import { useConfirm } from './components/useConfirm';
+import {
+  useCreateSubscription,
+  useDeleteSubscription,
+  useSubscriptions,
+  useUpdateSubscription,
+  type SubscriptionInput,
+} from './queries';
+import {
+  parseDecimal,
+  validatePositiveInt,
+  validatePositiveNumber,
+  validateRequired,
+} from './validation';
+
+export const SUBSCRIPTION_TYPE_LABELS: Record<SubscriptionType, string> = {
+  ONE_TIME: 'O singură dată',
+  RECURRING: 'Recurent',
+};
+
+const TYPE_OPTIONS: SelectOption<string>[] = SUBSCRIPTION_TYPES.map((type) => ({
+  value: type,
+  label: SUBSCRIPTION_TYPE_LABELS[type],
+}));
+
+interface Draft {
+  name: string;
+  description: string;
+  type: SubscriptionType;
+  price: string;
+  visitsPerMonth: string;
+  durationMonths: string;
+  isIndefinite: boolean;
+  isActive: boolean;
+}
+
+const EMPTY_DRAFT: Draft = {
+  name: '',
+  description: '',
+  type: 'ONE_TIME',
+  price: '',
+  visitsPerMonth: '',
+  durationMonths: '',
+  isIndefinite: false,
+  isActive: true,
+};
+
+function draftFrom(subscription: Subscription): Draft {
+  return {
+    name: subscription.name,
+    description: subscription.description ?? '',
+    type: subscription.type,
+    price: subscription.price === null ? '' : String(subscription.price),
+    visitsPerMonth: subscription.visitsPerMonth?.toString() ?? '',
+    durationMonths: subscription.durationMonths?.toString() ?? '',
+    isIndefinite: subscription.isIndefinite ?? false,
+    isActive: subscription.isActive,
+  };
+}
+
+function validateDraft(draft: Draft): string | null {
+  const nameError = validateRequired(draft.name, 'Numele abonamentului');
+  if (nameError) return nameError;
+  const priceError = validatePositiveNumber(draft.price, 'Prețul');
+  if (priceError) return priceError;
+  if (draft.type === 'RECURRING') {
+    return validatePositiveInt(draft.visitsPerMonth, 'Numărul de vizite/lună');
+  }
+  return null;
+}
+
+function toInput(draft: Draft): SubscriptionInput {
+  const recurring = draft.type === 'RECURRING';
+  return {
+    name: draft.name.trim(),
+    description: draft.description.trim() || null,
+    type: draft.type,
+    price: parseDecimal(draft.price),
+    visitsPerMonth: recurring ? Number.parseInt(draft.visitsPerMonth, 10) : null,
+    durationMonths:
+      recurring && !draft.isIndefinite && draft.durationMonths.trim()
+        ? Number.parseInt(draft.durationMonths, 10)
+        : null,
+    isIndefinite: recurring ? draft.isIndefinite : null,
+    isActive: draft.isActive,
+  };
+}
+
+type StatusTab = 'all' | 'active' | 'inactive';
 
 export function SubscriptionsPage() {
+  const subscriptionsQuery = useSubscriptions(true);
+  const createSubscription = useCreateSubscription();
+  const updateSubscription = useUpdateSubscription();
+  const deleteSubscription = useDeleteSubscription();
+  const { confirm, confirmDialog } = useConfirm();
+
+  const [search, setSearch] = useState('');
+  const [tab, setTab] = useState<StatusTab>('all');
+  const [editing, setEditing] = useState<Subscription | null>(null);
+  const [draft, setDraft] = useState<Draft | null>(null);
+
+  const subscriptions = useMemo(
+    () => subscriptionsQuery.data ?? [],
+    [subscriptionsQuery.data],
+  );
+
+  const counts = useMemo(
+    () => ({
+      all: subscriptions.length,
+      active: subscriptions.filter((entry) => entry.isActive).length,
+      inactive: subscriptions.filter((entry) => !entry.isActive).length,
+    }),
+    [subscriptions],
+  );
+
+  const rows = useMemo(() => {
+    const needle = search.trim().toLowerCase();
+    return subscriptions.filter((subscription) => {
+      if (tab === 'active' && !subscription.isActive) return false;
+      if (tab === 'inactive' && subscription.isActive) return false;
+      if (!needle) return true;
+      return `${subscription.name} ${subscription.description ?? ''}`
+        .toLowerCase()
+        .includes(needle);
+    });
+  }, [subscriptions, search, tab]);
+
+  const openCreate = () => {
+    setEditing(null);
+    setDraft({ ...EMPTY_DRAFT });
+  };
+
+  const openEdit = (subscription: Subscription) => {
+    setEditing(subscription);
+    setDraft(draftFrom(subscription));
+  };
+
+  const closeModal = () => {
+    setEditing(null);
+    setDraft(null);
+  };
+
+  const save = async () => {
+    if (!draft) return;
+    const error = validateDraft(draft);
+    if (error) {
+      toast.error(error);
+      return;
+    }
+    try {
+      if (editing) {
+        await updateSubscription.mutateAsync({ id: editing.id, input: toInput(draft) });
+        toast.success('Abonamentul a fost actualizat.');
+      } else {
+        await createSubscription.mutateAsync(toInput(draft));
+        toast.success('Abonamentul a fost adăugat.');
+      }
+      closeModal();
+    } catch (mutationError) {
+      toast.error(errorMessage(mutationError, 'Nu s-a putut salva abonamentul'));
+    }
+  };
+
+  const toggleActive = async (subscription: Subscription) => {
+    const next = !subscription.isActive;
+    const confirmed = await confirm({
+      title: next ? 'Reactivează abonamentul?' : 'Dezactivează abonamentul?',
+      body: next
+        ? `„${subscription.name}” va redeveni disponibil pentru comenzi noi.`
+        : `„${subscription.name}” nu va mai apărea la comenzi noi. Comenzile existente nu sunt afectate.`,
+      confirmLabel: next ? 'Reactivează' : 'Dezactivează',
+      destructive: !next,
+    });
+    if (!confirmed) return;
+    try {
+      await updateSubscription.mutateAsync({
+        id: subscription.id,
+        input: { ...draftFromSubscriptionInput(subscription), isActive: next },
+      });
+      toast.success(next ? 'Abonamentul a fost reactivat.' : 'Abonamentul a fost dezactivat.');
+    } catch (error) {
+      toast.error(errorMessage(error, 'Nu s-a putut actualiza abonamentul'));
+    }
+  };
+
+  const remove = async (subscription: Subscription) => {
+    const confirmed = await confirm({
+      title: 'Șterge abonamentul?',
+      body: `„${subscription.name}” va fi șters definitiv.`,
+      confirmLabel: 'Șterge',
+      destructive: true,
+    });
+    if (!confirmed) return;
+    try {
+      await deleteSubscription.mutateAsync(subscription.id);
+      toast.success('Abonamentul a fost șters.');
+    } catch (error) {
+      toast.error(errorMessage(error, 'Nu s-a putut șterge abonamentul'));
+    }
+  };
+
+  const columns: Column<Subscription>[] = [
+    {
+      key: 'name',
+      header: 'Nume',
+      width: '18rem',
+      sortValue: (subscription) => subscription.name.toLowerCase(),
+      render: (subscription) => <span className="font-medium">{subscription.name}</span>,
+    },
+    {
+      key: 'type',
+      header: 'Tip',
+      width: '9rem',
+      sortValue: (subscription) => subscription.type,
+      render: (subscription) => (
+        <Badge tone={subscription.type === 'RECURRING' ? 'info' : 'neutral'}>
+          {SUBSCRIPTION_TYPE_LABELS[subscription.type]}
+        </Badge>
+      ),
+    },
+    {
+      key: 'description',
+      header: 'Descriere',
+      sortValue: (subscription) => (subscription.description ?? '').toLowerCase(),
+      render: (subscription) => (
+        <span className="block max-w-[24rem] truncate text-ink-muted">
+          {subscription.description ?? '—'}
+        </span>
+      ),
+    },
+    {
+      key: 'price',
+      header: 'Preț',
+      width: '8rem',
+      align: 'right',
+      sortValue: (subscription) => subscription.price,
+      render: (subscription) => <span className="tabular">{formatMoney(subscription.price)}</span>,
+    },
+    {
+      key: 'visits',
+      header: 'Vizite/lună',
+      width: '7rem',
+      align: 'right',
+      sortValue: (subscription) => subscription.visitsPerMonth,
+      render: (subscription) => (
+        <span className="tabular">{subscription.visitsPerMonth ?? '—'}</span>
+      ),
+    },
+    {
+      key: 'duration',
+      header: 'Durată',
+      width: '9rem',
+      sortValue: (subscription) =>
+        subscription.isIndefinite ? Number.MAX_SAFE_INTEGER : subscription.durationMonths,
+      render: (subscription) =>
+        subscription.isIndefinite
+          ? 'Nedeterminat'
+          : subscription.durationMonths
+            ? `${subscription.durationMonths} luni`
+            : '—',
+    },
+    {
+      key: 'status',
+      header: 'Stare',
+      width: '7rem',
+      sortValue: (subscription) => (subscription.isActive ? 'a' : 'b'),
+      render: (subscription) => (
+        <Badge tone={subscription.isActive ? 'success' : 'danger'}>
+          {subscription.isActive ? 'Activ' : 'Inactiv'}
+        </Badge>
+      ),
+    },
+    {
+      key: 'actions',
+      header: '',
+      width: '15rem',
+      align: 'right',
+      render: (subscription) => (
+        <span
+          role="presentation"
+          className="flex justify-end gap-1"
+          onClick={(event) => event.stopPropagation()}
+        >
+          <Button size="sm" variant="ghost" onClick={() => openEdit(subscription)}>
+            Editează
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => void toggleActive(subscription)}>
+            {subscription.isActive ? 'Dezactivează' : 'Reactivează'}
+          </Button>
+          <button
+            type="button"
+            className="px-1.5 text-xs font-medium text-red-600 hover:underline"
+            onClick={() => void remove(subscription)}
+          >
+            Șterge
+          </button>
+        </span>
+      ),
+    },
+  ];
+
+  const saving = createSubscription.isPending || updateSubscription.isPending;
+
   return (
     <>
-      <PageHeader title="Abonamente" />
-      <EmptyState title="Abonamente" body="Ecran neimplementat încă." />
+      <PageHeader
+        title="Abonamente"
+        subtitle={
+          subscriptionsQuery.isLoading
+            ? 'Se încarcă…'
+            : `${rows.length} din ${subscriptions.length} abonamente`
+        }
+        actions={
+          <>
+            <Button
+              variant="secondary"
+              loading={subscriptionsQuery.isFetching}
+              onClick={() => void subscriptionsQuery.refetch()}
+            >
+              Reîmprospătează
+            </Button>
+            <Button variant="primary" onClick={openCreate}>
+              + Abonament
+            </Button>
+          </>
+        }
+      />
+
+      <Tabs
+        active={tab}
+        onChange={(id) => setTab(id as StatusTab)}
+        items={[
+          { id: 'all', label: 'Toate', count: counts.all },
+          { id: 'active', label: 'Active', count: counts.active },
+          { id: 'inactive', label: 'Inactive', count: counts.inactive },
+        ]}
+      />
+
+      <FilterBar>
+        <FilterField label="Căutare">
+          <SearchInput value={search} onChange={setSearch} placeholder="Nume sau descriere" />
+        </FilterField>
+      </FilterBar>
+
+      {subscriptionsQuery.isError ? (
+        <ErrorNotice
+          message="Nu s-au putut prelua abonamentele."
+          onRetry={() => void subscriptionsQuery.refetch()}
+        />
+      ) : (
+        <DataTable
+          rows={rows}
+          columns={columns}
+          rowKey={(subscription) => subscription.id}
+          loading={subscriptionsQuery.isLoading}
+          activeKey={editing?.id ?? null}
+          onRowClick={openEdit}
+          empty={
+            <EmptyState
+              title="Nu există abonamente"
+              body="Adăugați un abonament pentru comenzile de igienizare."
+              action={
+                <Button variant="primary" onClick={openCreate}>
+                  + Abonament
+                </Button>
+              }
+            />
+          }
+        />
+      )}
+
+      <Modal
+        open={draft !== null}
+        onClose={closeModal}
+        width="md"
+        title={editing ? 'Editare abonament' : 'Abonament nou'}
+        footer={
+          <>
+            <Button variant="secondary" onClick={closeModal} disabled={saving}>
+              Anulează
+            </Button>
+            <Button variant="primary" loading={saving} onClick={() => void save()}>
+              {editing ? 'Salvează' : 'Adaugă'}
+            </Button>
+          </>
+        }
+      >
+        {draft && (
+          <div className="grid grid-cols-12 gap-3">
+            <div className="col-span-8">
+              <TextInput
+                label="Nume abonament"
+                required
+                value={draft.name}
+                placeholder="Ex: Igienizare lunară"
+                onChange={(event) => setDraft({ ...draft, name: event.target.value })}
+              />
+            </div>
+            <div className="col-span-4">
+              <TextInput
+                label="Preț (RON)"
+                required
+                inputMode="decimal"
+                value={draft.price}
+                onChange={(event) =>
+                  setDraft({ ...draft, price: event.target.value.replace(/[^\d.,]/g, '') })
+                }
+              />
+            </div>
+            <div className="col-span-12">
+              <TextArea
+                label="Descriere"
+                value={draft.description}
+                placeholder="Opțional"
+                onChange={(event) => setDraft({ ...draft, description: event.target.value })}
+              />
+            </div>
+            <div className="col-span-6">
+              <Select
+                label="Tip"
+                required
+                value={draft.type}
+                options={TYPE_OPTIONS}
+                onChange={(value) =>
+                  setDraft({ ...draft, type: value === 'RECURRING' ? 'RECURRING' : 'ONE_TIME' })
+                }
+              />
+            </div>
+            <div className="col-span-6">
+              <ToggleField
+                label="Activ"
+                checked={draft.isActive}
+                onChange={(isActive) => setDraft({ ...draft, isActive })}
+              />
+            </div>
+
+            {draft.type === 'RECURRING' && (
+              <>
+                <div className="col-span-4">
+                  <TextInput
+                    label="Vizite pe lună"
+                    required
+                    inputMode="numeric"
+                    value={draft.visitsPerMonth}
+                    onChange={(event) =>
+                      setDraft({
+                        ...draft,
+                        visitsPerMonth: event.target.value.replace(/\D/g, ''),
+                      })
+                    }
+                  />
+                </div>
+                <div className="col-span-4">
+                  <TextInput
+                    label="Durată (luni)"
+                    inputMode="numeric"
+                    disabled={draft.isIndefinite}
+                    value={draft.isIndefinite ? '' : draft.durationMonths}
+                    onChange={(event) =>
+                      setDraft({
+                        ...draft,
+                        durationMonths: event.target.value.replace(/\D/g, ''),
+                      })
+                    }
+                  />
+                </div>
+                <div className="col-span-4">
+                  <ToggleField
+                    label="Nedeterminat"
+                    checked={draft.isIndefinite}
+                    onChange={(isIndefinite) =>
+                      setDraft({
+                        ...draft,
+                        isIndefinite,
+                        durationMonths: isIndefinite ? '' : draft.durationMonths,
+                      })
+                    }
+                  />
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </Modal>
+
+      {confirmDialog}
+      <Toaster />
     </>
   );
+}
+
+/** Same subscription, minus the id — for updates that only flip `isActive`. */
+function draftFromSubscriptionInput(subscription: Subscription): SubscriptionInput {
+  const { id: _id, ...rest } = subscription;
+  return rest;
 }

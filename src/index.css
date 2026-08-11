@@ -6,19 +6,29 @@
  * Desktop back-office palette: cool slate neutrals, a single brand accent
  * carried over from the mobile app's splash (#16283C), and status colours that
  * map onto TaskStatus / order types. Density is tuned for tables, not touch.
+ *
+ * Light mode only — this is an internal back-office tool that lives on office
+ * monitors, and a second theme is surface area nobody asked for.
  */
 
 @theme {
+  /* Brand — navy. The single accent; everything else is neutral. */
   --color-brand-50: #eef4fb;
   --color-brand-100: #d6e4f2;
+  --color-brand-200: #b7cde8;
+  --color-brand-300: #8db0d6;
+  --color-brand-400: #5a86b5;
   --color-brand-500: #2c5a8f;
   --color-brand-600: #1f3f63;
   --color-brand-700: #16283c;
+  --color-brand-800: #11202f;
   --color-brand-900: #0d1826;
 
   --color-surface: #ffffff;
   --color-surface-sunken: #f6f8fa;
   --color-surface-raised: #ffffff;
+  /* Header/toolbar fill — a touch cooler than the page so tables read as a slab. */
+  --color-surface-header: #f1f5f9;
   --color-border: #e3e8ee;
   --color-border-strong: #cbd5e1;
 
@@ -30,12 +40,109 @@
   --color-status-progress: #b45309;
   --color-status-done: #15803d;
 
+  /* Semantic feedback ramps — used by Badge, Toast, validation states. */
+  --color-danger-50: #fef2f2;
+  --color-danger-100: #fee2e2;
+  --color-danger-200: #fecaca;
+  --color-danger-500: #ef4444;
+  --color-danger-600: #dc2626;
+  --color-danger-700: #b91c1c;
+
+  --color-success-50: #f0fdf4;
+  --color-success-100: #dcfce7;
+  --color-success-200: #bbf7d0;
+  --color-success-600: #16a34a;
+  --color-success-700: #15803d;
+
+  --color-warning-50: #fffbeb;
+  --color-warning-100: #fef3c7;
+  --color-warning-200: #fde68a;
+  --color-warning-600: #d97706;
+  --color-warning-700: #b45309;
+
+  --color-info-50: #eff6ff;
+  --color-info-100: #dbeafe;
+  --color-info-200: #bfdbfe;
+  --color-info-600: #2563eb;
+  --color-info-700: #1d4ed8;
+
   --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
   --font-mono: ui-monospace, 'SF Mono', 'Cascadia Code', monospace;
 
   --text-xs: 0.75rem;
   --text-sm: 0.8125rem;
   --text-base: 0.875rem;
+
+  /* Elevation. Overlays sit on a cool shadow so they read as glass over slate. */
+  --shadow-card: 0 1px 2px 0 rgb(15 23 42 / 0.04), 0 1px 3px 0 rgb(15 23 42 / 0.06);
+  --shadow-popover:
+    0 12px 32px -12px rgb(15 23 42 / 0.28), 0 2px 8px -3px rgb(15 23 42 / 0.14);
+  --shadow-modal:
+    0 24px 64px -20px rgb(15 23 42 / 0.35), 0 4px 12px -6px rgb(15 23 42 / 0.16);
+  --shadow-panel: -18px 0 56px -28px rgb(15 23 42 / 0.4);
+  --shadow-toast:
+    0 10px 28px -12px rgb(15 23 42 / 0.3), 0 2px 6px -3px rgb(15 23 42 / 0.16);
+  /* Sticky table header lifts off the rows once the body scrolls under it. */
+  --shadow-sticky: 0 1px 0 0 var(--color-border), 0 6px 12px -10px rgb(15 23 42 / 0.5);
+
+  --animate-fade-in: ui-fade-in 120ms ease-out;
+  --animate-scale-in: ui-scale-in 140ms cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-slide-left: ui-slide-left 180ms cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-slide-up: ui-slide-up 160ms cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-toast-in: ui-toast-in 200ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes ui-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes ui-scale-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px) scale(0.985);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes ui-slide-left {
+  from {
+    transform: translateX(2rem);
+    opacity: 0.4;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes ui-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes ui-toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(1.5rem) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
 }
 
 html,
@@ -53,7 +160,56 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+@layer base {
+  ::selection {
+    background: var(--color-brand-100);
+    color: var(--color-brand-900);
+  }
+
+  /* Thin, quiet scrollbars — dense tables scroll a lot and chrome-heavy bars
+     eat into the data. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-border-strong) transparent;
+  }
+
+  ::-webkit-scrollbar {
+    width: 11px;
+    height: 11px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background-color: var(--color-border-strong);
+    background-clip: content-box;
+    border: 3px solid transparent;
+    border-radius: 9999px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: var(--color-ink-subtle);
+    background-clip: content-box;
+  }
+
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+}
+
 /* Tabular figures everywhere numbers line up in columns. */
 .tabular {
   font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }

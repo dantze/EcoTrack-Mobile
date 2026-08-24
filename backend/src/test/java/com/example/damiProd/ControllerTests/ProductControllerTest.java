@@ -5,6 +5,7 @@ import com.example.damiProd.domain.Product;
 import com.example.damiProd.service.ProductService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -18,6 +19,10 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(ProductController.class)
+// Security filters are disabled in this slice: this test targets controller/service
+// wiring, not auth. @WebMvcTest does not pick up the app's own SecurityConfig, so
+// without this the default Spring Boot Security auto-config would 401 everything.
+@AutoConfigureMockMvc(addFilters = false)
 class ProductControllerTest {
 
     @Autowired

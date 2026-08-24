@@ -6,6 +6,7 @@ import com.example.damiProd.dto.CreateEmployeeRequest;
 import com.example.damiProd.dto.EmployeeResponse;
 import com.example.damiProd.repository.EmployeeRepository;
 import com.example.damiProd.repository.EmployeeRoleRepository;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,11 +21,14 @@ public class AdminService {
 
     private final EmployeeRepository employeeRepository;
     private final EmployeeRoleRepository employeeRoleRepository;
+    private final PasswordEncoder passwordEncoder;
 
     public AdminService(EmployeeRepository employeeRepository,
-            EmployeeRoleRepository employeeRoleRepository) {
+            EmployeeRoleRepository employeeRoleRepository,
+            PasswordEncoder passwordEncoder) {
         this.employeeRepository = employeeRepository;
         this.employeeRoleRepository = employeeRoleRepository;
+        this.passwordEncoder = passwordEncoder;
     }
 
     /**
@@ -56,10 +60,11 @@ public class AdminService {
 
         Employee employee = new Employee();
         employee.setUsername(request.getUsername());
-        employee.setPassword(request.getPassword());
+        employee.setPassword(passwordEncoder.encode(request.getPassword()));
         employee.setFullName(request.getFullName());
         employee.setPhone(request.getPhone());
         employee.setCounty(request.getCounty());
+        employee.setEmail(request.getEmail());
 
         // Save employee first
         Employee saved = employeeRepository.save(employee);
@@ -94,7 +99,7 @@ public class AdminService {
                 employee.setUsername(request.getUsername());
             }
             if (request.getPassword() != null && !request.getPassword().isEmpty()) {
-                employee.setPassword(request.getPassword());
+                employee.setPassword(passwordEncoder.encode(request.getPassword()));
             }
             if (request.getFullName() != null) {
                 employee.setFullName(request.getFullName());
@@ -104,6 +109,9 @@ public class AdminService {
             }
             if (request.getCounty() != null) {
                 employee.setCounty(request.getCounty());
+            }
+            if (request.getEmail() != null) {
+                employee.setEmail(request.getEmail());
             }
 
             // Update roles if provided

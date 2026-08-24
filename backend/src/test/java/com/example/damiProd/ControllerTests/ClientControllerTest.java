@@ -6,6 +6,7 @@ import com.example.damiProd.domain.Individual;
 import com.example.damiProd.service.ClientService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.http.MediaType;
@@ -23,6 +24,10 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 // Spring context or connect to a database — making tests fast and focused.
 // We supply a fake (mock) ClientService so tests never touch real data.
 @WebMvcTest(ClientController.class)
+// Security filters are disabled in this slice: this test targets controller/service
+// wiring, not auth. @WebMvcTest does not pick up the app's own SecurityConfig, so
+// without this the default Spring Boot Security auto-config would 401 everything.
+@AutoConfigureMockMvc(addFilters = false)
 class ClientControllerTest {
 
     // MockMvc lets us fire fake HTTP requests at the controller and inspect

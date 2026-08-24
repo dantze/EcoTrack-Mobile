@@ -1,6 +1,7 @@
 /**
- * EmployeeController — /api/employees   (reads, no key)
- * AdminController    — /api/admin/employees (writes, X-Admin-Key required)
+ * EmployeeController — /api/employees        (reads, any authenticated user)
+ * AdminController    — /api/admin/employees   (writes, requires an admin role
+ *                       on the caller's access token — see src/api/http.ts)
  *
  * Two traps here:
  *  1. The read endpoints return the JPA *entity*, whose `roles` is a list of
@@ -75,7 +76,6 @@ export const employeesApi: EmployeesApi = {
     const raw = await request<RawEmployee>('/admin/employees', {
       method: 'POST',
       body: toCreateBody(input),
-      admin: true,
     });
     return normalizeEmployee(raw);
   },
@@ -84,13 +84,12 @@ export const employeesApi: EmployeesApi = {
     const raw = await request<RawEmployee>(`/admin/employees/${id}`, {
       method: 'PUT',
       body: toCreateBody(input),
-      admin: true,
     });
     return normalizeEmployee(raw);
   },
 
   async remove(id: number): Promise<void> {
     // Answers 200 with {message}, not 204 — request() tolerates both.
-    await request<void>(`/admin/employees/${id}`, { method: 'DELETE', admin: true });
+    await request<void>(`/admin/employees/${id}`, { method: 'DELETE' });
   },
 };

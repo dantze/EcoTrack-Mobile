@@ -128,18 +128,18 @@ function normalise(value: string): string {
 // Errors
 // ---------------------------------------------------------------------------
 
-/** True for the 401/403 the backend returns when X-Admin-Key is missing/wrong. */
+/** True for the 401/403 the backend returns when the caller's role lacks admin rights. */
 export function isAdminAuthError(error: unknown): boolean {
   return error instanceof ApiError && (error.status === 401 || error.status === 403);
 }
 
-export const ADMIN_KEY_MESSAGE =
-  'Operațiunile pe angajați necesită cheia de administrator (VITE_ADMIN_KEY). ' +
-  'Cheia lipsește sau este invalidă, așa că serverul a refuzat cererea.';
+export const ADMIN_FORBIDDEN_MESSAGE =
+  'Operațiunile pe angajați necesită drepturi de administrator. ' +
+  'Contul tău nu are drepturile necesare, așa că serverul a refuzat cererea.';
 
 /** A Romanian, user-facing message for any thrown value. */
 export function errorMessage(error: unknown): string {
-  if (isAdminAuthError(error)) return ADMIN_KEY_MESSAGE;
+  if (isAdminAuthError(error)) return ADMIN_FORBIDDEN_MESSAGE;
   if (error instanceof ApiError) {
     if (error.status === 404) return 'Resursa nu a fost găsită pe server.';
     if (error.status >= 500) return 'Serverul a returnat o eroare. Încearcă din nou.';
@@ -147,4 +147,30 @@ export function errorMessage(error: unknown): string {
   }
   if (error instanceof Error && error.message) return error.message;
   return 'A apărut o eroare neașteptată.';
+}
+
+// ---------------------------------------------------------------------------
+// Failed-submit focus
+// ---------------------------------------------------------------------------
+
+/**
+ * Moves focus to the first field named in `errors`, keyed by that field's DOM
+ * `id` — a failed submit should land the cursor on the problem, not just toast
+ * about it. Only reaches `TextInput`/`TextArea` fields: `Select` and
+ * `DateInput` do not accept an explicit `id` from the UI kit today, so a key
+ * that names one of those simply finds no element and no-ops. The inline error
+ * text under the field still renders either way.
+ *
+ * Reads through `Object.entries` (rather than typing the parameter as
+ * `Record<string, string | undefined>` directly) so callers can pass their own
+ * named `Errors` interface without needing an index signature on it.
+ */
+export function focusFirstInvalidField(errors: object): void {
+  const [key] = Object.entries(errors).find(
+    ([, message]) => typeof message === 'string' && message,
+  ) ?? [];
+  if (!key) return;
+  requestAnimationFrame(() => {
+    document.getElementById(key)?.focus();
+  });
 }

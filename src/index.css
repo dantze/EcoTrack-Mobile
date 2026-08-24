@@ -34,7 +34,10 @@
 
   --color-ink: #0f172a;
   --color-ink-muted: #64748b;
-  --color-ink-subtle: #94a3b8;
+  /* Was #94a3b8 (2.6:1 on white) — failed WCAG AA for the placeholder, hint,
+     and empty-cell text it's used for. Darkened to clear 4.5:1; see the a11y
+     pass notes for the full contrast audit. */
+  --color-ink-subtle: #66768d;
 
   --color-status-new: #64748b;
   --color-status-progress: #b45309;

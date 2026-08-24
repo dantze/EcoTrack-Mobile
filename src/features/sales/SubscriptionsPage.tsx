@@ -36,6 +36,7 @@ import {
   type SubscriptionInput,
 } from './queries';
 import {
+  focusFirstInvalidField,
   parseDecimal,
   validatePositiveInt,
   validatePositiveNumber,
@@ -87,15 +88,28 @@ function draftFrom(subscription: Subscription): Draft {
   };
 }
 
-function validateDraft(draft: Draft): string | null {
+/** Field-keyed so each box gets its own inline message instead of one toast. */
+interface DraftErrors {
+  name?: string;
+  price?: string;
+  visitsPerMonth?: string;
+}
+
+function validateDraft(draft: Draft): DraftErrors {
+  const errors: DraftErrors = {};
   const nameError = validateRequired(draft.name, 'Numele abonamentului');
-  if (nameError) return nameError;
+  if (nameError) errors.name = nameError;
   const priceError = validatePositiveNumber(draft.price, 'Prețul');
-  if (priceError) return priceError;
+  if (priceError) errors.price = priceError;
   if (draft.type === 'RECURRING') {
-    return validatePositiveInt(draft.visitsPerMonth, 'Numărul de vizite/lună');
+    const visitsError = validatePositiveInt(draft.visitsPerMonth, 'Numărul de vizite/lună');
+    if (visitsError) errors.visitsPerMonth = visitsError;
   }
-  return null;
+  return errors;
+}
+
+function hasDraftErrors(errors: DraftErrors): boolean {
+  return Object.values(errors).some(Boolean);
 }
 
 function toInput(draft: Draft): SubscriptionInput {
@@ -128,6 +142,7 @@ export function SubscriptionsPage() {
   const [tab, setTab] = useState<StatusTab>('all');
   const [editing, setEditing] = useState<Subscription | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
+  const [draftErrors, setDraftErrors] = useState<DraftErrors>({});
 
   const subscriptions = useMemo(
     () => subscriptionsQuery.data ?? [],
@@ -158,23 +173,28 @@ export function SubscriptionsPage() {
   const openCreate = () => {
     setEditing(null);
     setDraft({ ...EMPTY_DRAFT });
+    setDraftErrors({});
   };
 
   const openEdit = (subscription: Subscription) => {
     setEditing(subscription);
     setDraft(draftFrom(subscription));
+    setDraftErrors({});
   };
 
   const closeModal = () => {
     setEditing(null);
     setDraft(null);
+    setDraftErrors({});
   };
 
   const save = async () => {
     if (!draft) return;
-    const error = validateDraft(draft);
-    if (error) {
-      toast.error(error);
+    const found = validateDraft(draft);
+    setDraftErrors(found);
+    if (hasDraftErrors(found)) {
+      toast.error('Verificați câmpurile marcate.');
+      focusFirstInvalidField(found);
       return;
     }
     try {
@@ -330,6 +350,11 @@ export function SubscriptionsPage() {
   ];
 
   const saving = createSubscription.isPending || updateSubscription.isPending;
+  const filtersActive = tab !== 'all' || search !== '';
+  const resetFilters = () => {
+    setTab('all');
+    setSearch('');
+  };
 
   return (
     <>
@@ -382,17 +407,28 @@ export function SubscriptionsPage() {
           rows={rows}
           columns={columns}
           rowKey={(subscription) => subscription.id}
+          initialSort={{ key: 'name', dir: 'asc' }}
           loading={subscriptionsQuery.isLoading}
           activeKey={editing?.id ?? null}
           onRowClick={openEdit}
           empty={
             <EmptyState
-              title="Nu există abonamente"
-              body="Adăugați un abonament pentru comenzile de igienizare."
+              title={filtersActive ? 'Niciun abonament pentru filtrele curente' : 'Nu există abonamente'}
+              body={
+                filtersActive
+                  ? 'Modifică fila sau căutarea, ori resetează filtrele.'
+                  : 'Adăugați primul abonament pentru comenzile de igienizare.'
+              }
               action={
-                <Button variant="primary" onClick={openCreate}>
-                  + Abonament
-                </Button>
+                filtersActive ? (
+                  <Button variant="secondary" onClick={resetFilters}>
+                    Resetează filtrele
+                  </Button>
+                ) : (
+                  <Button variant="primary" onClick={openCreate}>
+                    + Abonament
+                  </Button>
+                )
               }
             />
           }
@@ -419,19 +455,23 @@ export function SubscriptionsPage() {
           <div className="grid grid-cols-12 gap-3">
             <div className="col-span-8">
               <TextInput
+                id="name"
                 label="Nume abonament"
                 required
                 value={draft.name}
+                error={draftErrors.name}
                 placeholder="Ex: Igienizare lunară"
                 onChange={(event) => setDraft({ ...draft, name: event.target.value })}
               />
             </div>
             <div className="col-span-4">
               <TextInput
+                id="price"
                 label="Preț (RON)"
                 required
                 inputMode="decimal"
                 value={draft.price}
+                error={draftErrors.price}
                 onChange={(event) =>
                   setDraft({ ...draft, price: event.target.value.replace(/[^\d.,]/g, '') })
                 }
@@ -468,10 +508,12 @@ export function SubscriptionsPage() {
               <>
                 <div className="col-span-4">
                   <TextInput
+                    id="visitsPerMonth"
                     label="Vizite pe lună"
                     required
                     inputMode="numeric"
                     value={draft.visitsPerMonth}
+                    error={draftErrors.visitsPerMonth}
                     onChange={(event) =>
                       setDraft({
                         ...draft,

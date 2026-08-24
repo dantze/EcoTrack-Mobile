@@ -18,6 +18,7 @@
 import type { Client, Employee, Product, Role, Subscription, TaskStatus, TaskType } from '@/types/domain';
 import { clientName } from '@/types/domain';
 import type {
+  AuthSessionRow,
   CredentialRow,
   MockDb,
   OrderRow,
@@ -347,6 +348,9 @@ export function createSeedDb(): MockDb {
     employeeId: employee.id,
     username: employee.username,
     password: MOCK_PASSWORD,
+    // The Employee entity has no email field; auth is the only consumer, so
+    // it lives on the credential row instead. Deterministic from the seed.
+    email: `${employee.username}@ecotrack.ro`,
   }));
   const drivers = employees.filter((e) => e.roles.includes('DRIVER'));
 
@@ -730,6 +734,30 @@ export function createSeedDb(): MockDb {
     });
   }
 
+  // --- Auth sessions --------------------------------------------------------
+  // A demo device or two per employee so "Sesiuni active" has something to
+  // show and revoke on first login, rather than a lone current session.
+  const authSessions: AuthSessionRow[] = [];
+  let sessionId = 0;
+  const DEMO_DEVICES = ['Chrome · Windows', 'Aplicație mobilă · Android', 'Safari · iPhone'] as const;
+
+  for (const employee of employees) {
+    if (!chance(0.6)) continue;
+    sessionId += 1;
+    const createdAt = addDays(TODAY, -int(2, 30));
+    authSessions.push({
+      id: sessionId,
+      employeeId: employee.id,
+      // Never matches a real localStorage value, so it always shows as a
+      // revocable "other" device rather than the current one.
+      refreshToken: `mock.refresh.seed.${sessionId}`,
+      device: pick(DEMO_DEVICES),
+      createdAt: isoInstant(createdAt, int(8, 20)),
+      lastUsedAt: isoInstant(addDays(createdAt, int(0, 5)), int(8, 20)),
+      revoked: false,
+    });
+  }
+
   // --- Compact orderIndex per route --------------------------------------
   for (const route of routes) {
     tasks
@@ -750,6 +778,7 @@ export function createSeedDb(): MockDb {
     tasks,
     orders,
     recurring,
+    authSessions,
     seq: {
       client: clients.length,
       product: products.length,
@@ -761,6 +790,7 @@ export function createSeedDb(): MockDb {
       orderNumber,
       recurring: recurring.length,
       photo: taskId * 10 + 10,
+      session: sessionId,
     },
   };
 }
@@ -770,3 +800,10 @@ export const MOCK_CREDENTIALS_HINT = {
   username: EMPLOYEE_SEED[0]!.username,
   password: MOCK_PASSWORD,
 };
+
+/**
+ * The account "Continuă cu Google" signs in as, in mock mode. A different
+ * employee than MOCK_CREDENTIALS_HINT (SALES + TECH instead of SALES-only) so
+ * trying both buttons exercises different role gating.
+ */
+export const MOCK_GOOGLE_DEMO_USERNAME = EMPLOYEE_SEED[3]!.username;

@@ -119,3 +119,29 @@ export function splitPhone(raw: string | null | undefined): SplitPhone {
 export function joinPhone(code: string, digits: string): string {
   return `${code}${digits.trim()}`;
 }
+
+// ---------------------------------------------------------------------------
+// Failed-submit focus
+// ---------------------------------------------------------------------------
+
+/**
+ * Moves focus to the first field named in `errors`, keyed by that field's DOM
+ * `id` — a failed submit should land the cursor on the problem, not just toast
+ * about it. Only reaches `TextInput`/`TextArea` fields: `Select` and
+ * `DateInput` do not accept an explicit `id` from the UI kit today, so a key
+ * that names one of those simply finds no element and no-ops. The inline error
+ * text under the field still renders either way.
+ *
+ * Reads through `Object.entries` (rather than typing the parameter as
+ * `Record<string, string | undefined>` directly) so callers can pass their own
+ * named `Errors` interface without needing an index signature on it.
+ */
+export function focusFirstInvalidField(errors: object): void {
+  const [key] = Object.entries(errors).find(
+    ([, message]) => typeof message === 'string' && message,
+  ) ?? [];
+  if (!key) return;
+  requestAnimationFrame(() => {
+    document.getElementById(key)?.focus();
+  });
+}

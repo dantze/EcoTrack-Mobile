@@ -1,12 +1,20 @@
 /**
  * Thin fetch wrapper for the live backend.
  *
- * Deliberately minimal: the backend has no auth tokens (login returns a user
- * object and nothing else), CORS is already `*`, and every endpoint speaks
- * plain JSON except the two multipart photo uploads.
+ * Every endpoint speaks plain JSON except the two multipart photo uploads.
+ *
+ * Auth: the access token currently held by the auth module (in memory only —
+ * see src/auth/tokenBridge.ts) is attached as `Authorization: Bearer <token>`
+ * to every request that has one available, including the admin endpoints —
+ * /api/admin/** is authorised by the caller's role inside that token now,
+ * not by a shared secret. A 401 from anything other than the /auth/**
+ * endpoints themselves triggers exactly one silent refresh-and-retry; if the
+ * refresh also fails, the caller sees the original 401 and the auth module's
+ * own failure handling logs the user out.
  */
 
-import { ADMIN_KEY, API_BASE_URL } from '@/lib/config';
+import { API_BASE_URL } from '@/lib/config';
+import { getAccessToken, refreshAccessToken } from '@/auth/tokenBridge';
 
 export class ApiError extends Error {
   constructor(
@@ -23,20 +31,20 @@ interface RequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   /** Serialised as JSON. Pass FormData to send multipart instead. */
   body?: unknown;
-  /** Adds the X-Admin-Key header required by /api/admin/**. */
-  admin?: boolean;
   signal?: AbortSignal;
 }
 
-export async function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
-  const { method = 'GET', body, admin = false, signal } = options;
+async function attempt<T>(path: string, options: RequestOptions, isRetry: boolean): Promise<T> {
+  const { method = 'GET', body, signal } = options;
 
   const headers: Record<string, string> = { Accept: 'application/json' };
   const isFormData = body instanceof FormData;
 
   // Let the browser set Content-Type for multipart so the boundary is correct.
   if (body !== undefined && !isFormData) headers['Content-Type'] = 'application/json';
-  if (admin && ADMIN_KEY) headers['X-Admin-Key'] = ADMIN_KEY;
+
+  const token = getAccessToken();
+  if (token) headers['Authorization'] = `Bearer ${token}`;
 
   const response = await fetch(`${API_BASE_URL}${path}`, {
     method,
@@ -48,6 +56,14 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
   const text = await response.text();
 
   if (!response.ok) {
+    // /auth/** handles its own 401s (a bad login/refresh is an expected
+    // outcome, not a lapsed session) — never loop a refresh-retry through it.
+    const isAuthEndpoint = path.startsWith('/auth/');
+    if (response.status === 401 && !isRetry && !isAuthEndpoint) {
+      const refreshed = await refreshAccessToken();
+      if (refreshed) return attempt<T>(path, options, true);
+    }
+
     throw new ApiError(
       `${method} ${path} failed with ${response.status}`,
       response.status,
@@ -64,4 +80,8 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     // A few endpoints (photo upload/delete) return a bare string message.
     return text as T;
   }
+}
+
+export function request<T>(path: string, options: RequestOptions = {}): Promise<T> {
+  return attempt<T>(path, options, false);
 }

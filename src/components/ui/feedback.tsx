@@ -283,12 +283,14 @@ export function ConfirmHost() {
       onClose={() => answerConfirm(current.id, false)}
       footer={
         <>
-          <Button variant="ghost" onClick={() => answerConfirm(current.id, false)}>
+          {/* Cancel gets the initial focus, not the confirm action — Enter or a
+              stray Space should never fire a destructive (or any) action the
+              user hasn't deliberately reached for. */}
+          <Button variant="ghost" data-autofocus onClick={() => answerConfirm(current.id, false)}>
             {cancelLabel}
           </Button>
           <Button
             variant={destructive ? 'danger' : 'primary'}
-            data-autofocus
             onClick={() => answerConfirm(current.id, true)}
           >
             {confirmLabel}

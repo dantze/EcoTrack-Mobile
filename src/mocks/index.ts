@@ -22,20 +22,24 @@
 
 import { MOCK_LATENCY_MS } from '@/lib/config';
 import type {
+  AuthSession,
+  AuthTokens,
   ClientInput,
   CreateEmployeeInput,
   CreateRouteInput,
   CreateTaskInput,
   EcoTrackApi,
+  LoginOutcome,
   OrderInput,
   OrderTaskStatus,
+  SessionDevice,
 } from '@/api/contract';
-import { clearSession, readSession, saveSession } from '@/api/live/session';
+import { readRefreshToken } from '@/auth/storage';
+import { getAccessToken } from '@/auth/tokenBridge';
 import type {
   AuthUser,
   Client,
   Employee,
-  LoginResponse,
   Product,
   RecurringIgienizare,
   Role,
@@ -63,10 +67,13 @@ import {
   notFound,
   placeOnRoute,
   tasksOfRoute,
+  type AuthSessionRow,
+  type CredentialRow,
   type OrderRow,
   type RecurringRow,
   type TaskRow,
 } from './store';
+import { MOCK_GOOGLE_DEMO_USERNAME } from './seed';
 
 // ---------------------------------------------------------------------------
 // Latency
@@ -140,37 +147,166 @@ const addDays = (date: Date, days: number): Date => new Date(date.getTime() + da
 // ---------------------------------------------------------------------------
 // Auth
 // ---------------------------------------------------------------------------
+//
+// Mocks the same token handshake the live backend performs: login/Google
+// hand back an access + refresh token pair, refresh rotates the refresh
+// token (the old value dies), and "who is this access token for" is decoded
+// from the token itself rather than looked up in any session store — there
+// isn't one, by design (see src/auth/storage.ts).
+//
+// Token formats are mock-only and never leave this file:
+//   accessToken  "mock.access.<employeeId>.<issuedAtMs>"
+//   refreshToken "mock.refresh.<sessionRowId>.<random>"
+
+/** Matches the live backend's ~30 minute access token TTL. */
+const ACCESS_TTL_SECONDS = 30 * 60;
+
+function makeAccessToken(employeeId: number): string {
+  return `mock.access.${employeeId}.${Date.now()}`;
+}
+
+function employeeIdFromAccessToken(token: string | null): number | null {
+  if (!token) return null;
+  const parts = token.split('.');
+  if (parts.length !== 4 || parts[0] !== 'mock' || parts[1] !== 'access') return null;
+  const id = Number(parts[2]);
+  return Number.isFinite(id) ? id : null;
+}
+
+function makeRefreshToken(sessionId: number): string {
+  return `mock.refresh.${sessionId}.${Math.random().toString(36).slice(2)}`;
+}
+
+function toAuthUser(employee: Employee, credential: CredentialRow): AuthUser {
+  return {
+    id: employee.id,
+    username: employee.username,
+    fullName: employee.fullName,
+    phone: employee.phone,
+    county: employee.county,
+    email: credential.email,
+    roles: [...employee.roles],
+  };
+}
+
+/** Requires an access token on the bridge that decodes to a live employee. */
+function currentEmployee(): { employee: Employee; credential: CredentialRow } {
+  const employeeId = employeeIdFromAccessToken(getAccessToken());
+  const employee = employeeId === null ? undefined : db.employees.find((e) => e.id === employeeId);
+  const credential = employee && db.credentials.find((c) => c.employeeId === employee.id);
+  if (!employee || !credential) throw new MockApiError('Neautentificat', 401);
+  return { employee, credential };
+}
+
+function issueSession(employee: Employee, credential: CredentialRow, device = 'Acest browser'): AuthSession {
+  const id = nextId('session');
+  const now = new Date().toISOString();
+  const row: AuthSessionRow = {
+    id,
+    employeeId: employee.id,
+    refreshToken: makeRefreshToken(id),
+    device,
+    createdAt: now,
+    lastUsedAt: now,
+    revoked: false,
+  };
+  db.authSessions.push(row);
+
+  return {
+    user: toAuthUser(employee, credential),
+    tokens: { accessToken: makeAccessToken(employee.id), refreshToken: row.refreshToken, expiresIn: ACCESS_TTL_SECONDS },
+  };
+}
 
 const authApi: EcoTrackApi['auth'] = {
-  async login(username: string, password: string): Promise<LoginResponse> {
-    return respond(() => {
+  login(username: string, password: string): Promise<LoginOutcome> {
+    return respond((): LoginOutcome => {
       const credential = db.credentials.find((row) => row.username === username);
-      if (!credential) return { message: 'Utilizator inexistent', success: false };
-      if (credential.password !== password) return { message: 'Parolă incorectă', success: false };
+      if (!credential) return { success: false, message: 'Utilizator inexistent' };
+      if (credential.password !== password) return { success: false, message: 'Parolă incorectă' };
 
       const employee = db.employees.find((e) => e.id === credential.employeeId);
-      if (!employee) return { message: 'Utilizator inexistent', success: false };
+      if (!employee) return { success: false, message: 'Utilizator inexistent' };
 
-      const user: AuthUser = {
-        id: employee.id,
-        username: employee.username,
-        fullName: employee.fullName,
-        phone: employee.phone,
-        county: employee.county,
-        roles: [...employee.roles],
-      };
-      saveSession(user);
-
-      return { ...user, message: 'Autentificare reușită', success: true };
+      return { success: true, message: 'Autentificare reușită', session: issueSession(employee, credential) };
     });
   },
 
-  currentUser(): AuthUser | null {
-    return readSession();
+  loginWithGoogle(): Promise<LoginOutcome> {
+    // The mock never inspects the idToken — the demo Google button always
+    // signs in as the same seeded account (see MOCK_GOOGLE_DEMO_USERNAME).
+    return respond((): LoginOutcome => {
+      const credential = db.credentials.find((row) => row.username === MOCK_GOOGLE_DEMO_USERNAME);
+      const employee = credential && db.employees.find((e) => e.id === credential.employeeId);
+      if (!credential || !employee) {
+        return { success: false, message: 'Contul Google nu este asociat niciunui angajat.' };
+      }
+      return {
+        success: true,
+        message: 'Autentificare reușită',
+        session: issueSession(employee, credential, 'Cont Google (demo)'),
+      };
+    });
   },
 
-  logout(): void {
-    clearSession();
+  refresh(refreshToken: string): Promise<AuthTokens> {
+    return respond((): AuthTokens => {
+      const row = db.authSessions.find((s) => s.refreshToken === refreshToken && !s.revoked);
+      if (!row) throw new MockApiError('Token de reîmprospătare invalid', 401);
+
+      // Rotate, exactly like the real backend — the old value dies here.
+      row.refreshToken = makeRefreshToken(row.id);
+      row.lastUsedAt = new Date().toISOString();
+      return { accessToken: makeAccessToken(row.employeeId), refreshToken: row.refreshToken, expiresIn: ACCESS_TTL_SECONDS };
+    });
+  },
+
+  logout(refreshToken: string | null): Promise<void> {
+    return respond(() => {
+      const row = refreshToken && db.authSessions.find((s) => s.refreshToken === refreshToken);
+      if (row) row.revoked = true;
+    });
+  },
+
+  me(): Promise<AuthUser> {
+    return respond(() => {
+      const { employee, credential } = currentEmployee();
+      return toAuthUser(employee, credential);
+    });
+  },
+
+  listSessions(): Promise<SessionDevice[]> {
+    return respond((): SessionDevice[] => {
+      const { employee } = currentEmployee();
+      const mine = readRefreshToken();
+      return db.authSessions
+        .filter((row) => row.employeeId === employee.id && !row.revoked)
+        .map((row) => ({
+          id: String(row.id),
+          device: row.device,
+          createdAt: row.createdAt,
+          lastUsedAt: row.lastUsedAt,
+          current: row.refreshToken === mine,
+        }));
+    });
+  },
+
+  revokeSession(id: string): Promise<void> {
+    return respond(() => {
+      const { employee } = currentEmployee();
+      const row = db.authSessions.find((s) => String(s.id) === id && s.employeeId === employee.id);
+      if (row) row.revoked = true;
+    });
+  },
+
+  revokeOtherSessions(): Promise<void> {
+    return respond(() => {
+      const { employee } = currentEmployee();
+      const mine = readRefreshToken();
+      for (const row of db.authSessions) {
+        if (row.employeeId === employee.id && row.refreshToken !== mine) row.revoked = true;
+      }
+    });
   },
 };
 
@@ -559,6 +695,7 @@ const employeesApi: EcoTrackApi['employees'] = {
         employeeId: employee.id,
         username: input.username,
         password: input.password,
+        email: `${input.username}@ecotrack.ro`,
       });
       return cloneEmployee(employee);
     }),

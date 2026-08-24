@@ -380,7 +380,7 @@ export function useDeactivateRecurring(): UseMutationResult<
 }
 
 // ---------------------------------------------------------------------------
-// Mutations — employees (admin endpoints, need VITE_ADMIN_KEY)
+// Mutations — employees (admin endpoints, need the admin role on the caller's token)
 // ---------------------------------------------------------------------------
 
 function useEmployeeInvalidation() {

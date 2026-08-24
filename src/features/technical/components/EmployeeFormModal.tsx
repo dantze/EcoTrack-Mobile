@@ -2,9 +2,10 @@
  * Create / edit an employee.
  *
  * These are the only screens in the Technical module that hit `/api/admin/**`,
- * which needs the X-Admin-Key header from VITE_ADMIN_KEY. When the key is
- * missing the backend answers 401 — the dialog surfaces that as a plain
- * Romanian explanation instead of letting the error bubble out.
+ * which requires the admin role on the caller's Bearer token. When the
+ * signed-in account lacks that role the backend answers 401/403 — the dialog
+ * surfaces that as a plain Romanian explanation instead of letting the error
+ * bubble out.
  */
 
 import { useEffect, useState } from 'react';
@@ -14,7 +15,7 @@ import { ROLE_LABELS } from '@/components/domain';
 import { ROLES } from '@/types/domain';
 import type { Employee, Role } from '@/types/domain';
 import { COUNTY_OPTIONS } from '../constants';
-import { errorMessage, isAdminAuthError } from '../utils';
+import { errorMessage, focusFirstInvalidField, isAdminAuthError } from '../utils';
 
 export interface EmployeeFormModalProps {
   open: boolean;
@@ -75,7 +76,10 @@ export function EmployeeFormModal({
     if (!isEdit && password.trim().length < 4) next.password = 'Minim 4 caractere.';
     if (roles.length === 0) next.roles = 'Alege cel puțin un rol.';
     setErrors(next);
-    if (Object.keys(next).length > 0) return;
+    if (Object.keys(next).length > 0) {
+      focusFirstInvalidField(next);
+      return;
+    }
 
     onSubmit(
       {
@@ -123,6 +127,7 @@ export function EmployeeFormModal({
 
       <div className="flex flex-col gap-3">
         <TextInput
+          id="fullName"
           label="Nume complet"
           required
           value={fullName}
@@ -131,6 +136,7 @@ export function EmployeeFormModal({
         />
         <div className="grid grid-cols-2 gap-3">
           <TextInput
+            id="username"
             label="Utilizator"
             required
             autoComplete="off"
@@ -139,6 +145,7 @@ export function EmployeeFormModal({
             onChange={(event) => setUsername(event.target.value)}
           />
           <TextInput
+            id="password"
             label="Parolă"
             type="password"
             autoComplete="new-password"

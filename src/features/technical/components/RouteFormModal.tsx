@@ -11,6 +11,7 @@ import { Button, DateInput, Modal, Select, TextInput } from '@/components/ui';
 import type { CreateRouteInput } from '@/api';
 import type { Employee } from '@/types/domain';
 import { COUNTY_OPTIONS, WEEKDAY_OPTIONS } from '../constants';
+import { focusFirstInvalidField } from '../utils';
 
 export interface RouteFormModalProps {
   open: boolean;
@@ -76,7 +77,10 @@ export function RouteFormModal({
     if (!county) next.county = 'Alege județul.';
     if (!dayOfWeek) next.dayOfWeek = 'Alege ziua săptămânii.';
     setErrors(next);
-    if (Object.keys(next).length > 0) return;
+    if (Object.keys(next).length > 0) {
+      focusFirstInvalidField(next);
+      return;
+    }
 
     onSubmit({
       name: name.trim(),
@@ -111,6 +115,7 @@ export function RouteFormModal({
     >
       <div className="flex flex-col gap-3">
         <TextInput
+          id="name"
           label="Nume rută"
           required
           placeholder="ex: Ruta Cluj Vest"
@@ -122,6 +127,7 @@ export function RouteFormModal({
         <div className="grid grid-cols-2 gap-3">
           <DateInput label="Data" value={date} onChange={handleDateChange} />
           <Select
+            id="dayOfWeek"
             label="Ziua săptămânii"
             required
             value={dayOfWeek}
@@ -132,6 +138,7 @@ export function RouteFormModal({
         </div>
 
         <Select
+          id="county"
           label="Județ"
           required
           searchable

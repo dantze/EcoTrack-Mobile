@@ -26,7 +26,12 @@ import {
   useUpdateProduct,
   type ProductInput,
 } from './queries';
-import { parseDecimal, validatePositiveNumber, validateRequired } from './validation';
+import {
+  focusFirstInvalidField,
+  parseDecimal,
+  validatePositiveNumber,
+  validateRequired,
+} from './validation';
 
 interface Draft {
   name: string;
@@ -36,6 +41,12 @@ interface Draft {
 
 const EMPTY_DRAFT: Draft = { name: '', description: '', price: '' };
 
+/** Field-keyed so each box gets its own inline message instead of one toast. */
+interface DraftErrors {
+  name?: string;
+  price?: string;
+}
+
 function draftFrom(product: Product): Draft {
   return {
     name: product.name,
@@ -44,11 +55,13 @@ function draftFrom(product: Product): Draft {
   };
 }
 
-function validateDraft(draft: Draft): string | null {
-  return (
-    validateRequired(draft.name, 'Numele produsului') ??
-    validatePositiveNumber(draft.price, 'Prețul')
-  );
+function validateDraft(draft: Draft): DraftErrors {
+  const errors: DraftErrors = {};
+  const nameError = validateRequired(draft.name, 'Numele produsului');
+  if (nameError) errors.name = nameError;
+  const priceError = validatePositiveNumber(draft.price, 'Prețul');
+  if (priceError) errors.price = priceError;
+  return errors;
 }
 
 function toInput(draft: Draft): ProductInput {
@@ -69,7 +82,9 @@ export function ProductsPage() {
   const [search, setSearch] = useState('');
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editDraft, setEditDraft] = useState<Draft>(EMPTY_DRAFT);
+  const [editErrors, setEditErrors] = useState<DraftErrors>({});
   const [newDraft, setNewDraft] = useState<Draft>(EMPTY_DRAFT);
+  const [newErrors, setNewErrors] = useState<DraftErrors>({});
 
   const products = useMemo(() => productsQuery.data ?? [], [productsQuery.data]);
 
@@ -84,17 +99,21 @@ export function ProductsPage() {
   const startEdit = (product: Product) => {
     setEditingId(product.id);
     setEditDraft(draftFrom(product));
+    setEditErrors({});
   };
 
   const cancelEdit = () => {
     setEditingId(null);
     setEditDraft(EMPTY_DRAFT);
+    setEditErrors({});
   };
 
   const saveEdit = async (product: Product) => {
-    const error = validateDraft(editDraft);
-    if (error) {
-      toast.error(error);
+    const found = validateDraft(editDraft);
+    setEditErrors(found);
+    if (found.name || found.price) {
+      toast.error('Verificați câmpurile marcate.');
+      focusFirstInvalidField({ 'product-edit-name': found.name, 'product-edit-price': found.price });
       return;
     }
     cancelEdit();
@@ -107,14 +126,17 @@ export function ProductsPage() {
   };
 
   const create = async () => {
-    const error = validateDraft(newDraft);
-    if (error) {
-      toast.error(error);
+    const found = validateDraft(newDraft);
+    setNewErrors(found);
+    if (found.name || found.price) {
+      toast.error('Verificați câmpurile marcate.');
+      focusFirstInvalidField({ 'product-new-name': found.name, 'product-new-price': found.price });
       return;
     }
     try {
       await createProduct.mutateAsync(toInput(newDraft));
       setNewDraft(EMPTY_DRAFT);
+      setNewErrors({});
       toast.success('Produsul a fost adăugat.');
     } catch (mutationError) {
       toast.error(errorMessage(mutationError, 'Nu s-a putut adăuga produsul'));
@@ -146,7 +168,9 @@ export function ProductsPage() {
       render: (product) =>
         product.id === editingId ? (
           <TextInput
+            id="product-edit-name"
             value={editDraft.name}
+            error={editErrors.name}
             autoFocus
             onChange={(event) => setEditDraft({ ...editDraft, name: event.target.value })}
           />
@@ -179,7 +203,9 @@ export function ProductsPage() {
       render: (product) =>
         product.id === editingId ? (
           <TextInput
+            id="product-edit-price"
             value={editDraft.price}
+            error={editErrors.price}
             inputMode="decimal"
             onChange={(event) =>
               setEditDraft({ ...editDraft, price: event.target.value.replace(/[^\d.,]/g, '') })
@@ -253,9 +279,11 @@ export function ProductsPage() {
         <div className="ml-auto flex items-end gap-2">
           <div className="w-52">
             <TextInput
+              id="product-new-name"
               label="Produs nou"
               placeholder="Nume"
               value={newDraft.name}
+              error={newErrors.name}
               onChange={(event) => setNewDraft({ ...newDraft, name: event.target.value })}
             />
           </div>
@@ -269,10 +297,12 @@ export function ProductsPage() {
           </div>
           <div className="w-28">
             <TextInput
+              id="product-new-price"
               label="Preț (RON)"
               placeholder="0"
               inputMode="decimal"
               value={newDraft.price}
+              error={newErrors.price}
               onChange={(event) =>
                 setNewDraft({ ...newDraft, price: event.target.value.replace(/[^\d.,]/g, '') })
               }
@@ -294,6 +324,7 @@ export function ProductsPage() {
           rows={rows}
           columns={columns}
           rowKey={(product) => product.id}
+          initialSort={{ key: 'name', dir: 'asc' }}
           loading={productsQuery.isLoading}
           activeKey={editingId}
           onRowClick={(product) => {
@@ -301,8 +332,19 @@ export function ProductsPage() {
           }}
           empty={
             <EmptyState
-              title={search ? 'Niciun produs găsit' : 'Nu există produse'}
-              body="Adăugați un produs din bara de sus."
+              title={search ? 'Niciun produs pentru căutarea curentă' : 'Nu există produse'}
+              body={
+                search
+                  ? 'Ajustează căutarea sau golește câmpul.'
+                  : 'Adăugați primul produs din bara de sus.'
+              }
+              action={
+                search ? (
+                  <Button variant="secondary" size="sm" onClick={() => setSearch('')}>
+                    Golește căutarea
+                  </Button>
+                ) : undefined
+              }
             />
           }
         />

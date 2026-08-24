@@ -40,6 +40,8 @@ const MIN_POPUP_HEIGHT = 168;
 const MAX_POPUP_HEIGHT = 288;
 
 export interface SelectExtraProps {
+  /** Explicit control id, so a caller can label or focus this field itself. */
+  id?: string;
   /** Allows clearing back to `null` — renders a "—" reset row at the top. */
   clearable?: boolean;
   onClear?: () => void;
@@ -53,6 +55,7 @@ export interface SelectExtraProps {
 }
 
 export function Select<V extends string | number = string>({
+  id: explicitId,
   label,
   error,
   hint,
@@ -71,7 +74,7 @@ export function Select<V extends string | number = string>({
   onOpenChange,
   className,
 }: SelectProps<V> & SelectExtraProps) {
-  const { id, hintId, errorId } = useFieldIds();
+  const { id, hintId, errorId } = useFieldIds(explicitId);
   const listId = `${id}-listbox`;
 
   const [open, setOpen] = useState(defaultOpen);

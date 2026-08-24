@@ -165,6 +165,9 @@ function TasksScreen() {
     setQuery('');
   };
 
+  const filtersActive =
+    status !== ALL || type !== ALL || date !== null || route !== ALL || driver !== ALL || query !== '';
+
   return (
     <>
       <PageHeader
@@ -175,9 +178,11 @@ function TasksScreen() {
             : `${filtered.length} din ${tasks.length} sarcini${selected.size > 0 ? ` · ${selected.size} selectate` : ''}`
         }
         actions={
-          <Button variant="ghost" onClick={resetFilters}>
-            Resetează filtrele
-          </Button>
+          filtersActive && (
+            <Button variant="ghost" onClick={resetFilters}>
+              Resetează filtrele
+            </Button>
+          )
         }
       />
 
@@ -260,6 +265,7 @@ function TasksScreen() {
           rows={filtered}
           columns={columns}
           rowKey={(task) => task.id}
+          initialSort={{ key: 'date', dir: 'asc' }}
           loading={tasksQuery.isPending}
           activeKey={openTaskId}
           onRowClick={(task) => setOpenTaskId(task.id)}
@@ -282,12 +288,18 @@ function TasksScreen() {
           }
           empty={
             <EmptyState
-              title="Nicio sarcină"
-              body="Niciun rezultat pentru filtrele curente."
+              title={filtersActive ? 'Nicio sarcină pentru filtrele curente' : 'Nicio sarcină'}
+              body={
+                filtersActive
+                  ? 'Ajustează filtrele sau resetează-le.'
+                  : 'Sarcinile se generează automat din comenzile de vânzări.'
+              }
               action={
-                <Button size="sm" variant="secondary" onClick={resetFilters}>
-                  Resetează filtrele
-                </Button>
+                filtersActive ? (
+                  <Button size="sm" variant="secondary" onClick={resetFilters}>
+                    Resetează filtrele
+                  </Button>
+                ) : undefined
               }
             />
           }

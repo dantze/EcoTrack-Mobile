@@ -126,11 +126,32 @@ export interface RecurringRow {
   lastGeneratedDate: string | null;
 }
 
-/** Login credentials live beside the employee, never exposed through the API. */
+/**
+ * Login credentials live beside the employee, never exposed through the API.
+ * `email` is the address the mock /auth/google flow would match against —
+ * the real Employee entity has no email field, so this is where it lives.
+ */
 export interface CredentialRow {
   employeeId: number;
   username: string;
   password: string;
+  email: string;
+}
+
+/**
+ * One issued refresh token — the mock equivalent of a backend session row.
+ * `refreshToken` is rotated in place on every /auth/refresh, exactly like the
+ * real backend (the old value dies); `revoked` is set by logout and by the
+ * "Sesiuni active" revoke actions.
+ */
+export interface AuthSessionRow {
+  id: number;
+  employeeId: number;
+  refreshToken: string;
+  device: string;
+  createdAt: string;
+  lastUsedAt: string;
+  revoked: boolean;
 }
 
 export interface Sequences {
@@ -144,6 +165,7 @@ export interface Sequences {
   orderNumber: number;
   recurring: number;
   photo: number;
+  session: number;
 }
 
 export interface MockDb {
@@ -156,6 +178,7 @@ export interface MockDb {
   tasks: TaskRow[];
   orders: OrderRow[];
   recurring: RecurringRow[];
+  authSessions: AuthSessionRow[];
   seq: Sequences;
 }
 

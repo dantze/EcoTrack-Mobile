@@ -239,22 +239,35 @@ function RecurringScreen() {
           rows={filtered}
           columns={columns}
           rowKey={(plan) => plan.id}
+          initialSort={{ key: 'client', dir: 'asc' }}
           loading={plansQuery.isPending}
           activeKey={openPlan?.id ?? null}
           onRowClick={(plan) => setOpenPlan(plan)}
           empty={
-            <EmptyState
-              title={
-                scope === 'unassigned'
-                  ? 'Nicio igienizare recurentă neasignată'
-                  : 'Niciun plan recurent'
-              }
-              body={
-                scope === 'unassigned'
-                  ? 'Toate planurile au deja o rută.'
-                  : 'Planurile recurente se creează din modulul de vânzări.'
-              }
-            />
+            query ? (
+              <EmptyState
+                title="Niciun rezultat pentru căutarea curentă"
+                body="Ajustează căutarea sau golește câmpul."
+                action={
+                  <Button variant="secondary" size="sm" onClick={() => setQuery('')}>
+                    Golește căutarea
+                  </Button>
+                }
+              />
+            ) : (
+              <EmptyState
+                title={
+                  scope === 'unassigned'
+                    ? 'Nicio igienizare recurentă neasignată'
+                    : 'Niciun plan recurent'
+                }
+                body={
+                  scope === 'unassigned'
+                    ? 'Toate planurile au deja o rută.'
+                    : 'Planurile recurente se creează din modulul de vânzări.'
+                }
+              />
+            )
           }
         />
       )}

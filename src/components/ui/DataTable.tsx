@@ -49,6 +49,8 @@ export interface DataTableExtendedProps<T> extends Omit<DataTableProps<T>, 'colu
   onRowDoubleClick?: (row: T) => void;
   /** Keeps the checkbox column pinned while scrolling sideways. */
   stickySelection?: boolean;
+  /** Accessible name for the `<table>` — the page title rarely doubles as one. */
+  ariaLabel?: string;
   className?: string;
 }
 
@@ -89,6 +91,7 @@ export function DataTable<T>({
   rowClassName,
   onRowDoubleClick,
   stickySelection = true,
+  ariaLabel,
   className,
 }: DataTableExtendedProps<T>) {
   const [sort, setSort] = useState<SortState>(initialSort);
@@ -265,6 +268,7 @@ export function DataTable<T>({
           className="w-full border-separate border-spacing-0 text-left text-sm"
           style={{ minWidth, tableLayout: 'fixed' }}
           aria-busy={loading || undefined}
+          aria-label={ariaLabel}
         >
           <colgroup>
             {selectable && <col style={{ width: SELECT_COL_WIDTH }} />}

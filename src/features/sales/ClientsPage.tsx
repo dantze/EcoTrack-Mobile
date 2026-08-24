@@ -242,21 +242,34 @@ export function ClientsPage() {
           rows={rows}
           columns={columns}
           rowKey={(client) => client.id}
+          initialSort={{ key: 'name', dir: 'asc' }}
           loading={clientsQuery.isLoading}
           activeKey={openClient?.id ?? null}
           onRowClick={(client) => setDrawer({ kind: 'edit', clientId: client.id })}
           empty={
             <EmptyState
-              title={filtersActive ? 'Niciun client găsit' : 'Nu există clienți'}
+              title={filtersActive ? 'Niciun client pentru filtrele curente' : 'Nu există clienți'}
               body={
                 filtersActive
-                  ? 'Modificați căutarea sau filtrul de tip.'
+                  ? 'Modificați căutarea sau filtrul de tip, ori resetați-le.'
                   : 'Adăugați primul client pentru a putea crea comenzi.'
               }
               action={
-                <Button variant="primary" onClick={() => setDrawer({ kind: 'create' })}>
-                  + Client
-                </Button>
+                filtersActive ? (
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      setSearch('');
+                      setKindFilter('');
+                    }}
+                  >
+                    Resetează filtrele
+                  </Button>
+                ) : (
+                  <Button variant="primary" onClick={() => setDrawer({ kind: 'create' })}>
+                    + Client
+                  </Button>
+                )
               }
             />
           }

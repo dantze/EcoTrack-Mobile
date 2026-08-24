@@ -228,13 +228,9 @@ export interface AuthUser {
   fullName: string;
   phone: string | null;
   county: string | null;
+  /** Used to match a Google account to an employee record on /auth/google. */
+  email: string | null;
   roles: Role[];
-}
-
-/** Raw body of POST /api/auth/login. */
-export interface LoginResponse extends Partial<AuthUser> {
-  message: string | null;
-  success: boolean;
 }
 
 // ---------------------------------------------------------------------------

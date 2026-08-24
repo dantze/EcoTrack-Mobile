@@ -5,8 +5,9 @@
  * table answers "who is overloaded today" at a glance and the drawer holds the
  * per-driver detail that used to be a separate screen.
  *
- * Employee create/edit/delete go through /api/admin/**, which needs
- * VITE_ADMIN_KEY. A 401 from those is reported as a clear Romanian message.
+ * Employee create/edit/delete go through /api/admin/**, which requires the
+ * admin role on the caller's Bearer token. A 401/403 from those is reported
+ * as a clear Romanian message instead of bubbling out.
  */
 
 import { useMemo, useState } from 'react';
@@ -119,6 +120,12 @@ function DriversScreen() {
       }),
     [drivers, county, query],
   );
+
+  const filtersActive = county !== ALL || query !== '';
+  const resetFilters = () => {
+    setCounty(ALL);
+    setQuery('');
+  };
 
   const openDriver = useMemo(
     () => drivers.find((driver) => driver.id === openDriverId) ?? null,
@@ -316,13 +323,36 @@ function DriversScreen() {
           rows={filtered}
           columns={columns}
           rowKey={(driver) => driver.id}
+          initialSort={{ key: 'name', dir: 'asc' }}
           loading={driversQuery.isPending}
           activeKey={openDriverId}
           onRowClick={(driver) => setOpenDriverId(driver.id)}
           empty={
             <EmptyState
-              title="Niciun șofer"
-              body="Nu există angajați cu rolul de șofer pentru filtrele curente."
+              title={filtersActive ? 'Niciun șofer pentru filtrele curente' : 'Niciun șofer'}
+              body={
+                filtersActive
+                  ? 'Ajustează filtrele sau resetează-le.'
+                  : 'Nu există încă angajați cu rolul de șofer.'
+              }
+              action={
+                filtersActive ? (
+                  <Button variant="secondary" size="sm" onClick={resetFilters}>
+                    Resetează filtrele
+                  </Button>
+                ) : (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => {
+                      setEditing(null);
+                      setFormOpen(true);
+                    }}
+                  >
+                    Angajat nou
+                  </Button>
+                )
+              }
             />
           }
         />

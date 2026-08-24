@@ -21,7 +21,7 @@ import {
   formatCoordinates,
   parseCoordinates,
 } from '@/types/domain';
-import { formatDate } from '@/components/domain';
+import { formatDate, formatMoney } from '@/components/domain';
 import { DEFAULT_PHONE_CODE, joinPhone, splitPhone } from './validation';
 
 // ---------------------------------------------------------------------------
@@ -543,16 +543,20 @@ export function buildRecurringPlanInput(
   };
 }
 
+// Wording matches `FREQUENCY_LABELS` in `features/technical/constants.ts` — a
+// plan created here shows up with the same frequency label once a dispatcher
+// looks at it in the Technical module, instead of drifting ("Bisăptămânal"
+// here vs. "La 2 săptămâni" there for the same 14-day plan).
 export const FREQUENCY_OPTIONS = [
   { value: '7', label: 'Săptămânal (7 zile)' },
-  { value: '14', label: 'Bisăptămânal (14 zile)' },
+  { value: '14', label: 'La 2 săptămâni (14 zile)' },
   { value: '21', label: 'La 3 săptămâni (21 zile)' },
   { value: '30', label: 'Lunar (30 zile)' },
 ];
 
 export function subscriptionLabel(subscription: Subscription): string {
-  const price = subscription.price ?? 0;
+  const price = formatMoney(subscription.price ?? 0);
   return subscription.type === 'ONE_TIME'
-    ? `${subscription.name} — ${price} RON (o singură vizită)`
-    : `${subscription.name} — ${price} RON/lună · ${subscription.visitsPerMonth ?? 0}x/lună`;
+    ? `${subscription.name} — ${price} (o singură vizită)`
+    : `${subscription.name} — ${price}/lună · ${subscription.visitsPerMonth ?? 0}x/lună`;
 }

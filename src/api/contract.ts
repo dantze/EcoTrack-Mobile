@@ -18,7 +18,6 @@ import type {
   AuthUser,
   Client,
   Employee,
-  LoginResponse,
   Order,
   OrderTypeTag,
   Product,
@@ -87,17 +86,62 @@ export interface OrderTaskStatus {
   status: TaskStatus | null;
 }
 
+/** POST /auth/refresh response, and the token half of a successful login. */
+export interface AuthTokens {
+  accessToken: string;
+  refreshToken: string;
+  /** Seconds until the access token expires, counted from issuance. */
+  expiresIn: number;
+}
+
+/** User + a fresh token pair — what a successful login/Google handshake yields. */
+export interface AuthSession {
+  user: AuthUser;
+  tokens: AuthTokens;
+}
+
+/**
+ * POST /auth/login and /auth/google share this response shape: `success`
+ * decides which fields are present. A failed attempt is not an exception —
+ * `message` is the server's Romanian copy, meant to be rendered on the form
+ * as-is ("Utilizator inexistent", "Parolă incorectă", …).
+ */
+export interface LoginOutcome {
+  success: boolean;
+  message: string | null;
+  session?: AuthSession;
+}
+
+/** One row of GET /auth/sessions — a device holding a live refresh token. */
+export interface SessionDevice {
+  id: string;
+  device: string;
+  createdAt: string;
+  lastUsedAt: string;
+  current: boolean;
+}
+
 // ---------------------------------------------------------------------------
 // Per-resource interfaces
 // ---------------------------------------------------------------------------
 
 export interface AuthApi {
   /** POST /auth/login */
-  login(username: string, password: string): Promise<LoginResponse>;
-  /** Reads the persisted session from localStorage. No network call. */
-  currentUser(): AuthUser | null;
-  /** Clears the persisted session. No network call. */
-  logout(): void;
+  login(username: string, password: string): Promise<LoginOutcome>;
+  /** POST /auth/google — idToken is the Google Identity Services credential. */
+  loginWithGoogle(idToken: string): Promise<LoginOutcome>;
+  /** POST /auth/refresh. Rotates the refresh token — the old one dies. */
+  refresh(refreshToken: string): Promise<AuthTokens>;
+  /** POST /auth/logout. Best-effort: callers clear local state regardless. */
+  logout(refreshToken: string | null): Promise<void>;
+  /** GET /auth/me — identifies the caller from the access token on the token bridge. */
+  me(): Promise<AuthUser>;
+  /** GET /auth/sessions */
+  listSessions(): Promise<SessionDevice[]>;
+  /** DELETE /auth/sessions/{id} */
+  revokeSession(id: string): Promise<void>;
+  /** DELETE /auth/sessions — every device but this one. */
+  revokeOtherSessions(): Promise<void>;
 }
 
 export interface ClientsApi {
@@ -169,11 +213,11 @@ export interface EmployeesApi {
   listDrivers(): Promise<Employee[]>;
   /** GET /employees/role/{roleName} */
   listByRole(role: Role): Promise<Employee[]>;
-  /** POST /admin/employees — requires X-Admin-Key. */
+  /** POST /admin/employees — requires an admin role on the caller's token. */
   create(input: CreateEmployeeInput): Promise<Employee>;
-  /** PUT /admin/employees/{id} — requires X-Admin-Key. */
+  /** PUT /admin/employees/{id} — requires an admin role on the caller's token. */
   update(id: number, input: Partial<CreateEmployeeInput>): Promise<Employee>;
-  /** DELETE /admin/employees/{id} — requires X-Admin-Key. */
+  /** DELETE /admin/employees/{id} — requires an admin role on the caller's token. */
   remove(id: number): Promise<void>;
 }
 

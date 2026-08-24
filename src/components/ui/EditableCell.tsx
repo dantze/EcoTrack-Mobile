@@ -58,13 +58,29 @@ export function EditableCell({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
   const abandoned = useRef(false);
+  const wasEditing = useRef(false);
 
   const asString = value === null || value === undefined ? '' : String(value);
 
   useEffect(() => {
     if (editing && !options) inputRef.current?.select();
   }, [editing, options]);
+
+  // Enter/Escape/a Select pick all unmount the editor synchronously, which
+  // drops focus to <body> — reclaim it for the cell. A Tab-away blur has
+  // already moved focus to a real element by the time this runs, so this
+  // only fires when nothing else claimed it.
+  useEffect(() => {
+    if (wasEditing.current && !editing) {
+      const active = document.activeElement;
+      if (active === document.body || active === null) {
+        triggerRef.current?.focus({ preventScroll: true });
+      }
+    }
+    wasEditing.current = editing;
+  }, [editing]);
 
   const start = () => {
     if (disabled) return;
@@ -188,6 +204,7 @@ export function EditableCell({
 
   return (
     <button
+      ref={triggerRef}
       type="button"
       disabled={disabled}
       aria-label={label ? `${label}: editează` : undefined}

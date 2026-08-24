@@ -47,6 +47,7 @@ import {
   subscriptionLabel,
   validateOrderForm,
 } from '../orderModel';
+import { focusFirstInvalidField } from '../validation';
 import {
   useClientOrders,
   useClients,
@@ -152,6 +153,7 @@ export function OrderFormDrawer({ order = null, initialClient = null, onClose }:
     setErrors(found);
     if (hasErrors(found)) {
       toast.error('Verificați câmpurile marcate.');
+      focusFirstInvalidField(found);
       return;
     }
 
@@ -328,6 +330,7 @@ export function OrderFormDrawer({ order = null, initialClient = null, onClose }:
         <FormGrid>
           <Col span={6}>
             <PhoneField
+              id="contact"
               label="Contact șantier"
               required
               code={form.contactCode}
@@ -379,6 +382,7 @@ function AmplasareFields({
         <FormGrid>
           <Col span={8}>
             <Select
+              id="productId"
               label="Pachet servicii"
               required
               value={form.productId === null ? null : String(form.productId)}
@@ -390,6 +394,7 @@ function AmplasareFields({
           </Col>
           <Col span={4}>
             <Select
+              id="quantity"
               label="Cantitate"
               required
               value={form.quantity}
@@ -415,6 +420,8 @@ function AmplasareFields({
           value={form.placementLocation}
           addressError={errors.placementAddress}
           coordinatesError={errors.placementCoordinates}
+          addressId="placementAddress"
+          coordinatesId="placementCoordinates"
           onChange={(placementLocation) => patch({ placementLocation })}
         />
       </FormSection>
@@ -423,6 +430,7 @@ function AmplasareFields({
         <FormGrid>
           <Col span={4}>
             <DateInput
+              id="startDate"
               label="Dată început"
               required
               value={form.startDate}
@@ -432,6 +440,7 @@ function AmplasareFields({
           </Col>
           <Col span={4}>
             <DateInput
+              id="endDate"
               label="Dată sfârșit"
               value={form.endDate}
               error={errors.endDate}
@@ -455,6 +464,7 @@ function AmplasareFields({
           </Col>
           <Col span={4}>
             <TextInput
+              id="durationDays"
               label="Durata contract (zile)"
               inputMode="numeric"
               required={!form.isIndefinite}
@@ -469,6 +479,7 @@ function AmplasareFields({
           </Col>
           <Col span={4}>
             <Select
+              id="igienizariPerMonth"
               label="Igienizări pe lună"
               required
               value={form.igienizariPerMonth}
@@ -596,6 +607,7 @@ function RidicareFields({
           <FormGrid>
             <Col span={4}>
               <TextInput
+                id="pickupQuantity"
                 label="Cantitate"
                 required
                 inputMode="numeric"
@@ -621,6 +633,7 @@ function RidicareFields({
         <FormGrid>
           <Col span={4}>
             <DateInput
+              id="pickupDate"
               label="Dată ridicare"
               required
               value={form.pickupDate}
@@ -656,6 +669,7 @@ function IgienizareFields({
         <FormGrid>
           <Col span={12}>
             <Select
+              id="subscriptionId"
               label="Abonament igienizări"
               required
               value={form.subscriptionId === null ? null : String(form.subscriptionId)}
@@ -675,6 +689,8 @@ function IgienizareFields({
           value={form.sanitationLocation}
           addressError={errors.sanitationAddress}
           coordinatesError={errors.sanitationCoordinates}
+          addressId="sanitationAddress"
+          coordinatesId="sanitationCoordinates"
           onChange={(sanitationLocation) => patch({ sanitationLocation })}
         />
       </FormSection>
@@ -683,6 +699,7 @@ function IgienizareFields({
         <FormGrid>
           <Col span={4}>
             <DateInput
+              id="sanitationDate"
               label={form.isRecurring ? 'Dată începere' : 'Dată igienizare'}
               required
               value={form.sanitationDate}
@@ -713,6 +730,7 @@ function IgienizareFields({
                   </Col>
                   <Col span={4}>
                     <DateInput
+                      id="recurrenceEndDate"
                       label="Dată sfârșit recurență"
                       value={form.recurrenceEndDate}
                       error={errors.recurrenceEndDate}

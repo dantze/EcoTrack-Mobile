@@ -329,6 +329,13 @@ function RoutesScreen() {
   ];
 
   const selectedProgress = taskProgress(routeTasks);
+  const filtersActive = date !== null || county !== ALL || driver !== ALL || query !== '';
+  const resetFilters = () => {
+    setDate(null);
+    setCounty(ALL);
+    setDriver(ALL);
+    setQuery('');
+  };
 
   return (
     <>
@@ -402,21 +409,28 @@ function RoutesScreen() {
               rows={filteredRoutes}
               columns={columns}
               rowKey={(route) => route.id}
+              initialSort={{ key: 'date', dir: 'asc' }}
               loading={routesQuery.isPending}
               activeKey={selectedRouteId}
               onRowClick={(route) => setSelectedRouteId(route.id)}
               empty={
                 <EmptyState
-                  title="Nicio rută"
+                  title={filtersActive ? 'Nicio rută pentru filtrele curente' : 'Nicio rută'}
                   body={
-                    date
-                      ? 'Niciun rezultat pentru filtrele curente. Încearcă „Toate datele”.'
+                    filtersActive
+                      ? 'Ajustează filtrele sau resetează-le.'
                       : 'Creează prima rută pentru a începe planificarea.'
                   }
                   action={
-                    <Button variant="primary" size="sm" onClick={() => setCreateOpen(true)}>
-                      Rută nouă
-                    </Button>
+                    filtersActive ? (
+                      <Button variant="secondary" size="sm" onClick={resetFilters}>
+                        Resetează filtrele
+                      </Button>
+                    ) : (
+                      <Button variant="primary" size="sm" onClick={() => setCreateOpen(true)}>
+                        Rută nouă
+                      </Button>
+                    )
                   }
                 />
               }
@@ -504,8 +518,8 @@ function RoutesScreen() {
                 isPending={tasksQuery.isPending}
                 error={tasksQuery.error}
                 isEmpty={unassignedTasks.length === 0}
-                emptyTitle="Nimic de repartizat"
-                emptyBody="Toate sarcinile au o rută."
+                emptyTitle={query ? 'Niciun rezultat pentru căutarea curentă' : 'Nimic de repartizat'}
+                emptyBody={query ? 'Golește căutarea din bara de sus.' : 'Toate sarcinile au o rută.'}
                 onRetry={() => void tasksQuery.refetch()}
               >
                 <div className="flex flex-col gap-1.5">

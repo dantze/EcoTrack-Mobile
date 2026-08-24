@@ -95,6 +95,7 @@ export function PhoneField({
   onDigitsChange,
   error,
   required,
+  id,
 }: {
   label: string;
   code: string;
@@ -103,6 +104,8 @@ export function PhoneField({
   onDigitsChange: (digits: string) => void;
   error?: string;
   required?: boolean;
+  /** DOM id for the digits box, so a failed submit can focus it directly. */
+  id?: string;
 }) {
   return (
     <div className="flex items-start gap-2">
@@ -116,6 +119,7 @@ export function PhoneField({
       </div>
       <div className="flex-1">
         <TextInput
+          id={id}
           label={label}
           required={required}
           inputMode="numeric"
@@ -151,6 +155,8 @@ export function LocationFields({
   addressError,
   coordinatesError,
   required,
+  addressId,
+  coordinatesId,
 }: {
   label: string;
   value: LocationValue;
@@ -158,12 +164,16 @@ export function LocationFields({
   addressError?: string;
   coordinatesError?: string;
   required?: boolean;
+  /** DOM ids matching the validator's error keys, for focus-on-failed-submit. */
+  addressId?: string;
+  coordinatesId?: string;
 }) {
   const point = parseCoordinates(value.coordinates);
   return (
     <FormGrid>
       <Col span={8}>
         <TextInput
+          id={addressId}
           label={label}
           required={required}
           value={value.address}
@@ -174,6 +184,7 @@ export function LocationFields({
       </Col>
       <Col span={4}>
         <TextInput
+          id={coordinatesId}
           label="Coordonate (lat,lng)"
           value={value.coordinates}
           error={coordinatesError}

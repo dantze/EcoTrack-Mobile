@@ -15,6 +15,7 @@ import {
   EmptyState,
   PageHeader,
   Select,
+  Skeleton,
   type Column,
   type RowKey,
   type SelectOption,
@@ -191,7 +192,7 @@ export function OrdersPage() {
       render: (order) => {
         const status = statusesQuery.data?.[order.id] ?? null;
         if (status) return <TaskStatusBadge status={status} />;
-        if (statusesQuery.isLoading) return <span className="text-ink-subtle">…</span>;
+        if (statusesQuery.isLoading) return <Skeleton className="h-4 w-20 rounded-full" />;
         return <Badge tone="danger">Neprogramat</Badge>;
       },
     },
@@ -268,6 +269,7 @@ export function OrdersPage() {
           rows={rows}
           columns={columns}
           rowKey={(order) => order.id}
+          initialSort={{ key: 'date', dir: 'desc' }}
           loading={ordersQuery.isLoading}
           activeKey={openOrder?.id ?? null}
           onRowClick={(order) => setDrawer({ kind: 'detail', orderId: order.id })}

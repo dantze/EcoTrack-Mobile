@@ -10,6 +10,8 @@ import { controlClass, cx, useFieldIds } from './utils';
 import type { DateInputProps } from './types';
 
 export interface DateInputExtraProps {
+  /** Explicit control id, so a caller can label or focus this field itself. */
+  id?: string;
   size?: 'sm' | 'md';
   className?: string;
   /** Quick-set row under the field, e.g. `[{ label: 'Azi', value: today }]`. */
@@ -17,6 +19,7 @@ export interface DateInputExtraProps {
 }
 
 export function DateInput({
+  id: explicitId,
   label,
   error,
   hint,
@@ -28,7 +31,7 @@ export function DateInput({
   presets,
   ...rest
 }: DateInputProps & DateInputExtraProps) {
-  const { id, hintId, errorId } = useFieldIds();
+  const { id, hintId, errorId } = useFieldIds(explicitId);
 
   return (
     <FieldShell

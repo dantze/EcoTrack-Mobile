@@ -15,9 +15,15 @@ export const cx = (...parts: ClassValue[]) => parts.filter(Boolean).join(' ');
  * Keyboard-only focus ring. Tailwind v4 `outline-*` utilities give us a ring
  * that sits outside the element without the offset-colour dance `ring-*`
  * needs — important inside table cells where there is no room to spare.
+ *
+ * Uses `brand-400`, not `brand-500`: Button/IconButton render on both the
+ * white content area and the dark `brand-700` sidebar, and `brand-500` drops
+ * to ~2.1:1 against that sidebar (fails the 3:1 non-text contrast minimum).
+ * `brand-400` clears 3:1 against both ends — white (3.8:1) and the sidebar
+ * (3.9–4.7:1).
  */
 export const FOCUS_RING =
-  'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500';
+  'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-400';
 
 /** Same idea, but hugging the element (used inside dense rows and menus). */
 export const FOCUS_RING_TIGHT =

@@ -18,6 +18,7 @@ import {
   useUploadIdPhoto,
 } from '../queries';
 import {
+  focusFirstInvalidField,
   isValidEmail,
   isValidPhoneDigits,
   joinPhone,
@@ -139,6 +140,7 @@ export function ClientFormDrawer({
     setErrors(found);
     if (Object.keys(found).length > 0) {
       toast.error('Verificați câmpurile marcate.');
+      focusFirstInvalidField(found);
       return;
     }
 
@@ -234,6 +236,7 @@ export function ClientFormDrawer({
             <>
               <Col span={8}>
                 <TextInput
+                  id="fullName"
                   label="Nume complet"
                   required
                   value={state.fullName}
@@ -256,6 +259,7 @@ export function ClientFormDrawer({
             <>
               <Col span={6}>
                 <TextInput
+                  id="companyName"
                   label="Nume companie"
                   required
                   value={state.companyName}
@@ -265,6 +269,7 @@ export function ClientFormDrawer({
               </Col>
               <Col span={3}>
                 <TextInput
+                  id="cui"
                   label="CUI"
                   required
                   value={state.cui}
@@ -274,6 +279,7 @@ export function ClientFormDrawer({
               </Col>
               <Col span={3}>
                 <TextInput
+                  id="adminName"
                   label="Administrator"
                   required
                   value={state.adminName}
@@ -290,6 +296,7 @@ export function ClientFormDrawer({
         <FormGrid>
           <Col span={6}>
             <TextInput
+              id="email"
               label="Email"
               required
               type="email"
@@ -300,6 +307,7 @@ export function ClientFormDrawer({
           </Col>
           <Col span={6}>
             <PhoneField
+              id="phoneDigits"
               label="Telefon"
               required
               code={state.phoneCode}
@@ -311,6 +319,7 @@ export function ClientFormDrawer({
           </Col>
           <Col span={12}>
             <TextInput
+              id="address"
               label="Adresă"
               required
               value={state.address}

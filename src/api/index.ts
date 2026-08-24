@@ -19,3 +19,9 @@ export const api: EcoTrackApi = IS_MOCK ? mockApi : liveApi;
 export { DATA_MODE };
 export * from './contract';
 export { ApiError } from './http';
+
+/**
+ * Demo credentials for the seeded mock account, so LoginPage can hint them
+ * without importing `@/mocks` directly. Only meaningful in mock mode.
+ */
+export { MOCK_CREDENTIALS_HINT } from '@/mocks';

@@ -4,7 +4,7 @@
  * screen.
  */
 
-import { Badge, Button, Drawer } from '@/components/ui';
+import { Badge, Button, Drawer, Skeleton } from '@/components/ui';
 import {
   ORDER_TYPE_LABELS,
   OrderTypeBadge,
@@ -57,7 +57,9 @@ export function OrderDetailDrawer({
           <OrderTypeBadge type={order.orderType} />
           {taskStatus ? (
             <TaskStatusBadge status={taskStatus} />
-          ) : statusesQuery.isLoading ? null : (
+          ) : statusesQuery.isLoading ? (
+            <Skeleton className="h-4 w-20 rounded-full" />
+          ) : (
             <Badge tone="danger">Neprogramat</Badge>
           )}
         </span>

@@ -12,6 +12,7 @@ public class EmployeeResponse {
     private String fullName;
     private String phone;
     private String county;
+    private String email;
     private Set<String> roles;
 
     public EmployeeResponse() {
@@ -24,6 +25,7 @@ public class EmployeeResponse {
         response.setFullName(employee.getFullName());
         response.setPhone(employee.getPhone());
         response.setCounty(employee.getCounty());
+        response.setEmail(employee.getEmail());
         response.setRoles(
                 employee.getRoles().stream()
                         .map(EmployeeRole::getRoleName)
@@ -69,6 +71,14 @@ public class EmployeeResponse {
 
     public void setCounty(String county) {
         this.county = county;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
     }
 
     public Set<String> getRoles() {

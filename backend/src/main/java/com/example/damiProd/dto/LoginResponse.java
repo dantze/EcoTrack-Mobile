@@ -2,6 +2,10 @@ package com.example.damiProd.dto;
 
 import java.util.Set;
 
+// NOTE ON SHAPE: the "flat" fields below (id/username/fullName/phone/county/roles)
+// are duplicated inside `user` on purpose. The existing mobile app reads the flat
+// fields; new web clients should read `user` + the token fields. Do not remove
+// the flat fields - see AuthController/AuthService.
 public class LoginResponse {
     private Long id;
     private String username;
@@ -12,12 +16,50 @@ public class LoginResponse {
     private String message;
     private boolean success;
 
+    // --- Session auth fields (added for real, token-based auth) ---
+    private String accessToken;
+    private String refreshToken;
+    private long expiresIn; // seconds
+    private EmployeeResponse user;
+
     public LoginResponse() {
     }
 
     public LoginResponse(boolean success, String message) {
         this.success = success;
         this.message = message;
+    }
+
+    public String getAccessToken() {
+        return accessToken;
+    }
+
+    public void setAccessToken(String accessToken) {
+        this.accessToken = accessToken;
+    }
+
+    public String getRefreshToken() {
+        return refreshToken;
+    }
+
+    public void setRefreshToken(String refreshToken) {
+        this.refreshToken = refreshToken;
+    }
+
+    public long getExpiresIn() {
+        return expiresIn;
+    }
+
+    public void setExpiresIn(long expiresIn) {
+        this.expiresIn = expiresIn;
+    }
+
+    public EmployeeResponse getUser() {
+        return user;
+    }
+
+    public void setUser(EmployeeResponse user) {
+        this.user = user;
     }
 
     public Long getId() {

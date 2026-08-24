@@ -26,6 +26,18 @@ public class Employee {
     private String phone;
     private String county;
 
+    // Nullable, unique: only set for employees provisioned for Google sign-in.
+    // Plain employees (mobile app, username/password only) leave this null.
+    @Column(unique = true)
+    private String email;
+
+    // Google's stable "sub" claim, captured on the employee's first successful
+    // Google login. Once set, later logins must match it even if the email
+    // column changes later - see AuthService#loginWithGoogle.
+    @Column(name = "google_sub", unique = true)
+    @JsonIgnore
+    private String googleSub;
+
     @ManyToMany(fetch = FetchType.EAGER, cascade = {CascadeType.PERSIST, CascadeType.MERGE})
     @JoinTable(
         name = "employees_roles_join",
@@ -95,6 +107,22 @@ public class Employee {
 
     public void setCounty(String county) {
         this.county = county;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
+    }
+
+    public String getGoogleSub() {
+        return googleSub;
+    }
+
+    public void setGoogleSub(String googleSub) {
+        this.googleSub = googleSub;
     }
 
     public Set<EmployeeRole> getRoles() {

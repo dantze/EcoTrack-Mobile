@@ -48,6 +48,7 @@ public class DataLoader implements CommandLineRunner {
                 EmployeeRole driverRole = getOrCreateRole("DRIVER");
                 EmployeeRole salesRole = getOrCreateRole("SALES");
                 EmployeeRole techRole = getOrCreateRole("TECH");
+                EmployeeRole adminRole = getOrCreateRole("ADMIN");
 
                 // ==================== TEHNIC (TECH) ====================
                 createEmployee("ivan_sebastian", "tehnic1122", "Ivan Sebastian", null, null, techRole);
@@ -77,10 +78,13 @@ public class DataLoader implements CommandLineRunner {
                 createEmployee("tripa_andrei", "sofer123452", "Tripa Andrei", null, null, driverRole);
 
                 // ==================== ADMIN (optional - for testing) ====================
+                // Also holds the ADMIN role so /api/admin/** remains reachable on a
+                // fresh database once ecotrack.security.enforce=true - see SecurityConfig.
                 Employee admin = createEmployee("admin", "admin", "Administrator", null, null,
                                 salesRole);
                 admin.getRoles().add(techRole);
                 admin.getRoles().add(driverRole);
+                admin.getRoles().add(adminRole);
                 employeeRepository.save(admin);
 
                 System.out.println("Seeded " + employeeRepository.count() + " employees with roles!");

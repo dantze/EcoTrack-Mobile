@@ -47,6 +47,30 @@ class GoogleAuthServiceTest {
     }
 
     @Test
+    void domainMatches_whenNoDomainConfigured_doesNotBlowUpAndImposesNoRestriction() {
+        // verify() never calls this when no domain is set, but the method is public
+        // and used to dereference a null allowedDomain.
+        GoogleAuthService service = new GoogleAuthService("some-client-id", "");
+
+        assertThat(service.domainMatches(payloadWithEmail("someone@gmail.com", null))).isTrue();
+    }
+
+    @Test
+    void domainMatches_withNoPayload_returnsFalse() {
+        GoogleAuthService service = new GoogleAuthService("some-client-id", "ecotrack.ro");
+
+        assertThat(service.domainMatches(null)).isFalse();
+    }
+
+    @Test
+    void domainMatches_lookalikeDomain_isNotAccepted() {
+        GoogleAuthService service = new GoogleAuthService("some-client-id", "ecotrack.ro");
+
+        assertThat(service.domainMatches(payloadWithEmail("someone@not-ecotrack.ro", null))).isFalse();
+        assertThat(service.domainMatches(payloadWithEmail("ecotrack.ro@gmail.com", null))).isFalse();
+    }
+
+    @Test
     void verify_whenClientIdNotConfigured_failsClosedRegardlessOfToken() {
         GoogleAuthService service = new GoogleAuthService("", "");
 

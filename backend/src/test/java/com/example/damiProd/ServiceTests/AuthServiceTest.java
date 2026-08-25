@@ -30,6 +30,9 @@ import static org.mockito.Mockito.*;
 @ExtendWith(MockitoExtension.class)
 class AuthServiceTest {
 
+    /** The single message both "unknown user" and "wrong password" must produce. */
+    private static final String GENERIC_FAILURE_MESSAGE = "Nume de utilizator sau parolă incorectă";
+
     @Mock private EmployeeRepository employeeRepository;
     @Mock private TokenService tokenService;
     @Mock private GoogleAuthService googleAuthService;
@@ -90,7 +93,7 @@ class AuthServiceTest {
         LoginResponse response = authService.login(new LoginRequest("legacy_user2", "wrong"), "1.2.3.4", "JUnit");
 
         assertThat(response.isSuccess()).isFalse();
-        assertThat(response.getMessage()).isEqualTo("Parolă incorectă");
+        assertThat(response.getMessage()).isEqualTo(GENERIC_FAILURE_MESSAGE);
         verify(employeeRepository, never()).save(any());
         verify(loginRateLimiter).recordFailure("legacy_user2", "1.2.3.4");
     }
@@ -108,14 +111,82 @@ class AuthServiceTest {
         verify(employeeRepository, never()).save(any());
     }
 
+    // -----------------------------------------------------------------------
+    // Account enumeration: "no such user" and "wrong password" must be
+    // indistinguishable, in the message and in the work done.
+    // -----------------------------------------------------------------------
+
     @Test
-    void login_unknownUsername_returnsRomanianMessage() {
+    void login_unknownUsername_returnsTheSameMessageAsAWrongPassword() {
+        when(employeeRepository.findByUsername("ghost")).thenReturn(Optional.empty());
+        Employee realEmployee = buildEmployee("real_user", passwordEncoder.encode("secret123"));
+        when(employeeRepository.findByUsername("real_user")).thenReturn(Optional.of(realEmployee));
+
+        LoginResponse unknownUser = authService.login(new LoginRequest("ghost", "whatever"), "1.2.3.4", "JUnit");
+        LoginResponse wrongPassword = authService.login(new LoginRequest("real_user", "nope"), "1.2.3.4", "JUnit");
+
+        assertThat(unknownUser.isSuccess()).isFalse();
+        assertThat(wrongPassword.isSuccess()).isFalse();
+        // One message for both, or the endpoint is a free "does this account
+        // exist?" oracle.
+        assertThat(unknownUser.getMessage()).isEqualTo(GENERIC_FAILURE_MESSAGE);
+        assertThat(wrongPassword.getMessage()).isEqualTo(unknownUser.getMessage());
+        // Both paths are counted, so enumeration cannot outrun the throttle either.
+        verify(loginRateLimiter).recordFailure("ghost", "1.2.3.4");
+        verify(loginRateLimiter).recordFailure("real_user", "1.2.3.4");
+    }
+
+    @Test
+    void login_unknownUsername_stillSpendsBcryptTimeSoTimingDoesNotLeakExistence() {
         when(employeeRepository.findByUsername("ghost")).thenReturn(Optional.empty());
 
-        LoginResponse response = authService.login(new LoginRequest("ghost", "whatever"), "1.2.3.4", "JUnit");
+        long start = System.nanoTime();
+        authService.login(new LoginRequest("ghost", "whatever"), "1.2.3.4", "JUnit");
+        long elapsedMs = (System.nanoTime() - start) / 1_000_000;
+
+        // A bare repository miss returns in well under a millisecond; a real bcrypt
+        // verification cannot. The exact figure is machine-dependent, so this only
+        // asserts "hashing actually happened".
+        assertThat(elapsedMs).isGreaterThan(3);
+    }
+
+    // -----------------------------------------------------------------------
+    // Input the login endpoint must reject before doing any work
+    // -----------------------------------------------------------------------
+
+    @Test
+    void login_withBlankCredentials_isRejectedWithoutTouchingTheDatabaseOrThrottle() {
+        LoginResponse blankUsername = authService.login(new LoginRequest("   ", "pass"), "1.2.3.4", "JUnit");
+        LoginResponse blankPassword = authService.login(new LoginRequest("someone", ""), "1.2.3.4", "JUnit");
+        LoginResponse nullBoth = authService.login(new LoginRequest(null, null), "1.2.3.4", "JUnit");
+
+        assertThat(blankUsername.isSuccess()).isFalse();
+        assertThat(blankPassword.isSuccess()).isFalse();
+        assertThat(nullBoth.isSuccess()).isFalse();
+        assertThat(nullBoth.getMessage()).isEqualTo(GENERIC_FAILURE_MESSAGE);
+        verifyNoInteractions(employeeRepository);
+        verifyNoInteractions(loginRateLimiter);
+    }
+
+    @Test
+    void login_withAbsurdlyLongPassword_isRejectedBeforeHashing() {
+        // bcrypt ignores everything past 72 bytes anyway; accepting megabyte
+        // "passwords" just means hashing whatever an anonymous caller sends.
+        String huge = "x".repeat(100_000);
+
+        LoginResponse response = authService.login(new LoginRequest("someone", huge), "1.2.3.4", "JUnit");
 
         assertThat(response.isSuccess()).isFalse();
-        assertThat(response.getMessage()).isEqualTo("Utilizator inexistent");
+        verifyNoInteractions(employeeRepository);
+    }
+
+    @Test
+    void loginWithGoogle_withOversizedIdToken_isRejectedBeforeVerification() {
+        LoginResponse response = authService.loginWithGoogle("y".repeat(50_000), "JUnit");
+
+        assertThat(response.isSuccess()).isFalse();
+        verifyNoInteractions(googleAuthService);
+        verifyNoInteractions(employeeRepository);
     }
 
     @Test

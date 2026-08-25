@@ -166,7 +166,7 @@ const PhoneInputField: React.FC<PhoneInputFieldProps> = ({
                             keyExtractor={(item) => item.code}
                             style={{ maxHeight: 350 }}
                             keyboardShouldPersistTaps="handled"
-                            renderItem={({ item, index }) => (
+                            renderItem={({ item }) => (
                                 <Pressable
                                     style={({ pressed }) => [
                                         styles.countryItem,

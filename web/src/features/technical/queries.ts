@@ -49,8 +49,16 @@ export const keys = {
 // Queries
 // ---------------------------------------------------------------------------
 
-export function useRoutes(): UseQueryResult<Route[]> {
-  return useQuery({ queryKey: keys.routes(), queryFn: () => api.routes.list() });
+/**
+ * `enabled` lets the shell's command palette subscribe to the same keys without
+ * firing requests a Sales-only account is not allowed to make.
+ */
+export interface ReadOptions {
+  enabled?: boolean;
+}
+
+export function useRoutes({ enabled = true }: ReadOptions = {}): UseQueryResult<Route[]> {
+  return useQuery({ queryKey: keys.routes(), queryFn: () => api.routes.list(), enabled });
 }
 
 export function useRouteTasks(routeId: number | null): UseQueryResult<Task[]> {
@@ -61,8 +69,8 @@ export function useRouteTasks(routeId: number | null): UseQueryResult<Task[]> {
   });
 }
 
-export function useTasks(): UseQueryResult<Task[]> {
-  return useQuery({ queryKey: keys.tasks(), queryFn: () => api.tasks.list() });
+export function useTasks({ enabled = true }: ReadOptions = {}): UseQueryResult<Task[]> {
+  return useQuery({ queryKey: keys.tasks(), queryFn: () => api.tasks.list(), enabled });
 }
 
 /** Full record for the detail drawer — the list rows are not guaranteed deep. */
@@ -281,6 +289,38 @@ export function useMoveTaskToRoute(
   });
 }
 
+export interface AssignGroupVars {
+  taskIds: number[];
+  /** Full desired order of the target route once the batch has landed. */
+  orderedIds: number[];
+}
+
+/**
+ * Accepting a suggested group: move a batch of unassigned tasks onto one route
+ * and immediately persist the driving order they were proposed in.
+ *
+ * Two calls, same as `useMoveTaskToRoute`, because the contract has no
+ * "assign at positions" endpoint. Not optimistic: this writes several rows at
+ * once from a suggestion, and showing the real result is worth the round trip.
+ */
+export function useAssignTasksToRoute(
+  routeId: number,
+): UseMutationResult<void, unknown, AssignGroupVars> {
+  const client = useQueryClient();
+  return useMutation<void, unknown, AssignGroupVars>({
+    mutationFn: async ({ taskIds, orderedIds }) => {
+      await api.tasks.reassignMany(taskIds, routeId);
+      await api.routes.reorderTasks(routeId, orderedIds);
+    },
+    onSuccess: () => {
+      void client.invalidateQueries({ queryKey: keys.routeTasks(routeId) });
+      void client.invalidateQueries({ queryKey: keys.tasks() });
+      void client.invalidateQueries({ queryKey: keys.routes() });
+      void client.invalidateQueries({ queryKey: keys.drivers() });
+    },
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Mutations — tasks
 // ---------------------------------------------------------------------------
@@ -317,6 +357,45 @@ export function useUpdateTaskDate(): UseMutationResult<Task, unknown, UpdateDate
   const invalidate = useTaskInvalidation();
   return useMutation({
     mutationFn: ({ taskId, date }: UpdateDateVars) => api.tasks.updateScheduledDate(taskId, date),
+    onSuccess: invalidate,
+  });
+}
+
+export interface UpdateManyStatusVars {
+  taskIds: number[];
+  status: TaskStatus;
+}
+
+/**
+ * Set the same status on a whole selection.
+ *
+ * The contract has no batch status endpoint (only `PATCH /tasks/{id}/status`),
+ * so this fans out sequentially and reports how many landed — a dispatcher
+ * closing out a finished route should not have to click through twenty rows.
+ * Sequential rather than parallel on purpose: the backend has no optimistic
+ * locking (see CLAUDE.md), and hammering it with twenty concurrent writes is
+ * the wrong way to find that out.
+ */
+export function useUpdateManyTaskStatuses(): UseMutationResult<
+  { updated: number; failed: number },
+  unknown,
+  UpdateManyStatusVars
+> {
+  const invalidate = useTaskInvalidation();
+  return useMutation({
+    mutationFn: async ({ taskIds, status }: UpdateManyStatusVars) => {
+      let updated = 0;
+      let failed = 0;
+      for (const id of taskIds) {
+        try {
+          await api.tasks.updateStatus(id, status);
+          updated += 1;
+        } catch {
+          failed += 1;
+        }
+      }
+      return { updated, failed };
+    },
     onSuccess: invalidate,
   });
 }

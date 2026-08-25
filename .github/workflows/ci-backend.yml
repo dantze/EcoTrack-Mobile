@@ -1,15 +1,39 @@
 name: CI Backend
 
+# PATH FILTERING IS LOAD-BEARING. CLAUDE.md: the per-project `paths:` filters
+# are the reason three independently deployed projects can share one repo. Do
+# not remove them. Anything that must run on EVERY pull request regardless of
+# which project changed belongs in repo-hygiene.yml instead.
 on:
   pull_request:
     paths:
       - 'backend/**'
       - '.github/workflows/ci-backend.yml'
+      - '.github/scripts/junit_summary.py'
+      - '.github/scripts/jacoco_summary.py'
   push:
     branches: [main]
     paths:
       - 'backend/**'
       - '.github/workflows/ci-backend.yml'
+      - '.github/scripts/junit_summary.py'
+      - '.github/scripts/jacoco_summary.py'
+  # deploy-backend.yml calls this workflow as its gate, so a deploy can never
+  # ship a commit whose tests were not run.
+  workflow_call:
+
+# A second push to the same PR cancels the first. `github.ref` on a PR is the
+# merge ref, so this groups per-PR; on main the group is per-branch and
+# cancel-in-progress is off so every pushed commit on main keeps its own run.
+concurrency:
+  group: ci-backend-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+# Least privilege: this workflow only ever reads the repository. Test results
+# are surfaced through $GITHUB_STEP_SUMMARY and ::error annotations, neither of
+# which needs `checks: write`.
+permissions:
+  contents: read
 
 defaults:
   run:
@@ -17,13 +41,56 @@ defaults:
 
 jobs:
   build:
+    name: Build and test
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
+
+      # Guards against a tampered gradle-wrapper.jar — the wrapper is a binary
+      # that runs before any of our code does. Also enforced repo-wide in
+      # repo-hygiene.yml; kept here so a backend-only PR fails fast.
+      - name: Validate Gradle wrapper
+        uses: gradle/actions/wrapper-validation@v4
+
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '21'
+
       - uses: gradle/actions/setup-gradle@v4
+
       - name: Build and test
-        run: ./gradlew build
+        run: ./gradlew build --no-daemon
+
+      # `if: always()` so the reports are produced for FAILING runs too — that
+      # is the case where they matter.
+      - name: Publish test summary
+        if: always()
+        working-directory: .
+        run: python3 .github/scripts/junit_summary.py backend/build/test-results/test
+
+      - name: Publish coverage summary
+        if: always()
+        working-directory: .
+        run: python3 .github/scripts/jacoco_summary.py backend/build/reports/jacoco/test/jacocoTestReport.csv
+
+      - name: Upload test reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-test-reports-${{ github.run_id }}
+          path: |
+            backend/build/reports/tests/test/
+            backend/build/test-results/test/
+          retention-days: 14
+          if-no-files-found: warn
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage-${{ github.run_id }}
+          path: backend/build/reports/jacoco/test/
+          retention-days: 14
+          if-no-files-found: warn

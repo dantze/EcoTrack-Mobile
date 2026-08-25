@@ -3,7 +3,7 @@ import React, { useState } from 'react'
 import { useRouter } from 'expo-router'
 import { AuthService } from '../services/AuthService'
 
-const login = () => {
+const Login = () => {
   const router = useRouter();
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -120,7 +120,7 @@ const login = () => {
   )
 }
 
-export default login
+export default Login
 
 const styles = StyleSheet.create({
   container: {

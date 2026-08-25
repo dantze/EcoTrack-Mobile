@@ -23,14 +23,6 @@ export default function EditOrder() {
 
     const orderData = params.order ? JSON.parse(params.order) : null;
 
-    if (!orderData) {
-        return (
-            <View style={styles.centered}>
-                <Text style={{ color: '#FFF', fontSize: 18 }}>Eroare: date comandă lipsă.</Text>
-            </View>
-        );
-    }
-
     const getOrderTypeLabel = (type: string): string => {
         const labels: Record<string, string> = {
             Amplasari: 'Amplasare',
@@ -54,6 +46,19 @@ export default function EditOrder() {
     const [formData, setFormData] = useState<any>({});
     const [saving, setSaving] = useState(false);
     const [parentScrollEnabled, setParentScrollEnabled] = useState(true);
+
+    // Guard placed BELOW the hooks deliberately — see the same note in
+    // EditClient.tsx. An early return above them made the hook count depend on
+    // whether the `order` param was present, which is a Rules of Hooks
+    // violation and crashes on the transition. Nothing above this line reads
+    // `orderData`; everything that does runs only after it.
+    if (!orderData) {
+        return (
+            <View style={styles.centered}>
+                <Text style={{ color: '#FFF', fontSize: 18 }}>Eroare: date comandă lipsă.</Text>
+            </View>
+        );
+    }
 
     const handleDeleteOrder = async () => {
         try {

@@ -24,6 +24,7 @@ import {
 } from '@/components/ui';
 import { formatMoney } from '@/components/domain';
 import { SUBSCRIPTION_TYPES, type Subscription, type SubscriptionType } from '@/types/domain';
+import { includesFolded } from '@/lib/search';
 import { ErrorNotice, FilterBar, FilterField, SearchInput } from './components/FilterBar';
 import { ToggleField } from './components/fields';
 import { Toaster, errorMessage, toast } from './components/Toaster';
@@ -159,14 +160,13 @@ export function SubscriptionsPage() {
   );
 
   const rows = useMemo(() => {
-    const needle = search.trim().toLowerCase();
+    const needle = search.trim();
     return subscriptions.filter((subscription) => {
       if (tab === 'active' && !subscription.isActive) return false;
       if (tab === 'inactive' && subscription.isActive) return false;
       if (!needle) return true;
-      return `${subscription.name} ${subscription.description ?? ''}`
-        .toLowerCase()
-        .includes(needle);
+      // Diacritic-insensitive, like every other search box in the app.
+      return includesFolded(`${subscription.name} ${subscription.description ?? ''}`, needle);
     });
   }, [subscriptions, search, tab]);
 

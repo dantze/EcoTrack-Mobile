@@ -8,7 +8,8 @@
  *
  *   Layout     PageHeader · Tabs · FilterBar · SearchInput · EmptyState
  *   Data       DataTable · EditableCell · Badge · DetailList
- *   Forms      TextInput · TextArea · Select · DateInput · Checkbox · FieldRow
+ *   Assistive  SuggestionCard · WarningNote (accept/ignore, never auto-apply)
+ *   Forms      TextInput · TextArea · Select · Autocomplete · DateInput · Checkbox · FieldRow
  *   Overlays   Modal · Drawer · useConfirm · ToastProvider / useToast
  *   Primitives Button · IconButton · Spinner · Skeleton
  */
@@ -26,10 +27,14 @@ export type { TextInputExtraProps } from './TextInput';
 export { TextArea } from './TextArea';
 export { Select } from './Select';
 export type { SelectExtraProps } from './Select';
+export { Autocomplete } from './Autocomplete';
+export type { AutocompleteOption, AutocompleteProps } from './Autocomplete';
 export { DateInput } from './DateInput';
 export type { DateInputExtraProps } from './DateInput';
 export { Checkbox } from './Checkbox';
 export type { CheckboxExtraProps } from './Checkbox';
+
+export { SuggestionCard, WarningNote } from './SuggestionCard';
 
 export { Badge } from './Badge';
 export type { BadgeExtraProps } from './Badge';

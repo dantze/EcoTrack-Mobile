@@ -1,6 +1,6 @@
 import { StyleSheet, Text, View, ScrollView, ActivityIndicator, Pressable, Alert } from 'react-native';
 import React, { useState, useCallback } from 'react';
-import { useRouter, useLocalSearchParams, useFocusEffect } from 'expo-router';
+import { useLocalSearchParams, useFocusEffect } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { AppColors } from '../../constants/Colors';
 import { RecurringIgienizareService } from '../../services/RecurringIgienizareService';
@@ -44,7 +44,6 @@ const getClientName = (plan: RecurringPlan): string => {
 };
 
 const UnassignedRecurring = () => {
-    const router = useRouter();
     const { routeId, routeName } = useLocalSearchParams<{
         routeId?: string;
         routeName?: string;

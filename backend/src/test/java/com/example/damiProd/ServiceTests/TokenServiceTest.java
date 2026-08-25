@@ -146,6 +146,83 @@ class TokenServiceTest {
         assertThat(tokenService.validateAccessToken(deviceA.accessToken())).isPresent();
     }
 
+    // -----------------------------------------------------------------------
+    // Session hygiene: cap, session-level expiry, pruning
+    // -----------------------------------------------------------------------
+
+    @Test
+    void issueNewSession_beyondTheCap_revokesTheLeastRecentlyUsedSessions() {
+        // Built by hand rather than injected so the cap is small enough to hit
+        // without opening ten sessions.
+        TokenService capped = new TokenService(sessionRepository, 30, 60, 2, 30);
+        Employee employee = newEmployee("token_svc_cap");
+
+        TokenService.IssuedTokens oldest = capped.issueNewSession(employee, "Device-A");
+        TokenService.IssuedTokens middle = capped.issueNewSession(employee, "Device-B");
+        TokenService.IssuedTokens newest = capped.issueNewSession(employee, "Device-C");
+
+        // Three logins, cap of two: the least-recently-used one is revoked, and a
+        // 60-day refresh token on a forgotten device stops being a live key.
+        assertThat(capped.validateAccessToken(oldest.accessToken())).isEmpty();
+        assertThat(capped.rotate(oldest.refreshToken(), "Device-A")).isEmpty();
+        assertThat(capped.validateAccessToken(middle.accessToken())).isPresent();
+        assertThat(capped.validateAccessToken(newest.accessToken())).isPresent();
+
+        Session revoked = sessionRepository.findById(oldest.sessionId()).orElseThrow();
+        assertThat(revoked.getRevokedReason()).isEqualTo("SESSION_LIMIT_EXCEEDED");
+    }
+
+    @Test
+    void validateAccessToken_whenTheSessionItselfHasExpired_returnsEmpty() {
+        Employee employee = newEmployee("token_svc_session_expiry");
+        TokenService.IssuedTokens tokens = tokenService.issueNewSession(employee, "Device-A");
+
+        // Access token still inside its own 30-minute window, but the session it
+        // belongs to has run out - it must not outlive its session.
+        Session session = sessionRepository.findById(tokens.sessionId()).orElseThrow();
+        session.setExpiresAt(Instant.now().minusSeconds(1));
+        sessionRepository.save(session);
+
+        assertThat(tokenService.validateAccessToken(tokens.accessToken())).isEmpty();
+    }
+
+    @Test
+    void pruneStaleSessions_deletesOnlyRowsThatCanNoLongerAuthenticateAnyone() {
+        // Retention of 0 days: anything already revoked or expired is prunable.
+        TokenService pruning = new TokenService(sessionRepository, 30, 60, 10, 0);
+        Employee employee = newEmployee("token_svc_prune");
+
+        TokenService.IssuedTokens live = pruning.issueNewSession(employee, "Device-live");
+        TokenService.IssuedTokens loggedOut = pruning.issueNewSession(employee, "Device-loggedout");
+        TokenService.IssuedTokens expired = pruning.issueNewSession(employee, "Device-expired");
+
+        pruning.revokeByRefreshToken(loggedOut.refreshToken());
+        Session expiredSession = sessionRepository.findById(expired.sessionId()).orElseThrow();
+        expiredSession.setExpiresAt(Instant.now().minusSeconds(60));
+        sessionRepository.saveAndFlush(expiredSession);
+
+        int deleted = pruning.pruneStaleSessions();
+
+        assertThat(deleted).isEqualTo(2);
+        assertThat(sessionRepository.findById(live.sessionId())).isPresent();
+        assertThat(sessionRepository.findById(loggedOut.sessionId())).isEmpty();
+        assertThat(sessionRepository.findById(expired.sessionId())).isEmpty();
+    }
+
+    @Test
+    void revokeAllSessions_killsEveryDeviceIncludingTheCurrentOne() {
+        Employee employee = newEmployee("token_svc_revoke_all");
+        TokenService.IssuedTokens deviceA = tokenService.issueNewSession(employee, "Device-A");
+        TokenService.IssuedTokens deviceB = tokenService.issueNewSession(employee, "Device-B");
+
+        int revoked = tokenService.revokeAllSessions(employee.getId(), "PASSWORD_CHANGED");
+
+        assertThat(revoked).isEqualTo(2);
+        assertThat(tokenService.validateAccessToken(deviceA.accessToken())).isEmpty();
+        assertThat(tokenService.validateAccessToken(deviceB.accessToken())).isEmpty();
+        assertThat(tokenService.listActiveSessions(employee.getId())).isEmpty();
+    }
+
     @Test
     void revokeSession_onlyAffectsSessionsOwnedByThatEmployee() {
         Employee owner = newEmployee("token_svc_user8");

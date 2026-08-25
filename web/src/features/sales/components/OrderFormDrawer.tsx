@@ -8,6 +8,13 @@
  *
  * Mount this only while it is open and give it a `key` — it seeds its state
  * once from props and never re-syncs.
+ *
+ * Once a client is chosen the form also offers what `../suggestions.ts` derives
+ * from that client's own order history: a pre-fill card, an address typeahead,
+ * a note about the type they usually order, and a warning when a quantity is
+ * far outside their norm. All of it is local arithmetic over data already
+ * fetched, all of it is opt-in — nothing is written to the form until the
+ * operator presses "Aplică".
  */
 
 import { useMemo, useState } from 'react';
@@ -17,8 +24,11 @@ import {
   Drawer,
   Select,
   Spinner,
+  SuggestionCard,
   TextArea,
   TextInput,
+  WarningNote,
+  type AutocompleteOption,
   type SelectOption,
 } from '@/components/ui';
 import { ORDER_TYPE_LABELS, formatMoney } from '@/components/domain';
@@ -54,10 +64,17 @@ import {
   useCreateOrders,
   useCreateRecurringPlan,
   useOrderTaskStatuses,
+  useOrders,
   useProducts,
   useSubscriptions,
   useUpdateOrder,
 } from '../queries';
+import {
+  buildAddressSuggestions,
+  buildOrderSuggestion,
+  quantityAnomaly,
+  suggestOrderType,
+} from '../suggestions';
 import { ClientPicker } from './ClientPicker';
 import { Col, FormGrid, FormSection, LocationFields, PhoneField, ToggleField } from './fields';
 import { errorMessage, toast } from './Toaster';
@@ -89,10 +106,15 @@ export function OrderFormDrawer({ order = null, initialClient = null, onClose }:
     order ? orderToForm(order) : emptyOrderForm(),
   );
   const [errors, setErrors] = useState<OrderFormErrors>({});
+  /** Suggestion cards the operator has dismissed, keyed by `${clientId}:${type}`. */
+  const [dismissed, setDismissed] = useState<Set<string>>(new Set());
 
   const clientsQuery = useClients();
   const productsQuery = useProducts();
   const subscriptionsQuery = useSubscriptions(false);
+  // Cached by OrdersPage; only used to widen the address typeahead beyond this
+  // client's own sites, so a cold cache costs nothing but a shorter list.
+  const allOrdersQuery = useOrders();
 
   const createOrders = useCreateOrders();
   const createRecurring = useCreateRecurringPlan();
@@ -101,23 +123,27 @@ export function OrderFormDrawer({ order = null, initialClient = null, onClose }:
   const patch = (changes: Partial<OrderFormState>) =>
     setForm((current) => ({ ...current, ...changes }));
 
-  // ── Ridicari: what this client still has on site ────────────────────────
+  // ── This client's history ───────────────────────────────────────────────
+  // Fetched as soon as a client is chosen, not only for Ridicari: the same
+  // list feeds the packet groups, the pre-fill card and the address typeahead.
+  const clientOrdersQuery = useClientOrders(client ? client.id : null);
+  const clientOrders = useMemo(() => clientOrdersQuery.data ?? [], [clientOrdersQuery.data]);
+
   const needsPackets = form.orderType === 'Ridicari' && !editing && client !== null;
-  const clientOrdersQuery = useClientOrders(needsPackets && client ? client.id : null);
   const pickupOrderIds = useMemo(
     () => (clientOrdersQuery.data ?? []).filter(isRidicare).map((entry) => entry.id),
     [clientOrdersQuery.data],
   );
   const pickupStatusesQuery = useOrderTaskStatuses(needsPackets ? pickupOrderIds : []);
   const packetGroups = useMemo<PacketGroup[]>(() => {
-    if (!needsPackets || !clientOrdersQuery.data) return [];
+    if (!needsPackets || clientOrders.length === 0) return [];
     const completed = new Set(
       Object.entries(pickupStatusesQuery.data ?? {})
         .filter(([, status]) => status === 'COMPLETED')
         .map(([id]) => Number(id)),
     );
-    return buildPacketGroups(clientOrdersQuery.data, completed);
-  }, [needsPackets, clientOrdersQuery.data, pickupStatusesQuery.data]);
+    return buildPacketGroups(clientOrders, completed);
+  }, [needsPackets, clientOrders, pickupStatusesQuery.data]);
 
   const products = productsQuery.data ?? [];
   const subscriptions = subscriptionsQuery.data ?? [];
@@ -133,6 +159,65 @@ export function OrderFormDrawer({ order = null, initialClient = null, onClose }:
     (orderSubscription && orderSubscription.id === form.subscriptionId
       ? orderSubscription
       : null);
+
+  // ── Local suggestions, derived from this client's own orders ────────────
+  const suggestionKey = client ? `${client.id}:${form.orderType}` : '';
+
+  const suggestion = useMemo(
+    () =>
+      editing || !client || clientOrders.length === 0
+        ? null
+        : buildOrderSuggestion(clientOrders, form.orderType, products, subscriptions),
+    [editing, client, clientOrders, form.orderType, products, subscriptions],
+  );
+
+  const typeHint = useMemo(
+    () => (editing || !client ? null : suggestOrderType(clientOrders)),
+    [editing, client, clientOrders],
+  );
+
+  const addressSuggestions = useMemo(
+    () =>
+      client
+        ? buildAddressSuggestions(clientOrders, allOrdersQuery.data ?? [], client.id)
+        : [],
+    [client, clientOrders, allOrdersQuery.data],
+  );
+
+  const addressOptions = useMemo<AutocompleteOption[]>(
+    () =>
+      addressSuggestions.map((entry) => ({
+        value: entry.address,
+        hint: [
+          entry.count > 1 ? `${entry.count} comenzi` : '1 comandă',
+          entry.lastUsed ? `ultima: ${entry.lastUsed.slice(0, 10)}` : null,
+          entry.coordinates ? 'cu coordonate' : null,
+        ]
+          .filter(Boolean)
+          .join(' · '),
+        group:
+          entry.scope === 'client' ? 'Adresele acestui client' : 'Alte adrese din sistem',
+      })),
+    [addressSuggestions],
+  );
+
+  const coordinatesForAddress = (option: AutocompleteOption) =>
+    addressSuggestions.find((entry) => entry.address === option.value)?.coordinates ?? null;
+
+  const quantityWarning = useMemo(() => {
+    if (form.orderType !== 'Amplasari') return null;
+    const parsed = Number.parseInt(form.quantity, 10);
+    if (!Number.isFinite(parsed)) return null;
+    return quantityAnomaly(clientOrders, form.productId, parsed);
+  }, [form.orderType, form.quantity, form.productId, clientOrders]);
+
+  const applySuggestion = () => {
+    if (!suggestion) return;
+    setForm((current) => ({ ...current, ...suggestion.patch }));
+    setErrors({});
+    toast.info('Câmpurile au fost completate din istoricul clientului.');
+    setDismissed((current) => new Set(current).add(suggestionKey));
+  };
 
   const saving = createOrders.isPending || createRecurring.isPending || updateOrder.isPending;
 
@@ -279,13 +364,53 @@ export function OrderFormDrawer({ order = null, initialClient = null, onClose }:
             ))}
           </div>
         )}
+
+        {typeHint && !editing && (
+          <p className="mt-2 text-xs text-ink-muted">
+            Acest client comandă de obicei{' '}
+            <span className="font-medium text-ink">{typeHint.label}</span> ({typeHint.count} din{' '}
+            {typeHint.total} comenzi).
+            {typeHint.type !== form.orderType && (
+              <button
+                type="button"
+                onClick={() => {
+                  setErrors({});
+                  setForm({
+                    ...emptyOrderForm(typeHint.type),
+                    contactCode: form.contactCode,
+                    contactDigits: form.contactDigits,
+                    details: form.details,
+                  });
+                }}
+                className="ml-1.5 font-medium text-brand-600 underline underline-offset-2 hover:text-brand-700"
+              >
+                Comută pe {typeHint.label}
+              </button>
+            )}
+          </p>
+        )}
       </FormSection>
+
+      {suggestion && !dismissed.has(suggestionKey) && (
+        <div className="pb-4">
+          <SuggestionCard
+            title="Completează din istoricul clientului"
+            details={suggestion.details}
+            basis={suggestion.basis}
+            onApply={applySuggestion}
+            onDismiss={() => setDismissed((current) => new Set(current).add(suggestionKey))}
+          />
+        </div>
+      )}
 
       {form.orderType === 'Amplasari' && (
         <AmplasareFields
           form={form}
           errors={errors}
           patch={patch}
+          addressOptions={addressOptions}
+          coordinatesForAddress={coordinatesForAddress}
+          quantityWarning={quantityWarning?.message ?? null}
           productOptions={products.map((product) => ({
             value: String(product.id),
             label: product.name,
@@ -318,6 +443,8 @@ export function OrderFormDrawer({ order = null, initialClient = null, onClose }:
           errors={errors}
           patch={patch}
           editing={editing}
+          addressOptions={addressOptions}
+          coordinatesForAddress={coordinatesForAddress}
           subscriptionOptions={subscriptions.map((subscription) => ({
             value: String(subscription.id),
             label: subscriptionLabel(subscription),
@@ -371,10 +498,17 @@ function AmplasareFields({
   productOptions,
   productsLoading,
   totalPrice,
+  addressOptions,
+  coordinatesForAddress,
+  quantityWarning,
 }: FieldsProps & {
   productOptions: SelectOption<string>[];
   productsLoading: boolean;
   totalPrice: number | null;
+  addressOptions: AutocompleteOption[];
+  coordinatesForAddress: (option: AutocompleteOption) => string | null;
+  /** Non-blocking note when the quantity is unlike this client's usual. */
+  quantityWarning: string | null;
 }) {
   return (
     <>
@@ -403,6 +537,11 @@ function AmplasareFields({
               onChange={(quantity) => patch({ quantity })}
             />
           </Col>
+          {quantityWarning && (
+            <Col span={12}>
+              <WarningNote>{quantityWarning}</WarningNote>
+            </Col>
+          )}
           {totalPrice !== null && (
             <Col span={12}>
               <p className="text-sm text-green-700">
@@ -422,6 +561,8 @@ function AmplasareFields({
           coordinatesError={errors.placementCoordinates}
           addressId="placementAddress"
           coordinatesId="placementCoordinates"
+          suggestions={addressOptions}
+          coordinatesFor={coordinatesForAddress}
           onChange={(placementLocation) => patch({ placementLocation })}
         />
       </FormSection>
@@ -658,10 +799,14 @@ function IgienizareFields({
   editing,
   subscriptionOptions,
   subscriptionsLoading,
+  addressOptions,
+  coordinatesForAddress,
 }: FieldsProps & {
   editing: boolean;
   subscriptionOptions: SelectOption<string>[];
   subscriptionsLoading: boolean;
+  addressOptions: AutocompleteOption[];
+  coordinatesForAddress: (option: AutocompleteOption) => string | null;
 }) {
   return (
     <>
@@ -691,6 +836,8 @@ function IgienizareFields({
           coordinatesError={errors.sanitationCoordinates}
           addressId="sanitationAddress"
           coordinatesId="sanitationCoordinates"
+          suggestions={addressOptions}
+          coordinatesFor={coordinatesForAddress}
           onChange={(sanitationLocation) => patch({ sanitationLocation })}
         />
       </FormSection>

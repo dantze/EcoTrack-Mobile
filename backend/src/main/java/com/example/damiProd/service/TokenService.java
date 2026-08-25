@@ -6,6 +6,7 @@ import com.example.damiProd.repository.SessionRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -42,13 +43,19 @@ public class TokenService {
 
     private final Duration accessTokenTtl;
     private final Duration refreshTokenTtl;
+    private final int maxSessionsPerUser;
+    private final Duration sessionRetention;
 
     public TokenService(SessionRepository sessionRepository,
             @Value("${ecotrack.security.access-token-ttl-minutes:30}") long accessTokenTtlMinutes,
-            @Value("${ecotrack.security.refresh-token-ttl-days:60}") long refreshTokenTtlDays) {
+            @Value("${ecotrack.security.refresh-token-ttl-days:60}") long refreshTokenTtlDays,
+            @Value("${ecotrack.security.max-sessions-per-user:10}") int maxSessionsPerUser,
+            @Value("${ecotrack.security.session-retention-days:30}") long sessionRetentionDays) {
         this.sessionRepository = sessionRepository;
         this.accessTokenTtl = Duration.ofMinutes(accessTokenTtlMinutes);
         this.refreshTokenTtl = Duration.ofDays(refreshTokenTtlDays);
+        this.maxSessionsPerUser = maxSessionsPerUser;
+        this.sessionRetention = Duration.ofDays(sessionRetentionDays);
     }
 
     public long getAccessTokenTtlSeconds() {
@@ -83,7 +90,35 @@ public class TokenService {
         session.setExpiresAt(now.plus(refreshTokenTtl));
 
         Session saved = sessionRepository.save(session);
+        enforceSessionCap(employee.getId(), saved.getId(), now);
         return new IssuedTokens(saved.getId(), accessToken, refreshToken, accessTokenTtl.getSeconds());
+    }
+
+    /**
+     * Caps how many live sessions one employee can accumulate. Without this,
+     * every login adds a 60-day credential that nothing ever cleans up, so a
+     * years-old forgotten device stays a valid way into the account. The
+     * least-recently-used sessions above the cap are revoked, oldest first.
+     */
+    private void enforceSessionCap(Long employeeId, Long currentSessionId, Instant now) {
+        if (maxSessionsPerUser <= 0) {
+            return;
+        }
+        List<Session> active = sessionRepository
+                .findByEmployeeIdAndRevokedAtIsNullOrderByLastUsedAtDesc(employeeId);
+        if (active.size() <= maxSessionsPerUser) {
+            return;
+        }
+        for (Session stale : active.subList(maxSessionsPerUser, active.size())) {
+            if (stale.getId().equals(currentSessionId)) {
+                continue;
+            }
+            stale.setRevokedAt(now);
+            stale.setRevokedReason("SESSION_LIMIT_EXCEEDED");
+            sessionRepository.save(stale);
+            log.info("Revoked least-recently-used session id={} for employee id={} (cap {} reached)",
+                    stale.getId(), employeeId, maxSessionsPerUser);
+        }
     }
 
     /**
@@ -153,7 +188,10 @@ public class TokenService {
         Instant now = Instant.now();
 
         return sessionRepository.findByAccessTokenHash(presentedHash)
-                .filter(session -> session.getRevokedAt() == null)
+                // isActive() covers both revocation and the session's own (refresh
+                // token) expiry - an access token must never outlive its session,
+                // even if its own 30-minute window has not elapsed yet.
+                .filter(session -> session.isActive(now))
                 .filter(session -> session.getAccessTokenExpiresAt() != null
                         && session.getAccessTokenExpiresAt().isAfter(now))
                 .map(session -> {
@@ -202,6 +240,40 @@ public class TokenService {
                 sessionRepository.save(session);
             }
         }
+    }
+
+    /**
+     * Revokes every session an employee has, including the one making the call.
+     * Meant for "this account is compromised" / password reset flows.
+     */
+    @Transactional
+    public int revokeAllSessions(Long employeeId, String reason) {
+        Instant now = Instant.now();
+        int revoked = 0;
+        for (Session session : sessionRepository.findByEmployeeIdAndRevokedAtIsNullOrderByLastUsedAtDesc(employeeId)) {
+            session.setRevokedAt(now);
+            session.setRevokedReason(reason);
+            sessionRepository.save(session);
+            revoked++;
+        }
+        return revoked;
+    }
+
+    /**
+     * Deletes sessions that stopped being usable more than
+     * {@code ecotrack.security.session-retention-days} ago (revoked or expired).
+     * Keeps the table - and therefore the set of hashes an attacker could ever
+     * work with - bounded, and runs nightly rather than on the request path.
+     */
+    @Scheduled(cron = "${ecotrack.security.session-prune-cron:0 30 3 * * *}")
+    @Transactional
+    public int pruneStaleSessions() {
+        Instant cutoff = Instant.now().minus(sessionRetention);
+        int deleted = sessionRepository.deleteStaleSessions(cutoff);
+        if (deleted > 0) {
+            log.info("Pruned {} session row(s) that became unusable before {}", deleted, cutoff);
+        }
+        return deleted;
     }
 
     private String generateToken() {

@@ -3,7 +3,7 @@
  * Shared by all four Sales screens so the filtering affordances line up.
  */
 
-import type { ReactNode } from 'react';
+import type { ReactNode, RefObject } from 'react';
 import { Button } from '@/components/ui';
 
 export function FilterBar({ children }: { children: ReactNode }) {
@@ -19,20 +19,35 @@ export function SearchInput({
   onChange,
   placeholder,
   width = 'w-72',
+  inputRef,
+  controls,
+  activeDescendant,
 }: {
   value: string;
   onChange: (value: string) => void;
   placeholder: string;
   width?: string;
+  /** Lets a screen focus its search box from a keyboard shortcut ("/"). */
+  inputRef?: RefObject<HTMLInputElement | null>;
+  /** Id of a listbox this box drives — turns it into an ARIA combobox. */
+  controls?: string;
+  /** Id of the highlighted option in that listbox. */
+  activeDescendant?: string;
 }) {
   return (
     <div className={`relative ${width}`}>
       <input
+        ref={inputRef}
         type="search"
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder={placeholder}
         aria-label={placeholder}
+        role={controls ? 'combobox' : undefined}
+        aria-expanded={controls ? true : undefined}
+        aria-controls={controls}
+        aria-autocomplete={controls ? 'list' : undefined}
+        aria-activedescendant={activeDescendant}
         className="h-8 w-full rounded-md border border-border bg-white pr-2.5 pl-7 text-sm text-ink outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20"
       />
       <span

@@ -34,7 +34,7 @@ interface PlacePrediction {
     };
 }
 
-const { width, height } = Dimensions.get('window');
+const { width: _width, height: _height } = Dimensions.get('window');
 
 const DEFAULT_REGION = {
     latitude: 45.9432,

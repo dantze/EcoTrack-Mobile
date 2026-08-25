@@ -16,6 +16,7 @@ import {
 } from '@/components/ui';
 import { formatMoney } from '@/components/domain';
 import type { Product } from '@/types/domain';
+import { includesFolded } from '@/lib/search';
 import { ErrorNotice, FilterBar, FilterField, SearchInput } from './components/FilterBar';
 import { Toaster, errorMessage, toast } from './components/Toaster';
 import { useConfirm } from './components/useConfirm';
@@ -89,10 +90,11 @@ export function ProductsPage() {
   const products = useMemo(() => productsQuery.data ?? [], [productsQuery.data]);
 
   const rows = useMemo(() => {
-    const needle = search.trim().toLowerCase();
+    const needle = search.trim();
     if (!needle) return products;
+    // Diacritic-insensitive: "toaleta" has to find "Toaletă".
     return products.filter((product) =>
-      `${product.name} ${product.description ?? ''}`.toLowerCase().includes(needle),
+      includesFolded(`${product.name} ${product.description ?? ''}`, needle),
     );
   }, [products, search]);
 

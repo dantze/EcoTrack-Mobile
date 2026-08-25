@@ -1,5 +1,6 @@
 name: CI Web
 
+# PATH FILTERING IS LOAD-BEARING — see the note in ci-backend.yml.
 on:
   pull_request:
     paths:
@@ -10,6 +11,15 @@ on:
     paths:
       - 'web/**'
       - '.github/workflows/ci-web.yml'
+  # deploy-web.yml (workflow_dispatch only) can call this as its gate.
+  workflow_call:
+
+concurrency:
+  group: ci-web-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
 
 defaults:
   run:
@@ -17,14 +27,31 @@ defaults:
 
 jobs:
   build:
+    name: Lint, typecheck, test, build
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: npm
           cache-dependency-path: web/package-lock.json
+
       - run: npm ci
-      - run: npm run typecheck
-      - run: npm run build
+
+      # Ordered cheapest-and-most-specific first so a PR fails on the smallest
+      # possible signal. `if: always()` on the later steps would hide which one
+      # broke, so it is deliberately absent — first failure stops the job.
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Test
+        run: npm run test:run
+
+      - name: Build
+        run: npm run build

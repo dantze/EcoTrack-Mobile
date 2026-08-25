@@ -28,20 +28,12 @@ export default function EditClient() {
 
     const clientData = params.client ? JSON.parse(params.client) : null;
 
-    if (!clientData) {
-        return (
-            <View style={styles.centered}>
-                <Text style={{ color: '#FFF', fontSize: 18 }}>Eroare: date client lipsă.</Text>
-            </View>
-        );
-    }
-
-    const isCompany = clientData.type === 'company';
+    const isCompany = clientData?.type === 'company';
 
     // Form state initialized with existing data
-    const [fullName, setFullName] = useState(clientData.fullName || '');
-    const [cnp, setCnp] = useState(clientData.cnp || '');
-    const [email, setEmail] = useState(clientData.email || '');
+    const [fullName, setFullName] = useState(clientData?.fullName || '');
+    const [cnp, setCnp] = useState(clientData?.cnp || '');
+    const [email, setEmail] = useState(clientData?.email || '');
     // Parse existing phone to extract country code and number
     const parsePhone = (raw: string) => {
         if (!raw) return { code: '+40', number: '' };
@@ -62,14 +54,27 @@ export default function EditClient() {
         return { code: '+40', number: normalised };
     };
 
-    const parsed = parsePhone(clientData.phone || '');
+    const parsed = parsePhone(clientData?.phone || '');
     const [phone, setPhone] = useState(parsed.number);
     const [countryCode, setCountryCode] = useState(parsed.code);
-    const [address, setAddress] = useState(clientData.address || '');
-    const [companyName, setCompanyName] = useState(clientData.name || '');
-    const [cui, setCui] = useState(clientData.cui || clientData.CUI || '');
-    const [adminName, setAdminName] = useState(clientData.adminName || '');
+    const [address, setAddress] = useState(clientData?.address || '');
+    const [companyName, setCompanyName] = useState(clientData?.name || '');
+    const [cui, setCui] = useState(clientData?.cui || clientData?.CUI || '');
+    const [adminName, setAdminName] = useState(clientData?.adminName || '');
     const [saving, setSaving] = useState(false);
+
+    // The guard lives BELOW every hook on purpose. It used to sit right after
+    // the JSON.parse, which meant a render with no `client` param ran zero
+    // hooks while a render with one ran twelve — the classic "Rendered fewer
+    // hooks than expected" crash the moment the param appears or disappears.
+    // Hooks are unconditional now; only the returned tree is conditional.
+    if (!clientData) {
+        return (
+            <View style={styles.centered}>
+                <Text style={{ color: '#FFF', fontSize: 18 }}>Eroare: date client lipsă.</Text>
+            </View>
+        );
+    }
 
     const handleSave = async () => {
         if (!email.trim() || !phone.trim() || !address.trim()) {

@@ -23,7 +23,7 @@ import { Checkbox } from './Checkbox';
 import { EmptyState } from './EmptyState';
 import { SortIcon } from './icons';
 import { compareValues, cx } from './utils';
-import type { Column, DataTableProps, RowKey } from './types';
+import type { Column, DataTableProps } from './types';
 
 export interface DataTableColumn<T> extends Column<T> {
   /** Right-aligns and applies tabular figures. Use for money, counts, ids. */

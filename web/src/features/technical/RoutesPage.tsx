@@ -9,6 +9,14 @@
  * Reordering persists through `api.routes.reorderTasks(routeId, taskIds)` —
  * a bare ordered array of ids — and is applied optimistically so the list never
  * snaps back while the request is in flight.
+ *
+ * Above the stop list sit the two local suggestions from `./grouping.ts`:
+ * unassigned jobs that fall on this route's day and near its stops, and a
+ * shorter stop order. Both are proposals with their numbers on show — nothing
+ * is assigned or reordered until the dispatcher accepts.
+ *
+ * `?ruta=<id>` selects a route and `?nou=1` opens the create form, which is how
+ * the command palette (⌘K) lands here.
  */
 
 import { useEffect, useMemo, useState } from 'react';
@@ -41,8 +49,12 @@ import {
 import type { Column } from '@/components/ui';
 import { formatDate, weekdayLabel } from '@/components/domain';
 import type { Route, Task } from '@/types/domain';
+import { useDeepLink } from '@/lib/deepLink';
+import { useShortcuts } from '@/lib/hotkeys';
+import { recordUse } from '@/lib/recents';
 import {
   useAssignDriver,
+  useAssignTasksToRoute,
   useCreateRoute,
   useDeleteRoute,
   useDrivers,
@@ -84,6 +96,7 @@ import {
 } from './components/display';
 import { FeedbackProvider, useFeedback } from './components/feedback';
 import { DriverPickerModal, RoutePickerModal } from './components/pickers';
+import { DispatchSuggestions } from './components/suggestions';
 
 export function RoutesPage() {
   return (
@@ -94,6 +107,8 @@ export function RoutesPage() {
 }
 
 const NO_DRIVER = 'NONE';
+/** DOM id so the "/" shortcut can put the cursor in the search box. */
+const SEARCH_FIELD_ID = 'routes-search';
 
 function RoutesScreen() {
   const { toast, confirm } = useFeedback();
@@ -172,6 +187,61 @@ function RoutesScreen() {
   const reorderTasks = useReorderRouteTasks(selectedRouteId ?? -1);
   const moveTask = useMoveTaskToRoute(selectedRoute);
   const reassignTasks = useReassignTasks();
+  const assignGroup = useAssignTasksToRoute(selectedRouteId ?? -1);
+
+  // --- deep links & shortcuts ----------------------------------------------
+  const deepLink = useDeepLink();
+  const linkedRouteId = deepLink.number('ruta');
+  const wantsNew = deepLink.flag('nou');
+
+  useEffect(() => {
+    if (linkedRouteId === null) return;
+    // Clear the date filter too: a linked route is rarely on the current day.
+    setDate(null);
+    setSelectedRouteId(linkedRouteId);
+    recordUse('route', linkedRouteId);
+    deepLink.clear('ruta');
+  }, [linkedRouteId, deepLink]);
+
+  useEffect(() => {
+    if (!wantsNew) return;
+    setCreateOpen(true);
+    deepLink.clear('nou');
+  }, [wantsNew, deepLink]);
+
+  useShortcuts([
+    {
+      combo: 'n',
+      description: 'Rută nouă',
+      group: 'Rute',
+      run: () => setCreateOpen(true),
+    },
+    {
+      combo: '/',
+      description: 'Focus pe câmpul de căutare',
+      group: 'Rute',
+      run: () => document.getElementById(SEARCH_FIELD_ID)?.focus(),
+    },
+    {
+      combo: 't',
+      description: 'Arată rutele de azi',
+      group: 'Rute',
+      run: () => setDate(todayIso()),
+    },
+    {
+      combo: 'a',
+      description: 'Arată toate datele',
+      group: 'Rute',
+      run: () => setDate(null),
+    },
+    {
+      combo: 'd',
+      description: 'Alege șoferul rutei selectate',
+      group: 'Rute',
+      disabled: selectedRouteId === null,
+      run: () => setDriverPickerOpen(true),
+    },
+  ]);
 
   // --- drag and drop -------------------------------------------------------
   const sensors = useSensors(
@@ -391,8 +461,9 @@ function RoutesScreen() {
 
         <div className="w-56">
           <TextInput
+            id={SEARCH_FIELD_ID}
             label="Căutare"
-            placeholder="rută, județ, șofer, client…"
+            placeholder="rută, județ, șofer, client…  ( / )"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
           />
@@ -412,7 +483,10 @@ function RoutesScreen() {
               initialSort={{ key: 'date', dir: 'asc' }}
               loading={routesQuery.isPending}
               activeKey={selectedRouteId}
-              onRowClick={(route) => setSelectedRouteId(route.id)}
+              onRowClick={(route) => {
+                recordUse('route', route.id);
+                setSelectedRouteId(route.id);
+              }}
               empty={
                 <EmptyState
                   title={filtersActive ? 'Nicio rută pentru filtrele curente' : 'Nicio rută'}
@@ -468,6 +542,33 @@ function RoutesScreen() {
                 )
               }
             />
+
+            {selectedRoute && !routeTasksQuery.isPending && (
+              <DispatchSuggestions
+                route={selectedRoute}
+                routeTasks={routeTasks}
+                pool={unassignedTasks}
+                busy={assignGroup.isPending || reorderTasks.isPending}
+                onApplyGroup={(taskIds, orderedIds) =>
+                  assignGroup.mutate(
+                    { taskIds, orderedIds },
+                    {
+                      onSuccess: () =>
+                        toast.success(
+                          `${taskIds.length} sarcini au fost adăugate pe ${routeLabel(selectedRoute)}.`,
+                        ),
+                      onError: (error) => toast.error(errorMessage(error)),
+                    },
+                  )
+                }
+                onApplyOrder={(orderedIds) =>
+                  reorderTasks.mutate(orderedIds, {
+                    onSuccess: () => toast.success('Ordinea opririlor a fost actualizată.'),
+                    onError: (error) => toast.error(errorMessage(error)),
+                  })
+                }
+              />
+            )}
 
             <div className="min-h-0 flex-1 overflow-y-auto bg-surface-sunken">
               {!selectedRoute ? (

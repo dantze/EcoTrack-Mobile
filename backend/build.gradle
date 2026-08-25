@@ -1,5 +1,6 @@
 plugins {
 	id 'java'
+	id 'jacoco'
 	id 'org.springframework.boot' version '3.5.7'
 	id 'io.spring.dependency-management' version '1.1.7'
 }
@@ -28,6 +29,11 @@ dependencies {
 	implementation 'org.springframework.boot:spring-boot-starter-data-jpa'
 	implementation 'org.springframework.boot:spring-boot-starter-web'
 	implementation 'org.springframework.boot:spring-boot-starter-security'
+	// Actuator is here for one reason: /actuator/health is what the deploy
+	// workflow polls after a restart (see .github/workflows/deploy-backend.yml).
+	// Only the "health" endpoint is exposed, with no details - see the
+	// management.* keys in application.properties.
+	implementation 'org.springframework.boot:spring-boot-starter-actuator'
 	implementation 'software.amazon.awssdk:s3:2.25.27'
 	// Verifies Google Sign-In ID tokens server-side (signature against Google's cached JWKS,
 	// issuer, audience, expiry) - see service/GoogleAuthService.java
@@ -43,6 +49,41 @@ dependencies {
 
 tasks.named('test') {
 	useJUnitPlatform()
+	// A machine-readable summary of the run, consumed by
+	// .github/scripts/junit_summary.py to build the CI job summary.
+	reports {
+		junitXml.required = true
+		html.required = true
+	}
+	finalizedBy tasks.named('jacocoTestReport')
+}
+
+// ─── Coverage ────────────────────────────────────────────────────────────
+// REPORT ONLY. There is deliberately no `jacocoTestCoverageVerification`
+// wired into `check` and no violationRules: a threshold set at today's
+// coverage would either be trivially low or would start failing unrelated
+// PRs. CI prints the numbers (.github/scripts/jacoco_summary.py) so the
+// trend is visible without gating the build.
+jacoco {
+	toolVersion = '0.8.13'
+}
+
+tasks.named('jacocoTestReport') {
+	dependsOn tasks.named('test')
+	reports {
+		xml.required = true
+		csv.required = true
+		html.required = true
+	}
+	// Generated / framework-only classes carry no logic worth measuring.
+	classDirectories.setFrom(
+		files(classDirectories.files.collect {
+			fileTree(dir: it, exclude: [
+				'com/example/damiProd/DamiProdApplication.class',
+				'com/example/damiProd/dto/**',
+			])
+		})
+	)
 }
 
 // Automatically load .env file when running locally with bootRun

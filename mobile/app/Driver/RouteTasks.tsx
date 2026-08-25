@@ -4,7 +4,7 @@ import { useRouter, useLocalSearchParams } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons';
 import { AuthService } from '../../services/AuthService';
 import { TaskService, Task } from '../../services/TaskService';
-import { TASK_TYPE_LABELS, STATUS_LABELS, STATUS_COLORS, getTaskTypeLabel, getStatusLabel, getStatusColor } from '../../constants/TaskConstants';
+import { getTaskTypeLabel, getStatusLabel, getStatusColor } from '../../constants/TaskConstants';
 import { AppColors } from '../../constants/Colors';
 import { toDateString } from '../../utils/dateUtils';
 import { DAY_NAMES_SHORT } from '../../constants/RouteConstants';
@@ -13,7 +13,7 @@ import StatusBadge from '../../components/display/StatusBadge';
 
 const RouteTasks = () => {
     const router = useRouter();
-    const { routeId, routeDate, routeName } = useLocalSearchParams<{ routeId: string; routeDate?: string; routeName?: string }>();
+    const { routeName } = useLocalSearchParams<{ routeId: string; routeDate?: string; routeName?: string }>();
     const { width: screenWidth } = useWindowDimensions();
 
     const [tasks, setTasks] = useState<Task[]>([]);

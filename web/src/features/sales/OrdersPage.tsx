@@ -4,9 +4,13 @@
  * One dense, sortable table of every order with a filter strip on top; the
  * record detail and the create/edit form are slide-overs, so the list never
  * unmounts and the filters survive.
+ *
+ * Two entry points besides clicking a row: `?comanda=<id>` opens that order's
+ * drawer and `?nou=1` opens an empty form, which is how the command palette
+ * (⌘K) reaches this screen and what makes an order link shareable.
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Badge,
   Button,
@@ -26,12 +30,11 @@ import {
   OrderTypeBadge,
   TaskStatusBadge,
 } from '@/components/domain';
-import {
-  ORDER_TYPES,
-  type Order,
-  type OrderTypeTag,
-  clientName,
-} from '@/types/domain';
+import { ORDER_TYPES, type Order, clientName } from '@/types/domain';
+import { useDeepLink } from '@/lib/deepLink';
+import { includesFolded } from '@/lib/search';
+import { useShortcuts } from '@/lib/hotkeys';
+import { recordUse } from '@/lib/recents';
 import { ErrorNotice, FilterBar, FilterField, SearchInput } from './components/FilterBar';
 import { OrderDetailDrawer } from './components/OrderDetailDrawer';
 import { OrderFormDrawer } from './components/OrderFormDrawer';
@@ -64,8 +67,53 @@ export function OrdersPage() {
   const [dateTo, setDateTo] = useState<string | null>(null);
   const [selected, setSelected] = useState<Set<RowKey>>(new Set());
   const [drawer, setDrawer] = useState<DrawerState>({ kind: 'none' });
+  const searchRef = useRef<HTMLInputElement>(null);
 
   const orders = useMemo(() => ordersQuery.data ?? [], [ordersQuery.data]);
+
+  // ── Deep links from the command palette and from shared URLs ────────────
+  const deepLink = useDeepLink();
+  const linkedOrderId = deepLink.number('comanda');
+  const wantsNew = deepLink.flag('nou');
+
+  useEffect(() => {
+    if (linkedOrderId === null) return;
+    setDrawer({ kind: 'detail', orderId: linkedOrderId });
+    recordUse('order', linkedOrderId);
+    deepLink.clear('comanda');
+  }, [linkedOrderId, deepLink]);
+
+  useEffect(() => {
+    if (!wantsNew) return;
+    setDrawer({ kind: 'create' });
+    deepLink.clear('nou');
+  }, [wantsNew, deepLink]);
+
+  const openDetail = (orderId: number) => {
+    recordUse('order', orderId);
+    setDrawer({ kind: 'detail', orderId });
+  };
+
+  useShortcuts([
+    {
+      combo: 'n',
+      description: 'Comandă nouă',
+      group: 'Comenzi',
+      run: () => setDrawer({ kind: 'create' }),
+    },
+    {
+      combo: '/',
+      description: 'Focus pe câmpul de căutare',
+      group: 'Comenzi',
+      run: () => searchRef.current?.focus(),
+    },
+    {
+      combo: 'r',
+      description: 'Reîmprospătează lista',
+      group: 'Comenzi',
+      run: () => void ordersQuery.refetch(),
+    },
+  ]);
 
   const statusesQuery = useOrderTaskStatuses(orders.map((order) => order.id));
 
@@ -80,7 +128,7 @@ export function OrdersPage() {
   );
 
   const rows = useMemo(() => {
-    const needle = search.trim().toLowerCase();
+    const needle = search.trim();
     return orders.filter((order) => {
       if (needle) {
         const haystack = [
@@ -89,7 +137,8 @@ export function OrdersPage() {
           orderAddress(order) ?? '',
           orderSummary(order),
         ];
-        if (!haystack.some((value) => value.toLowerCase().includes(needle))) return false;
+        // Diacritic-insensitive: a typed "bucuresti" has to find "București".
+        if (!haystack.some((value) => includesFolded(value, needle))) return false;
       }
       if (typeFilter && order.orderType !== typeFilter) return false;
       if (clientFilter && String(order.client.id) !== clientFilter) return false;
@@ -226,6 +275,7 @@ export function OrdersPage() {
       <FilterBar>
         <FilterField label="Căutare">
           <SearchInput
+            inputRef={searchRef}
             value={search}
             onChange={setSearch}
             placeholder="Număr, client, adresă, produs"
@@ -272,7 +322,7 @@ export function OrdersPage() {
           initialSort={{ key: 'date', dir: 'desc' }}
           loading={ordersQuery.isLoading}
           activeKey={openOrder?.id ?? null}
-          onRowClick={(order) => setDrawer({ kind: 'detail', orderId: order.id })}
+          onRowClick={(order) => openDetail(order.id)}
           selectedKeys={selected}
           onSelectionChange={setSelected}
           bulkActions={

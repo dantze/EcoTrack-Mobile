@@ -91,6 +91,9 @@ expo-env.d.ts
 # Local environment files and compiled artifacts
 .env*.local
 mobile/.env
+# backend/.env holds DB_PASS, DO_SPACES_* and GOOGLE_CLIENT_ID and is read by
+# the bootRun task in backend/build.gradle - it must never be committed.
+backend/.env
 *.tsbuildinfo
 
 # H2 Database (local dev only)

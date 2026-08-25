@@ -97,6 +97,14 @@ public class GoogleAuthService {
     // Public (not just used internally) so GoogleAuthServiceTest can exercise the
     // domain-matching rule directly without round-tripping a real signed Google token.
     public boolean domainMatches(GoogleIdToken.Payload payload) {
+        if (allowedDomain == null) {
+            // No domain restriction configured: verify() never calls this, but a
+            // direct caller must not get an NPE (or an accidental "false").
+            return true;
+        }
+        if (payload == null) {
+            return false;
+        }
         String hostedDomain = payload.getHostedDomain();
         if (hostedDomain != null && hostedDomain.equalsIgnoreCase(allowedDomain)) {
             return true;

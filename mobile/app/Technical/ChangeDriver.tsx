@@ -1,6 +1,5 @@
 import { StyleSheet, Text, View, Pressable, Alert, ScrollView } from 'react-native'
 import React, { useState, useEffect } from 'react'
-import { useRouter } from 'expo-router'
 import { Ionicons } from '@expo/vector-icons';
 import { Employee, getAllDrivers } from '@/services/EmployeeService';
 import { RouteService } from '@/services/RouteService';
@@ -14,14 +13,13 @@ import { AppColors } from '../../constants/Colors';
 import { formatDisplayDate, toDateString } from '../../utils/dateUtils';
 
 const ChangeDriver = () => {
-    const router = useRouter();
 
     const [selectedDate, setSelectedDate] = useState(new Date());
     const [showDatePicker, setShowDatePicker] = useState(false);
 
     // Drivers
     const [drivers, setDrivers] = useState<Employee[]>([]);
-    const [driversLoading, setDriversLoading] = useState(false);
+    const [_driversLoading, setDriversLoading] = useState(false);
 
     // Driver selection
     const [sourceDriver, setSourceDriver] = useState<Employee | null>(null);

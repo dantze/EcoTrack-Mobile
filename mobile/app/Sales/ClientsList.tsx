@@ -56,7 +56,7 @@ export default function ClientsList() {
         }
     }, []);
 
-    const fetchOrderSummaries = async (clientsList: ClientItem[]) => {
+    const fetchOrderSummaries = async (_clientsList: ClientItem[]) => {
         try {
             const allOrders: Order[] = await OrderService.getOrders();
             const summaryMap: Record<number, { orderTypes: string[]; items: string[] }> = {};

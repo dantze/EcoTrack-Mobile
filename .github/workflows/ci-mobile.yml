@@ -1,5 +1,6 @@
 name: CI Mobile
 
+# PATH FILTERING IS LOAD-BEARING — see the note in ci-backend.yml.
 on:
   pull_request:
     paths:
@@ -11,19 +12,35 @@ on:
       - 'mobile/**'
       - '.github/workflows/ci-mobile.yml'
 
+concurrency:
+  group: ci-mobile-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
 defaults:
   run:
     working-directory: mobile
 
 jobs:
-  typecheck:
+  check:
+    name: Lint and typecheck
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: npm
           cache-dependency-path: mobile/package-lock.json
+
       - run: npm ci
-      - run: npm run typecheck
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Typecheck
+        run: npm run typecheck

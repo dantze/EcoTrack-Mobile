@@ -6,7 +6,13 @@
  */
 
 import type { ReactNode } from 'react';
-import { Select, TextInput, type SelectOption } from '@/components/ui';
+import {
+  Autocomplete,
+  Select,
+  TextInput,
+  type AutocompleteOption,
+  type SelectOption,
+} from '@/components/ui';
 import { parseCoordinates } from '@/types/domain';
 import type { LocationValue } from '../orderModel';
 import { PHONE_CODES } from '../validation';
@@ -140,12 +146,17 @@ export function PhoneField({
 /**
  * Address text plus optional manual coordinates.
  *
+ * When `suggestions` is supplied the address becomes a typeahead over places
+ * this client (and then anyone) has been served before — the operator picks a
+ * known site instead of retyping it, and accepting a suggestion carries its
+ * "lat,lng" across too, via `coordinatesFor`. Free text is still allowed: the
+ * list only offers shortcuts, it never constrains the value.
+ *
  * TODO(map): the mobile app picks the point on a MapView with reverse
  * geocoding and shows the client's existing placements as markers. The desktop
  * equivalent is a map picker in this slot — it needs a mapping library, which
- * is deliberately not installed yet, so for now the address is typed and the
- * coordinates are optional. Everything downstream already round-trips the
- * "lat,lng" string via parseCoordinates/formatCoordinates, so dropping a
+ * is deliberately not installed yet. Everything downstream already round-trips
+ * the "lat,lng" string via parseCoordinates/formatCoordinates, so dropping a
  * picker in here is the only change needed.
  */
 export function LocationFields({
@@ -157,6 +168,8 @@ export function LocationFields({
   required,
   addressId,
   coordinatesId,
+  suggestions,
+  coordinatesFor,
 }: {
   label: string;
   value: LocationValue;
@@ -167,20 +180,46 @@ export function LocationFields({
   /** DOM ids matching the validator's error keys, for focus-on-failed-submit. */
   addressId?: string;
   coordinatesId?: string;
+  /** Known addresses to offer as a typeahead. Omit for a plain text field. */
+  suggestions?: AutocompleteOption[];
+  /** "lat,lng" for an accepted suggestion, so the point comes with it. */
+  coordinatesFor?: (option: AutocompleteOption) => string | null;
 }) {
   const point = parseCoordinates(value.coordinates);
   return (
     <FormGrid>
       <Col span={8}>
-        <TextInput
-          id={addressId}
-          label={label}
-          required={required}
-          value={value.address}
-          error={addressError}
-          placeholder="Str. Exemplu 12, București"
-          onChange={(event) => onChange({ ...value, address: event.target.value })}
-        />
+        {suggestions ? (
+          <Autocomplete
+            id={addressId}
+            label={label}
+            required={required}
+            value={value.address}
+            error={addressError}
+            hint={
+              value.address.trim() ? undefined : 'Scrie sau alege o adresă folosită anterior'
+            }
+            placeholder="Str. Exemplu 12, București"
+            options={suggestions}
+            onChange={(address) => onChange({ ...value, address })}
+            onSelect={(option) =>
+              onChange({
+                address: option.value,
+                coordinates: coordinatesFor?.(option) ?? value.coordinates,
+              })
+            }
+          />
+        ) : (
+          <TextInput
+            id={addressId}
+            label={label}
+            required={required}
+            value={value.address}
+            error={addressError}
+            placeholder="Str. Exemplu 12, București"
+            onChange={(event) => onChange({ ...value, address: event.target.value })}
+          />
+        )}
       </Col>
       <Col span={4}>
         <TextInput

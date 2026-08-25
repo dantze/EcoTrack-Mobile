@@ -23,7 +23,7 @@ export const PhotoService = {
         const type = match ? `image/${match[1]}` : 'image/jpeg';
 
         // React Native FormData expects an object with uri, name, type
-        // @ts-ignore
+        // @ts-expect-error React Native FormData accepts { uri, name, type }
         formData.append('file', { uri: photoUri, name: filename, type });
 
         console.log(`[PhotoService] Uploading photo for client ${clientId}...`);
@@ -104,7 +104,7 @@ export const PhotoService = {
             const match = /\.(\w+)$/.exec(filename);
             const type = match ? `image/${match[1]}` : 'image/jpeg';
 
-            // @ts-ignore - React Native FormData expects { uri, name, type }
+            // @ts-expect-error React Native FormData expects { uri, name, type }
             formData.append('files', { uri, name: filename, type });
         }
 

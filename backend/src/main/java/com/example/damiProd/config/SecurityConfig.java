@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -16,6 +17,8 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
+import org.springframework.security.web.header.writers.XXssProtectionHeaderWriter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -34,19 +37,56 @@ import java.util.List;
  * which is what keeps the current React Native app (which sends no tokens)
  * working in production until it is updated.
  *
- * See README.md for the full list of related properties and what an
- * operator must do to flip this on.
+ * Two things deliberately apply in BOTH modes, because neither can break a
+ * token-less caller:
+ *   - the infrastructure deny-list below (/h2-console, actuator internals):
+ *     nothing in either client app ever calls those;
+ *   - the security response headers.
+ * Everything role-related is inside the {@code enforceSecurity} branch and is
+ * therefore inert while the flag is false.
+ *
+ * See CLAUDE.md ("The security enforcement flag") for the full property list
+ * and what an operator must do to flip this on.
  */
 @Configuration
 public class SecurityConfig {
 
     private static final Logger log = LoggerFactory.getLogger(SecurityConfig.class);
 
+    // Role names as stored in employee_roles (SecurityConfig prefixes ROLE_ itself
+    // via hasRole/hasAnyRole - see BearerTokenAuthenticationFilter, which builds the
+    // authorities as "ROLE_" + roleName).
+    private static final String ADMIN = "ADMIN";
+    private static final String SALES = "SALES";
+    private static final String TECH = "TECH";
+    private static final String DRIVER = "DRIVER";
+    /** Office staff: everyone allowed to change business data (clients, orders, routes, ...). */
+    private static final String[] OFFICE = { ADMIN, SALES, TECH };
+
+    /**
+     * Never routable, in either enforcement mode. The H2 console in particular is
+     * an arbitrary-JDBC-URL client: reachable + unauthenticated means "connect to
+     * any database this host can see", so it is denied at the filter chain as well
+     * as switched off via spring.h2.console.enabled.
+     */
+    private static final String[] INFRA_DENY_LIST = {
+            "/h2-console/**", "/actuator/**", "/env/**", "/heapdump", "/jolokia/**"
+    };
+
+    private static final List<String> ALLOWED_CORS_HEADERS =
+            List.of("Authorization", "Content-Type", "Accept", "Accept-Language", "X-Requested-With");
+
     @Value("${ecotrack.security.enforce:false}")
     private boolean enforceSecurity;
 
     @Value("${ecotrack.cors.allowed-origins:http://localhost:5173}")
     private String allowedOriginsProperty;
+
+    @Value("${ecotrack.security.bcrypt-strength:12}")
+    private int bcryptStrength;
+
+    @Value("${ecotrack.security.reject-invalid-bearer:true}")
+    private boolean rejectInvalidBearer;
 
     @PostConstruct
     void logEnforcementMode() {
@@ -55,18 +95,28 @@ public class SecurityConfig {
         if (enforceSecurity) {
             log.info("EcoTrack security ENFORCEMENT IS ON (ecotrack.security.enforce=true).");
             log.info("  -> /api/** requires a valid Bearer access token.");
-            log.info("  -> /api/admin/** additionally requires the ADMIN role.");
+            log.info("  -> /api/admin/** and employee management require the ADMIN role.");
+            log.info("  -> business writes require SALES/TECH/ADMIN; DRIVER may only");
+            log.info("     update task status and upload task photos.");
         } else {
             log.warn("EcoTrack security enforcement is OFF (ecotrack.security.enforce=false).");
             log.warn("  -> /api/** accepts unauthenticated requests (legacy/mobile compatibility mode).");
             log.warn("  -> Token issuance/validation still works; only the gate is open.");
+            log.warn("  -> Role checks are INERT in this mode - anyone reaching the API is effectively admin.");
         }
         log.info("====================================================================");
     }
 
+    /**
+     * BCrypt, strength configurable (default 12 - roughly 250ms per verification
+     * on modern hardware, which is what makes an offline crack of a leaked hash
+     * expensive). Existing hashes carry their own cost factor in the string, so
+     * raising this never invalidates already-stored passwords; they simply verify
+     * at their original strength until the next time they are set.
+     */
     @Bean
     public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
+        return new BCryptPasswordEncoder(bcryptStrength);
     }
 
     @Bean
@@ -75,11 +125,24 @@ public class SecurityConfig {
         List<String> origins = Arrays.stream(allowedOriginsProperty.split(","))
                 .map(String::trim)
                 .filter(s -> !s.isEmpty())
+                // Fail closed: "*" cannot be combined with credentials, and silently
+                // letting it through would be the one CORS mistake that matters.
+                .filter(s -> {
+                    if ("*".equals(s)) {
+                        log.error("ecotrack.cors.allowed-origins contains '*', which is not allowed with "
+                                + "credentialed requests - ignoring that entry.");
+                        return false;
+                    }
+                    return true;
+                })
                 .toList();
         configuration.setAllowedOrigins(origins);
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(List.of("*"));
+        // Explicit list rather than "*": with allowCredentials=true a browser will
+        // not honour "*" anyway, and an explicit list documents the contract.
+        configuration.setAllowedHeaders(ALLOWED_CORS_HEADERS);
         configuration.setAllowCredentials(true);
+        configuration.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
@@ -95,7 +158,25 @@ public class SecurityConfig {
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .formLogin(AbstractHttpConfigurer::disable)
                 .sessionManagement(sm -> sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .addFilterBefore(new BearerTokenAuthenticationFilter(tokenService),
+                // This is a pure JSON API: nothing here is ever meant to be framed,
+                // embedded, sniffed as another content type, or cached by a shared proxy.
+                .headers(headers -> headers
+                        .frameOptions(frame -> frame.deny())
+                        .contentTypeOptions(Customizer.withDefaults())
+                        .cacheControl(Customizer.withDefaults())
+                        .xssProtection(xss -> xss.headerValue(XXssProtectionHeaderWriter.HeaderValue.DISABLED))
+                        .referrerPolicy(referrer -> referrer
+                                .policy(ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER))
+                        // No document this API serves is allowed to load anything or be
+                        // framed; this mainly neuters any error page or accidental HTML.
+                        .contentSecurityPolicy(csp -> csp
+                                .policyDirectives("default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"))
+                        // Ignored over plain HTTP (which is what production still speaks),
+                        // but correct the moment TLS is terminated in front of the app.
+                        .httpStrictTransportSecurity(hsts -> hsts
+                                .includeSubDomains(true)
+                                .maxAgeInSeconds(31536000)))
+                .addFilterBefore(new BearerTokenAuthenticationFilter(tokenService, rejectInvalidBearer),
                         UsernamePasswordAuthenticationFilter.class)
                 // Plain status codes, no redirect-to-login-page: this is a token API,
                 // never an HTML login flow.
@@ -108,17 +189,52 @@ public class SecurityConfig {
         if (enforceSecurity) {
             http.authorizeHttpRequests(auth -> auth
                     .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                    .requestMatchers(INFRA_DENY_LIST).denyAll()
                     .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/google",
                             "/api/auth/refresh", "/api/auth/logout")
                     .permitAll()
-                    .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                    // /auth/me + session management: any signed-in employee manages
+                    // their own sessions, regardless of role.
+                    .requestMatchers("/api/auth/**").authenticated()
+
+                    // ---- Administration -------------------------------------------------
+                    .requestMatchers("/api/admin/**").hasRole(ADMIN)
+                    // EmployeeController writes are an unguarded privilege-escalation path
+                    // (create an employee, hand it any role) - admins only.
+                    .requestMatchers(HttpMethod.POST, "/api/employees", "/api/employees/**").hasRole(ADMIN)
+                    .requestMatchers(HttpMethod.PUT, "/api/employees/**").hasRole(ADMIN)
+                    .requestMatchers(HttpMethod.PATCH, "/api/employees/**").hasRole(ADMIN)
+                    .requestMatchers(HttpMethod.DELETE, "/api/employees/**").hasRole(ADMIN)
+
+                    // ---- Field work -----------------------------------------------------
+                    // The only two writes the driver app performs (see mobile/app/Driver/*):
+                    // marking a task done and attaching its photos.
+                    .requestMatchers(HttpMethod.PATCH, "/api/tasks/*/status")
+                    .hasAnyRole(DRIVER, SALES, TECH, ADMIN)
+                    .requestMatchers(HttpMethod.POST, "/api/tasks/*/photos")
+                    .hasAnyRole(DRIVER, SALES, TECH, ADMIN)
+
+                    // ---- Every other business write is office staff ---------------------
+                    .requestMatchers(HttpMethod.POST, "/api/**").hasAnyRole(OFFICE)
+                    .requestMatchers(HttpMethod.PUT, "/api/**").hasAnyRole(OFFICE)
+                    .requestMatchers(HttpMethod.PATCH, "/api/**").hasAnyRole(OFFICE)
+                    .requestMatchers(HttpMethod.DELETE, "/api/**").hasAnyRole(OFFICE)
+
+                    // ---- Reads: any authenticated employee ------------------------------
                     .requestMatchers("/api/**").authenticated()
-                    .anyRequest().permitAll());
+
+                    // Container-generated error dispatches must stay reachable, or a 401
+                    // would turn into a 403 loop.
+                    .requestMatchers("/error").permitAll()
+                    .anyRequest().denyAll());
         } else {
-            // Enforcement off: everything stays open, but the filter above still
-            // populates the SecurityContext for anyone who *does* send a token,
-            // so web clients can already rely on auth working end-to-end.
-            http.authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
+            // Enforcement off: the business API stays open, but the filter above still
+            // populates the SecurityContext for anyone who *does* send a token, so web
+            // clients can already rely on auth working end-to-end. The infrastructure
+            // deny-list still applies - no client has ever called those paths.
+            http.authorizeHttpRequests(auth -> auth
+                    .requestMatchers(INFRA_DENY_LIST).denyAll()
+                    .anyRequest().permitAll());
         }
 
         return http.build();

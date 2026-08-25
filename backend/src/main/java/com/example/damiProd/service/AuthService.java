@@ -20,6 +20,7 @@ import java.security.MessageDigest;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -27,11 +28,36 @@ public class AuthService {
 
     private static final Logger log = LoggerFactory.getLogger(AuthService.class);
 
+    /**
+     * One message for "no such user" and for "wrong password". Telling the two
+     * apart hands an attacker a free account-enumeration oracle: they could walk
+     * a list of names and learn which ones exist before spending a single guess.
+     */
+    private static final String INVALID_CREDENTIALS_MESSAGE = "Nume de utilizator sau parolă incorectă";
+
+    /**
+     * bcrypt caps at 72 bytes anyway; anything past this is someone making the
+     * server do work, not someone logging in.
+     */
+    private static final int MAX_CREDENTIAL_LENGTH = 200;
+
+    /** A Google ID token is a JWT of a few hundred bytes - this is generous. */
+    private static final int MAX_ID_TOKEN_LENGTH = 4096;
+
     private final EmployeeRepository employeeRepository;
     private final PasswordEncoder passwordEncoder;
     private final TokenService tokenService;
     private final GoogleAuthService googleAuthService;
     private final LoginRateLimiter loginRateLimiter;
+
+    /**
+     * A throwaway bcrypt hash, verified against when the username does not exist
+     * so that the "unknown user" path costs the same as the "wrong password" one.
+     * Without it, login time alone reveals which usernames are real, which is the
+     * same leak the shared message above closes. Generated at startup rather than
+     * hardcoded so it always matches this encoder's cost factor.
+     */
+    private final String dummyHash;
 
     public AuthService(EmployeeRepository employeeRepository,
             PasswordEncoder passwordEncoder,
@@ -43,6 +69,7 @@ public class AuthService {
         this.tokenService = tokenService;
         this.googleAuthService = googleAuthService;
         this.loginRateLimiter = loginRateLimiter;
+        this.dummyHash = passwordEncoder.encode(UUID.randomUUID().toString());
     }
 
     /**
@@ -53,7 +80,17 @@ public class AuthService {
      */
     @Transactional
     public LoginResponse login(LoginRequest request, String clientIp, String userAgent) {
+        if (request == null) {
+            return new LoginResponse(false, INVALID_CREDENTIALS_MESSAGE);
+        }
         String username = request.getUsername();
+        String password = request.getPassword();
+
+        // Rejected before touching the database or bcrypt: a blank or absurdly
+        // long credential is never a real login, and both are cheap to abuse.
+        if (isUnusable(username) || isUnusable(password)) {
+            return new LoginResponse(false, INVALID_CREDENTIALS_MESSAGE);
+        }
 
         if (loginRateLimiter.isBlocked(username, clientIp)) {
             return new LoginResponse(false, "Prea multe încercări eșuate. Încearcă din nou mai târziu.");
@@ -61,14 +98,17 @@ public class AuthService {
 
         Optional<Employee> employeeOpt = employeeRepository.findByUsername(username);
         if (employeeOpt.isEmpty()) {
+            // Burn the same bcrypt cost as a real verification would, then answer
+            // with the same message - see INVALID_CREDENTIALS_MESSAGE / dummyHash.
+            passwordEncoder.matches(password, dummyHash);
             loginRateLimiter.recordFailure(username, clientIp);
-            return new LoginResponse(false, "Utilizator inexistent");
+            return new LoginResponse(false, INVALID_CREDENTIALS_MESSAGE);
         }
 
         Employee employee = employeeOpt.get();
-        if (!passwordMatches(request.getPassword(), employee)) {
+        if (!passwordMatches(password, employee)) {
             loginRateLimiter.recordFailure(username, clientIp);
-            return new LoginResponse(false, "Parolă incorectă");
+            return new LoginResponse(false, INVALID_CREDENTIALS_MESSAGE);
         }
 
         loginRateLimiter.recordSuccess(username, clientIp);
@@ -84,6 +124,9 @@ public class AuthService {
      */
     @Transactional
     public LoginResponse loginWithGoogle(String idToken, String userAgent) {
+        if (idToken == null || idToken.isBlank() || idToken.length() > MAX_ID_TOKEN_LENGTH) {
+            return new LoginResponse(false, "Token Google invalid sau domeniu nepermis.");
+        }
         Optional<GoogleIdToken.Payload> payloadOpt = googleAuthService.verify(idToken);
         if (payloadOpt.isEmpty()) {
             return new LoginResponse(false, "Token Google invalid sau domeniu nepermis.");
@@ -156,6 +199,10 @@ public class AuthService {
             employeeRepository.save(employee);
         }
         return matches;
+    }
+
+    private boolean isUnusable(String credential) {
+        return credential == null || credential.isBlank() || credential.length() > MAX_CREDENTIAL_LENGTH;
     }
 
     private boolean isBcryptHash(String value) {

@@ -149,7 +149,7 @@ export const ClientService = {
         const type = match ? `image/${match[1]}` : 'image/jpeg';
 
         // Append file
-        // @ts-ignore: React Native FormData expects an object with uri, name, type
+        // @ts-expect-error React Native FormData expects an object with uri, name, type
         formData.append('file', { uri: photoUri, name: filename, type });
 
         console.log(`Uploading photo for client ${clientId} to ${API_BASE_URL}/${clientId}/idPhoto`);

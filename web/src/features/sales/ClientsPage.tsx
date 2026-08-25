@@ -3,9 +3,12 @@
  *
  * Deletion keeps the mobile guard: ask the backend whether the client has
  * orders and escalate the confirmation when it does.
+ *
+ * `?client=<id>` opens that client's drawer and `?nou=1` opens an empty form —
+ * the entry points the command palette (⌘K) uses.
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Badge,
   Button,
@@ -16,6 +19,9 @@ import {
   type Column,
   type SelectOption,
 } from '@/components/ui';
+import { useDeepLink } from '@/lib/deepLink';
+import { useShortcuts } from '@/lib/hotkeys';
+import { recordUse } from '@/lib/recents';
 import { type Client, clientName } from '@/types/domain';
 import { ClientFormDrawer } from './components/ClientFormDrawer';
 import { matchesClient } from './components/ClientPicker';
@@ -48,8 +54,47 @@ export function ClientsPage() {
   const [kindFilter, setKindFilter] = useState('');
   const [drawer, setDrawer] = useState<DrawerState>({ kind: 'none' });
   const [orderClient, setOrderClient] = useState<Client | null>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
 
   const clients = useMemo(() => clientsQuery.data ?? [], [clientsQuery.data]);
+
+  const deepLink = useDeepLink();
+  const linkedClientId = deepLink.number('client');
+  const wantsNew = deepLink.flag('nou');
+
+  useEffect(() => {
+    if (linkedClientId === null) return;
+    setDrawer({ kind: 'edit', clientId: linkedClientId });
+    recordUse('client', linkedClientId);
+    deepLink.clear('client');
+  }, [linkedClientId, deepLink]);
+
+  useEffect(() => {
+    if (!wantsNew) return;
+    setDrawer({ kind: 'create' });
+    deepLink.clear('nou');
+  }, [wantsNew, deepLink]);
+
+  useShortcuts([
+    {
+      combo: 'n',
+      description: 'Client nou',
+      group: 'Clienți',
+      run: () => setDrawer({ kind: 'create' }),
+    },
+    {
+      combo: '/',
+      description: 'Focus pe câmpul de căutare',
+      group: 'Clienți',
+      run: () => searchRef.current?.focus(),
+    },
+    {
+      combo: 'r',
+      description: 'Reîmprospătează lista',
+      group: 'Clienți',
+      run: () => void clientsQuery.refetch(),
+    },
+  ]);
 
   const orderCounts = useMemo(() => {
     const counts = new Map<number, number>();
@@ -74,7 +119,7 @@ export function ClientsPage() {
 
   const removeClient = async (client: Client) => {
     const label = clientName(client);
-    let hasOrders = false;
+    let hasOrders: boolean;
     try {
       hasOrders = await checkHasOrders(client.id);
     } catch (error) {
@@ -209,6 +254,7 @@ export function ClientsPage() {
       <FilterBar>
         <FilterField label="Căutare">
           <SearchInput
+            inputRef={searchRef}
             value={search}
             onChange={setSearch}
             placeholder="Nume, CUI/CNP, email, telefon"
@@ -245,7 +291,10 @@ export function ClientsPage() {
           initialSort={{ key: 'name', dir: 'asc' }}
           loading={clientsQuery.isLoading}
           activeKey={openClient?.id ?? null}
-          onRowClick={(client) => setDrawer({ kind: 'edit', clientId: client.id })}
+          onRowClick={(client) => {
+            recordUse('client', client.id);
+            setDrawer({ kind: 'edit', clientId: client.id });
+          }}
           empty={
             <EmptyState
               title={filtersActive ? 'Niciun client pentru filtrele curente' : 'Nu există clienți'}

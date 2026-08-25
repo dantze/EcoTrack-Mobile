@@ -8,17 +8,31 @@
  * role that section's routes are gated on in src/routes/router.tsx (SALES for
  * Vânzări, TECH for Tehnic) — a Sales-only account never even sees a Tehnic
  * link it would bounce off of.
+ *
+ * The shell also owns the two app-wide keyboard affordances, because they must
+ * work on every screen and outlive any single page:
+ *   ⌘K / Ctrl+K  the command palette (jump to any record, run any action)
+ *   ?            the shortcut help overlay, built from the live registry
+ *   g then …     jump straight to a section
+ * Screens add their own keys with `useShortcuts` from `@/lib/hotkeys`; they
+ * appear in the help overlay automatically.
  */
 
-import { NavLink, Outlet } from 'react-router-dom';
+import { useState } from 'react';
+import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { DATA_MODE } from '@/api';
 import { useAuth } from '@/auth';
 import { AccountMenu } from '@/features/auth/AccountMenu';
+import { CommandPalette } from '@/features/command/CommandPalette';
+import { GLOBAL_GROUP, ShortcutHelp } from '@/features/command/ShortcutHelp';
+import { ShortcutProvider, comboLabel, useShortcuts, usePendingChord } from '@/lib/hotkeys';
 import type { Role } from '@/types/domain';
 
 interface NavItem {
   to: string;
   label: string;
+  /** Second key of the `g …` chord that jumps here. */
+  chord: string;
 }
 
 interface NavSectionDef {
@@ -32,20 +46,20 @@ const NAV_SECTIONS: NavSectionDef[] = [
     title: 'Vânzări',
     role: 'SALES',
     items: [
-      { to: '/comenzi', label: 'Comenzi' },
-      { to: '/clienti', label: 'Clienți' },
-      { to: '/produse', label: 'Produse' },
-      { to: '/abonamente', label: 'Abonamente' },
+      { to: '/comenzi', label: 'Comenzi', chord: 'c' },
+      { to: '/clienti', label: 'Clienți', chord: 'l' },
+      { to: '/produse', label: 'Produse', chord: 'p' },
+      { to: '/abonamente', label: 'Abonamente', chord: 'a' },
     ],
   },
   {
     title: 'Tehnic',
     role: 'TECH',
     items: [
-      { to: '/rute', label: 'Rute' },
-      { to: '/sarcini', label: 'Sarcini' },
-      { to: '/soferi', label: 'Șoferi' },
-      { to: '/recurente', label: 'Igienizări recurente' },
+      { to: '/rute', label: 'Rute', chord: 'r' },
+      { to: '/sarcini', label: 'Sarcini', chord: 's' },
+      { to: '/soferi', label: 'Șoferi', chord: 'd' },
+      { to: '/recurente', label: 'Igienizări recurente', chord: 'i' },
     ],
   },
 ];
@@ -63,12 +77,18 @@ function NavSection({ title, items }: { title: string; items: NavItem[] }) {
             to={item.to}
             className={({ isActive }) =>
               [
-                'rounded-md px-3 py-1.5 text-sm transition-colors',
+                'group flex items-center justify-between rounded-md px-3 py-1.5 text-sm transition-colors',
                 isActive ? 'bg-white/15 font-medium text-white' : 'text-white/70 hover:bg-white/10',
               ].join(' ')
             }
           >
-            {item.label}
+            <span className="truncate">{item.label}</span>
+            <span
+              aria-hidden
+              className="ml-2 shrink-0 font-mono text-[0.625rem] text-white/0 transition-colors group-hover:text-white/45"
+            >
+              g {item.chord}
+            </span>
           </NavLink>
         ))}
       </nav>
@@ -77,16 +97,75 @@ function NavSection({ title, items }: { title: string; items: NavItem[] }) {
 }
 
 export function AppShell() {
+  return (
+    <ShortcutProvider>
+      <ShellBody />
+    </ShortcutProvider>
+  );
+}
+
+function ShellBody() {
   const { hasRole } = useAuth();
+  const navigate = useNavigate();
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const pendingChord = usePendingChord();
+
   const visibleSections = NAV_SECTIONS.filter((section) => hasRole(section.role));
+
+  useShortcuts([
+    {
+      combo: 'mod+k',
+      description: 'Căutare rapidă (clienți, comenzi, sarcini, rute, acțiuni)',
+      group: GLOBAL_GROUP,
+      run: () => {
+        setHelpOpen(false);
+        setPaletteOpen((open) => !open);
+      },
+    },
+    {
+      combo: '?',
+      description: 'Arată scurtăturile disponibile',
+      group: GLOBAL_GROUP,
+      run: () => {
+        setPaletteOpen(false);
+        setHelpOpen((open) => !open);
+      },
+    },
+    ...visibleSections.flatMap((section) =>
+      section.items.map((item) => ({
+        combo: `g ${item.chord}`,
+        description: `Deschide ${item.label}`,
+        group: 'Navigare',
+        run: () => navigate(item.to),
+      })),
+    ),
+  ]);
 
   return (
     <div className="flex h-full">
       <aside className="flex w-56 shrink-0 flex-col bg-brand-700 px-2 py-4">
-        <div className="mb-6 px-3">
+        <div className="mb-4 px-3">
           <p className="text-sm font-semibold text-white">EcoTrack</p>
           <p className="text-xs text-white/50">Dami Prod</p>
         </div>
+
+        <button
+          type="button"
+          onClick={() => setPaletteOpen(true)}
+          className="mx-1 mb-5 flex items-center justify-between gap-2 rounded-md bg-white/10 px-2.5 py-1.5 text-sm text-white/70 transition-colors hover:bg-white/15 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-400"
+        >
+          <span className="flex min-w-0 items-center gap-1.5">
+            <svg viewBox="0 0 16 16" aria-hidden className="size-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth={1.5}>
+              <circle cx="7.2" cy="7.2" r="4.2" />
+              <path d="m10.4 10.4 2.6 2.6" strokeLinecap="round" />
+            </svg>
+            <span className="truncate">Caută…</span>
+          </span>
+          <kbd className="shrink-0 rounded border border-white/25 px-1 font-mono text-[0.625rem] text-white/60">
+            {comboLabel('mod+k')}
+          </kbd>
+        </button>
 
         {visibleSections.map((section) => (
           <NavSection key={section.title} title={section.title} items={section.items} />
@@ -98,6 +177,13 @@ export function AppShell() {
               date demo
             </span>
           )}
+          <button
+            type="button"
+            onClick={() => setHelpOpen(true)}
+            className="mx-1 rounded px-2 py-1 text-left text-xs text-white/45 transition-colors hover:text-white/80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-400"
+          >
+            Scurtături tastatură · ?
+          </button>
           <div className="border-t border-white/10 pt-2">
             <AccountMenu />
           </div>
@@ -107,6 +193,19 @@ export function AppShell() {
       <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-white">
         <Outlet />
       </main>
+
+      {/* Chord feedback: "g" alone means nothing until the second key lands. */}
+      {pendingChord && (
+        <div
+          role="status"
+          className="pointer-events-none fixed bottom-4 left-1/2 z-[80] -translate-x-1/2 rounded-md bg-ink px-3 py-1.5 text-xs text-white shadow-popover"
+        >
+          <kbd className="font-mono">{pendingChord}</kbd> … apasă a doua tastă
+        </div>
+      )}
+
+      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
+      <ShortcutHelp open={helpOpen} onClose={() => setHelpOpen(false)} />
     </div>
   );
 }

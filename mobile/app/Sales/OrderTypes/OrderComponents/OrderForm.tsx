@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import {
     StyleSheet, Text, View, Pressable, Switch,
-    ScrollView, TextInput, ActivityIndicator, Alert,
+    TextInput, ActivityIndicator, Alert,
     Modal, FlatList, TouchableOpacity,
 } from 'react-native';
 import { AntDesign } from '@expo/vector-icons';

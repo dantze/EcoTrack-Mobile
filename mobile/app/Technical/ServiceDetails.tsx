@@ -83,7 +83,7 @@ const ServiceDetails = () => {
                             await TaskService.updateTaskStatus(taskId!, "COMPLETED");
                             Alert.alert("Succes", "Sarcina a fost finalizată cu succes!");
                             router.back();
-                        } catch (error) {
+                        } catch {
                             Alert.alert("Eroare", "Nu s-a putut finaliza sarcina.");
                             setLoading(false);
                         }
@@ -93,7 +93,7 @@ const ServiceDetails = () => {
         );
     };
 
-    const handlePostpone = () => {
+    const _handlePostpone = () => {
         // Placeholder for postpone logic
         Alert.alert("Info", "Funcționalitatea de schimbare dată (snooze) va fi disponibilă în curând.");
     };

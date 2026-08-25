@@ -2,7 +2,6 @@ import {
     StyleSheet, Text, View, Pressable, ScrollView, ActivityIndicator,
 } from 'react-native'
 import React, { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'expo-router'
 import { Ionicons, MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { ProductService, Product } from '../../services/ProductService';
 import { Subscription, SubscriptionService, SubscriptionType } from '../../services/SubscriptionService';
@@ -17,7 +16,6 @@ import { AppColors } from '../../constants/Colors';
 type ActiveTab = 'products' | 'subscriptions';
 
 const ProductsAndSubscriptions = () => {
-    const router = useRouter();
     const [activeTab, setActiveTab] = useState<ActiveTab>('products');
 
     // ─── Products state ──────────────────────────────────────────────────────

@@ -101,6 +101,14 @@ public class AuthController {
         return ResponseEntity.noContent().build();
     }
 
+    /**
+     * Best-effort caller IP for the login throttle only - never for an
+     * authorization decision. X-Forwarded-For is set by whatever proxy sits in
+     * front of the app, but nothing stops a direct caller from sending it
+     * themselves, so this value is attacker-controlled in the general case.
+     * That is precisely why LoginRateLimiter also keeps a per-username counter
+     * that does not depend on it.
+     */
     private String clientIp(HttpServletRequest request) {
         String forwarded = request.getHeader("X-Forwarded-For");
         if (forwarded != null && !forwarded.isBlank()) {

@@ -40,12 +40,21 @@ export const salesKeys = {
 // Reads
 // ---------------------------------------------------------------------------
 
-export function useClients(): UseQueryResult<Client[]> {
-  return useQuery({ queryKey: salesKeys.clients, queryFn: () => api.clients.list() });
+/**
+ * `enabled` lets a caller outside the Sales screens (the command palette in the
+ * shell) hold the same query key without firing a request the signed-in user's
+ * roles would not be allowed to make.
+ */
+export interface ReadOptions {
+  enabled?: boolean;
 }
 
-export function useOrders(): UseQueryResult<Order[]> {
-  return useQuery({ queryKey: salesKeys.orders, queryFn: () => api.orders.list() });
+export function useClients({ enabled = true }: ReadOptions = {}): UseQueryResult<Client[]> {
+  return useQuery({ queryKey: salesKeys.clients, queryFn: () => api.clients.list(), enabled });
+}
+
+export function useOrders({ enabled = true }: ReadOptions = {}): UseQueryResult<Order[]> {
+  return useQuery({ queryKey: salesKeys.orders, queryFn: () => api.orders.list(), enabled });
 }
 
 export function useClientOrders(clientId: number | null): UseQueryResult<Order[]> {

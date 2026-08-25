@@ -13,7 +13,7 @@ import { API_BASE_URL } from '../../constants/ApiConfig';
 import { useRouter } from 'expo-router';
 import { AntDesign } from '@expo/vector-icons';
 
-const { width, height } = Dimensions.get('window');
+const { width: _width, height: _height } = Dimensions.get('window');
 
 // Default to center of Romania, zoomed out to show the whole country
 const DEFAULT_REGION: Region = {

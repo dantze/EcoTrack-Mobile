@@ -4,9 +4,12 @@
  * The phone app could only show a driver's day; here the dispatcher gets the
  * whole board with inline status and date edits, multi-select, and a single
  * bulk `reassignMany` call to move a batch onto another route.
+ *
+ * `?sarcina=<id>` opens that task's drawer — the command palette's entry point
+ * and a shareable link to one job.
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Button,
   DataTable,
@@ -17,8 +20,17 @@ import {
   TextInput,
 } from '@/components/ui';
 import type { Column, RowKey } from '@/components/ui';
+import { useDeepLink } from '@/lib/deepLink';
+import { useShortcuts } from '@/lib/hotkeys';
+import { recordUse } from '@/lib/recents';
 import type { Task } from '@/types/domain';
-import { useDrivers, useReassignTasks, useRoutes, useTasks } from './queries';
+import {
+  useDrivers,
+  useReassignTasks,
+  useRoutes,
+  useTasks,
+  useUpdateManyTaskStatuses,
+} from './queries';
 import {
   driverLabel,
   errorMessage,
@@ -28,6 +40,8 @@ import {
   todayIso,
 } from './utils';
 import { ALL, TASK_STATUS_OPTIONS, TASK_TYPE_OPTIONS } from './constants';
+import { TASK_STATUS_LABELS } from '@/components/domain';
+import { TASK_STATUSES, type TaskStatus } from '@/types/domain';
 import { AddressCell, ErrorBlock, TaskTypeBadge, Toolbar } from './components/display';
 import { InlineDateInput, InlineStatusSelect } from './components/inline';
 import { FeedbackProvider, useFeedback } from './components/feedback';
@@ -43,6 +57,8 @@ export function TasksPage() {
 }
 
 const NO_ROUTE = 'NONE';
+/** DOM id so the "/" shortcut can put the cursor in the search box. */
+const SEARCH_FIELD_ID = 'tasks-search';
 
 function TasksScreen() {
   const { toast } = useFeedback();
@@ -62,8 +78,46 @@ function TasksScreen() {
   const routesQuery = useRoutes();
   const driversQuery = useDrivers();
   const reassign = useReassignTasks();
+  const bulkStatus = useUpdateManyTaskStatuses();
 
   const tasks = useMemo(() => tasksQuery.data ?? [], [tasksQuery.data]);
+
+  const deepLink = useDeepLink();
+  const linkedTaskId = deepLink.number('sarcina');
+
+  useEffect(() => {
+    if (linkedTaskId === null) return;
+    setOpenTaskId(linkedTaskId);
+    recordUse('task', linkedTaskId);
+    deepLink.clear('sarcina');
+  }, [linkedTaskId, deepLink]);
+
+  useShortcuts([
+    {
+      combo: '/',
+      description: 'Focus pe câmpul de căutare',
+      group: 'Sarcini',
+      run: () => document.getElementById(SEARCH_FIELD_ID)?.focus(),
+    },
+    {
+      combo: 't',
+      description: 'Filtrează pe ziua de azi',
+      group: 'Sarcini',
+      run: () => setDate(todayIso()),
+    },
+    {
+      combo: 'a',
+      description: 'Arată toate datele',
+      group: 'Sarcini',
+      run: () => setDate(null),
+    },
+    {
+      combo: 'r',
+      description: 'Reîmprospătează lista',
+      group: 'Sarcini',
+      run: () => void tasksQuery.refetch(),
+    },
+  ]);
 
   const filtered = useMemo(
     () =>
@@ -91,6 +145,31 @@ function TasksScreen() {
       filtered.filter((task) => selected.has(task.id)).map((task) => task.id),
     [filtered, selected],
   );
+
+  const applyBulkStatus = (status: TaskStatus) => {
+    if (selectedIds.length === 0) {
+      toast.info('Selectează cel puțin o sarcină.');
+      return;
+    }
+    bulkStatus.mutate(
+      { taskIds: selectedIds, status },
+      {
+        onSuccess: ({ updated, failed }) => {
+          if (updated > 0) {
+            toast.success(
+              `${updated} ${updated === 1 ? 'sarcină marcată' : 'sarcini marcate'} „${TASK_STATUS_LABELS[status]}”.`,
+            );
+          }
+          if (failed > 0) {
+            toast.error(`${failed} sarcini nu au putut fi actualizate.`);
+          } else {
+            setSelected(new Set());
+          }
+        },
+        onError: (error) => toast.error(errorMessage(error)),
+      },
+    );
+  };
 
   const columns: Column<Task>[] = [
     {
@@ -250,8 +329,9 @@ function TasksScreen() {
 
         <div className="w-56">
           <TextInput
+            id={SEARCH_FIELD_ID}
             label="Căutare"
-            placeholder="client, adresă, note…"
+            placeholder="client, adresă, note…  ( / )"
             value={query}
             onChange={(event) => setQuery(event.target.value)}
           />
@@ -268,7 +348,10 @@ function TasksScreen() {
           initialSort={{ key: 'date', dir: 'asc' }}
           loading={tasksQuery.isPending}
           activeKey={openTaskId}
-          onRowClick={(task) => setOpenTaskId(task.id)}
+          onRowClick={(task) => {
+            recordUse('task', task.id);
+            setOpenTaskId(task.id);
+          }}
           selectedKeys={selected}
           onSelectionChange={setSelected}
           bulkActions={
@@ -281,6 +364,24 @@ function TasksScreen() {
               >
                 Reasignează pe rută
               </Button>
+              {/* One click per status beats one click per row: closing out a
+                  finished route used to mean editing every line by hand. */}
+              <div className="w-44">
+                <Select
+                  size="sm"
+                  aria-label="Schimbă statusul selecției"
+                  value={null}
+                  placeholder={
+                    bulkStatus.isPending ? 'Se actualizează…' : 'Schimbă statusul…'
+                  }
+                  disabled={bulkStatus.isPending}
+                  options={TASK_STATUSES.map((status) => ({
+                    value: status,
+                    label: `Marchează „${TASK_STATUS_LABELS[status]}”`,
+                  }))}
+                  onChange={(value) => applyBulkStatus(value as TaskStatus)}
+                />
+              </div>
               <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>
                 Golește selecția
               </Button>

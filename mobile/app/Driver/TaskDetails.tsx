@@ -6,11 +6,10 @@ import { TaskService, Task } from '../../services/TaskService';
 import { OrderService } from '../../services/OrderService';
 import { PhotoService } from '../../services/PhotoService';
 import * as ImagePicker from 'expo-image-picker';
-import { TASK_TYPE_LABELS, STATUS_LABELS, STATUS_COLORS, getTaskTypeLabel, getStatusLabel, getStatusColor } from '../../constants/TaskConstants';
+import { STATUS_LABELS, getTaskTypeLabel, getStatusLabel, getStatusColor } from '../../constants/TaskConstants';
 import { AppColors } from '../../constants/Colors';
 import ScreenHeader from '../../components/layout/ScreenHeader';
 import StatusBadge from '../../components/display/StatusBadge';
-import PhotoGallery from '../../components/display/PhotoGallery';
 import CloudPhotoViewer from '../../components/display/CloudPhotoViewer';
 
 type OrderDetails = {

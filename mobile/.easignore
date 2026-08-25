@@ -1,4 +1,4 @@
-# Exclude the entire backend from EAS builds (only frontend is needed)
+# Exclude the entire backend from EAS builds (only the mobile app is needed)
 ../backend/
 
 # Exclude local H2 database files

@@ -2,8 +2,9 @@
 # 1. Monorepo Cleanup (Crucial)
 # ------------------------------------
 # Prevents the temporary .gitignore files from being tracked
-/frontend/.gitignore
+/mobile/.gitignore
 /backend/.gitignore
+/web/.gitignore
 
 # ------------------------------------
 # 2. General / OS / IDE Ignores
@@ -89,10 +90,17 @@ expo-env.d.ts
 
 # Local environment files and compiled artifacts
 .env*.local
-frontend/.env
+mobile/.env
 *.tsbuildinfo
 
 # H2 Database (local dev only)
 *.mv.db
 *.trace.db
 backend/data/
+
+# ------------------------------------
+# 5. React / Vite Ignores (Web)
+# ------------------------------------
+# node_modules/, dist/ and *.tsbuildinfo are already covered above.
+web/.env
+*.log

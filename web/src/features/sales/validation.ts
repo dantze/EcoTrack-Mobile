@@ -3,8 +3,8 @@
  *
  * Ported 1:1 from the mobile app so the desktop rewrite rejects exactly the
  * same input:
- *   - frontend/utils/validation.ts   (isValidEmail, isValidPhoneDigits)
- *   - frontend/utils/formatters.ts   (validateRequired / PositiveNumber / PositiveInt)
+ *   - mobile/utils/validation.ts   (isValidEmail, isValidPhoneDigits)
+ *   - mobile/utils/formatters.ts   (validateRequired / PositiveNumber / PositiveInt)
  * Messages stay in Romanian and keep the original wording.
  */
 

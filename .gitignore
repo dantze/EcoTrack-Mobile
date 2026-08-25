@@ -4,6 +4,7 @@
 # Prevents the temporary .gitignore files from being tracked
 /mobile/.gitignore
 /backend/.gitignore
+/web/.gitignore
 
 # ------------------------------------
 # 2. General / OS / IDE Ignores
@@ -96,3 +97,10 @@ mobile/.env
 *.mv.db
 *.trace.db
 backend/data/
+
+# ------------------------------------
+# 5. React / Vite Ignores (Web)
+# ------------------------------------
+# node_modules/, dist/ and *.tsbuildinfo are already covered above.
+web/.env
+*.log

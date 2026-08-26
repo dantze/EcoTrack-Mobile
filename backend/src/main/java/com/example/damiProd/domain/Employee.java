@@ -18,25 +18,15 @@ public class Employee {
     @Column(unique = true, nullable = false)
     private String username;
 
-    @Column(nullable = false)
-    @JsonIgnore
-    private String password;
-
     private String fullName;
     private String phone;
     private String county;
 
-    // Nullable, unique: only set for employees provisioned for Google sign-in.
-    // Plain employees (mobile app, username/password only) leave this null.
+    // Optional contact detail only. Nothing authenticates with it - Google
+    // sign-in was removed along with passwords; access comes from an admin
+    // approving a device (see EnrollmentService).
     @Column(unique = true)
     private String email;
-
-    // Google's stable "sub" claim, captured on the employee's first successful
-    // Google login. Once set, later logins must match it even if the email
-    // column changes later - see AuthService#loginWithGoogle.
-    @Column(name = "google_sub", unique = true)
-    @JsonIgnore
-    private String googleSub;
 
     @ManyToMany(fetch = FetchType.EAGER, cascade = {CascadeType.PERSIST, CascadeType.MERGE})
     @JoinTable(
@@ -53,9 +43,8 @@ public class Employee {
     // --- Constructori ---
     public Employee() {}
 
-    public Employee(String username, String password, String fullName, String phone) {
+    public Employee(String username, String fullName, String phone) {
         this.username = username;
-        this.password = password;
         this.fullName = fullName;
         this.phone = phone;
     }
@@ -75,14 +64,6 @@ public class Employee {
 
     public void setUsername(String username) {
         this.username = username;
-    }
-
-    public String getPassword() {
-        return password;
-    }
-
-    public void setPassword(String password) {
-        this.password = password;
     }
 
     public String getFullName() {
@@ -115,14 +96,6 @@ public class Employee {
 
     public void setEmail(String email) {
         this.email = email;
-    }
-
-    public String getGoogleSub() {
-        return googleSub;
-    }
-
-    public void setGoogleSub(String googleSub) {
-        this.googleSub = googleSub;
     }
 
     public Set<EmployeeRole> getRoles() {

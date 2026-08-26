@@ -1,0 +1,64 @@
+{
+	# Global options
+	admin off
+}
+
+# Shared upstream definition for the Spring Boot backend. Caddy already passes
+# X-Forwarded-For and X-Forwarded-Proto by default, so only Host and the real
+# client IP need setting explicitly.
+(backend_proxy) {
+	reverse_proxy backend:8080 {
+		header_up Host {host}
+		header_up X-Real-IP {remote_host}
+	}
+}
+
+# Production domain, or localhost as a fallback.
+# Caddy provisions and renews the Let's Encrypt certificate automatically and
+# redirects HTTP->HTTPS, so long as DOMAIN_NAME is a real domain whose A record
+# points at this box and ports 80/443 are reachable. A bare IP or "localhost"
+# gets a self-signed cert instead: TLS still works, browsers just warn.
+{$DOMAIN_NAME:localhost} {
+	encode zstd gzip
+
+	# ------------------------------------------------------------------
+	# Backend
+	# ------------------------------------------------------------------
+	# Every controller is mapped under /api (auth included, at /api/auth), so
+	# /api/* plus /actuator/* is the whole backend surface. A bare /auth/* rule
+	# here would shadow the SPA's own login route.
+	#
+	# ORDER MATTERS: `handle` blocks are mutually exclusive and evaluated in
+	# order, so these must precede the catch-all or the SPA would swallow /api.
+	handle /api/* {
+		import backend_proxy
+	}
+
+	# Only the `health` endpoint is exposed, with show-details=never — see
+	# application.properties. Safe to serve publicly; useful for uptime checks.
+	handle /actuator/* {
+		import backend_proxy
+	}
+
+	# ------------------------------------------------------------------
+	# Everything else -> web SPA
+	# ------------------------------------------------------------------
+	# The web container serves the built bundle and does its own try_files
+	# fallback to index.html, so deep links like /rute/42 resolve.
+	handle {
+		reverse_proxy web:80
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+		X-Content-Type-Options "nosniff"
+		X-Frame-Options "DENY"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}

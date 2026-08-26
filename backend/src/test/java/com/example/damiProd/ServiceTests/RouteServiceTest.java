@@ -3,6 +3,7 @@ package com.example.damiProd.ServiceTests;
 import com.example.damiProd.domain.Employee;
 import com.example.damiProd.domain.Route;
 import com.example.damiProd.dto.CreateRouteRequest;
+import com.example.damiProd.exception.ResourceNotFoundException;
 import com.example.damiProd.repository.EmployeeRepository;
 import com.example.damiProd.repository.RouteRepository;
 import com.example.damiProd.service.RouteService;
@@ -35,7 +36,7 @@ class RouteServiceTest {
 
     @BeforeEach
     void setUp() {
-        mockDriver = new Employee("driver1", "pass", "Ion Șofer", "0711000000");
+        mockDriver = new Employee("driver1", "Ion Șofer", "0711000000");
         mockDriver.setId(5L);
         mockDriver.setCounty("Cluj");
     }
@@ -103,7 +104,7 @@ class RouteServiceTest {
         when(employeeRepository.findById(999L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> routeService.createRoute(request))
-                .isInstanceOf(RuntimeException.class);
+                .isInstanceOf(ResourceNotFoundException.class);
     }
 
     // -----------------------------------------------------------------------
@@ -132,7 +133,7 @@ class RouteServiceTest {
         when(routeRepository.findById(999L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> routeService.assignDriverToRoute(999L, 5L))
-                .isInstanceOf(RuntimeException.class);
+                .isInstanceOf(ResourceNotFoundException.class);
     }
 
     // -----------------------------------------------------------------------

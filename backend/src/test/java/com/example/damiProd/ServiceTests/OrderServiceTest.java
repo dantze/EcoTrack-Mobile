@@ -1,6 +1,7 @@
 package com.example.damiProd.ServiceTests;
 
 import com.example.damiProd.domain.*;
+import com.example.damiProd.exception.ResourceNotFoundException;
 import com.example.damiProd.repository.*;
 import com.example.damiProd.service.OrderService;
 import org.junit.jupiter.api.BeforeEach;
@@ -26,6 +27,7 @@ class OrderServiceTest {
     @Mock private ProductRepository productRepository;
     @Mock private SubscriptionRepository subscriptionRepository;
     @Mock private TaskRepository taskRepository;
+    @Mock private RecurringIgienizareRepository recurringIgienizareRepository;
 
     @InjectMocks
     private OrderService orderService;
@@ -112,7 +114,7 @@ class OrderServiceTest {
         order.setOrderType("Amplasari");
 
         assertThatThrownBy(() -> orderService.createOrder(999L, order))
-                .isInstanceOf(RuntimeException.class)
+                .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("Client not found");
     }
 
@@ -184,7 +186,7 @@ class OrderServiceTest {
         when(orderRepository.findByIdWithClientAndProduct(999L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> orderService.getOrderById(999L))
-                .isInstanceOf(RuntimeException.class)
+                .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("Order not found");
     }
 

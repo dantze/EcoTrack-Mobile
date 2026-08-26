@@ -52,7 +52,7 @@ public class RecurringIgienizareController {
     public RecurringIgienizare assignRoute(@PathVariable Long id,
                                            @RequestBody Map<String, Long> body) {
         Long routeId = body.get("routeId");
-        if (routeId == null) throw new RuntimeException("routeId is required");
+        if (routeId == null) throw new IllegalArgumentException("routeId is required");
         return service.assignRoute(id, routeId);
     }
 

@@ -1,0 +1,120 @@
+services:
+  # =========================================================================
+  # PostgreSQL Database Service
+  # =========================================================================
+  postgres:
+    image: postgres:16-alpine
+    container_name: ecotrack_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME:-damiprod}
+      POSTGRES_USER: ${DB_USER:-damiprod_user}
+      POSTGRES_PASSWORD: ${DB_PASS:-secure_db_password}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      # Expose locally for management/debugging if needed
+      - "${DB_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-damiprod_user} -d ${DB_NAME:-damiprod}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - ecotrack_network
+
+  # =========================================================================
+  # Spring Boot Backend Service
+  # =========================================================================
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: ecotrack_backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: ${DB_NAME:-damiprod}
+      DB_USER: ${DB_USER:-damiprod_user}
+      DB_PASS: ${DB_PASS:-secure_db_password}
+      DO_SPACES_ACCESS_KEY: ${DO_SPACES_ACCESS_KEY:-}
+      DO_SPACES_SECRET_KEY: ${DO_SPACES_SECRET_KEY:-}
+      DO_SPACES_BUCKET: ${DO_SPACES_BUCKET:-}
+      DO_SPACES_REGION: ${DO_SPACES_REGION:-fra1}
+      ECOTRACK_SECURITY_ENFORCE: ${ECOTRACK_SECURITY_ENFORCE:-true}
+      ECOTRACK_CORS_ALLOWED_ORIGINS: ${ECOTRACK_CORS_ALLOWED_ORIGINS:-http://localhost:5173,http://localhost:3000}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_ALLOWED_DOMAIN: ${GOOGLE_ALLOWED_DOMAIN:-}
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/actuator/health | grep -q '\"status\":\"UP\"' || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+    networks:
+      - ecotrack_network
+
+  # =========================================================================
+  # Web SPA (React/Vite) — static bundle served by its own Caddy
+  # =========================================================================
+  # Built from source on the VPS by the deploy, same as the backend. The VITE_*
+  # values are BUILD args, not runtime env: Vite inlines them into the bundle.
+  web:
+    build:
+      context: ./web
+      dockerfile: Dockerfile
+      args:
+        # Same-origin: the edge Caddy serves this SPA and proxies /api to the
+        # backend, so the browser never makes a cross-origin call.
+        VITE_DATA_MODE: ${VITE_DATA_MODE:-live}
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api}
+        VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID:-}
+    container_name: ecotrack_web
+    restart: unless-stopped
+    networks:
+      - ecotrack_network
+
+  # =========================================================================
+  # Caddy Reverse Proxy & Automatic SSL (HTTPS)
+  # =========================================================================
+  caddy:
+    image: caddy:2.8-alpine
+    container_name: ecotrack_caddy
+    restart: unless-stopped
+    depends_on:
+      backend:
+        condition: service_healthy
+      web:
+        condition: service_started
+    environment:
+      DOMAIN_NAME: ${DOMAIN_NAME:-localhost}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - ecotrack_network
+
+volumes:
+  postgres_data:
+    driver: local
+  caddy_data:
+    driver: local
+  caddy_config:
+    driver: local
+
+networks:
+  ecotrack_network:
+    driver: bridge

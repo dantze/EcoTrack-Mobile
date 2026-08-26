@@ -23,8 +23,15 @@ export type TaskType = (typeof TASK_TYPES)[number];
 export const SUBSCRIPTION_TYPES = ['ONE_TIME', 'RECURRING'] as const;
 export type SubscriptionType = (typeof SUBSCRIPTION_TYPES)[number];
 
-/** Role names as stored in EmployeeRole.roleName. */
-export const ROLES = ['SALES', 'DRIVER', 'TECH'] as const;
+/**
+ * Role names as stored in EmployeeRole.roleName.
+ *
+ * ADMIN is the one the backend treats as a superset: it satisfies every
+ * business-write rule in SecurityConfig's matrix AND is the only role allowed
+ * near /api/admin/**. `hasRole` mirrors that, so an admin sees every section
+ * rather than only the Admin one.
+ */
+export const ROLES = ['SALES', 'DRIVER', 'TECH', 'ADMIN'] as const;
 export type Role = (typeof ROLES)[number];
 
 // ---------------------------------------------------------------------------

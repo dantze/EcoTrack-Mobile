@@ -1263,5 +1263,5 @@ export const mockApi: EcoTrackApi = {
   recurring: recurringApi,
 };
 
-export { MOCK_CREDENTIALS_HINT } from './seed';
+export { MOCK_CREDENTIALS_HINT, MOCK_AUTO_LOGIN } from './seed';
 export { MockApiError } from './store';

@@ -9,9 +9,12 @@ tool — each has its own dependencies and is built from its own directory.
 
 | Dir | Stack | Deploy |
 |---|---|---|
-| `backend/` | Spring Boot 3.5, Java 21, Gradle, JPA | `.github/workflows/deploy-backend.yml` → SSH to a VPS |
-| `web/` | React 19, Vite 6, Tailwind 4, TanStack Query, React Router 7 | not yet automated |
-| `mobile/` | Expo ~54 / React Native 0.81, expo-router | EAS |
+| `backend/` | Spring Boot 3.5, Java 21, Gradle, JPA | `deploy.yml` → SSH to a VPS, docker compose |
+| `web/` | React 19, Vite 6, Tailwind 4, TanStack Query, React Router 7 | `deploy.yml` — same stack, same domain as the backend |
+| `mobile/` | Expo ~54 / React Native 0.81, expo-router | `deploy-mobile.yml` → EAS Update (OTA) / EAS Build |
+
+**See `DEPLOYMENT.md`** for triggers, required secrets and the runbook. The
+backend and web deploy together because Caddy serves both from one domain.
 
 CI is split into `ci-backend.yml` / `ci-web.yml` / `ci-mobile.yml`, each filtered
 on its own `paths:`. Keep that filtering when adding workflows — it is the reason
@@ -30,6 +33,11 @@ cd backend
 ./gradlew test --tests "*OrderServiceTest.createOrder_shouldThrowWhenClientNotFound"
 ./gradlew bootRun                # H2 file DB, enforcement OFF (see below)
 ./gradlew bootRun --args='--spring.profiles.active=dev'    # same H2 DB, enforcement ON
+
+# docker (full stack: backend + postgres + caddy with auto HTTPS)
+docker compose up -d --build     # starts all 3 services in production mode
+docker compose logs -f backend   # view backend logs
+docker compose down              # stops all containers
 
 # web
 cd web
@@ -82,6 +90,28 @@ Two companion knobs sit next to it, both **independent of `enforce`**:
 
 `AuthEnforcementOnTest`, `AuthEnforcementOffTest` and `AuthorizationMatrixTest`
 cover both modes.
+
+### Row-level task access is a separate layer
+
+The role matrix answers "which VERBS may this role use". It does not answer
+"which ROWS" — and those are different questions. `TaskAccessPolicy`
+(`service/TaskAccessPolicy.java`) is the second layer, consulted by
+`TaskController`:
+
+- A **driver-only** employee (holds `DRIVER` and no office role) may read and
+  write exactly the tasks on routes assigned to them. Assignment runs
+  `Task -> Route -> Employee`; a route has one assignee.
+- **Office staff** (`ADMIN`/`SALES`/`TECH`) are unrestricted — the overview is
+  unchanged. Someone holding `DRIVER` *and* an office role counts as office.
+- `GET /api/tasks/mine` and `/api/tasks/mine/date/{date}` take the employee from
+  the access token. **The driver app must use these** — passing an id from the
+  client is what allowed one driver to read another's day.
+- `/api/tasks/employee/{id}` still exists for the office overview (and for
+  `Technical/ChangeDriver`), and returns 403 when a driver asks for an id that
+  is not their own.
+
+`SecurityTests/TaskScopingTest` covers this against the real filter chain.
+**A new task endpoint needs a policy call, not just a matcher row.**
 
 Note that `@WebMvcTest` slices are not profiled, so they see the base default
 (`false`) rather than the test profile's `true`.
@@ -143,9 +173,12 @@ Feature code must import only `{ api } from '@/api'` — never from `@/api/live`
 or `@/mocks` directly. That rule is the only thing keeping the two implementations
 substitutable.
 
-Mock is the default deliberately: the production backend is plain HTTP on a bare
-IP, which a browser refuses to call from an HTTPS origin. Live mode works from a
-local dev server; a deployed live build needs TLS on the backend first.
+Mock is the default for local development, where it needs no backend at all.
+**Production builds live mode.** `web/Dockerfile` defaults to
+`VITE_DATA_MODE=live` with a RELATIVE `VITE_API_BASE_URL=/api`: Caddy serves the
+SPA and proxies `/api` to the backend on the same domain, so the call is
+same-origin. That is what retired the old mixed-content blocker — the backend is
+no longer plain HTTP on a bare IP.
 
 **`src/api/live/normalize.ts` absorbs the wire/domain mismatch.** The Spring
 entities do not serialise cleanly into `@/types/domain`: associations are
@@ -186,17 +219,19 @@ Deliberate or unresolved; do not assume these are safe.
   Concurrent edits to the same task/route/order are silent last-write-wins, and
   because Spring Data `save()` issues a full-row UPDATE, the loser's other field
   changes are lost too.
-- **`OrderService.createOrder` is not `@Transactional`**, and its Ridicare
-  availability check (two SUM queries, then a comparison, then a save) is a
-  read-then-write race.
+- **`OrderService.createOrder` and `updateOrder` are now `@Transactional`**,
+  protecting multi-step operations and inventory adjustments.
 - **`mobile/services/OrderLockService.ts` is a stub** that always reports a
   successful lock.
 - `spring.jpa.hibernate.ddl-auto=update` in base and prod — there is no
   migration tool. Local dev runs H2 while prod runs Postgres, so
   concurrency-sensitive bugs will not reproduce locally.
-- `mobile/constants/ApiConfig.ts` hardcodes the production IP.
+- `mobile/constants/ApiConfig.ts` reads `EXPO_PUBLIC_API_BASE_URL` and falls
+  back to the old hardcoded `http://146.190.224.202:8080/api`. The fallback is
+  load-bearing for installed builds; compose still publishes 8080 for them.
+  New builds should set the env var to the HTTPS domain.
 - `application-prod.properties` says its env vars are "provided by Render". They
-  are not — `deploy-backend.yml` SSHes into a VPS and passes them on the
+  are not — `deploy.yml` SSHes into a VPS and passes them on the
   command line. The comment is stale.
 - `SecurityConfig` and `application.properties` both say "See README.md" for the
   enforcement flag; the README has never contained that. This file is the

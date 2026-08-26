@@ -8,6 +8,17 @@ module.exports = {
         scheme: "frontend",
         userInterfaceStyle: "automatic",
         newArchEnabled: true,
+        // --- EAS Update (OTA) ---
+        // `eas update` ships JS/asset changes straight to installed apps
+        // without a store review. It CANNOT ship native changes — adding a
+        // native module still needs a new build.
+        runtimeVersion: {
+            policy: "appVersion"
+        },
+        updates: {
+            url: "https://u.expo.dev/b68f1933-d3e1-4cdb-a5e3-31a0540679b2",
+            fallbackToCacheTimeout: 0
+        },
         splash: {
             image: "./assets/images/splash-icon.png",
             resizeMode: "contain",

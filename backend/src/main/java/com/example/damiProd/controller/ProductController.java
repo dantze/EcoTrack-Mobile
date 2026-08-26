@@ -40,7 +40,6 @@ public class ProductController {
     public ResponseEntity<?> deleteProduct(@PathVariable Long id) {
         try {
             productService.deleteProduct(id);
-            System.out.println("Produs sters cu succes");
             return ResponseEntity.noContent().build();
         } catch (IllegalStateException e) {
             return ResponseEntity.status(409).body(java.util.Map.of("error", e.getMessage()));

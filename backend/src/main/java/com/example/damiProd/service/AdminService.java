@@ -8,7 +8,6 @@ import com.example.damiProd.repository.EmployeeRepository;
 import com.example.damiProd.repository.EmployeeRoleRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,16 +24,13 @@ public class AdminService {
 
     private final EmployeeRepository employeeRepository;
     private final EmployeeRoleRepository employeeRoleRepository;
-    private final PasswordEncoder passwordEncoder;
     private final TokenService tokenService;
 
     public AdminService(EmployeeRepository employeeRepository,
             EmployeeRoleRepository employeeRoleRepository,
-            PasswordEncoder passwordEncoder,
             TokenService tokenService) {
         this.employeeRepository = employeeRepository;
         this.employeeRoleRepository = employeeRoleRepository;
-        this.passwordEncoder = passwordEncoder;
         this.tokenService = tokenService;
     }
 
@@ -62,12 +58,14 @@ public class AdminService {
     public EmployeeResponse createEmployee(CreateEmployeeRequest request) {
         // Check if username already exists
         if (employeeRepository.findByUsername(request.getUsername()).isPresent()) {
-            throw new RuntimeException("Username already exists: " + request.getUsername());
+            throw new IllegalArgumentException("Username already exists: " + request.getUsername());
         }
 
+        // No password: nothing logs in with credentials any more. This creates
+        // the PERSON (assignable to routes); their device gets access separately,
+        // by enrolling and being approved - see EnrollmentService.
         Employee employee = new Employee();
         employee.setUsername(request.getUsername());
-        employee.setPassword(passwordEncoder.encode(request.getPassword()));
         employee.setFullName(request.getFullName());
         employee.setPhone(request.getPhone());
         employee.setCounty(request.getCounty());
@@ -96,18 +94,14 @@ public class AdminService {
     }
 
     /**
-     * Update an existing employee.
+     * Update an existing employee. This is how someone is promoted to ADMIN or
+     * demoted again.
      *
-     * A password or role change also revokes every session the employee has.
-     * Without that, the credentials being replaced here - which is what an admin
-     * does when an account is compromised or someone leaves - keep working for
-     * up to the refresh-token lifetime (60 days by default), on every device
-     * that ever logged in. Changing the password would look like it locked the
-     * old holder out while doing nothing of the sort.
-     *
-     * Roles are included because the access token is only checked for validity
-     * on each request; authorities are read from the Employee it points at, but
-     * a stale session is exactly the kind of thing a demotion is meant to end.
+     * A ROLE change revokes every session that employee holds. The access token
+     * is only checked for validity per request and authorities are read from the
+     * Employee it points at, but revoking is still the right move: a demotion
+     * must not leave the old device running on a session granted under the old
+     * role, on any of up to 10 enrolled devices.
      */
     @Transactional
     public Optional<EmployeeResponse> updateEmployee(Long id, CreateEmployeeRequest request) {
@@ -117,10 +111,6 @@ public class AdminService {
             // Update fields if provided
             if (request.getUsername() != null) {
                 employee.setUsername(request.getUsername());
-            }
-            if (request.getPassword() != null && !request.getPassword().isEmpty()) {
-                employee.setPassword(passwordEncoder.encode(request.getPassword()));
-                credentialsChanged = true;
             }
             if (request.getFullName() != null) {
                 employee.setFullName(request.getFullName());
@@ -194,7 +184,7 @@ public class AdminService {
     public String createRole(String roleName) {
         String upperRoleName = roleName.toUpperCase();
         if (employeeRoleRepository.findByRoleName(upperRoleName).isPresent()) {
-            throw new RuntimeException("Role already exists: " + upperRoleName);
+            throw new IllegalArgumentException("Role already exists: " + upperRoleName);
         }
         EmployeeRole role = new EmployeeRole(upperRoleName);
         return employeeRoleRepository.save(role).getRoleName();

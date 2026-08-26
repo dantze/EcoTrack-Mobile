@@ -8,10 +8,11 @@
  *                    how the UI is developed and demoed.
  *   live           — calls the real Spring backend at VITE_API_BASE_URL.
  *
- * Mock is the default deliberately: the production backend is currently plain
- * HTTP on a bare IP, which a browser will refuse to call from an HTTPS origin
- * (mixed content). Live mode works from a local http://localhost dev server;
- * a deployed build needs TLS on the backend first.
+ * Mock is the default for local development because it needs no backend. The
+ * PRODUCTION build sets live mode explicitly (see web/Dockerfile), with a
+ * relative VITE_API_BASE_URL=/api: Caddy serves this bundle and proxies /api to
+ * the backend on the same domain, so the request is same-origin and neither
+ * CORS nor mixed content applies.
  */
 
 export type DataMode = 'mock' | 'live';

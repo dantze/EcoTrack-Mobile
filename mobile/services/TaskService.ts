@@ -64,19 +64,34 @@ export const TaskService = {
     },
 
     /**
-     * Get tasks for a specific employee on a specific scheduled date
+     * The signed-in driver's own tasks for a date.
+     *
+     * Deliberately sends NO employee id: the backend reads it from the access
+     * token. Passing an id from the client was the bug - the server never
+     * checked it was yours, so any driver could read another's day by changing
+     * the number. /tasks/employee/{id} still exists for the office overview and
+     * now rejects drivers asking for someone else.
      */
-    getTasksByEmployeeAndDate: async (employeeId: number, date: string): Promise<Task[]> => {
-        const response = await apiFetch(`/tasks/employee/${employeeId}/date/${date}`);
+    getMyTasksByDate: async (date: string): Promise<Task[]> => {
+        const response = await apiFetch(`/tasks/mine/date/${date}`);
+        if (!response.ok) throw new Error('Eșec la preluarea sarcinilor angajatului');
+        return await response.json();
+    },
+
+    /** The signed-in driver's own tasks, regardless of date. */
+    getMyTasks: async (): Promise<Task[]> => {
+        const response = await apiFetch('/tasks/mine');
         if (!response.ok) throw new Error('Eșec la preluarea sarcinilor angajatului');
         return await response.json();
     },
 
     /**
-     * Get all tasks for a specific employee (regardless of date)
+     * Another employee's tasks. OFFICE USE ONLY (e.g. Technical/ChangeDriver
+     * reassigning a route) - the backend returns 403 if a driver-only account
+     * asks for an id that is not their own. Drivers use getMyTasksByDate.
      */
-    getTasksByEmployee: async (employeeId: number): Promise<Task[]> => {
-        const response = await apiFetch(`/tasks/employee/${employeeId}`);
+    getTasksByEmployeeAndDate: async (employeeId: number, date: string): Promise<Task[]> => {
+        const response = await apiFetch(`/tasks/employee/${employeeId}/date/${date}`);
         if (!response.ok) throw new Error('Eșec la preluarea sarcinilor angajatului');
         return await response.json();
     },

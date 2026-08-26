@@ -5,6 +5,7 @@ import com.example.damiProd.domain.RecurringIgienizare;
 import com.example.damiProd.domain.Route;
 import com.example.damiProd.domain.Task;
 import com.example.damiProd.dto.CreateRouteRequest;
+import com.example.damiProd.exception.ResourceNotFoundException;
 import com.example.damiProd.repository.EmployeeRepository;
 import com.example.damiProd.repository.RecurringIgienizareRepository;
 import com.example.damiProd.repository.RouteRepository;
@@ -46,7 +47,7 @@ public class RouteService {
         // Set employee if provided
         if (request.getEmployeeId() != null) {
             Employee employee = employeeRepository.findById(request.getEmployeeId())
-                    .orElseThrow(() -> new RuntimeException("Angajatul nu a fost găsit"));
+                    .orElseThrow(() -> new ResourceNotFoundException("Angajatul nu a fost găsit"));
             route.setEmployee(employee);
         }
 
@@ -56,7 +57,7 @@ public class RouteService {
     @Transactional
     public void deleteRoute(Long id) {
         Route route = routeRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Ruta nu a fost găsită"));
+                .orElseThrow(() -> new ResourceNotFoundException("Ruta nu a fost găsită"));
 
         // Unassign all tasks from this route (set route = null so they become "neatribuite")
         List<Task> tasks = taskRepository.findByRoute_Id(id);
@@ -79,7 +80,7 @@ public class RouteService {
     @Transactional(readOnly = true)
     public Route getRouteById(Long id) {
         Route route = routeRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Ruta nu a fost găsită"));
+                .orElseThrow(() -> new ResourceNotFoundException("Ruta nu a fost găsită"));
         // Force loading of tasks (triggers lazy loading within transaction)
         route.getTasks().size();
         return route;
@@ -104,9 +105,9 @@ public class RouteService {
     @Transactional
     public Route assignDriverToRoute(Long routeId, Long employeeId) {
         Route route = routeRepository.findById(routeId)
-                .orElseThrow(() -> new RuntimeException("Ruta nu a fost găsită"));
+                .orElseThrow(() -> new ResourceNotFoundException("Ruta nu a fost găsită"));
         Employee employee = employeeRepository.findById(employeeId)
-                .orElseThrow(() -> new RuntimeException("Angajatul nu a fost găsit"));
+                .orElseThrow(() -> new ResourceNotFoundException("Angajatul nu a fost găsit"));
 
         route.setEmployee(employee);
         return routeRepository.save(route);
@@ -115,7 +116,7 @@ public class RouteService {
     @Transactional
     public Route reorderTasks(Long routeId, List<Long> taskIds) {
         Route route = routeRepository.findById(routeId)
-                .orElseThrow(() -> new RuntimeException("Ruta nu a fost găsită"));
+                .orElseThrow(() -> new ResourceNotFoundException("Ruta nu a fost găsită"));
 
         List<Task> tasks = taskRepository.findByRoute_Id(routeId);
 
@@ -131,7 +132,8 @@ public class RouteService {
         taskRepository.saveAll(tasks);
 
         // Reload route with ordered tasks
-        Route reloaded = routeRepository.findById(routeId).orElseThrow();
+        Route reloaded = routeRepository.findById(routeId)
+                .orElseThrow(() -> new ResourceNotFoundException("Ruta nu a fost găsită"));
         reloaded.getTasks().size(); // force load
         return reloaded;
     }

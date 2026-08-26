@@ -267,8 +267,8 @@ class ConcurrencyGapsTest {
     }
 
     @Test
-    @DisplayName("GAP 2: createOrder has no @Transactional, so a failure mid-way is not rolled back as a unit")
-    void createOrderIsNotAnnotatedTransactional() throws NoSuchMethodException {
+    @DisplayName("GAP 2 (CLOSED): createOrder is @Transactional, so a failure mid-way rolls back as a unit")
+    void createOrderIsAnnotatedTransactional() throws NoSuchMethodException {
         var method = OrderService.class.getMethod("createOrder", Long.class, Order.class);
 
         boolean transactional =
@@ -276,10 +276,13 @@ class ConcurrencyGapsTest {
                         || OrderService.class.isAnnotationPresent(
                                 org.springframework.transaction.annotation.Transactional.class);
 
-        // ASSERTS THE GAP, so that adding @Transactional (the fix) trips this
-        // test and whoever does it comes back here to invert the race test above.
+        // This used to assert the GAP - that createOrder was NOT transactional -
+        // as a deliberate tripwire, so that whoever fixed it would be forced back
+        // here. It has since been fixed, so the assertion is inverted and now
+        // guards the fix instead: removing @Transactional must fail loudly.
         assertThat(transactional)
-                .as("OrderService.createOrder is documented in CLAUDE.md as NOT @Transactional")
-                .isFalse();
+                .as("OrderService.createOrder must stay @Transactional - multi-step "
+                        + "creation and inventory adjustment have to roll back as one unit")
+                .isTrue();
     }
 }

@@ -4,6 +4,7 @@ import com.example.damiProd.domain.Employee;
 import com.example.damiProd.domain.EmployeeRole;
 import com.example.damiProd.repository.EmployeeRepository;
 import com.example.damiProd.repository.EmployeeRoleRepository;
+import com.example.damiProd.service.TokenService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -12,7 +13,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
@@ -51,10 +51,7 @@ class AuthEnforcementOnTest {
     private EmployeeRoleRepository employeeRoleRepository;
 
     @Autowired
-    private PasswordEncoder passwordEncoder;
-
-    @Autowired
-    private ObjectMapper objectMapper;
+    private TokenService tokenService;
 
     @BeforeEach
     void setUp() {
@@ -64,29 +61,26 @@ class AuthEnforcementOnTest {
                 .orElseGet(() -> employeeRoleRepository.save(new EmployeeRole("ADMIN")));
 
         if (employeeRepository.findByUsername("enforce_on_driver").isEmpty()) {
-            Employee driver = new Employee("enforce_on_driver", passwordEncoder.encode("driverpass"), "Driver", "0700000001");
+            Employee driver = new Employee("enforce_on_driver", "Driver", "0700000001");
             driver.setRoles(Set.of(driverRole));
             employeeRepository.save(driver);
         }
         if (employeeRepository.findByUsername("enforce_on_admin").isEmpty()) {
-            Employee admin = new Employee("enforce_on_admin", passwordEncoder.encode("adminpass"), "Admin", "0700000002");
+            Employee admin = new Employee("enforce_on_admin", "Admin", "0700000002");
             admin.setRoles(Set.of(adminRole));
             employeeRepository.save(admin);
         }
     }
 
-    private String loginAndGetAccessToken(String username, String password) throws Exception {
-        String body = objectMapper.writeValueAsString(new LoginBody(username, password));
-        String responseJson = mockMvc.perform(post("/api/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(body))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-        JsonNode node = objectMapper.readTree(responseJson);
-        return node.get("accessToken").asText();
-    }
-
-    record LoginBody(String username, String password) {
+    /**
+     * Mints a session directly. There is no login endpoint any more - a session
+     * is only ever created by an admin approving a device, which
+     * EnrollmentFlowTest covers end to end. These tests are about what a valid
+     * token may then do.
+     */
+    private String tokenFor(String username) {
+        Employee employee = employeeRepository.findByUsername(username).orElseThrow();
+        return tokenService.issueNewSession(employee, "test-device").accessToken();
     }
 
     @Test
@@ -97,7 +91,7 @@ class AuthEnforcementOnTest {
 
     @Test
     void validAccessToken_grantsAccessToBusinessEndpoint() throws Exception {
-        String token = loginAndGetAccessToken("enforce_on_driver", "driverpass");
+        String token = tokenFor("enforce_on_driver");
 
         mockMvc.perform(get("/api/employees").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk());
@@ -105,7 +99,7 @@ class AuthEnforcementOnTest {
 
     @Test
     void nonAdminToken_isForbiddenFromAdminEndpoint() throws Exception {
-        String token = loginAndGetAccessToken("enforce_on_driver", "driverpass");
+        String token = tokenFor("enforce_on_driver");
 
         mockMvc.perform(get("/api/admin/employees").header("Authorization", "Bearer " + token))
                 .andExpect(status().isForbidden());
@@ -113,7 +107,7 @@ class AuthEnforcementOnTest {
 
     @Test
     void adminToken_canReachAdminEndpoint() throws Exception {
-        String token = loginAndGetAccessToken("enforce_on_admin", "adminpass");
+        String token = tokenFor("enforce_on_admin");
 
         mockMvc.perform(get("/api/admin/employees").header("Authorization", "Bearer " + token))
                 .andExpect(status().isOk());
@@ -128,7 +122,25 @@ class AuthEnforcementOnTest {
     @Test
     void loginItselfRemainsPubliclyReachable() throws Exception {
         // /api/auth/login must stay reachable without a token - otherwise nobody could ever log in.
-        String token = loginAndGetAccessToken("enforce_on_driver", "driverpass");
+        String token = tokenFor("enforce_on_driver");
         assertThat(token).isNotBlank();
+    }
+
+    @Test
+    void healthProbe_isReachableWithoutAuthentication() throws Exception {
+        // The Docker healthcheck polls this unauthenticated, and docker-compose
+        // gates Caddy on the container reporting healthy. When /actuator/health
+        // was swallowed by the /actuator/** deny-list it returned 401, the
+        // container never became healthy, and the deploy timed out with the
+        // reverse proxy never starting.
+        mockMvc.perform(get("/actuator/health"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void otherActuatorEndpoints_stayDenied() throws Exception {
+        // Only /actuator/health is carved out - the rest of the deny-list holds.
+        int status = mockMvc.perform(get("/actuator/env")).andReturn().getResponse().getStatus();
+        assertThat(status).isIn(401, 403, 404);
     }
 }

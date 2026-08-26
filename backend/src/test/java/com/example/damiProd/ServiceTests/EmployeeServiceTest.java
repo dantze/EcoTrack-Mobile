@@ -38,11 +38,11 @@ class EmployeeServiceTest {
         EmployeeRole salesRole = new EmployeeRole("SALES");
         salesRole.setId(2L);
 
-        driver = new Employee("sofer1", "pass", "Ion Șofer", "0711000000");
+        driver = new Employee("sofer1", "Ion Șofer", "0711000000");
         driver.setId(1L);
         driver.setRoles(Set.of(driverRole));
 
-        salesPerson = new Employee("vanzator1", "pass", "Maria Vânzări", "0722111222");
+        salesPerson = new Employee("vanzator1", "Maria Vânzări", "0722111222");
         salesPerson.setId(2L);
         salesPerson.setRoles(Set.of(salesRole));
     }

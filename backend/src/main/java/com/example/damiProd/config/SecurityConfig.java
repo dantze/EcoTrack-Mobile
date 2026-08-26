@@ -13,8 +13,6 @@ import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
@@ -73,6 +71,21 @@ public class SecurityConfig {
             "/h2-console/**", "/actuator/**", "/env/**", "/heapdump", "/jolokia/**"
     };
 
+    /**
+     * The one actuator path that must stay reachable, in BOTH enforcement modes.
+     *
+     * The Docker healthcheck and the deploy workflow poll it, and docker-compose
+     * gates Caddy on {@code service_healthy}. While this was swallowed by the
+     * {@code /actuator/**} entry above, the container could never report healthy,
+     * so the deploy timed out and the reverse proxy never started.
+     *
+     * Exposing it leaks nothing: application.properties exposes only the `health`
+     * endpoint, with show-details=never and show-components=never, so the body is
+     * exactly {"status":"UP"}. It MUST be matched before INFRA_DENY_LIST - the
+     * first matching rule wins.
+     */
+    private static final String HEALTH_PROBE = "/actuator/health";
+
     private static final List<String> ALLOWED_CORS_HEADERS =
             List.of("Authorization", "Content-Type", "Accept", "Accept-Language", "X-Requested-With");
 
@@ -81,9 +94,6 @@ public class SecurityConfig {
 
     @Value("${ecotrack.cors.allowed-origins:http://localhost:5173}")
     private String allowedOriginsProperty;
-
-    @Value("${ecotrack.security.bcrypt-strength:12}")
-    private int bcryptStrength;
 
     @Value("${ecotrack.security.reject-invalid-bearer:true}")
     private boolean rejectInvalidBearer;
@@ -105,18 +115,6 @@ public class SecurityConfig {
             log.warn("  -> Role checks are INERT in this mode - anyone reaching the API is effectively admin.");
         }
         log.info("====================================================================");
-    }
-
-    /**
-     * BCrypt, strength configurable (default 12 - roughly 250ms per verification
-     * on modern hardware, which is what makes an offline crack of a leaked hash
-     * expensive). Existing hashes carry their own cost factor in the string, so
-     * raising this never invalidates already-stored passwords; they simply verify
-     * at their original strength until the next time they are set.
-     */
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder(bcryptStrength);
     }
 
     @Bean
@@ -189,9 +187,16 @@ public class SecurityConfig {
         if (enforceSecurity) {
             http.authorizeHttpRequests(auth -> auth
                     .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+                    .requestMatchers(HEALTH_PROBE).permitAll()
                     .requestMatchers(INFRA_DENY_LIST).denyAll()
-                    .requestMatchers(HttpMethod.POST, "/api/auth/login", "/api/auth/google",
-                            "/api/auth/refresh", "/api/auth/logout")
+                    // The ONLY unauthenticated surface. A device has no credential
+                    // until an admin approves it, so asking and collecting must be
+                    // reachable; /login and /google are gone with passwords and
+                    // Google sign-in.
+                    .requestMatchers(HttpMethod.GET, "/api/enrollment/status").permitAll()
+                    .requestMatchers(HttpMethod.POST, "/api/enrollment/request", "/api/enrollment/claim")
+                    .permitAll()
+                    .requestMatchers(HttpMethod.POST, "/api/auth/refresh", "/api/auth/logout")
                     .permitAll()
                     // /auth/me + session management: any signed-in employee manages
                     // their own sessions, regardless of role.
@@ -233,6 +238,7 @@ public class SecurityConfig {
             // clients can already rely on auth working end-to-end. The infrastructure
             // deny-list still applies - no client has ever called those paths.
             http.authorizeHttpRequests(auth -> auth
+                    .requestMatchers(HEALTH_PROBE).permitAll()
                     .requestMatchers(INFRA_DENY_LIST).denyAll()
                     .anyRequest().permitAll());
         }

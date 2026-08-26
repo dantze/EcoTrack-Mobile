@@ -7,6 +7,7 @@ import com.example.damiProd.repository.ProductRepository;
 import com.example.damiProd.repository.SubscriptionRepository;
 import com.example.damiProd.repository.TaskRepository;
 import com.example.damiProd.repository.RecurringIgienizareRepository;
+import com.example.damiProd.exception.ResourceNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -34,20 +35,21 @@ public class OrderService {
         this.recurringIgienizareRepository = recurringIgienizareRepository;
     }
 
+    @Transactional
     public Order createOrder(Long clientId, Order order) {
         Client client = clientRepository.findById(clientId)
-                .orElseThrow(() -> new RuntimeException("Client not found with id: " + clientId));
+                .orElseThrow(() -> new ResourceNotFoundException("Client not found with id: " + clientId));
         order.setClient(client);
 
         // ─── Link product for Amplasare & Ridicare ───
         if (order instanceof AmplasareOrder amp && amp.getProduct() != null && amp.getProduct().getId() != null) {
             Product product = productRepository.findById(amp.getProduct().getId())
-                    .orElseThrow(() -> new RuntimeException("Product not found with id: " + amp.getProduct().getId()));
+                    .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + amp.getProduct().getId()));
             amp.setProduct(product);
         }
         if (order instanceof RidicareOrder rid && rid.getProduct() != null && rid.getProduct().getId() != null) {
             Product product = productRepository.findById(rid.getProduct().getId())
-                    .orElseThrow(() -> new RuntimeException("Product not found with id: " + rid.getProduct().getId()));
+                    .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + rid.getProduct().getId()));
             rid.setProduct(product);
         }
 
@@ -74,7 +76,7 @@ public class OrderService {
         if (order instanceof IgienizareOrder igi && igi.getSubscription() != null
                 && igi.getSubscription().getId() != null) {
             Subscription sub = subscriptionRepository.findById(igi.getSubscription().getId())
-                    .orElseThrow(() -> new RuntimeException(
+                    .orElseThrow(() -> new ResourceNotFoundException(
                             "Subscription not found with id: " + igi.getSubscription().getId()));
             igi.setSubscription(sub);
         }
@@ -113,12 +115,13 @@ public class OrderService {
 
     public Order getOrderById(Long orderId) {
         return orderRepository.findByIdWithClientAndProduct(orderId)
-                .orElseThrow(() -> new RuntimeException("Order not found with id: " + orderId));
+                .orElseThrow(() -> new ResourceNotFoundException("Order not found with id: " + orderId));
     }
 
+    @Transactional
     public Order updateOrder(Long orderId, Order orderDetails) {
         Order existingOrder = orderRepository.findById(orderId)
-                .orElseThrow(() -> new RuntimeException("Order not found with id: " + orderId));
+                .orElseThrow(() -> new ResourceNotFoundException("Order not found with id: " + orderId));
 
         // ─── Shared fields ───
         if (orderDetails.getContact() != null)
@@ -130,7 +133,7 @@ public class OrderService {
         if (existingOrder instanceof AmplasareOrder existing && orderDetails instanceof AmplasareOrder updates) {
             if (updates.getProduct() != null && updates.getProduct().getId() != null) {
                 Product product = productRepository.findById(updates.getProduct().getId())
-                        .orElseThrow(() -> new RuntimeException(
+                        .orElseThrow(() -> new ResourceNotFoundException(
                                 "Product not found with id: " + updates.getProduct().getId()));
                 existing.setProduct(product);
             }
@@ -156,7 +159,7 @@ public class OrderService {
         if (existingOrder instanceof RidicareOrder existing && orderDetails instanceof RidicareOrder updates) {
             if (updates.getProduct() != null && updates.getProduct().getId() != null) {
                 Product product = productRepository.findById(updates.getProduct().getId())
-                        .orElseThrow(() -> new RuntimeException(
+                        .orElseThrow(() -> new ResourceNotFoundException(
                                 "Product not found with id: " + updates.getProduct().getId()));
                 existing.setProduct(product);
             }
@@ -176,7 +179,7 @@ public class OrderService {
         if (existingOrder instanceof IgienizareOrder existing && orderDetails instanceof IgienizareOrder updates) {
             if (updates.getSubscription() != null && updates.getSubscription().getId() != null) {
                 Subscription sub = subscriptionRepository.findById(updates.getSubscription().getId())
-                        .orElseThrow(() -> new RuntimeException(
+                        .orElseThrow(() -> new ResourceNotFoundException(
                                 "Subscription not found with id: " + updates.getSubscription().getId()));
                 existing.setSubscription(sub);
             }

@@ -1,29 +1,22 @@
 package com.example.damiProd.bootstrap;
 
-import com.example.damiProd.domain.Employee;
 import com.example.damiProd.domain.EmployeeRole;
 import com.example.damiProd.domain.Product;
 import com.example.damiProd.repository.EmployeeRepository;
 import com.example.damiProd.repository.EmployeeRoleRepository;
 import com.example.damiProd.repository.ProductRepository;
 import org.springframework.boot.CommandLineRunner;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Seeds roles, employees and products into an empty database.
+ * Seeds the role rows and the product catalogue into an empty database.
  *
- * The seeded passwords below are development credentials that are committed to
- * this repository, so they are public knowledge - treat any environment still
- * running them as unauthenticated. They are at least stored as bcrypt hashes
- * (see {@link #createEmployee}) rather than plaintext, so a database dump does
- * not additionally leak passwords that staff may have reused elsewhere.
- *
- * Changing the values is a deliberate operational decision, not a code cleanup:
- * seeding only runs against an empty employee table, so a new value never
- * reaches an existing database, and it locks local dev out until the new
- * password is known. Rotate real credentials through /api/admin/employees.
+ * It no longer seeds employees, and the committed dev passwords it used to
+ * carry are gone with them: there are no passwords anywhere in this system.
+ * The first person to enroll on a fresh database becomes ADMIN - see
+ * EnrollmentService - and every account after that exists because that admin
+ * approved a device.
  */
 @Component
 public class DataLoader implements CommandLineRunner {
@@ -31,16 +24,13 @@ public class DataLoader implements CommandLineRunner {
         private final EmployeeRepository employeeRepository;
         private final EmployeeRoleRepository employeeRoleRepository;
         private final ProductRepository productRepository;
-        private final PasswordEncoder passwordEncoder;
 
         public DataLoader(EmployeeRepository employeeRepository,
                         EmployeeRoleRepository employeeRoleRepository,
-                        ProductRepository productRepository,
-                        PasswordEncoder passwordEncoder) {
+                        ProductRepository productRepository) {
                 this.employeeRepository = employeeRepository;
                 this.employeeRoleRepository = employeeRoleRepository;
                 this.productRepository = productRepository;
-                this.passwordEncoder = passwordEncoder;
         }
 
         @Override
@@ -48,9 +38,8 @@ public class DataLoader implements CommandLineRunner {
         public void run(String... args) throws Exception {
                 System.out.println("Checking for seed data...");
 
-                // Seed roles and employees only if the database is completely empty
-                if (employeeRepository.count() == 0) {
-                        loadRolesAndEmployees();
+                if (employeeRoleRepository.count() == 0) {
+                        loadRoles();
                 }
 
                 // Seed products only if none exist
@@ -59,53 +48,19 @@ public class DataLoader implements CommandLineRunner {
                 }
         }
 
-        private void loadRolesAndEmployees() {
-                System.out.println("Seeding roles and employees...");
-
-                // Create roles
-                EmployeeRole driverRole = getOrCreateRole("DRIVER");
-                EmployeeRole salesRole = getOrCreateRole("SALES");
-                EmployeeRole techRole = getOrCreateRole("TECH");
-                EmployeeRole adminRole = getOrCreateRole("ADMIN");
-
-                // ==================== TEHNIC (TECH) ====================
-                createEmployee("ivan_sebastian", "tehnic1122", "Ivan Sebastian", null, null, techRole);
-                createEmployee("stef_adrian", "tehnic3344", "Stef Adrian", null, null, techRole);
-                // Note: Halalai Tudor has both TECH and SALES roles - added below
-
-                // ==================== VANZARI (SALES) ====================
-                createEmployee("cetean_narcis", "vanzari4413", "Cetean Narcis", null, null, salesRole);
-                createEmployee("danila_gina", "vanzari5566", "Danila Gina", null, null, salesRole);
-                createEmployee("cristea_calin", "vanzari7788", "Cristea Calin", null, null, salesRole);
-
-                // Halalai Tudor - has both TECH and SALES roles
-                Employee halalaiTudor = createEmployee("halalai_tudor", "tehnic133413", "Halalai Tudor", null, null,
-                                techRole);
-                halalaiTudor.getRoles().add(salesRole);
-
-                employeeRepository.save(halalaiTudor);
-
-                // ==================== SOFERI (DRIVERS) ====================
-                createEmployee("coman_teofil", "sofer23423", "Coman Teofil", null, null, driverRole);
-                createEmployee("man_virgil", "sofer13555", "Man Virgil", null, null, driverRole);
-                createEmployee("opric_ionut", "sofer38374", "Opric Ionut", null, null, driverRole);
-                createEmployee("lodroman_ioan", "sofer99087", "Lodroman Ioan", null, null, driverRole);
-                createEmployee("goarna_florin", "sofer56738", "Goarna Florin", null, null, driverRole);
-                createEmployee("lapadat_aurel", "sofer10475", "Lapadat Aurel", null, null, driverRole);
-                createEmployee("gavrilete_ioan", "sofer76543", "Gavrilete Ioan", null, null, driverRole);
-                createEmployee("tripa_andrei", "sofer123452", "Tripa Andrei", null, null, driverRole);
-
-                // ==================== ADMIN (optional - for testing) ====================
-                // Also holds the ADMIN role so /api/admin/** remains reachable on a
-                // fresh database once ecotrack.security.enforce=true - see SecurityConfig.
-                Employee admin = createEmployee("admin", "admin", "Administrator", null, null,
-                                salesRole);
-                admin.getRoles().add(techRole);
-                admin.getRoles().add(driverRole);
-                admin.getRoles().add(adminRole);
-                employeeRepository.save(admin);
-
-                System.out.println("Seeded " + employeeRepository.count() + " employees with roles!");
+        /**
+         * Roles only. Employees are NOT seeded any more and must not be: an
+         * account now exists only because an admin approved a specific device
+         * (see EnrollmentService), and there is no password for a seeded row to
+         * carry. Seeding one would also silently consume the first-run bootstrap,
+         * since that triggers on an empty employees table.
+         */
+        private void loadRoles() {
+                System.out.println("Seeding roles...");
+                getOrCreateRole("DRIVER");
+                getOrCreateRole("SALES");
+                getOrCreateRole("TECH");
+                getOrCreateRole("ADMIN");
         }
 
         private EmployeeRole getOrCreateRole(String roleName) {
@@ -114,26 +69,6 @@ public class DataLoader implements CommandLineRunner {
                                         EmployeeRole role = new EmployeeRole(roleName);
                                         return employeeRoleRepository.save(role);
                                 });
-        }
-
-        /**
-         * @param password the raw seed password; stored as a bcrypt hash. Seeding
-         *                 it in plaintext used to leave every seeded account
-         *                 unhashed in the database until its owner happened to log
-         *                 in and trip AuthService's legacy-plaintext migration.
-         */
-        private Employee createEmployee(String username, String password, String fullName,
-                        String phone, String county, EmployeeRole role) {
-                Employee employee = new Employee();
-                employee.setUsername(username);
-                employee.setPassword(passwordEncoder.encode(password));
-                employee.setFullName(fullName);
-                employee.setPhone(phone);
-                employee.setCounty(county);
-
-                Employee saved = employeeRepository.save(employee);
-                saved.getRoles().add(role);
-                return employeeRepository.save(saved);
         }
 
         private void loadProducts() {

@@ -36,7 +36,7 @@ class TokenServiceTest {
     private EmployeeRepository employeeRepository;
 
     private Employee newEmployee(String username) {
-        Employee employee = new Employee(username, "irrelevant-for-these-tests", "Test Employee", "0700000000");
+        Employee employee = new Employee(username, "Test Employee", "0700000000");
         return employeeRepository.save(employee);
     }
 

@@ -9,6 +9,7 @@ import com.example.damiProd.repository.ClientRepository;
 import com.example.damiProd.repository.OrderRepository;
 import com.example.damiProd.repository.TaskPhotoRepository;
 import com.example.damiProd.repository.TaskRepository;
+import com.example.damiProd.exception.ResourceNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -44,12 +45,12 @@ public class ClientService {
 
     public Client getClientById(Long id) {
         return clientRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Client not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Client not found with id: " + id));
     }
 
     public Client updateClient(Long id, Client clientDetails) {
         Client existingClient = clientRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Client not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Client not found with id: " + id));
 
         existingClient.setEmail(clientDetails.getEmail());
         existingClient.setPhone(clientDetails.getPhone());

@@ -31,6 +31,7 @@ public class TaskServiceTest {
     @Mock private TaskRepository taskRepository;
     @Mock private OrderRepository orderRepository;
     @Mock private RouteRepository routeRepository;
+    @Mock private com.example.damiProd.service.RecurringIgienizareService recurringIgienizareService;
 
     @InjectMocks
     private TaskService taskService;
@@ -52,7 +53,7 @@ public class TaskServiceTest {
         mockCompany.setId(5L);
 
         // Route assigned to a driver
-        mockDriver = new Employee("driver1", "password", "Ion Șofer", "0711000000");
+        mockDriver = new Employee("driver1", "Ion Șofer", "0711000000");
         mockDriver.setId(99L);
 
         mockRoute = new Route();

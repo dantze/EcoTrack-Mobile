@@ -37,7 +37,7 @@ class RouteControllerTest {
     // Helper
     // -----------------------------------------------------------------------
     private Route buildSampleRoute() {
-        Employee driver = new Employee("driver1", "pass", "Ion Șofer", "0711000000");
+        Employee driver = new Employee("driver1", "Ion Șofer", "0711000000");
         driver.setId(5L);
 
         Route route = new Route("Ruta Cluj Nord", LocalDate.of(2025, 7, 1), "Cluj", driver);

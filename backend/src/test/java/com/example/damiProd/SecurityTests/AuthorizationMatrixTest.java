@@ -3,6 +3,7 @@ package com.example.damiProd.SecurityTests;
 import com.example.damiProd.domain.Employee;
 import com.example.damiProd.domain.EmployeeRole;
 import com.example.damiProd.repository.EmployeeRepository;
+import com.example.damiProd.service.TokenService;
 import com.example.damiProd.repository.EmployeeRoleRepository;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -12,7 +13,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
@@ -50,13 +50,13 @@ class AuthorizationMatrixTest {
     private MockMvc mockMvc;
 
     @Autowired
+    private TokenService tokenService;
+
+    @Autowired
     private EmployeeRepository employeeRepository;
 
     @Autowired
     private EmployeeRoleRepository employeeRoleRepository;
-
-    @Autowired
-    private PasswordEncoder passwordEncoder;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -67,37 +67,32 @@ class AuthorizationMatrixTest {
 
     @BeforeEach
     void setUp() throws Exception {
-        seed("authz_driver", "driverpass", "DRIVER");
-        seed("authz_sales", "salespass", "SALES");
-        seed("authz_admin", "adminpass", "ADMIN");
-
-        driverToken = login("authz_driver", "driverpass");
-        salesToken = login("authz_sales", "salespass");
-        adminToken = login("authz_admin", "adminpass");
+        driverToken = mintToken(seed("authz_driver", "DRIVER"));
+        salesToken = mintToken(seed("authz_sales", "SALES"));
+        adminToken = mintToken(seed("authz_admin", "ADMIN"));
     }
 
-    private void seed(String username, String password, String roleName) {
+    private Employee seed(String username, String roleName) {
         EmployeeRole role = employeeRoleRepository.findByRoleName(roleName)
                 .orElseGet(() -> employeeRoleRepository.save(new EmployeeRole(roleName)));
-        if (employeeRepository.findByUsername(username).isEmpty()) {
-            Employee employee = new Employee(username, passwordEncoder.encode(password), username, "0700000000");
+        return employeeRepository.findByUsername(username).orElseGet(() -> {
+            Employee employee = new Employee(username, username, "0700000000");
             employee.setRoles(Set.of(role));
-            employeeRepository.save(employee);
-        }
+            return employeeRepository.save(employee);
+        });
     }
 
-    private String login(String username, String password) throws Exception {
-        String body = objectMapper.writeValueAsString(new LoginBody(username, password));
-        String json = mockMvc.perform(post("/api/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(body))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-        JsonNode node = objectMapper.readTree(json);
-        return node.get("accessToken").asText();
-    }
-
-    record LoginBody(String username, String password) {
+    /**
+     * Mints a session directly instead of POSTing credentials.
+     *
+     * There is no login endpoint any more - a session is only ever created by
+     * an admin approving a device (see EnrollmentService). These tests are
+     * about what a VALID token may then do, so they take the short path to one
+     * rather than driving the whole enrollment flow; EnrollmentFlowTest covers
+     * that end to end.
+     */
+    private String mintToken(Employee employee) {
+        return tokenService.issueNewSession(employee, "test-device").accessToken();
     }
 
     // ---------------------------------------------------------------------

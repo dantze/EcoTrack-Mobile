@@ -4,6 +4,9 @@ import com.example.damiProd.domain.*;
 import com.example.damiProd.repository.OrderRepository;
 import com.example.damiProd.repository.RouteRepository;
 import com.example.damiProd.repository.TaskRepository;
+import com.example.damiProd.exception.ResourceNotFoundException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -14,6 +17,8 @@ import java.util.Optional;
 
 @Service
 public class TaskService {
+
+    private static final Logger log = LoggerFactory.getLogger(TaskService.class);
 
     private final TaskRepository taskRepository;
     private final OrderRepository orderRepository;
@@ -34,7 +39,7 @@ public class TaskService {
 
     public Task getTaskById(Long id) {
         return taskRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Task-ul nu a fost găsit"));
+                .orElseThrow(() -> new ResourceNotFoundException("Task-ul nu a fost găsit"));
     }
 
     public List<Task> getTasksByRouteId(Long routeId) {
@@ -84,14 +89,14 @@ public class TaskService {
     public Task createTaskFromOrder(Long orderId, Long routeId) {
         // Check if task already exists for this order
         if (taskRepository.existsByOrder_Id(orderId)) {
-            throw new RuntimeException("Această comandă are deja un task asociat");
+            throw new IllegalStateException("Această comandă are deja un task asociat");
         }
 
         Order order = orderRepository.findById(orderId)
-                .orElseThrow(() -> new RuntimeException("Comanda nu a fost găsită"));
+                .orElseThrow(() -> new ResourceNotFoundException("Comanda nu a fost găsită"));
 
         Route route = routeRepository.findById(routeId)
-                .orElseThrow(() -> new RuntimeException("Ruta nu a fost găsită"));
+                .orElseThrow(() -> new ResourceNotFoundException("Ruta nu a fost găsită"));
 
         // Determine task type based on order type
         TaskType taskType = mapOrderTypeToTaskType(order.getOrderType());
@@ -178,7 +183,7 @@ public class TaskService {
             try {
                 recurringIgienizareService.assignRoute(igi.getRecurringPlan().getId(), routeId);
             } catch (RuntimeException e) {
-                System.err.println("Warning: could not generate recurring tasks: " + e.getMessage());
+                log.warn("Warning: could not generate recurring tasks: {}", e.getMessage());
             }
         }
 
@@ -206,7 +211,7 @@ public class TaskService {
     public Task reassignTask(Long taskId, Long newRouteId) {
         Task task = getTaskById(taskId);
         Route newRoute = routeRepository.findById(newRouteId)
-                .orElseThrow(() -> new RuntimeException("Ruta nu a fost găsită"));
+                .orElseThrow(() -> new ResourceNotFoundException("Ruta nu a fost găsită"));
 
         task.setRoute(newRoute);
         return taskRepository.save(task);
@@ -218,7 +223,7 @@ public class TaskService {
     @Transactional
     public List<Task> reassignTasks(List<Long> taskIds, Long newRouteId) {
         Route newRoute = routeRepository.findById(newRouteId)
-                .orElseThrow(() -> new RuntimeException("Ruta nu a fost găsită"));
+                .orElseThrow(() -> new ResourceNotFoundException("Ruta nu a fost găsită"));
 
         List<Task> tasks = taskRepository.findAllById(taskIds);
         tasks.forEach(task -> task.setRoute(newRoute));

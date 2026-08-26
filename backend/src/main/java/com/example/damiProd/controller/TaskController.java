@@ -4,9 +4,14 @@ import com.example.damiProd.domain.Task;
 import com.example.damiProd.domain.TaskPhoto;
 import com.example.damiProd.domain.TaskStatus;
 import com.example.damiProd.repository.TaskPhotoRepository;
+import com.example.damiProd.config.EmployeePrincipal;
 import com.example.damiProd.service.PhotoService;
+import com.example.damiProd.service.TaskAccessPolicy;
 import com.example.damiProd.service.TaskService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -17,37 +22,82 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 @RestController
 @RequestMapping("/api/tasks")
 public class TaskController {
 
+    private static final Logger log = LoggerFactory.getLogger(TaskController.class);
+    private static final Set<String> ALLOWED_IMAGE_TYPES = Set.of(
+            "image/jpeg",
+            "image/jpg",
+            "image/png",
+            "image/webp",
+            "image/heic",
+            "image/heif"
+    );
+
     private final TaskService taskService;
     private final PhotoService photoService;
     private final TaskPhotoRepository taskPhotoRepository;
+    private final TaskAccessPolicy accessPolicy;
 
-    public TaskController(TaskService taskService, PhotoService photoService, TaskPhotoRepository taskPhotoRepository) {
+    public TaskController(TaskService taskService, PhotoService photoService,
+            TaskPhotoRepository taskPhotoRepository, TaskAccessPolicy accessPolicy) {
         this.taskService = taskService;
         this.photoService = photoService;
         this.taskPhotoRepository = taskPhotoRepository;
+        this.accessPolicy = accessPolicy;
+    }
+
+    // -------------------------------------------------------------------
+    // The driver app's entry point.
+    // -------------------------------------------------------------------
+    // Takes the employee from the ACCESS TOKEN, never from the URL, so there is
+    // no id for a caller to swap. /tasks/employee/{id} below still exists for
+    // the office overview and is guarded separately.
+    @GetMapping("/mine")
+    public ResponseEntity<List<Task>> getMyTasks(@AuthenticationPrincipal EmployeePrincipal principal) {
+        Long self = accessPolicy.callerId(principal);
+        if (self == null) {
+            return ResponseEntity.status(401).build();
+        }
+        return ResponseEntity.ok(taskService.getTasksByEmployee(self));
+    }
+
+    @GetMapping("/mine/date/{date}")
+    public ResponseEntity<List<Task>> getMyTasksByDate(
+            @AuthenticationPrincipal EmployeePrincipal principal,
+            @PathVariable String date) {
+        Long self = accessPolicy.callerId(principal);
+        if (self == null) {
+            return ResponseEntity.status(401).build();
+        }
+        return ResponseEntity.ok(taskService.getTasksByEmployeeAndDate(self, LocalDate.parse(date)));
     }
 
     // Get all tasks
     @GetMapping
-    public ResponseEntity<List<Task>> getAllTasks() {
+    public ResponseEntity<List<Task>> getAllTasks(@AuthenticationPrincipal EmployeePrincipal principal) {
+        accessPolicy.requireOfficeRole(principal);
         return ResponseEntity.ok(taskService.getAllTasks());
     }
 
     // Get a specific task by ID
     @GetMapping("/{id}")
-    public ResponseEntity<Task> getTaskById(@PathVariable Long id) {
+    public ResponseEntity<Task> getTaskById(@AuthenticationPrincipal EmployeePrincipal principal,
+            @PathVariable Long id) {
         Task task = taskService.getTaskById(id);
+        accessPolicy.requireCanAccessTask(principal, task);
         return ResponseEntity.ok(task);
     }
 
     // Get all tasks for a specific route
     @GetMapping("/route/{routeId}")
-    public ResponseEntity<List<Task>> getTasksByRoute(@PathVariable Long routeId) {
+    public ResponseEntity<List<Task>> getTasksByRoute(@AuthenticationPrincipal EmployeePrincipal principal,
+            @PathVariable Long routeId) {
+        accessPolicy.requireOfficeRole(principal);
         List<Task> tasks = taskService.getTasksByRouteId(routeId);
         return ResponseEntity.ok(tasks);
     }
@@ -55,8 +105,10 @@ public class TaskController {
     // Get tasks for a specific route on a specific date
     @GetMapping("/route/{routeId}/date/{date}")
     public ResponseEntity<List<Task>> getTasksByRouteAndDate(
+            @AuthenticationPrincipal EmployeePrincipal principal,
             @PathVariable Long routeId,
             @PathVariable String date) {
+        accessPolicy.requireOfficeRole(principal);
         LocalDate localDate = LocalDate.parse(date);
         List<Task> tasks = taskService.getTasksByRouteAndDate(routeId, localDate);
         return ResponseEntity.ok(tasks);
@@ -65,8 +117,10 @@ public class TaskController {
     // Get tasks by employee and scheduled date
     @GetMapping("/employee/{employeeId}/date/{date}")
     public ResponseEntity<List<Task>> getTasksByEmployeeAndDate(
+            @AuthenticationPrincipal EmployeePrincipal principal,
             @PathVariable Long employeeId,
             @PathVariable String date) {
+        accessPolicy.requireCanReadTasksOf(principal, employeeId);
         LocalDate localDate = LocalDate.parse(date);
         List<Task> tasks = taskService.getTasksByEmployeeAndDate(employeeId, localDate);
         return ResponseEntity.ok(tasks);
@@ -74,7 +128,9 @@ public class TaskController {
 
     // Get all tasks for an employee (regardless of date)
     @GetMapping("/employee/{employeeId}")
-    public ResponseEntity<List<Task>> getTasksByEmployee(@PathVariable Long employeeId) {
+    public ResponseEntity<List<Task>> getTasksByEmployee(@AuthenticationPrincipal EmployeePrincipal principal,
+            @PathVariable Long employeeId) {
+        accessPolicy.requireCanReadTasksOf(principal, employeeId);
         List<Task> tasks = taskService.getTasksByEmployee(employeeId);
         return ResponseEntity.ok(tasks);
     }
@@ -120,11 +176,24 @@ public class TaskController {
     // Update task status (for driver to mark task as IN_PROGRESS, COMPLETED, etc.)
     @PatchMapping("/{id}/status")
     public ResponseEntity<Task> updateTaskStatus(
+            @AuthenticationPrincipal EmployeePrincipal principal,
             @PathVariable Long id,
             @RequestBody Map<String, String> statusUpdate) {
 
+        // A driver may only advance a task on their OWN route. Without this a
+        // driver could complete anyone's task by guessing an id.
+        accessPolicy.requireCanAccessTask(principal, taskService.getTaskById(id));
+
         String statusStr = statusUpdate.get("status");
-        TaskStatus status = TaskStatus.valueOf(statusStr);
+        if (statusStr == null || statusStr.isBlank()) {
+            return ResponseEntity.badRequest().build();
+        }
+        TaskStatus status;
+        try {
+            status = TaskStatus.valueOf(statusStr.trim());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().build();
+        }
         Task updatedTask = taskService.updateTaskStatus(id, status);
         return ResponseEntity.ok(updatedTask);
     }
@@ -181,11 +250,18 @@ public class TaskController {
     // cabine/{taskId}_{clientName}/" folder)
     @PostMapping("/{id}/photos")
     public ResponseEntity<Map<String, Object>> uploadTaskPhotos(
+            @AuthenticationPrincipal EmployeePrincipal principal,
             @PathVariable Long id,
             @RequestParam("files") List<MultipartFile> files) {
 
         Task task = taskService.getTaskById(id);
+        // Second of the two driver writes - same rule as status.
+        accessPolicy.requireCanAccessTask(principal, task);
         List<String> uploadedUrls = new ArrayList<>();
+
+        if (files == null || files.isEmpty()) {
+            return ResponseEntity.ok(Map.of("uploaded", 0, "urls", List.of()));
+        }
 
         // Build folder name: "poze cabine/{taskId}_{clientName}"
         String clientName = task.getClientName() != null ? task.getClientName() : "unknown";
@@ -201,9 +277,15 @@ public class TaskController {
             if (file.isEmpty())
                 continue;
 
+            String contentType = file.getContentType();
+            if (contentType != null && !ALLOWED_IMAGE_TYPES.contains(contentType.toLowerCase())) {
+                log.warn("Skipping file upload for task {} with disallowed content type: {}", id, contentType);
+                continue;
+            }
+
             try {
                 // Simple incrementing filename: 1, 2, 3...
-                String customFileName = String.valueOf(startIndex + i);
+                String customFileName = String.valueOf(startIndex + uploadedUrls.size());
                 String publicUrl = photoService.uploadPhoto(file, folderName, customFileName);
 
                 // Save reference in database
@@ -211,7 +293,7 @@ public class TaskController {
                 taskPhotoRepository.save(taskPhoto);
                 uploadedUrls.add(publicUrl);
             } catch (Exception e) {
-                System.err.println("Failed to upload task photo: " + e.getMessage());
+                log.error("Failed to upload task photo for task ID {}", id, e);
             }
         }
 
@@ -223,7 +305,10 @@ public class TaskController {
 
     // Get all photo URLs for a task
     @GetMapping("/{id}/photos")
-    public ResponseEntity<List<String>> getTaskPhotos(@PathVariable Long id) {
+    public ResponseEntity<List<String>> getTaskPhotos(@AuthenticationPrincipal EmployeePrincipal principal,
+            @PathVariable Long id) {
+        // Photos are evidence of a job: same visibility rule as the task itself.
+        accessPolicy.requireCanAccessTask(principal, taskService.getTaskById(id));
         List<TaskPhoto> photos = taskPhotoRepository.findByTaskId(id);
         List<String> urls = photos.stream().map(TaskPhoto::getImageUrl).toList();
         return ResponseEntity.ok(urls);

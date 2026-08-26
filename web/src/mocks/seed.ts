@@ -303,6 +303,10 @@ interface EmployeeSeed {
 }
 
 const EMPLOYEE_SEED: readonly EmployeeSeed[] = [
+  // Mock mode signs in as this account automatically - see AuthProvider. It
+  // holds ADMIN so the Admin section is reachable, plus SALES/TECH so every
+  // other section is too.
+  { fullName: 'Administrator', username: 'admin', county: 'Cluj', roles: ['ADMIN', 'SALES', 'TECH'] },
   { fullName: 'Andreea Vasilescu', username: 'andreea.vasilescu', county: 'București', roles: ['SALES'] },
   { fullName: 'Mihai Popa', username: 'mihai.popa', county: 'București', roles: ['SALES'] },
   { fullName: 'Cristina Dobre', username: 'cristina.dobre', county: 'Ilfov', roles: ['SALES'] },
@@ -797,6 +801,18 @@ export function createSeedDb(): MockDb {
 
 /** Exposed so the login screen can tell a demo user what to type. */
 export const MOCK_CREDENTIALS_HINT = {
+  username: EMPLOYEE_SEED[0]!.username,
+  password: MOCK_PASSWORD,
+};
+
+/**
+ * The account mock mode signs in as on boot, with no login screen at all.
+ *
+ * Local development has no backend and no enrollment flow to run, and the real
+ * app has no password to type any more - so a login form in mock mode would be
+ * asking for a credential that no longer exists anywhere in the system.
+ */
+export const MOCK_AUTO_LOGIN = {
   username: EMPLOYEE_SEED[0]!.username,
   password: MOCK_PASSWORD,
 };

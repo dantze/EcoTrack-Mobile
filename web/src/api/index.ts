@@ -24,4 +24,4 @@ export { ApiError } from './http';
  * Demo credentials for the seeded mock account, so LoginPage can hint them
  * without importing `@/mocks` directly. Only meaningful in mock mode.
  */
-export { MOCK_CREDENTIALS_HINT } from '@/mocks';
+export { MOCK_CREDENTIALS_HINT, MOCK_AUTO_LOGIN } from '@/mocks';

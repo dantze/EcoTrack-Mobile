@@ -1,0 +1,131 @@
+name: Deploy
+
+# ONE workflow deploys the whole stack (backend + web + Caddy TLS) to the VPS.
+# It replaces the old deploy-backend.yml / deploy-web.yml pair: because the SPA
+# and the API are now served from the same Caddy on the same domain, they share
+# a docker-compose stack and there is nothing left to deploy separately.
+
+on:
+  # Manual trigger — adds a "Run workflow" button in GitHub.
+  workflow_dispatch:
+
+  push:
+    branches:
+      - main
+    paths:
+      - 'backend/**'
+      - 'web/**'
+      - 'docker-compose.yml'
+      - 'Caddyfile'
+      - '.github/workflows/deploy.yml'
+
+# One deploy at a time, and never cancel one in flight: a cancelled run leaves
+# the box with a stopped service or a half-built image and no rollback.
+# A second push queues behind the first instead.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  # The gates. Both run the real CI — build + all tests — against this exact
+  # commit before anything touches the server. `docker compose build` on the
+  # VPS skips tests (backend builds with -x test), which is only defensible
+  # because these jobs already ran them on a clean runner for this commit.
+  #
+  # Both gates run even when only one project changed. That is deliberate: the
+  # two are deployed as one stack, so both must be green for the stack to ship.
+  verify-backend:
+    name: Verify backend
+    uses: ./.github/workflows/ci-backend.yml
+
+  verify-web:
+    name: Verify web
+    uses: ./.github/workflows/ci-web.yml
+
+  deploy:
+    name: Deploy stack
+    needs: [verify-backend, verify-web]
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Deploy Docker stack to VPS
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          DB_NAME: ${{ secrets.DB_NAME }}
+          DB_USER: ${{ secrets.DB_USER }}
+          DB_PASS: ${{ secrets.DB_PASS }}
+          DO_SPACES_ACCESS_KEY: ${{ secrets.DO_SPACES_ACCESS_KEY }}
+          DO_SPACES_SECRET_KEY: ${{ secrets.DO_SPACES_SECRET_KEY }}
+          DO_SPACES_BUCKET: ${{ secrets.DO_SPACES_BUCKET }}
+          DO_SPACES_REGION: ${{ secrets.DO_SPACES_REGION }}
+          ECOTRACK_SECURITY_ENFORCE: ${{ secrets.ECOTRACK_SECURITY_ENFORCE }}
+          ECOTRACK_CORS_ALLOWED_ORIGINS: ${{ secrets.ECOTRACK_CORS_ALLOWED_ORIGINS }}
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_ALLOWED_DOMAIN: ${{ secrets.GOOGLE_ALLOWED_DOMAIN }}
+          DOMAIN_NAME: ${{ secrets.DOMAIN_NAME }}
+          # Vite inlines these at build time — see web/Dockerfile.
+          VITE_DATA_MODE: ${{ vars.VITE_DATA_MODE || 'live' }}
+          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL || '/api' }}
+          VITE_GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          command_timeout: 25m
+          envs: DB_NAME,DB_USER,DB_PASS,DO_SPACES_ACCESS_KEY,DO_SPACES_SECRET_KEY,DO_SPACES_BUCKET,DO_SPACES_REGION,ECOTRACK_SECURITY_ENFORCE,ECOTRACK_CORS_ALLOWED_ORIGINS,GOOGLE_CLIENT_ID,GOOGLE_ALLOWED_DOMAIN,DOMAIN_NAME,VITE_DATA_MODE,VITE_API_BASE_URL,VITE_GOOGLE_CLIENT_ID
+          script: |
+            set -e
+            echo "🚀 Starting deployment..."
+            APP_DIR=~/Dami-Prod-EcoTrack
+            mkdir -p "$APP_DIR"
+            cd "$APP_DIR"
+
+            echo "📥 Pulling latest code..."
+            if [ -d .git ]; then
+              git fetch origin main
+              git reset --hard origin/main
+            else
+              git clone https://github.com/dantze/Dami-Prod-EcoTrack.git .
+            fi
+
+            echo "🐳 Building and starting containers..."
+            docker compose up -d --build
+
+            echo "🩺 Waiting for backend healthcheck (Actuator)..."
+            i=1
+            while [ "$i" -le 40 ]; do
+              STATUS=$(docker inspect --format='{{.State.Health.Status}}' ecotrack_backend 2>/dev/null || true)
+              if [ "$STATUS" = "healthy" ]; then
+                echo "✅ Backend HEALTHY after $((i * 5))s"
+                break
+              fi
+              if [ "$i" -eq 40 ]; then
+                echo "❌ Backend never became healthy. Logs:"
+                docker compose logs --tail=50 backend
+                exit 1
+              fi
+              echo "⏳ Health status: '$STATUS' (attempt $i/40)..."
+              sleep 5
+              i=$((i + 1))
+            done
+
+            echo "🌐 Checking the SPA is served through Caddy..."
+            # Hit the edge from inside the network. -k because DOMAIN_NAME may
+            # be a bare IP/localhost, which gets a self-signed cert.
+            if docker compose exec -T caddy wget -q -O /dev/null --no-check-certificate http://web:80/; then
+              echo "✅ Web container is serving the bundle"
+            else
+              echo "❌ Web container is not serving. Logs:"
+              docker compose logs --tail=50 web caddy
+              exit 1
+            fi
+
+            echo "🧹 Pruning old images..."
+            docker image prune -f
+
+            docker compose ps
+            echo "🎉 Deploy complete."

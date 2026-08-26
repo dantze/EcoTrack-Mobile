@@ -4,6 +4,7 @@ import com.example.damiProd.controller.TaskController;
 import com.example.damiProd.domain.*;
 import com.example.damiProd.repository.TaskPhotoRepository;
 import com.example.damiProd.service.PhotoService;
+import com.example.damiProd.service.TaskAccessPolicy;
 import com.example.damiProd.service.TaskService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,6 +35,11 @@ class TaskControllerTest {
     @MockitoBean private TaskService taskService;
     @MockitoBean private PhotoService photoService;
     @MockitoBean private TaskPhotoRepository taskPhotoRepository;
+    // Row-level task access (TaskAccessPolicy) is a real @Component, so the slice
+    // needs it mocked or the controller cannot be constructed. A mock's void
+    // guards no-op, which is what this wiring-focused slice wants; the actual
+    // rules are covered by SecurityTests/TaskScopingTest against the real chain.
+    @MockitoBean private TaskAccessPolicy accessPolicy;
 
     // -----------------------------------------------------------------------
     // Helper — builds a sample Task

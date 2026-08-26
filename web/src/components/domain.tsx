@@ -31,6 +31,7 @@ export const ROLE_LABELS: Record<Role, string> = {
   SALES: 'Vânzări',
   DRIVER: 'Șofer',
   TECH: 'Tehnic',
+  ADMIN: 'Administrator',
 };
 
 export const WEEKDAY_LABELS = [

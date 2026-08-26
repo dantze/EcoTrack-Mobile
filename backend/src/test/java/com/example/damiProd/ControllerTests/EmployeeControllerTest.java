@@ -38,7 +38,7 @@ class EmployeeControllerTest {
     // Helper
     // -----------------------------------------------------------------------
     private Employee buildDriver() {
-        Employee driver = new Employee("sofer1", "pass123", "Ion Șofer", "0711000000");
+        Employee driver = new Employee("sofer1", "Ion Șofer", "0711000000");
         driver.setId(1L);
         driver.setCounty("Cluj");
 
@@ -49,7 +49,7 @@ class EmployeeControllerTest {
     }
 
     private Employee buildSalesEmployee() {
-        Employee sales = new Employee("vanzator1", "pass123", "Maria Vânzări", "0722111222");
+        Employee sales = new Employee("vanzator1", "Maria Vânzări", "0722111222");
         sales.setId(2L);
         sales.setCounty("București");
 

@@ -11,6 +11,7 @@ import com.example.damiProd.domain.SubscriptionType;
 import com.example.damiProd.domain.Task;
 import com.example.damiProd.domain.TaskStatus;
 import com.example.damiProd.domain.TaskType;
+import com.example.damiProd.exception.ResourceNotFoundException;
 import com.example.damiProd.repository.ClientRepository;
 import com.example.damiProd.repository.OrderRepository;
 import com.example.damiProd.repository.RecurringIgienizareRepository;
@@ -379,7 +380,7 @@ class RecurringIgienizareServiceTest {
         when(clientRepository.findById(99L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.create(99L, new RecurringIgienizare()))
-                .isInstanceOf(RuntimeException.class)
+                .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("Client not found");
     }
 
@@ -403,7 +404,7 @@ class RecurringIgienizareServiceTest {
         when(routeRepository.findById(77L)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.assignRoute(100L, 77L))
-                .isInstanceOf(RuntimeException.class)
+                .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessageContaining("Route not found");
     }
 

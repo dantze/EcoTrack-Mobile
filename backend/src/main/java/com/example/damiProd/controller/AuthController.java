@@ -2,9 +2,6 @@ package com.example.damiProd.controller;
 
 import com.example.damiProd.config.EmployeePrincipal;
 import com.example.damiProd.dto.EmployeeResponse;
-import com.example.damiProd.dto.GoogleLoginRequest;
-import com.example.damiProd.dto.LoginRequest;
-import com.example.damiProd.dto.LoginResponse;
 import com.example.damiProd.dto.RefreshRequest;
 import com.example.damiProd.dto.RefreshResponse;
 import com.example.damiProd.dto.SessionResponse;
@@ -18,6 +15,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+/**
+ * Session endpoints for a device that is ALREADY enrolled.
+ *
+ * There is no /login and no /google any more - credentials were removed from
+ * the system. A device gets its first session from /api/enrollment/claim, once
+ * an admin has approved it. Everything here operates on a refresh token the
+ * device already holds.
+ */
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
@@ -26,29 +31,6 @@ public class AuthController {
 
     public AuthController(AuthService authService) {
         this.authService = authService;
-    }
-
-    @PostMapping("/login")
-    public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest request, HttpServletRequest httpRequest) {
-        LoginResponse response = authService.login(request, clientIp(httpRequest), userAgent(httpRequest));
-
-        if (response.isSuccess()) {
-            return ResponseEntity.ok(response);
-        } else {
-            return ResponseEntity.status(401).body(response);
-        }
-    }
-
-    @PostMapping("/google")
-    public ResponseEntity<LoginResponse> loginWithGoogle(@RequestBody GoogleLoginRequest request,
-            HttpServletRequest httpRequest) {
-        LoginResponse response = authService.loginWithGoogle(request.getIdToken(), userAgent(httpRequest));
-
-        if (response.isSuccess()) {
-            return ResponseEntity.ok(response);
-        } else {
-            return ResponseEntity.status(403).body(response);
-        }
     }
 
     @PostMapping("/refresh")
@@ -99,22 +81,6 @@ public class AuthController {
         }
         authService.revokeOtherSessions(principal.getEmployee().getId(), principal.getSessionId());
         return ResponseEntity.noContent().build();
-    }
-
-    /**
-     * Best-effort caller IP for the login throttle only - never for an
-     * authorization decision. X-Forwarded-For is set by whatever proxy sits in
-     * front of the app, but nothing stops a direct caller from sending it
-     * themselves, so this value is attacker-controlled in the general case.
-     * That is precisely why LoginRateLimiter also keeps a per-username counter
-     * that does not depend on it.
-     */
-    private String clientIp(HttpServletRequest request) {
-        String forwarded = request.getHeader("X-Forwarded-For");
-        if (forwarded != null && !forwarded.isBlank()) {
-            return forwarded.split(",")[0].trim();
-        }
-        return request.getRemoteAddr();
     }
 
     private String userAgent(HttpServletRequest request) {

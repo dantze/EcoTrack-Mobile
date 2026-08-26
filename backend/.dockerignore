@@ -1,0 +1,13 @@
+.git
+.gradle
+build
+out
+.idea
+*.iml
+.DS_Store
+data/
+logs/
+*.log
+.env
+.env.*
+!.env.example

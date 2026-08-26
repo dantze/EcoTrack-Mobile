@@ -1,6 +1,7 @@
 package com.example.damiProd.service;
 
 import com.example.damiProd.domain.Subscription;
+import com.example.damiProd.exception.ResourceNotFoundException;
 import com.example.damiProd.repository.SubscriptionRepository;
 import org.springframework.stereotype.Service;
 
@@ -27,7 +28,7 @@ public class SubscriptionService {
 
     public Subscription getById(Long id) {
         return subscriptionRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Subscription not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("Subscription not found with id: " + id));
     }
 
     public Subscription save(Subscription subscription) {

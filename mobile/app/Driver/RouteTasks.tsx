@@ -30,21 +30,20 @@ const RouteTasks = () => {
         try {
             setLoading(true);
 
-            // Get the logged-in user or active driver
-            const user = await AuthService.getCurrentUser();
+            // Two cases, and the SERVER decides which is allowed:
+            //  - office staff impersonating a driver (DriverSelection.tsx) ->
+            //    ask for that driver by id; the backend permits it for
+            //    ADMIN/SALES/TECH and returns 403 for a driver-only account.
+            //  - a driver on their own device -> /tasks/mine, which takes the
+            //    employee from the access token so there is no id to tamper with.
             const activeDriver = await AuthService.getActiveDriver();
-            const employeeId = activeDriver?.id || user?.id;
-
-            if (!employeeId) {
-                setTasks([]);
-                return;
-            }
 
             // Format date as YYYY-MM-DD
             const dateString = toDateString(selectedDate);
 
-            // Fetch tasks for the employee on the selected date
-            const data = await TaskService.getTasksByEmployeeAndDate(employeeId, dateString);
+            const data = activeDriver
+                ? await TaskService.getTasksByEmployeeAndDate(activeDriver.id, dateString)
+                : await TaskService.getMyTasksByDate(dateString);
             console.log('Fetched tasks for', dateString, ':', data.length);
             setTasks(data);
         } catch (error) {

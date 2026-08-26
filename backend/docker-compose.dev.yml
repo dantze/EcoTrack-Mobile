@@ -1,0 +1,18 @@
+# Local development compose file: starts a local PostgreSQL instance
+# Run with: docker compose -f backend/docker-compose.dev.yml up -d
+services:
+  postgres-dev:
+    image: postgres:16-alpine
+    container_name: ecotrack_postgres_dev
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: damiprod
+      POSTGRES_USER: damiprod_user
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_dev_data:

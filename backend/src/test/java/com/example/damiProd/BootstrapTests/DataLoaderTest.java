@@ -1,37 +1,24 @@
 package com.example.damiProd.BootstrapTests;
 
 import com.example.damiProd.bootstrap.DataLoader;
-import com.example.damiProd.domain.Employee;
 import com.example.damiProd.repository.EmployeeRepository;
+import com.example.damiProd.repository.EmployeeRoleRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
-
-import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * The seed used to call setPassword() with the raw value, so a freshly
- * provisioned database held every staff password in plaintext until each
- * person happened to log in and trip AuthService's legacy-plaintext migration.
+ * The seed used to create fifteen employees with committed plaintext-then-bcrypt
+ * passwords. Both the employees and the passwords are gone: access now comes
+ * only from an admin approving a device (see EnrollmentService), and the roles
+ * are all the seed still needs to provide - an admin picks one when approving.
  */
 @DataJpaTest
-@Import({ DataLoader.class, DataLoaderTest.EncoderConfig.class })
+@Import(DataLoader.class)
 class DataLoaderTest {
-
-    @TestConfiguration
-    static class EncoderConfig {
-        @Bean
-        PasswordEncoder passwordEncoder() {
-            return new BCryptPasswordEncoder(4);
-        }
-    }
 
     @Autowired
     private DataLoader dataLoader;
@@ -40,39 +27,34 @@ class DataLoaderTest {
     private EmployeeRepository employeeRepository;
 
     @Autowired
-    private PasswordEncoder passwordEncoder;
+    private EmployeeRoleRepository employeeRoleRepository;
 
     @Test
-    void seededEmployees_areStoredAsBcryptHashes() throws Exception {
+    void seedsTheFourAssignableRoles() throws Exception {
         dataLoader.run();
 
-        List<Employee> seeded = employeeRepository.findAll();
-        assertThat(seeded).isNotEmpty();
-        assertThat(seeded).allSatisfy(employee -> assertThat(employee.getPassword())
-                .as("seeded password for %s", employee.getUsername())
-                .startsWith("$2"));
+        assertThat(employeeRoleRepository.findAll())
+                .extracting(role -> role.getRoleName())
+                .containsExactlyInAnyOrder("DRIVER", "SALES", "TECH", "ADMIN");
     }
 
     @Test
-    void seededAdmin_canStillLogInWithTheDocumentedPassword() throws Exception {
+    void seedsNoEmployees() throws Exception {
         dataLoader.run();
 
-        // Hashing the seed must not change what the credentials *are* - local dev
-        // and the deploy runbook both rely on these values.
-        Employee admin = employeeRepository.findByUsername("admin").orElseThrow();
-        assertThat(passwordEncoder.matches("admin", admin.getPassword())).isTrue();
-
-        Employee driver = employeeRepository.findByUsername("coman_teofil").orElseThrow();
-        assertThat(passwordEncoder.matches("sofer23423", driver.getPassword())).isTrue();
+        // Load-bearing, not incidental: the first-run bootstrap in
+        // EnrollmentService triggers on an EMPTY employees table. A seeded row
+        // would silently consume it and nobody could ever become the first admin.
+        assertThat(employeeRepository.count()).isZero();
     }
 
     @Test
     void run_onAnAlreadySeededDatabase_doesNotReseed() throws Exception {
         dataLoader.run();
-        long afterFirst = employeeRepository.count();
+        long rolesAfterFirst = employeeRoleRepository.count();
 
         dataLoader.run();
 
-        assertThat(employeeRepository.count()).isEqualTo(afterFirst);
+        assertThat(employeeRoleRepository.count()).isEqualTo(rolesAfterFirst);
     }
 }

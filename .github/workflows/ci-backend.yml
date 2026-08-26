@@ -18,7 +18,7 @@ on:
       - '.github/workflows/ci-backend.yml'
       - '.github/scripts/junit_summary.py'
       - '.github/scripts/jacoco_summary.py'
-  # deploy-backend.yml calls this workflow as its gate, so a deploy can never
+  # deploy.yml calls this workflow as its gate, so a deploy can never
   # ship a commit whose tests were not run.
   workflow_call:
 

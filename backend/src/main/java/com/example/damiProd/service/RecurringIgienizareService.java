@@ -1,6 +1,7 @@
 package com.example.damiProd.service;
 
 import com.example.damiProd.domain.*;
+import com.example.damiProd.exception.ResourceNotFoundException;
 import com.example.damiProd.repository.*;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -54,7 +55,7 @@ public class RecurringIgienizareService {
 
     public RecurringIgienizare getById(Long id) {
         return recurringRepo.findById(id)
-                .orElseThrow(() -> new RuntimeException("RecurringIgienizare not found with id: " + id));
+                .orElseThrow(() -> new ResourceNotFoundException("RecurringIgienizare not found with id: " + id));
     }
 
     // ─── CREATE ──────────────────────────────────────────────────────────
@@ -66,13 +67,13 @@ public class RecurringIgienizareService {
     @Transactional
     public RecurringIgienizare create(Long clientId, RecurringIgienizare plan) {
         Client client = clientRepository.findById(clientId)
-                .orElseThrow(() -> new RuntimeException("Client not found with id: " + clientId));
+                .orElseThrow(() -> new ResourceNotFoundException("Client not found with id: " + clientId));
         plan.setClient(client);
 
         // Link subscription
         if (plan.getSubscription() != null && plan.getSubscription().getId() != null) {
             Subscription sub = subscriptionRepository.findById(plan.getSubscription().getId())
-                    .orElseThrow(() -> new RuntimeException(
+                    .orElseThrow(() -> new ResourceNotFoundException(
                             "Subscription not found with id: " + plan.getSubscription().getId()));
             plan.setSubscription(sub);
         }
@@ -80,7 +81,7 @@ public class RecurringIgienizareService {
         // Link route if provided
         if (plan.getRoute() != null && plan.getRoute().getId() != null) {
             Route route = routeRepository.findById(plan.getRoute().getId())
-                    .orElseThrow(() -> new RuntimeException(
+                    .orElseThrow(() -> new ResourceNotFoundException(
                             "Route not found with id: " + plan.getRoute().getId()));
             plan.setRoute(route);
         }
@@ -121,7 +122,7 @@ public class RecurringIgienizareService {
     public RecurringIgienizare assignRoute(Long planId, Long routeId) {
         RecurringIgienizare plan = getById(planId);
         Route route = routeRepository.findById(routeId)
-                .orElseThrow(() -> new RuntimeException("Route not found with id: " + routeId));
+                .orElseThrow(() -> new ResourceNotFoundException("Route not found with id: " + routeId));
         plan.setRoute(route);
         RecurringIgienizare saved = recurringRepo.save(plan);
 

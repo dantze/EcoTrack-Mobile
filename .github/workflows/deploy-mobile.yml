@@ -1,0 +1,110 @@
+name: Deploy Mobile
+
+# Two different things ship the mobile app, and the difference matters:
+#
+#   OTA update (`eas update`) — automatic on every push to main that touches
+#     mobile/. Ships JS + assets to already-installed apps in seconds, no store
+#     review. This is the day-to-day delivery path.
+#
+#   Native build (`eas build`) — manual, via "Run workflow". Needed whenever
+#     the NATIVE layer changes: a new native module, an SDK bump, anything in
+#     app.config.js's plugins/permissions, or a version bump. An OTA cannot
+#     carry those; pushing one that assumes them crashes the old binary.
+#
+# runtimeVersion policy is "appVersion", so an OTA only reaches installs whose
+# expo.version matches. Bumping expo.version therefore fences off old installs
+# until they get a new build — which is the safe default, not a bug.
+
+on:
+  workflow_dispatch:
+    inputs:
+      action:
+        description: 'What to ship'
+        required: true
+        default: 'update'
+        type: choice
+        options:
+          - update          # OTA to installed apps
+          - build-preview   # internal APK
+          - build-production # Play Store app bundle
+      branch:
+        description: 'EAS channel/branch (update only)'
+        required: false
+        default: 'production'
+        type: string
+
+  push:
+    branches: [main]
+    paths:
+      - 'mobile/**'
+      - '.github/workflows/deploy-mobile.yml'
+
+concurrency:
+  group: deploy-mobile
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  # Same gate as the other deploys: lint + typecheck + tests on a clean runner
+  # for this exact commit, before anything reaches a device.
+  verify:
+    name: Verify
+    uses: ./.github/workflows/ci-mobile.yml
+
+  ship:
+    name: Ship
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+
+      - uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - run: npm ci
+
+      # A push to main always takes the OTA path. The build paths are manual
+      # only — they cost EAS build minutes and, for production, a store review.
+      - name: Publish OTA update
+        if: github.event_name == 'push' || inputs.action == 'update'
+        env:
+          EXPO_PUBLIC_API_BASE_URL: ${{ vars.EXPO_PUBLIC_API_BASE_URL }}
+          EXPO_PUBLIC_GOOGLE_MAPS_API_KEY: ${{ secrets.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY }}
+          # Via env, never inlined into the run script: a commit message is
+          # attacker-controllable text and `${{ }}` splices it in before the
+          # shell ever sees it, which is a command-injection hole.
+          UPDATE_BRANCH: ${{ inputs.branch || 'production' }}
+          UPDATE_MESSAGE: ${{ github.event.head_commit.message || github.sha }}
+        run: |
+          eas update \
+            --branch "$UPDATE_BRANCH" \
+            --message "$UPDATE_MESSAGE" \
+            --non-interactive
+
+      - name: Build preview APK
+        if: github.event_name == 'workflow_dispatch' && inputs.action == 'build-preview'
+        env:
+          EXPO_PUBLIC_API_BASE_URL: ${{ vars.EXPO_PUBLIC_API_BASE_URL }}
+          EXPO_PUBLIC_GOOGLE_MAPS_API_KEY: ${{ secrets.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY }}
+        run: eas build --platform android --profile preview --non-interactive --no-wait
+
+      - name: Build production app bundle
+        if: github.event_name == 'workflow_dispatch' && inputs.action == 'build-production'
+        env:
+          EXPO_PUBLIC_API_BASE_URL: ${{ vars.EXPO_PUBLIC_API_BASE_URL }}
+          EXPO_PUBLIC_GOOGLE_MAPS_API_KEY: ${{ secrets.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY }}
+        run: eas build --platform android --profile production --non-interactive --no-wait

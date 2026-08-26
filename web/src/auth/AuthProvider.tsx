@@ -37,7 +37,8 @@ import {
   useState,
 } from 'react';
 import type { ReactNode } from 'react';
-import { api } from '@/api';
+import { api, MOCK_AUTO_LOGIN } from '@/api';
+import { IS_MOCK } from '@/lib/config';
 import type { AuthSession } from '@/api/contract';
 import type { AuthUser, Role } from '@/types/domain';
 import { clearRefreshToken, readRefreshToken, saveRefreshToken, REFRESH_TOKEN_KEY } from './storage';
@@ -171,8 +172,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Boot restore: never flash the login page for a user who has a live
   // refresh token — `status` stays 'loading' until this settles.
+  //
+  // MOCK MODE SIGNS ITSELF IN. There is no password anywhere in this system
+  // any more (access comes from an admin approving a device), so a login form
+  // in local development would be asking for a credential that does not
+  // exist. Instead the seeded ADMIN account is adopted on boot and `npm run
+  // dev` drops straight into the app. This branch is dead in live builds.
   useEffect(() => {
-    void restoreSession();
+    void (async () => {
+      if (IS_MOCK && !readRefreshToken()) {
+        const outcome = await api.auth.login(MOCK_AUTO_LOGIN.username, MOCK_AUTO_LOGIN.password);
+        if (outcome.success && outcome.session) {
+          applySession(outcome.session);
+          return;
+        }
+      }
+      await restoreSession();
+    })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -233,7 +249,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await api.auth.logout(refreshToken).catch(() => {});
   }, [localLogout]);
 
-  const hasRole = useCallback((role: Role) => user?.roles.includes(role) ?? false, [user]);
+  // ADMIN satisfies every gate. That mirrors the backend: SecurityConfig's
+  // matrix lets ADMIN perform every business write, so an admin seeing only
+  // the Admin section while being allowed to do everything would be a lie the
+  // UI tells about the server.
+  const hasRole = useCallback(
+    (role: Role) => {
+      if (!user) return false;
+      return user.roles.includes(role) || user.roles.includes('ADMIN');
+    },
+    [user],
+  );
 
   const value = useMemo<AuthContextValue>(
     () => ({ user, status, login, loginWithGoogle, logout, hasRole }),

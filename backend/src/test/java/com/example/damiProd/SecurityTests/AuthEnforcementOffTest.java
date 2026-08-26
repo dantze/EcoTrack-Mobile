@@ -89,4 +89,22 @@ class AuthEnforcementOffTest {
                 .andExpect(header().string("Content-Security-Policy",
                         "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'"));
     }
+
+    @Test
+    void healthProbe_isReachableWithoutAuthentication() throws Exception {
+        // The Docker healthcheck polls this unauthenticated, and docker-compose
+        // gates Caddy on the container reporting healthy. When /actuator/health
+        // was swallowed by the /actuator/** deny-list it returned 401, the
+        // container never became healthy, and the deploy timed out with the
+        // reverse proxy never starting.
+        mockMvc.perform(get("/actuator/health"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void otherActuatorEndpoints_stayDenied() throws Exception {
+        // Only /actuator/health is carved out - the rest of the deny-list holds.
+        int status = mockMvc.perform(get("/actuator/env")).andReturn().getResponse().getStatus();
+        assertThat(status).isIn(401, 403, 404);
+    }
 }

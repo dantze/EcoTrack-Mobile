@@ -9,11 +9,7 @@ import com.example.damiProd.service.TokenService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
-import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.Set;
 
@@ -26,17 +22,8 @@ import static org.assertj.core.api.Assertions.assertThat;
  * in holds a refresh token good for another 60 days.
  */
 @DataJpaTest
-@Import({ AdminService.class, TokenService.class, AdminServiceTest.EncoderConfig.class })
+@Import({ AdminService.class, TokenService.class })
 class AdminServiceTest {
-
-    @TestConfiguration
-    static class EncoderConfig {
-        /** Cost 4, not the app's 12: these tests hash a lot and verify nothing about the cost. */
-        @Bean
-        PasswordEncoder passwordEncoder() {
-            return new BCryptPasswordEncoder(4);
-        }
-    }
 
     @Autowired
     private AdminService adminService;
@@ -47,32 +34,12 @@ class AdminServiceTest {
     @Autowired
     private EmployeeRepository employeeRepository;
 
-    @Autowired
-    private PasswordEncoder passwordEncoder;
-
     private Employee newEmployee(String username) {
-        return employeeRepository.save(new Employee(username, "unused", "Test Employee", "0700000000"));
+        return employeeRepository.save(new Employee(username, "Test Employee", "0700000000"));
     }
 
     private CreateEmployeeRequest request() {
         return new CreateEmployeeRequest();
-    }
-
-    @Test
-    void updateEmployee_passwordChange_revokesEveryExistingSession() {
-        Employee employee = newEmployee("admin_svc_pw");
-        TokenService.IssuedTokens phone = tokenService.issueNewSession(employee, "Device-phone");
-        TokenService.IssuedTokens laptop = tokenService.issueNewSession(employee, "Device-laptop");
-
-        CreateEmployeeRequest change = request();
-        change.setPassword("a-brand-new-password");
-        adminService.updateEmployee(employee.getId(), change).orElseThrow();
-
-        assertThat(tokenService.validateAccessToken(phone.accessToken())).isEmpty();
-        assertThat(tokenService.validateAccessToken(laptop.accessToken())).isEmpty();
-        // The 60-day refresh tokens have to die too, or the lockout lasts 30 minutes.
-        assertThat(tokenService.rotate(phone.refreshToken(), "Device-phone")).isEmpty();
-        assertThat(tokenService.rotate(laptop.refreshToken(), "Device-laptop")).isEmpty();
     }
 
     @Test
@@ -122,18 +89,18 @@ class AdminServiceTest {
     }
 
     @Test
-    void createEmployee_storesABcryptHashNotTheRawPassword() {
+    void createEmployee_storesNoCredential() {
         CreateEmployeeRequest create = request();
         create.setUsername("admin_svc_created");
-        create.setPassword("plaintext-secret");
         create.setFullName("Created Employee");
         create.setRoleNames(Set.of("SALES"));
 
         EmployeeResponse created = adminService.createEmployee(create);
 
-        Employee stored = employeeRepository.findById(created.getId()).orElseThrow();
-        assertThat(stored.getPassword()).isNotEqualTo("plaintext-secret");
-        assertThat(stored.getPassword()).startsWith("$2");
-        assertThat(passwordEncoder.matches("plaintext-secret", stored.getPassword())).isTrue();
+        // Creating an employee makes a PERSON (assignable to routes); it grants
+        // no access. That only happens when a device enrolls and an admin
+        // approves it - see EnrollmentService.
+        assertThat(employeeRepository.findById(created.getId())).isPresent();
+        assertThat(tokenService.listActiveSessions(created.getId())).isEmpty();
     }
 }

@@ -35,6 +35,7 @@ ALLOW_FILE = REPO_ROOT / ".github" / "repo-hygiene-allow.txt"
 NO_CI_REQUIRED = {
     ".github",          # workflows themselves; this script is their check
     ".gitignore",
+    ".claude",          # agent instructions (skills); prose, ships in no build
     "deploy",           # documentation-only systemd unit + README
     "CLAUDE.md",
     "README.md",

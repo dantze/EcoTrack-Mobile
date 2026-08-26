@@ -8,9 +8,12 @@
  * Employee create/edit/delete go through /api/admin/**, which requires the
  * admin role on the caller's Bearer token. A 401/403 from those is reported
  * as a clear Romanian message instead of bubbling out.
+ *
+ * `?sofer=<id>` opens that driver's drawer and `?nou=1` opens an empty employee
+ * form — the command palette's entry points, and shareable links.
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Badge,
   Button,
@@ -24,6 +27,9 @@ import {
 } from '@/components/ui';
 import type { Column } from '@/components/ui';
 import { ROLE_LABELS, formatDate, weekdayLabel } from '@/components/domain';
+import { useDeepLink } from '@/lib/deepLink';
+import { useShortcuts } from '@/lib/hotkeys';
+import { recordUse } from '@/lib/recents';
 import type { CreateEmployeeInput } from '@/api';
 import type { Employee, Task } from '@/types/domain';
 import {
@@ -68,6 +74,9 @@ export function DriversPage() {
 /** How many days of workload the drawer projects forward. */
 const WORKLOAD_DAYS = 7;
 
+/** DOM id so the "/" shortcut can put the cursor in the search box. */
+const SEARCH_FIELD_ID = 'drivers-search';
+
 function DriversScreen() {
   const { toast, confirm } = useFeedback();
 
@@ -86,6 +95,54 @@ function DriversScreen() {
   const deleteEmployee = useDeleteEmployee();
 
   const drivers = useMemo(() => driversQuery.data ?? [], [driversQuery.data]);
+
+  const deepLink = useDeepLink();
+  const linkedDriverId = deepLink.number('sofer');
+  const wantsNew = deepLink.flag('nou');
+
+  useEffect(() => {
+    if (linkedDriverId === null) return;
+    setOpenDriverId(linkedDriverId);
+    recordUse('driver', linkedDriverId);
+    deepLink.clear('sofer');
+  }, [linkedDriverId, deepLink]);
+
+  useEffect(() => {
+    if (!wantsNew) return;
+    setEditing(null);
+    setFormOpen(true);
+    deepLink.clear('nou');
+  }, [wantsNew, deepLink]);
+
+  useShortcuts([
+    {
+      combo: 'n',
+      description: 'Angajat nou',
+      group: 'Șoferi',
+      run: () => {
+        setEditing(null);
+        setFormOpen(true);
+      },
+    },
+    {
+      combo: '/',
+      description: 'Focus pe câmpul de căutare',
+      group: 'Șoferi',
+      run: () => document.getElementById(SEARCH_FIELD_ID)?.focus(),
+    },
+    {
+      combo: 't',
+      description: 'Sarcinile de azi',
+      group: 'Șoferi',
+      run: () => setDay(todayIso()),
+    },
+    {
+      combo: 'r',
+      description: 'Reîncarcă șoferii',
+      group: 'Șoferi',
+      run: () => void driversQuery.refetch(),
+    },
+  ]);
 
   /** Tasks grouped by the driver that owns their route. */
   const tasksByDriver = useMemo(() => {
@@ -308,6 +365,7 @@ function DriversScreen() {
 
         <div className="w-56">
           <TextInput
+            id={SEARCH_FIELD_ID}
             label="Căutare"
             placeholder="nume, utilizator, telefon…"
             value={query}

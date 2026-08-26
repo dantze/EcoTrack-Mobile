@@ -37,14 +37,21 @@ interface NavItem {
 
 interface NavSectionDef {
   title: string;
-  role: Role;
+  /** Visible when the account holds ANY of these — matches RequireRole. */
+  roles: Role[];
   items: NavItem[];
 }
 
 const NAV_SECTIONS: NavSectionDef[] = [
   {
+    // Cross-module, so it sits above both sections rather than inside one.
+    title: 'General',
+    roles: ['SALES', 'TECH'],
+    items: [{ to: '/harta', label: 'Hartă', chord: 'h' }],
+  },
+  {
     title: 'Vânzări',
-    role: 'SALES',
+    roles: ['SALES'],
     items: [
       { to: '/comenzi', label: 'Comenzi', chord: 'c' },
       { to: '/clienti', label: 'Clienți', chord: 'l' },
@@ -54,7 +61,7 @@ const NAV_SECTIONS: NavSectionDef[] = [
   },
   {
     title: 'Tehnic',
-    role: 'TECH',
+    roles: ['TECH'],
     items: [
       { to: '/rute', label: 'Rute', chord: 'r' },
       { to: '/sarcini', label: 'Sarcini', chord: 's' },
@@ -111,7 +118,9 @@ function ShellBody() {
   const [helpOpen, setHelpOpen] = useState(false);
   const pendingChord = usePendingChord();
 
-  const visibleSections = NAV_SECTIONS.filter((section) => hasRole(section.role));
+  const visibleSections = NAV_SECTIONS.filter((section) =>
+    section.roles.some((role) => hasRole(role)),
+  );
 
   useShortcuts([
     {

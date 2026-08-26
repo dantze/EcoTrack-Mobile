@@ -25,11 +25,11 @@ import { boost, recentIds, recordUse, recentsRevision, subscribeRecents } from '
 import { rankBy, splitHighlight, type MatchRange } from '@/lib/search';
 import { clientName, type Role } from '@/types/domain';
 import { useClients, useOrders } from '@/features/sales/queries';
-import { useRoutes, useTasks } from '@/features/technical/queries';
+import { useDrivers, useRecurring, useRoutes, useTasks } from '@/features/technical/queries';
 import { orderAddress, orderPrimaryDate, orderSummary } from '@/features/sales/orderModel';
-import { routeLabel, taskDate } from '@/features/technical/utils';
+import { frequencyLabel, routeLabel, taskDate } from '@/features/technical/utils';
 
-type EntryKind = 'command' | 'client' | 'order' | 'task' | 'route';
+type EntryKind = 'command' | 'client' | 'order' | 'task' | 'route' | 'recurring' | 'driver';
 
 interface Entry {
   id: string;
@@ -50,6 +50,8 @@ const KIND_LABELS: Record<EntryKind, string> = {
   order: 'Comenzi',
   task: 'Sarcini',
   route: 'Rute',
+  recurring: 'Igienizări recurente',
+  driver: 'Șoferi',
 };
 
 /** Records opened without a query — the "you were just here" list. */
@@ -78,6 +80,8 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
   const ordersQuery = useOrders({ enabled: open && isSales });
   const tasksQuery = useTasks({ enabled: open && isTech });
   const routesQuery = useRoutes({ enabled: open && isTech });
+  const recurringQuery = useRecurring('all', { enabled: open && isTech });
+  const driversQuery = useDrivers({ enabled: open && isTech });
 
   useEffect(() => {
     if (!open) {
@@ -95,19 +99,22 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
 
     const list: Entry[] = [];
 
-    const navItems: { path: string; label: string; role: Role; keywords?: string }[] = [
-      { path: '/comenzi', label: 'Comenzi', role: 'SALES', keywords: 'vanzari orders' },
-      { path: '/clienti', label: 'Clienți', role: 'SALES', keywords: 'clients firme persoane' },
-      { path: '/produse', label: 'Produse', role: 'SALES', keywords: 'catalog preturi' },
-      { path: '/abonamente', label: 'Abonamente', role: 'SALES', keywords: 'subscriptii' },
-      { path: '/rute', label: 'Rute', role: 'TECH', keywords: 'dispecerat planificare' },
-      { path: '/sarcini', label: 'Sarcini', role: 'TECH', keywords: 'tasks lucrari' },
-      { path: '/soferi', label: 'Șoferi', role: 'TECH', keywords: 'angajati drivers' },
-      { path: '/recurente', label: 'Igienizări recurente', role: 'TECH', keywords: 'planuri' },
+    // `roles` is any-of, matching RequireRole — the map is reachable by both,
+    // and must still produce exactly ONE entry for an account that holds both.
+    const navItems: { path: string; label: string; roles: Role[]; keywords?: string }[] = [
+      { path: '/harta', label: 'Hartă', roles: ['SALES', 'TECH'], keywords: 'map locatii geografic' },
+      { path: '/comenzi', label: 'Comenzi', roles: ['SALES'], keywords: 'vanzari orders' },
+      { path: '/clienti', label: 'Clienți', roles: ['SALES'], keywords: 'clients firme persoane' },
+      { path: '/produse', label: 'Produse', roles: ['SALES'], keywords: 'catalog preturi' },
+      { path: '/abonamente', label: 'Abonamente', roles: ['SALES'], keywords: 'subscriptii' },
+      { path: '/rute', label: 'Rute', roles: ['TECH'], keywords: 'dispecerat planificare' },
+      { path: '/sarcini', label: 'Sarcini', roles: ['TECH'], keywords: 'tasks lucrari' },
+      { path: '/soferi', label: 'Șoferi', roles: ['TECH'], keywords: 'angajati drivers' },
+      { path: '/recurente', label: 'Igienizări recurente', roles: ['TECH'], keywords: 'planuri' },
     ];
 
     for (const item of navItems) {
-      if (!hasRole(item.role)) continue;
+      if (!item.roles.some((role) => hasRole(role))) continue;
       list.push({
         id: `nav:${item.path}`,
         kind: 'command',
@@ -149,6 +156,15 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
         keywords: 'adauga creeaza ruta noua',
         recentId: 'new:route',
         run: go('/rute?nou=1', 'new:route'),
+      });
+      list.push({
+        id: 'new:employee',
+        kind: 'command',
+        title: 'Angajat nou',
+        subtitle: 'Deschide formularul de angajat',
+        keywords: 'adauga creeaza sofer angajat nou employee',
+        recentId: 'new:employee',
+        run: go('/soferi?nou=1', 'new:employee'),
       });
     }
 
@@ -215,6 +231,46 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
       });
     }
 
+    for (const plan of recurringQuery.data ?? []) {
+      list.push({
+        id: `recurring:${plan.id}`,
+        kind: 'recurring',
+        title: clientName(plan.client),
+        subtitle: [
+          frequencyLabel(plan.frequencyDays),
+          plan.route ? routeLabel(plan.route) : 'Neasignat',
+          plan.active ? null : 'Inactiv',
+        ]
+          .filter(Boolean)
+          .join(' · '),
+        keywords: [plan.sanitationLocationAddress, plan.contact, plan.subscription?.name]
+          .filter(Boolean)
+          .join(' '),
+        recentId: `recurring:${plan.id}`,
+        run: () => {
+          recordUse('recurring', plan.id);
+          navigate(`/recurente?plan=${plan.id}`);
+          onClose();
+        },
+      });
+    }
+
+    for (const driver of driversQuery.data ?? []) {
+      list.push({
+        id: `driver:${driver.id}`,
+        kind: 'driver',
+        title: driver.fullName,
+        subtitle: [driver.username, driver.phone, driver.county].filter(Boolean).join(' · '),
+        keywords: [driver.username, driver.phone, driver.county].filter(Boolean).join(' '),
+        recentId: `driver:${driver.id}`,
+        run: () => {
+          recordUse('driver', driver.id);
+          navigate(`/soferi?sofer=${driver.id}`);
+          onClose();
+        },
+      });
+    }
+
     for (const route of routesQuery.data ?? []) {
       list.push({
         id: `route:${route.id}`,
@@ -243,6 +299,8 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
     ordersQuery.data,
     tasksQuery.data,
     routesQuery.data,
+    recurringQuery.data,
+    driversQuery.data,
     hasRole,
     isSales,
     isTech,

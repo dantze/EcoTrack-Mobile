@@ -8,7 +8,14 @@
  * provisioned to an employee) carrying that same envelope, so both are
  * deliberately swallowed here and surfaced as `{success:false, message}`
  * rather than thrown — the login form wants to render the server's Romanian
- * message ("Utilizator inexistent" / "Parolă incorectă"), not an exception.
+ * message, not an exception.
+ *
+ * Do not branch on that message. A failed password login is always the single
+ * string "Nume de utilizator sau parolă incorectă", whether the username exists
+ * or not: telling the two apart would hand an attacker a free account-enumeration
+ * oracle, so AuthService collapses them on purpose (it even burns an equivalent
+ * bcrypt verify on the unknown-user path so the timing matches). The only other
+ * login-failure message is the rate-limit one.
  *
  * The response also carries legacy flat fields (id/username/fullName/…) at
  * the top level for the old mobile app. We ignore them and read `user`.

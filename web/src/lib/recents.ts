@@ -19,7 +19,15 @@ const MAX_ENTRIES = 240;
 const HALF_LIFE_MS = 14 * 24 * 60 * 60 * 1000;
 const BOOST_CEILING = 260;
 
-export type RecentKind = 'client' | 'order' | 'task' | 'route' | 'product' | 'command';
+export type RecentKind =
+  | 'client'
+  | 'order'
+  | 'task'
+  | 'route'
+  | 'product'
+  | 'recurring'
+  | 'driver'
+  | 'command';
 
 interface Entry {
   /** `${kind}:${id}` */

@@ -4,9 +4,12 @@
  * The unassigned tab is the default because it is the only actionable queue:
  * a plan without a route generates no tasks, so it is silently invisible work
  * until a dispatcher puts it on a route.
+ *
+ * `?plan=<id>` opens that plan's drawer — the command palette's entry point and
+ * a shareable link to one plan.
  */
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Badge,
   Button,
@@ -19,6 +22,9 @@ import {
 } from '@/components/ui';
 import type { Column } from '@/components/ui';
 import { ClientCell, formatDate, weekdayLabel } from '@/components/domain';
+import { useDeepLink } from '@/lib/deepLink';
+import { useShortcuts } from '@/lib/hotkeys';
+import { recordUse } from '@/lib/recents';
 import { clientName } from '@/types/domain';
 import type { RecurringIgienizare } from '@/types/domain';
 import {
@@ -61,6 +67,9 @@ const TAB_TITLES: Record<RecurringScope, string> = {
   all: 'Toate',
 };
 
+/** DOM id so the "/" shortcut can put the cursor in the search box. */
+const SEARCH_FIELD_ID = 'recurring-search';
+
 function RecurringScreen() {
   const { toast, confirm } = useFeedback();
 
@@ -73,11 +82,62 @@ function RecurringScreen() {
   // Always known so the tab can carry the size of the actionable queue.
   const unassignedQuery = useRecurring('unassigned');
   const routesQuery = useRoutes();
+  // A linked plan is often assigned and therefore not in the default
+  // "unassigned" tab, so the deep-link effect below reads from the full list
+  // rather than whichever tab happens to be showing.
+  const allPlansQuery = useRecurring('all');
 
   const assignRoute = useAssignRecurringRoute();
   const deactivate = useDeactivateRecurring();
 
   const plans = useMemo(() => plansQuery.data ?? [], [plansQuery.data]);
+
+  const deepLink = useDeepLink();
+  const linkedPlanId = deepLink.number('plan');
+  const allPlans = allPlansQuery.data;
+
+  useEffect(() => {
+    if (linkedPlanId === null) return;
+    // Wait for the full list before giving up on the id — clearing the param
+    // early would make the link a no-op on a cold cache.
+    if (!allPlans) return;
+    const plan = allPlans.find((candidate) => candidate.id === linkedPlanId);
+    if (plan) {
+      // Switch to the tab that can actually show it, so closing the drawer does
+      // not leave the operator staring at a list the plan is not in.
+      setScope('all');
+      setOpenPlan(plan);
+      recordUse('recurring', plan.id);
+    }
+    deepLink.clear('plan');
+  }, [linkedPlanId, allPlans, deepLink]);
+
+  useShortcuts([
+    {
+      combo: '/',
+      description: 'Focus pe câmpul de căutare',
+      group: 'Igienizări recurente',
+      run: () => document.getElementById(SEARCH_FIELD_ID)?.focus(),
+    },
+    {
+      combo: 'u',
+      description: 'Arată planurile neasignate',
+      group: 'Igienizări recurente',
+      run: () => setScope('unassigned'),
+    },
+    {
+      combo: 'a',
+      description: 'Arată toate planurile',
+      group: 'Igienizări recurente',
+      run: () => setScope('all'),
+    },
+    {
+      combo: 'r',
+      description: 'Reîncarcă planurile',
+      group: 'Igienizări recurente',
+      run: () => void plansQuery.refetch(),
+    },
+  ]);
 
   const filtered = useMemo(
     () =>
@@ -219,6 +279,7 @@ function RecurringScreen() {
       <Toolbar>
         <div className="w-72">
           <TextInput
+            id={SEARCH_FIELD_ID}
             label="Căutare"
             placeholder="client, adresă, abonament, rută…"
             value={query}

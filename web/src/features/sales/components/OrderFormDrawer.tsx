@@ -434,6 +434,8 @@ export function OrderFormDrawer({ order = null, initialClient = null, onClose }:
           groups={packetGroups}
           loadingGroups={clientOrdersQuery.isLoading || pickupStatusesQuery.isLoading}
           groupsError={clientOrdersQuery.isError}
+          addressOptions={addressOptions}
+          coordinatesForAddress={coordinatesForAddress}
         />
       )}
 
@@ -648,12 +650,16 @@ function RidicareFields({
   groups,
   loadingGroups,
   groupsError,
+  addressOptions,
+  coordinatesForAddress,
 }: FieldsProps & {
   editing: boolean;
   clientChosen: boolean;
   groups: PacketGroup[];
   loadingGroups: boolean;
   groupsError: boolean;
+  addressOptions: AutocompleteOption[];
+  coordinatesForAddress: (option: AutocompleteOption) => string | null;
 }) {
   const step = (group: PacketGroup, delta: number) => {
     const current = form.pickupSelection[group.key] ?? 0;
@@ -760,9 +766,19 @@ function RidicareFields({
               />
             </Col>
             <Col span={12}>
+              {/*
+                Edit mode only. The pickup address normally arrives from the
+                packet group rather than being typed, which is why this field
+                started out plain — but once someone IS editing it by hand they
+                deserve the same typeahead the placement and sanitation
+                addresses get, and accepting a suggestion carries its
+                coordinates across too.
+              */}
               <LocationFields
                 label="Adresă ridicare"
                 value={form.pickupLocation}
+                suggestions={addressOptions}
+                coordinatesFor={coordinatesForAddress}
                 onChange={(pickupLocation) => patch({ pickupLocation })}
               />
             </Col>

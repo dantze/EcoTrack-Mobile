@@ -1,0 +1,38 @@
+/**
+ * MapLibre ships its own control chrome as plain CSS classes (no Tailwind
+ * hook), so the one piece we keep — attribution, which OpenFreeMap's licence
+ * requires — is retinted here rather than left in stock grey-on-white that
+ * clashes with the rest of the app's rounded, shadowed control language.
+ *
+ * The credit text must stay VISIBLE. The button hidden below is compact mode's
+ * expand toggle, which only renders when the control is compact — and the
+ * control is deliberately constructed with `compact: false` (see MapCanvas)
+ * precisely so the text is always shown. Do not turn compact back on while
+ * this rule exists, or the credit disappears completely.
+ */
+
+.maplibregl-ctrl-attrib {
+  background: rgba(255, 255, 255, 0.85);
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 10px;
+  color: #64748b;
+}
+
+.maplibregl-ctrl-attrib a {
+  color: #64748b;
+}
+
+.maplibregl-ctrl-bottom-right {
+  bottom: 2px;
+  right: 2px;
+}
+
+.maplibregl-ctrl-attrib-button {
+  display: none;
+}
+
+.maplibregl-canvas:focus-visible {
+  outline: 2px solid #5a86b5;
+  outline-offset: -2px;
+}

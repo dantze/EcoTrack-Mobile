@@ -82,8 +82,12 @@ export function useTask(taskId: number | null): UseQueryResult<Task> {
   });
 }
 
-export function useDrivers(): UseQueryResult<Employee[]> {
-  return useQuery({ queryKey: keys.drivers(), queryFn: () => api.employees.listDrivers() });
+export function useDrivers({ enabled = true }: ReadOptions = {}): UseQueryResult<Employee[]> {
+  return useQuery({
+    queryKey: keys.drivers(),
+    queryFn: () => api.employees.listDrivers(),
+    enabled,
+  });
 }
 
 export function useDriverRoutes(employeeId: number | null): UseQueryResult<Route[]> {
@@ -110,7 +114,10 @@ export function useTaskPhotos(taskId: number | null): UseQueryResult<TaskPhoto[]
   });
 }
 
-export function useRecurring(scope: RecurringScope): UseQueryResult<RecurringIgienizare[]> {
+export function useRecurring(
+  scope: RecurringScope,
+  { enabled = true }: ReadOptions = {},
+): UseQueryResult<RecurringIgienizare[]> {
   return useQuery({
     queryKey: keys.recurring(scope),
     queryFn: () => {
@@ -118,6 +125,7 @@ export function useRecurring(scope: RecurringScope): UseQueryResult<RecurringIgi
       if (scope === 'active') return api.recurring.listActive();
       return api.recurring.list();
     },
+    enabled,
   });
 }
 

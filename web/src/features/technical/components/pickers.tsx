@@ -24,7 +24,7 @@ import type { Employee, Route } from '@/types/domain';
 import { driverLabel, matchesQuery, routeLabel, taskProgress } from '../utils';
 import { AsyncPanel } from './display';
 
-interface PickerRowProps {
+export interface PickerRowProps {
   id: string;
   /** Position in the list, used by the keyboard scroll-into-view lookup. */
   index: number;
@@ -35,9 +35,21 @@ interface PickerRowProps {
   disabled?: boolean;
   selected?: boolean;
   active?: boolean;
+  /**
+   * Optional action rendered on the right (e.g. an "Asignează" button). Its
+   * clicks are stopped from reaching the row, so an explicit button press
+   * fires the action once rather than once per handler.
+   *
+   * Hidden from assistive tech, and it must not be focusable — pass
+   * `tabIndex={-1}`. A `role="option"` may not contain interactive
+   * descendants, and this action only duplicates what activating the row
+   * already does, so exposing it twice would be noise rather than help.
+   * Keyboard users reach it through the list's own ↑ ↓ / Enter.
+   */
+  trailing?: ReactNode;
 }
 
-function PickerRow({
+export function PickerRow({
   id,
   index,
   title,
@@ -47,6 +59,7 @@ function PickerRow({
   disabled,
   selected,
   active,
+  trailing,
 }: PickerRowProps) {
   return (
     <div
@@ -69,16 +82,26 @@ function PickerRow({
         <span className="block truncate text-sm font-medium text-ink">{title}</span>
         <span className="mt-0.5 block truncate text-xs text-ink-muted">{meta}</span>
       </span>
+      {trailing && (
+        <span
+          className="shrink-0"
+          aria-hidden="true"
+          onClick={(event) => event.stopPropagation()}
+          onMouseDown={(event) => event.stopPropagation()}
+        >
+          {trailing}
+        </span>
+      )}
     </div>
   );
 }
 
 /**
- * Shared list-keyboard behaviour for both pickers: a highlight that resets
- * when the filter changes, stays inside the list, scrolls into view, and
- * commits on Enter.
+ * Shared list-keyboard behaviour for the pickers and for AssignRecurringModal:
+ * a highlight that resets when the filter changes, stays inside the list,
+ * scrolls into view, and commits on Enter.
  */
-function useListKeyboard<T>(items: T[], onPick: (item: T) => void) {
+export function useListKeyboard<T>(items: T[], onPick: (item: T) => void) {
   const [highlight, setHighlight] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
 

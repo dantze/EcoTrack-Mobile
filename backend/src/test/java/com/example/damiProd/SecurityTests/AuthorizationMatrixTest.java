@@ -103,6 +103,12 @@ class AuthorizationMatrixTest {
     // ---------------------------------------------------------------------
     // Employee management is admin-only (it is the privilege-escalation path:
     // create an account, give it any role you like).
+    //
+    // POST/DELETE /api/employees no longer have a handler at all - they were
+    // removed from EmployeeController - but the matchers stay and so do these
+    // tests: authorization runs before dispatch, so a non-admin still gets 403
+    // rather than 405, and the day someone adds a write back under this path it
+    // is denied by default instead of silently open. Defence in depth, asserted.
     // ---------------------------------------------------------------------
 
     @Test

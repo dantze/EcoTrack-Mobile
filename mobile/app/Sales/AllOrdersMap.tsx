@@ -9,7 +9,7 @@ import {
     Pressable
 } from 'react-native';
 import MapView, { Marker, PROVIDER_GOOGLE, Region } from 'react-native-maps';
-import { API_BASE_URL } from '../../constants/ApiConfig';
+import { apiFetch } from '../../services/http';
 import { useRouter } from 'expo-router';
 import { AntDesign } from '@expo/vector-icons';
 
@@ -81,7 +81,7 @@ export default function AllOrdersMap() {
 
     const fetchAllOrders = async () => {
         try {
-            const response = await fetch(`${API_BASE_URL}/orders`);
+            const response = await apiFetch('/orders');
             if (!response.ok) {
                 throw new Error(`Failed to fetch orders. Status: ${response.status}`);
             }

@@ -38,6 +38,16 @@ public class TokenService {
     private static final int TOKEN_BYTES = 32; // 256 bits of entropy per token
     private static final int MAX_DEVICE_LABEL_LENGTH = 200;
 
+    /**
+     * How many spent refresh-token hashes a session remembers, newest last.
+     *
+     * Reuse of any remembered hash revokes the session. A token older than this
+     * many rotations is already dead - the cap only limits how far back a replay
+     * stays *attributable* to theft, in exchange for a bounded row: a session
+     * that refreshes every 30 minutes for its 60-day life rotates ~2900 times.
+     */
+    private static final int MAX_RETIRED_TOKEN_HASHES = 10;
+
     private final SessionRepository sessionRepository;
     private final SecureRandom secureRandom = new SecureRandom();
 
@@ -126,12 +136,22 @@ public class TokenService {
      * new access/refresh pair is issued in its place. Returns empty if the
      * token is unknown, expired or revoked.
      *
-     * If the presented token matches a token that was already rotated out
-     * (i.e. it is being reused), the whole session is revoked immediately
+     * If the presented token is one this session already rotated away from
+     * (i.e. it is being replayed), the whole session is revoked immediately
      * and this returns empty - see the class javadoc.
+     *
+     * Only the session the token belongs to is revoked, not the employee's
+     * other sessions. A replay proves that *this* family leaked; it says
+     * nothing about the phone in someone's pocket, and a benign cause - a
+     * client that retried a refresh it had already spent - would otherwise
+     * sign the whole crew out of every device at once. Use
+     * {@link #revokeAllSessions} when the account itself is known compromised.
      */
     @Transactional
     public Optional<IssuedTokens> rotate(String rawRefreshToken, String deviceLabel) {
+        if (rawRefreshToken == null || rawRefreshToken.isBlank()) {
+            return Optional.empty();
+        }
         String presentedHash = hash(rawRefreshToken);
         Instant now = Instant.now();
 
@@ -145,7 +165,7 @@ public class TokenService {
             String newAccessToken = generateToken();
             String newRefreshToken = generateToken();
 
-            session.setPreviousTokenHash(session.getRefreshTokenHash());
+            retireTokenHash(session, session.getRefreshTokenHash());
             session.setRefreshTokenHash(hash(newRefreshToken));
             session.setAccessTokenHash(hash(newAccessToken));
             session.setAccessTokenExpiresAt(now.plus(accessTokenTtl));
@@ -160,8 +180,8 @@ public class TokenService {
                     accessTokenTtl.getSeconds()));
         }
 
-        // Not the current token - was it a token we already rotated away from?
-        Optional<Session> reused = sessionRepository.findByPreviousTokenHashAndRevokedAtIsNull(presentedHash);
+        // Not the current token - is it one this session already rotated away from?
+        Optional<Session> reused = sessionRepository.findActiveByRetiredRefreshTokenHash(presentedHash);
         if (reused.isPresent()) {
             Session session = reused.get();
             session.setRevokedAt(now);
@@ -173,6 +193,18 @@ public class TokenService {
         }
 
         return Optional.empty();
+    }
+
+    /**
+     * Appends a spent refresh-token hash to the session's replay-detection
+     * chain, dropping the oldest entries beyond {@link #MAX_RETIRED_TOKEN_HASHES}.
+     */
+    private void retireTokenHash(Session session, String spentHash) {
+        List<String> retired = session.getRetiredRefreshTokenHashes();
+        retired.add(spentHash);
+        while (retired.size() > MAX_RETIRED_TOKEN_HASHES) {
+            retired.remove(0);
+        }
     }
 
     /**
@@ -269,11 +301,15 @@ public class TokenService {
     @Transactional
     public int pruneStaleSessions() {
         Instant cutoff = Instant.now().minus(sessionRetention);
-        int deleted = sessionRepository.deleteStaleSessions(cutoff);
-        if (deleted > 0) {
-            log.info("Pruned {} session row(s) that became unusable before {}", deleted, cutoff);
+        List<Session> stale = sessionRepository.findStaleSessions(cutoff);
+        if (stale.isEmpty()) {
+            return 0;
         }
-        return deleted;
+        // Entity-level, so the session_retired_tokens rows go with them - see
+        // SessionRepository#findStaleSessions for why this is not a bulk delete.
+        sessionRepository.deleteAll(stale);
+        log.info("Pruned {} session row(s) that became unusable before {}", stale.size(), cutoff);
+        return stale.size();
     }
 
     private String generateToken() {

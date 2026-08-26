@@ -1,4 +1,4 @@
-import { API_BASE_URL } from '../constants/ApiConfig';
+import { apiFetch } from './http';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -35,7 +35,7 @@ export const SubscriptionService = {
      * Get all active subscription plans — used for frontend order dropdowns
      */
     getActiveSubscriptions: async (): Promise<Subscription[]> => {
-        const response = await fetch(`${API_BASE_URL}/subscriptions`);
+        const response = await apiFetch('/subscriptions');
         if (!response.ok) throw new Error('Eșec la preluarea abonamentelor');
         return await response.json();
     },
@@ -44,7 +44,7 @@ export const SubscriptionService = {
      * Get all subscription plans including retired ones — used for admin views
      */
     getAllSubscriptions: async (): Promise<Subscription[]> => {
-        const response = await fetch(`${API_BASE_URL}/subscriptions/all`);
+        const response = await apiFetch('/subscriptions/all');
         if (!response.ok) throw new Error('Eșec la preluarea abonamentelor');
         return await response.json();
     },
@@ -53,7 +53,7 @@ export const SubscriptionService = {
      * Get a single subscription by ID
      */
     getSubscriptionById: async (id: number): Promise<Subscription> => {
-        const response = await fetch(`${API_BASE_URL}/subscriptions/${id}`);
+        const response = await apiFetch(`/subscriptions/${id}`);
         if (!response.ok) throw new Error('Abonamentul nu a fost găsit');
         return await response.json();
     },
@@ -62,7 +62,7 @@ export const SubscriptionService = {
      * Create a new subscription plan
      */
     createSubscription: async (subscription: CreateSubscriptionRequest): Promise<Subscription> => {
-        const response = await fetch(`${API_BASE_URL}/subscriptions`, {
+        const response = await apiFetch('/subscriptions', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(subscription),
@@ -75,7 +75,7 @@ export const SubscriptionService = {
      * Update an existing subscription plan
      */
     updateSubscription: async (id: number, subscription: CreateSubscriptionRequest): Promise<Subscription> => {
-        const response = await fetch(`${API_BASE_URL}/subscriptions/${id}`, {
+        const response = await apiFetch(`/subscriptions/${id}`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(subscription),
@@ -89,7 +89,7 @@ export const SubscriptionService = {
      * so existing orders referencing it are never broken
      */
     deactivateSubscription: async (id: number): Promise<void> => {
-        const response = await fetch(`${API_BASE_URL}/subscriptions/${id}`, {
+        const response = await apiFetch(`/subscriptions/${id}`, {
             method: 'DELETE',
         });
         if (!response.ok && response.status !== 204) {

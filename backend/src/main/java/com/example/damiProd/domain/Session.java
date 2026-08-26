@@ -3,6 +3,8 @@ package com.example.damiProd.domain;
 import jakarta.persistence.*;
 
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * A single logged-in device/browser for an Employee.
@@ -12,11 +14,12 @@ import java.time.Instant;
  * backup cannot be used to forge sessions.
  *
  * Refresh tokens rotate on every use: {@code refreshTokenHash} always holds
- * the hash of the currently-valid refresh token, while {@code previousTokenHash}
- * keeps the hash of the token it replaced. If the previous (already-rotated)
- * token is ever presented again, that is treated as token theft: the whole
- * session is revoked. This is what makes one row a "session family" rather
- * than a single-use record.
+ * the hash of the currently-valid refresh token, and every hash it replaces is
+ * appended to {@code retiredRefreshTokenHashes}. If any already-rotated token
+ * is presented again, that is treated as token theft and the whole session is
+ * revoked. Keeping the full recent chain rather than only the immediately
+ * preceding hash is what lets a token stolen several rotations ago still be
+ * recognised as stolen instead of merely failing to work.
  */
 @Entity
 @Table(name = "sessions")
@@ -33,11 +36,23 @@ public class Session {
     @Column(name = "refresh_token_hash", nullable = false, unique = true, length = 64)
     private String refreshTokenHash;
 
-    // Hash of the refresh token this one replaced. Cleared (null) once the
-    // rotation window has been consumed by a real refresh, kept only long
-    // enough to catch reuse of a stolen, already-rotated token.
-    @Column(name = "previous_token_hash", unique = true, length = 64)
-    private String previousTokenHash;
+    /**
+     * Hashes of refresh tokens this session has already rotated away from,
+     * oldest first, capped at {@code TokenService.MAX_RETIRED_TOKEN_HASHES}.
+     *
+     * Presenting any of these is proof that two parties hold tokens from this
+     * family, so the session is revoked on sight. The cap keeps the row bounded
+     * on a session that refreshes every 30 minutes for 60 days; a token older
+     * than the window is already unusable, it just stops being *attributable*.
+     *
+     * EAGER because the reuse check runs on the /auth/refresh path outside any
+     * open session, and the list is at most a handful of short strings.
+     */
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "session_retired_tokens", joinColumns = @JoinColumn(name = "session_id"))
+    @OrderColumn(name = "position")
+    @Column(name = "token_hash", length = 64)
+    private List<String> retiredRefreshTokenHashes = new ArrayList<>();
 
     @Column(name = "access_token_hash", unique = true, length = 64)
     private String accessTokenHash;
@@ -99,12 +114,12 @@ public class Session {
         this.refreshTokenHash = refreshTokenHash;
     }
 
-    public String getPreviousTokenHash() {
-        return previousTokenHash;
+    public List<String> getRetiredRefreshTokenHashes() {
+        return retiredRefreshTokenHashes;
     }
 
-    public void setPreviousTokenHash(String previousTokenHash) {
-        this.previousTokenHash = previousTokenHash;
+    public void setRetiredRefreshTokenHashes(List<String> retiredRefreshTokenHashes) {
+        this.retiredRefreshTokenHashes = retiredRefreshTokenHashes;
     }
 
     public String getAccessTokenHash() {

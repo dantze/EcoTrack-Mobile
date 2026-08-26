@@ -1,0 +1,20 @@
+# Exceptions for .github/scripts/repo_hygiene.py.
+#
+# Format:  <path> <check-name>   # why
+#
+# check-name is one of: secret-filename, google-api-key, aws-access-key-id,
+# github-pat, private-key-block, slack-token.
+#
+# Every entry here is a thing the scanner is right about. Keep the reason
+# current, and delete the line the moment it stops being true.
+
+HANDOFF-auth-security.md google-api-key  # The leaked Maps key, quoted so the rotation task stays findable. It is in git history from 807aec2 either way. DELETE THIS LINE once the key is rotated and the reference removed.
+
+# mobile/google-services.json is Firebase's Android config. It is *designed* to
+# be committed and shipped inside the APK — anyone with the app has it — so it
+# is not a leak in the way a private key is. What matters is that the key it
+# carries is restricted in Google Cloud to the package name
+# `com.damiprod.ecotrack` plus the release signing SHA-1. Unrestricted, it is a
+# billable key anyone can extract from the APK and use.
+mobile/google-services.json secret-filename   # Firebase Android config, ships in the APK by design
+mobile/google-services.json google-api-key    # ^ same. VERIFY the key is package + SHA-1 restricted in Google Cloud.

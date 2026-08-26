@@ -11,6 +11,8 @@ on:
     paths:
       - 'mobile/**'
       - '.github/workflows/ci-mobile.yml'
+  # deploy/EAS workflows can call this as a gate.
+  workflow_call:
 
 concurrency:
   group: ci-mobile-${{ github.workflow }}-${{ github.ref }}
@@ -25,7 +27,7 @@ defaults:
 
 jobs:
   check:
-    name: Lint and typecheck
+    name: Lint, typecheck, test
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -39,8 +41,14 @@ jobs:
 
       - run: npm ci
 
+      # Ordered cheapest-and-most-specific first, as in ci-web.yml.
       - name: Lint
         run: npm run lint
 
       - name: Typecheck
         run: npm run typecheck
+
+      # Node-environment Vitest over the pure modules only (utils/, types/).
+      # See mobile/vitest.config.ts for why this is not jest-expo.
+      - name: Test
+        run: npm run test:run

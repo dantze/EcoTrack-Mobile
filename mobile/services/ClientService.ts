@@ -1,4 +1,4 @@
-import { API_BASE_URL } from '../constants/ApiConfig';
+import { apiFetch } from './http';
 
 export type ClientType = 'individual' | 'company';
 
@@ -19,7 +19,7 @@ export const ClientService = {
      * Fetches all clients from the backend.
      */
     getClients: async () => {
-        const response = await fetch(`${API_BASE_URL}/clients`);
+        const response = await apiFetch('/clients');
         if (!response.ok) {
             throw new Error('Eșec la preluarea clienților');
         }
@@ -31,7 +31,7 @@ export const ClientService = {
      * @param clientData The data for the new client.
      */
     createClient: async (clientData: ClientData) => {
-        const response = await fetch(`${API_BASE_URL}/clients`, {
+        const response = await apiFetch('/clients', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -52,7 +52,7 @@ export const ClientService = {
      * @param orderData The data for the new order.
      */
     createOrder: async (clientId: number, orderData: any) => {
-        const response = await fetch(`${API_BASE_URL}/clients/${clientId}/orders`, {
+        const response = await apiFetch(`/clients/${clientId}/orders`, {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -73,7 +73,7 @@ export const ClientService = {
      * @param clientId The ID of the client.
      */
     getOrders: async (clientId: number) => {
-        const response = await fetch(`${API_BASE_URL}/clients/${clientId}/orders`);
+        const response = await apiFetch(`/clients/${clientId}/orders`);
         if (!response.ok) {
             throw new Error('Eșec la preluarea comenzilor');
         }
@@ -86,7 +86,7 @@ export const ClientService = {
      * @param clientData The updated client data.
      */
     updateClient: async (clientId: number, clientData: ClientData) => {
-        const response = await fetch(`${API_BASE_URL}/clients/${clientId}`, {
+        const response = await apiFetch(`/clients/${clientId}`, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
@@ -108,7 +108,7 @@ export const ClientService = {
      * @param clientId The ID of the client.
      */
     checkClientHasOrders: async (clientId: number): Promise<boolean> => {
-        const response = await fetch(`${API_BASE_URL}/clients/${clientId}/has-orders`);
+        const response = await apiFetch(`/clients/${clientId}/has-orders`);
         if (!response.ok) {
             throw new Error('Eșec la verificarea comenzilor clientului');
         }
@@ -122,10 +122,10 @@ export const ClientService = {
      * @param cascade If true, also deletes all orders (and their tasks) associated with the client.
      */
     deleteClient: async (clientId: number, cascade: boolean = false) => {
-        const url = cascade
-            ? `${API_BASE_URL}/clients/${clientId}?cascade=true`
-            : `${API_BASE_URL}/clients/${clientId}`;
-        const response = await fetch(url, {
+        const path = cascade
+            ? `/clients/${clientId}?cascade=true`
+            : `/clients/${clientId}`;
+        const response = await apiFetch(path, {
             method: 'DELETE',
         });
 
@@ -152,9 +152,9 @@ export const ClientService = {
         // @ts-expect-error React Native FormData expects an object with uri, name, type
         formData.append('file', { uri: photoUri, name: filename, type });
 
-        console.log(`Uploading photo for client ${clientId} to ${API_BASE_URL}/${clientId}/idPhoto`);
+        console.log(`Uploading photo for client ${clientId}`);
 
-        const response = await fetch(`${API_BASE_URL}/${clientId}/idPhoto`, {
+        const response = await apiFetch(`/${clientId}/idPhoto`, {
             method: 'POST',
             headers: {
                 // Content-Type header must NOT be set manually for FormData; fetch sets it with boundary

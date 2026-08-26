@@ -1,6 +1,7 @@
 import { StyleSheet, Text, View, Pressable, StatusBar } from 'react-native';
 import React from 'react';
 import { useRouter, useLocalSearchParams } from 'expo-router';
+import { AuthService } from '../services/AuthService';
 import { Ionicons } from '@expo/vector-icons';
 
 const ROLE_CONFIG = {
@@ -31,6 +32,13 @@ type RoleKey = keyof typeof ROLE_CONFIG;
 
 const RoleSelection = () => {
     const router = useRouter();
+
+    // Revokes the session server-side before leaving the screen; navigating
+    // away on its own left this device's refresh token valid for 60 more days.
+    const handleLogout = async () => {
+        await AuthService.logout();
+        router.replace('/login');
+    };
     const params = useLocalSearchParams();
 
     // Get roles from params (passed as comma-separated string)
@@ -85,7 +93,7 @@ const RoleSelection = () => {
             <View style={styles.footer}>
                 <Pressable
                     style={styles.logoutButton}
-                    onPress={() => router.replace('/login')}
+                    onPress={handleLogout}
                 >
                     <Ionicons name="log-out-outline" size={20} color="#FF5252" />
                     <Text style={styles.logoutText}>Deconectare</Text>

@@ -237,4 +237,76 @@ class TokenServiceTest {
         assertThat(revokedByOwner).isTrue();
         assertThat(tokenService.validateAccessToken(ownerSession.accessToken())).isEmpty();
     }
+
+    @Test
+    void rotate_reuseOfATokenSeveralRotationsOld_stillRevokesTheSession() {
+        Employee employee = newEmployee("token_svc_deep_reuse");
+        TokenService.IssuedTokens stolen = tokenService.issueNewSession(employee, "Device-A");
+
+        // The legitimate client keeps refreshing normally while an attacker sits
+        // on the token it started with. Tracking only the immediately-preceding
+        // hash, this replay would simply find nothing and be silently ignored -
+        // the theft would go unnoticed and the session would stay live.
+        TokenService.IssuedTokens live = tokenService.rotate(stolen.refreshToken(), "Device-A").orElseThrow();
+        live = tokenService.rotate(live.refreshToken(), "Device-A").orElseThrow();
+        live = tokenService.rotate(live.refreshToken(), "Device-A").orElseThrow();
+
+        assertThat(tokenService.rotate(stolen.refreshToken(), "Device-A")).isEmpty();
+
+        Session session = sessionRepository.findById(stolen.sessionId()).orElseThrow();
+        assertThat(session.getRevokedReason()).isEqualTo("REFRESH_TOKEN_REUSE_DETECTED");
+        // The tokens the honest client is holding die with the family.
+        assertThat(tokenService.validateAccessToken(live.accessToken())).isEmpty();
+        assertThat(tokenService.rotate(live.refreshToken(), "Device-A")).isEmpty();
+    }
+
+    @Test
+    void rotate_reuseDetection_doesNotTouchTheEmployeesOtherSessions() {
+        Employee employee = newEmployee("token_svc_reuse_scope");
+        TokenService.IssuedTokens phone = tokenService.issueNewSession(employee, "Device-phone");
+        TokenService.IssuedTokens laptop = tokenService.issueNewSession(employee, "Device-laptop");
+
+        tokenService.rotate(laptop.refreshToken(), "Device-laptop").orElseThrow();
+        assertThat(tokenService.rotate(laptop.refreshToken(), "Device-laptop")).isEmpty();
+
+        // A leaked family is not a compromised account - the phone stays signed
+        // in. revokeAllSessions() is the tool for the account-level case.
+        assertThat(tokenService.validateAccessToken(phone.accessToken())).isPresent();
+    }
+
+    @Test
+    void rotate_retiredHashChain_staysBounded() {
+        Employee employee = newEmployee("token_svc_chain_bound");
+        TokenService.IssuedTokens tokens = tokenService.issueNewSession(employee, "Device-A");
+
+        // A session refreshing every 30 minutes for 60 days rotates ~2900 times;
+        // the row must not grow with it.
+        for (int i = 0; i < 25; i++) {
+            tokens = tokenService.rotate(tokens.refreshToken(), "Device-A").orElseThrow();
+        }
+
+        Session session = sessionRepository.findById(tokens.sessionId()).orElseThrow();
+        assertThat(session.getRetiredRefreshTokenHashes()).hasSize(10);
+    }
+
+    @Test
+    void pruneStaleSessions_alsoRemovesTheRetiredTokenChain() {
+        TokenService pruning = new TokenService(sessionRepository, 30, 60, 10, 0);
+        Employee employee = newEmployee("token_svc_prune_chain");
+
+        TokenService.IssuedTokens tokens = pruning.issueNewSession(employee, "Device-A");
+        TokenService.IssuedTokens rotated = pruning.rotate(tokens.refreshToken(), "Device-A").orElseThrow();
+        pruning.revokeByRefreshToken(rotated.refreshToken());
+
+        // A bulk `DELETE FROM Session` would strand the session_retired_tokens
+        // rows or trip their foreign key - see SessionRepository#findStaleSessions.
+        assertThat(pruning.pruneStaleSessions()).isEqualTo(1);
+        assertThat(sessionRepository.findById(tokens.sessionId())).isEmpty();
+    }
+
+    @Test
+    void rotate_blankOrNullToken_isRejectedWithoutHashing() {
+        assertThat(tokenService.rotate(null, "Device-A")).isEmpty();
+        assertThat(tokenService.rotate("   ", "Device-A")).isEmpty();
+    }
 }

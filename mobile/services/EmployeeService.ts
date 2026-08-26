@@ -1,4 +1,4 @@
-import { API_BASE_URL } from '../constants/ApiConfig';
+import { apiFetch } from './http';
 
 export interface EmployeeRole {
     id: number;
@@ -17,7 +17,7 @@ export interface Employee {
  * Obține toți angajații
  */
 export const getAllEmployees = async (): Promise<Employee[]> => {
-    const response = await fetch(`${API_BASE_URL}/employees`);
+    const response = await apiFetch('/employees');
     if (!response.ok) {
         throw new Error('Eroare la încărcarea angajaților');
     }
@@ -28,7 +28,7 @@ export const getAllEmployees = async (): Promise<Employee[]> => {
  * Obține un angajat după ID
  */
 export const getEmployeeById = async (id: number): Promise<Employee> => {
-    const response = await fetch(`${API_BASE_URL}/employees/${id}`);
+    const response = await apiFetch(`/employees/${id}`);
     if (!response.ok) {
         throw new Error('Angajatul nu a fost găsit');
     }
@@ -39,7 +39,7 @@ export const getEmployeeById = async (id: number): Promise<Employee> => {
  * Obține toți șoferii (angajați cu rolul DRIVER)
  */
 export const getAllDrivers = async (): Promise<Employee[]> => {
-    const response = await fetch(`${API_BASE_URL}/employees/drivers`);
+    const response = await apiFetch('/employees/drivers');
     if (!response.ok) {
         throw new Error('Eroare la încărcarea șoferilor');
     }
@@ -50,7 +50,7 @@ export const getAllDrivers = async (): Promise<Employee[]> => {
  * Obține angajații cu un anumit rol
  */
 export const getEmployeesByRole = async (roleName: string): Promise<Employee[]> => {
-    const response = await fetch(`${API_BASE_URL}/employees/role/${roleName}`);
+    const response = await apiFetch(`/employees/role/${roleName}`);
     if (!response.ok) {
         throw new Error('Eroare la încărcarea angajaților');
     }

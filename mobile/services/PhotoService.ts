@@ -1,4 +1,4 @@
-import { API_BASE_URL } from '../constants/ApiConfig';
+import { apiFetch } from './http';
 
 /**
  * PhotoService handles all photo-related communication with the backend.
@@ -28,7 +28,7 @@ export const PhotoService = {
 
         console.log(`[PhotoService] Uploading photo for client ${clientId}...`);
 
-        const response = await fetch(`${API_BASE_URL}/${clientId}/idPhoto`, {
+        const response = await apiFetch(`/${clientId}/idPhoto`, {
             method: 'POST',
             headers: {
                 // Do NOT set Content-Type manually — fetch sets it with the correct multipart boundary
@@ -57,7 +57,7 @@ export const PhotoService = {
     deleteIdPhoto: async (clientId: number): Promise<string> => {
         console.log(`[PhotoService] Deleting photo for client ${clientId}...`);
 
-        const response = await fetch(`${API_BASE_URL}/${clientId}/idPhoto`, {
+        const response = await apiFetch(`/${clientId}/idPhoto`, {
             method: 'DELETE',
         });
 
@@ -79,7 +79,7 @@ export const PhotoService = {
     getAllPhotos: async (): Promise<string[]> => {
         console.log(`[PhotoService] Fetching all photos...`);
 
-        const response = await fetch(`${API_BASE_URL}/photos`);
+        const response = await apiFetch('/photos');
 
         if (!response.ok) {
             throw new Error('Eșec la preluarea fotografiilor');
@@ -110,7 +110,7 @@ export const PhotoService = {
 
         console.log(`[PhotoService] Uploading ${photoUris.length} task photos for task ${taskId}...`);
 
-        const response = await fetch(`${API_BASE_URL}/tasks/${taskId}/photos`, {
+        const response = await apiFetch(`/tasks/${taskId}/photos`, {
             method: 'POST',
             headers: {
                 'Accept': 'application/json',

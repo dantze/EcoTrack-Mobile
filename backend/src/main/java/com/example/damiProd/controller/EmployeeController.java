@@ -7,6 +7,23 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+/**
+ * Read-only employee directory. Every write lives on
+ * {@link AdminController} (/api/admin/employees) instead.
+ *
+ * This controller used to also expose POST /api/employees and
+ * DELETE /api/employees/{id}, both binding the raw {@link Employee} JPA entity
+ * straight from the request body. That was a privilege-escalation hole: the
+ * body carried its own `roles` list, so any caller who could reach the endpoint
+ * could mint themselves an ADMIN, and `password` was persisted exactly as sent
+ * - in plaintext, bypassing the encoder. Neither endpoint had a caller: the web
+ * app and the mobile app both write through /api/admin/employees, which takes a
+ * CreateEmployeeRequest DTO, bcrypts the password and resolves role names
+ * against the role table.
+ *
+ * If you need a write here, add it to AdminController - do not re-add an
+ * entity-bound one.
+ */
 @RestController
 @RequestMapping("/api/employees")
 public class EmployeeController {
@@ -43,16 +60,5 @@ public class EmployeeController {
     @GetMapping("/role/{roleName}")
     public ResponseEntity<List<Employee>> getEmployeesByRole(@PathVariable String roleName) {
         return ResponseEntity.ok(employeeService.getEmployeesByRole(roleName));
-    }
-
-    @PostMapping
-    public ResponseEntity<Employee> createEmployee(@RequestBody Employee employee) {
-        return ResponseEntity.ok(employeeService.saveEmployee(employee));
-    }
-
-    @DeleteMapping("/{id}")
-    public ResponseEntity<Void> deleteEmployee(@PathVariable Long id) {
-        employeeService.deleteEmployee(id);
-        return ResponseEntity.noContent().build();
     }
 }

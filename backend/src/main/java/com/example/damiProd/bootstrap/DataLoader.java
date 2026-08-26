@@ -7,22 +7,40 @@ import com.example.damiProd.repository.EmployeeRepository;
 import com.example.damiProd.repository.EmployeeRoleRepository;
 import com.example.damiProd.repository.ProductRepository;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+/**
+ * Seeds roles, employees and products into an empty database.
+ *
+ * The seeded passwords below are development credentials that are committed to
+ * this repository, so they are public knowledge - treat any environment still
+ * running them as unauthenticated. They are at least stored as bcrypt hashes
+ * (see {@link #createEmployee}) rather than plaintext, so a database dump does
+ * not additionally leak passwords that staff may have reused elsewhere.
+ *
+ * Changing the values is a deliberate operational decision, not a code cleanup:
+ * seeding only runs against an empty employee table, so a new value never
+ * reaches an existing database, and it locks local dev out until the new
+ * password is known. Rotate real credentials through /api/admin/employees.
+ */
 @Component
 public class DataLoader implements CommandLineRunner {
 
         private final EmployeeRepository employeeRepository;
         private final EmployeeRoleRepository employeeRoleRepository;
         private final ProductRepository productRepository;
+        private final PasswordEncoder passwordEncoder;
 
         public DataLoader(EmployeeRepository employeeRepository,
                         EmployeeRoleRepository employeeRoleRepository,
-                        ProductRepository productRepository) {
+                        ProductRepository productRepository,
+                        PasswordEncoder passwordEncoder) {
                 this.employeeRepository = employeeRepository;
                 this.employeeRoleRepository = employeeRoleRepository;
                 this.productRepository = productRepository;
+                this.passwordEncoder = passwordEncoder;
         }
 
         @Override
@@ -98,11 +116,17 @@ public class DataLoader implements CommandLineRunner {
                                 });
         }
 
+        /**
+         * @param password the raw seed password; stored as a bcrypt hash. Seeding
+         *                 it in plaintext used to leave every seeded account
+         *                 unhashed in the database until its owner happened to log
+         *                 in and trip AuthService's legacy-plaintext migration.
+         */
         private Employee createEmployee(String username, String password, String fullName,
                         String phone, String county, EmployeeRole role) {
                 Employee employee = new Employee();
                 employee.setUsername(username);
-                employee.setPassword(password);
+                employee.setPassword(passwordEncoder.encode(password));
                 employee.setFullName(fullName);
                 employee.setPhone(phone);
                 employee.setCounty(county);

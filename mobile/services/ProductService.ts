@@ -1,4 +1,4 @@
-import { API_BASE_URL } from '../constants/ApiConfig';
+import { apiFetch } from './http';
 
 export interface Product {
     id: number;
@@ -29,7 +29,7 @@ export const ProductService = {
      * Get all products
      */
     getAllProducts: async (): Promise<Product[]> => {
-        const response = await fetch(`${API_BASE_URL}/products`);
+        const response = await apiFetch('/products');
         if (!response.ok) throw new Error('Eșec la preluarea produselor');
         return await response.json();
     },
@@ -38,7 +38,7 @@ export const ProductService = {
      * Get product by ID
      */
     getProductById: async (id: number): Promise<Product> => {
-        const response = await fetch(`${API_BASE_URL}/products/${id}`);
+        const response = await apiFetch(`/products/${id}`);
         if (!response.ok) throw new Error('Produsul nu a fost găsit');
         return await response.json();
     },
@@ -47,7 +47,7 @@ export const ProductService = {
      * Create a new product
      */
     createProduct: async (product: CreateProductRequest): Promise<Product> => {
-        const response = await fetch(`${API_BASE_URL}/products`, {
+        const response = await apiFetch('/products', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -66,7 +66,7 @@ export const ProductService = {
      * Update an existing product
      */
     updateProduct: async (id: number, product: UpdateProductRequest): Promise<Product> => {
-        const response = await fetch(`${API_BASE_URL}/products/${id}`, {
+        const response = await apiFetch(`/products/${id}`, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
@@ -86,7 +86,7 @@ export const ProductService = {
      * Returns success status and error message if product is in use
      */
     deleteProduct: async (id: number): Promise<DeleteProductResult> => {
-        const response = await fetch(`${API_BASE_URL}/products/${id}`, {
+        const response = await apiFetch(`/products/${id}`, {
             method: 'DELETE',
         });
 

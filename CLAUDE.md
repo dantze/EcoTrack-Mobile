@@ -59,18 +59,46 @@ always populates the SecurityContext for callers that do send a token.
 
 | Where | Value | Why |
 |---|---|---|
-| `application.properties` (base, inherited by prod) | `false` | **The deployed mobile app sends no tokens at all** and would break instantly |
+| `application.properties` (base, inherited by prod) | `false` | installed app builds predating the mobile token contract still send no tokens |
 | `application-dev.properties` | `true` | opt-in local enforcement |
 | `application-test.properties` | `true` | `@SpringBootTest` exercises the real behaviour |
 
-`mobile/services/AuthService.ts` stores only a user object in AsyncStorage —
-there is no token storage and no `Authorization` header anywhere in `mobile/`.
-Flipping this flag to `true` in production before the mobile app implements the
-token contract will take the field crew offline. `AuthEnforcementOnTest` and
-`AuthEnforcementOffTest` cover both modes.
+Two companion knobs sit next to it, both **independent of `enforce`**:
+
+- `ecotrack.security.reject-invalid-bearer` (default `true`) — a request whose
+  Bearer token is unknown, expired or revoked gets a 401 even while `enforce` is
+  `false`. Requests with **no** `Authorization` header are untouched, which is
+  what keeps a token-less client working. Without it, a revoked token would keep
+  working through the open gate and logout would be invisible to the client.
+- The **role matrix** in `SecurityConfig`, written inside the `enforceSecurity`
+  branch and therefore completely inert while `enforce=false`: `/api/admin/**`
+  and employee writes need `ADMIN`; `PATCH /api/tasks/*/status` and
+  `POST /api/tasks/*/photos` accept `DRIVER`/`SALES`/`TECH`/`ADMIN` (those two
+  are the only writes the driver app makes — **a new mobile write needs a new
+  row here**); other `/api/**` writes need `SALES`/`TECH`/`ADMIN`; `/api/**`
+  reads need any authenticated employee; everything else is `denyAll()`.
+  Authentication alone is not authorization: before this matrix existed, any
+  valid token was effectively an admin token.
+
+`AuthEnforcementOnTest`, `AuthEnforcementOffTest` and `AuthorizationMatrixTest`
+cover both modes.
 
 Note that `@WebMvcTest` slices are not profiled, so they see the base default
 (`false`) rather than the test profile's `true`.
+
+### What flipping it to `true` now depends on
+
+`mobile/` implements the token contract as of the auth hardening work:
+`services/tokenStore.ts` holds the pair, `services/http.ts` attaches
+`Authorization` and does a single-flight refresh-and-retry on one 401, and
+`AuthService.logout()` revokes server-side. Every EcoTrack call in `mobile/`
+goes through `apiFetch` — third-party calls (Google Places in `LocationPicker`)
+deliberately do not, since that would leak the bearer token to another host.
+
+What is left is an operational question, not a code one: **every installed copy
+of the app has to be a build that sends tokens.** Flipping the flag logs out
+every device still running an older build, mid-route. Ship the update, confirm
+rollout, then flip.
 
 ## Backend architecture
 

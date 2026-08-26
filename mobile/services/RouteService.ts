@@ -1,4 +1,4 @@
-import { API_BASE_URL } from '../constants/ApiConfig';
+import { apiFetch } from './http';
 
 // Definim structura datelor pentru crearea unei rute
 export interface CreateRouteData {
@@ -23,7 +23,7 @@ export interface Route {
 export const RouteService = {
 
     getAllRoutes: async () => {
-        const response = await fetch(`${API_BASE_URL}/routes`);
+        const response = await apiFetch('/routes');
         if (!response.ok) {
             throw new Error('Eșec la preluarea rutelor');
         }
@@ -31,7 +31,7 @@ export const RouteService = {
     },
 
     getRoutesByEmployeeId: async (employeeId: number): Promise<Route[]> => {
-        const response = await fetch(`${API_BASE_URL}/routes/employee/${employeeId}`);
+        const response = await apiFetch(`/routes/employee/${employeeId}`);
         if (!response.ok) {
             throw new Error('Eșec la preluarea rutelor șoferului');
         }
@@ -39,7 +39,7 @@ export const RouteService = {
     },
 
     getRoutesByEmployeeIdAndDate: async (employeeId: number, date: string): Promise<Route[]> => {
-        const response = await fetch(`${API_BASE_URL}/routes/employee/${employeeId}/date/${date}`);
+        const response = await apiFetch(`/routes/employee/${employeeId}/date/${date}`);
         if (!response.ok) {
             throw new Error('Eșec la preluarea rutelor șoferului');
         }
@@ -47,7 +47,7 @@ export const RouteService = {
     },
 
     getRouteById: async (routeId: number): Promise<Route> => {
-        const response = await fetch(`${API_BASE_URL}/routes/${routeId}`);
+        const response = await apiFetch(`/routes/${routeId}`);
         if (!response.ok) {
             throw new Error('Ruta nu a fost găsită');
         }
@@ -56,7 +56,7 @@ export const RouteService = {
 
 
     createRoute: async (routeData: CreateRouteData) => {
-        const response = await fetch(`${API_BASE_URL}/routes`, {
+        const response = await apiFetch('/routes', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -71,7 +71,7 @@ export const RouteService = {
     },
 
     assignDriverToRoute: async (routeId: number, employeeId: number): Promise<Route> => {
-        const response = await fetch(`${API_BASE_URL}/routes/${routeId}/assign-driver/${employeeId}`, {
+        const response = await apiFetch(`/routes/${routeId}/assign-driver/${employeeId}`, {
             method: 'PUT',
         });
 
@@ -82,7 +82,7 @@ export const RouteService = {
     },
 
     reorderTasks: async (routeId: number, taskIds: number[]): Promise<Route> => {
-        const response = await fetch(`${API_BASE_URL}/routes/${routeId}/reorder-tasks`, {
+        const response = await apiFetch(`/routes/${routeId}/reorder-tasks`, {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
@@ -97,7 +97,7 @@ export const RouteService = {
     },
 
     deleteRoute: async (routeId: number): Promise<void> => {
-        const response = await fetch(`${API_BASE_URL}/routes/${routeId}`, {
+        const response = await apiFetch(`/routes/${routeId}`, {
             method: 'DELETE',
         });
 

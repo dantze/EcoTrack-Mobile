@@ -1,0 +1,75 @@
+name: Repo Hygiene
+
+# NO `paths:` FILTER, ON PURPOSE.
+#
+# ci-backend / ci-web / ci-mobile are each path-filtered, and that filtering is
+# load-bearing (CLAUDE.md: it is why three independently deployed projects can
+# share one repo). The cost is that a change outside all three filters gets no
+# CI whatsoever. This workflow is the floor under that: it runs on every pull
+# request, whatever changed.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: repo-hygiene-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+jobs:
+  hygiene:
+    name: Hygiene checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Need the merge base to diff against; a shallow clone has no history.
+          fetch-depth: 0
+
+      # The wrapper is a binary that runs before any of our code does. Also
+      # checked in ci-backend.yml so a backend PR fails fast; here so that a PR
+      # touching ONLY the wrapper — which no path filter catches — cannot slip by.
+      - name: Validate Gradle wrapper
+        uses: gradle/actions/wrapper-validation@v4
+
+      - name: Collect changed files
+        id: changed
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+            HEAD="${{ github.event.pull_request.head.sha }}"
+          else
+            BASE="${{ github.event.before }}"
+            HEAD="${{ github.sha }}"
+          fi
+
+          # A first push to a new branch reports an all-zero `before` SHA.
+          if [ -z "$BASE" ] || [ "$BASE" = "0000000000000000000000000000000000000000" ]; then
+            git diff --name-only "$(git rev-list --max-parents=0 HEAD | tail -1)" "$HEAD" > changed.txt
+          else
+            git diff --name-only "$BASE" "$HEAD" > changed.txt
+          fi
+
+          echo "Changed files:"
+          cat changed.txt
+
+      - name: Install PyYAML
+        run: python3 -m pip install --quiet pyyaml
+
+      # Exit code is meaningful here, unlike the summary scripts — this step is
+      # what fails the job.
+      - name: Hygiene checks
+        run: python3 .github/scripts/repo_hygiene.py --changed-files changed.txt
+
+      - name: Validate workflow YAML
+        if: always()
+        run: |
+          for f in .github/workflows/*.yml; do
+            python3 -c "import yaml,sys; yaml.safe_load(open(sys.argv[1]))" "$f" \
+              || { echo "::error file=$f::not valid YAML"; exit 1; }
+          done
+          echo "All workflow files parse."

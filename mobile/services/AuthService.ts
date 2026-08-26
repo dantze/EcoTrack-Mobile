@@ -1,5 +1,6 @@
 import { API_BASE_URL } from '../constants/ApiConfig';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { clearTokens, getRefreshToken, setTokens } from './tokenStore';
 
 export interface LoginResponse {
     id: number;
@@ -10,6 +11,12 @@ export interface LoginResponse {
     roles: string[];
     message: string;
     success: boolean;
+    // Issued by the backend on every successful login. The app used to drop
+    // these on the floor and send no Authorization header anywhere, which is
+    // why `ecotrack.security.enforce` had to stay off in production.
+    accessToken?: string;
+    refreshToken?: string;
+    expiresIn?: number;
 }
 
 export interface User {
@@ -50,6 +57,15 @@ export const AuthService = {
                 roles: data.roles,
             };
             await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
+
+            if (data.accessToken && data.refreshToken) {
+                await setTokens({ accessToken: data.accessToken, refreshToken: data.refreshToken });
+            } else {
+                // An older backend, or one that stopped issuing tokens. Drop any
+                // stale pair rather than pairing a new user with a previous
+                // user's token, and carry on unauthenticated.
+                await clearTokens();
+            }
         }
 
         return data;
@@ -71,9 +87,29 @@ export const AuthService = {
     },
 
     /**
-     * Logout the current user
+     * Logout the current user.
+     *
+     * Revokes the session server-side first. Clearing local storage alone would
+     * leave the refresh token this device was issued valid for another 60 days,
+     * so a phone handed on or lost after "Deconectare" would still be a way in.
+     * Best-effort: a failed call must never trap someone in a signed-in state,
+     * so the local clear happens either way.
      */
     logout: async (): Promise<void> => {
+        try {
+            const refreshToken = await getRefreshToken();
+            if (refreshToken) {
+                await fetch(`${API_BASE_URL}/auth/logout`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ refreshToken }),
+                });
+            }
+        } catch (error) {
+            console.error('Error revoking session on logout:', error);
+        }
+
+        await clearTokens();
         await AsyncStorage.removeItem(USER_STORAGE_KEY);
         await AsyncStorage.removeItem(ACTIVE_DRIVER_KEY);
     },

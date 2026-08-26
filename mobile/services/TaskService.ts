@@ -1,4 +1,4 @@
-import { API_BASE_URL } from '../constants/ApiConfig';
+import { apiFetch } from './http';
 
 export interface Task {
     id: number;
@@ -31,7 +31,7 @@ export const TaskService = {
      * Get all tasks
      */
     getAllTasks: async (): Promise<Task[]> => {
-        const response = await fetch(`${API_BASE_URL}/tasks`);
+        const response = await apiFetch('/tasks');
         if (!response.ok) throw new Error('Eșec la preluarea sarcinilor');
         return await response.json();
     },
@@ -40,7 +40,7 @@ export const TaskService = {
      * Get task by ID
      */
     getTaskById: async (id: number): Promise<Task> => {
-        const response = await fetch(`${API_BASE_URL}/tasks/${id}`);
+        const response = await apiFetch(`/tasks/${id}`);
         if (!response.ok) throw new Error('Sarcina nu a fost găsită');
         return await response.json();
     },
@@ -49,7 +49,7 @@ export const TaskService = {
      * Get tasks for a specific route
      */
     getTasksByRouteId: async (routeId: number): Promise<Task[]> => {
-        const response = await fetch(`${API_BASE_URL}/tasks/route/${routeId}`);
+        const response = await apiFetch(`/tasks/route/${routeId}`);
         if (!response.ok) throw new Error('Eșec la preluarea sarcinilor rutei');
         return await response.json();
     },
@@ -58,7 +58,7 @@ export const TaskService = {
      * Get tasks for a specific route on a specific date
      */
     getTasksByRouteAndDate: async (routeId: number, date: string): Promise<Task[]> => {
-        const response = await fetch(`${API_BASE_URL}/tasks/route/${routeId}/date/${date}`);
+        const response = await apiFetch(`/tasks/route/${routeId}/date/${date}`);
         if (!response.ok) throw new Error('Eșec la preluarea sarcinilor rutei pentru data specificată');
         return await response.json();
     },
@@ -67,7 +67,7 @@ export const TaskService = {
      * Get tasks for a specific employee on a specific scheduled date
      */
     getTasksByEmployeeAndDate: async (employeeId: number, date: string): Promise<Task[]> => {
-        const response = await fetch(`${API_BASE_URL}/tasks/employee/${employeeId}/date/${date}`);
+        const response = await apiFetch(`/tasks/employee/${employeeId}/date/${date}`);
         if (!response.ok) throw new Error('Eșec la preluarea sarcinilor angajatului');
         return await response.json();
     },
@@ -76,7 +76,7 @@ export const TaskService = {
      * Get all tasks for a specific employee (regardless of date)
      */
     getTasksByEmployee: async (employeeId: number): Promise<Task[]> => {
-        const response = await fetch(`${API_BASE_URL}/tasks/employee/${employeeId}`);
+        const response = await apiFetch(`/tasks/employee/${employeeId}`);
         if (!response.ok) throw new Error('Eșec la preluarea sarcinilor angajatului');
         return await response.json();
     },
@@ -85,7 +85,7 @@ export const TaskService = {
      * Create a task from an order and assign it to a route
      */
     createTaskFromOrder: async (orderId: number, routeId: number): Promise<Task> => {
-        const response = await fetch(`${API_BASE_URL}/tasks/from-order`, {
+        const response = await apiFetch('/tasks/from-order', {
             method: 'POST',
             headers: {
                 'Content-Type': 'application/json',
@@ -105,7 +105,7 @@ export const TaskService = {
      * Check if an order has an associated task
      */
     checkOrderHasTask: async (orderId: number): Promise<OrderTaskStatus> => {
-        const response = await fetch(`${API_BASE_URL}/tasks/order/${orderId}/exists`);
+        const response = await apiFetch(`/tasks/order/${orderId}/exists`);
         if (!response.ok) throw new Error('Eșec la verificarea stării sarcinii');
         return await response.json();
     },
@@ -114,7 +114,7 @@ export const TaskService = {
      * Update task status
      */
     updateTaskStatus: async (taskId: number, status: string): Promise<Task> => {
-        const response = await fetch(`${API_BASE_URL}/tasks/${taskId}/status`, {
+        const response = await apiFetch(`/tasks/${taskId}/status`, {
             method: 'PATCH',
             headers: {
                 'Content-Type': 'application/json',
@@ -129,7 +129,7 @@ export const TaskService = {
      * Delete a task
      */
     deleteTask: async (taskId: number): Promise<void> => {
-        const response = await fetch(`${API_BASE_URL}/tasks/${taskId}`, {
+        const response = await apiFetch(`/tasks/${taskId}`, {
             method: 'DELETE',
         });
         if (!response.ok) throw new Error('Eșec la ștergerea sarcinii');
@@ -139,7 +139,7 @@ export const TaskService = {
      * Reassign a single task to a different route
      */
     reassignTask: async (taskId: number, newRouteId: number): Promise<Task> => {
-        const response = await fetch(`${API_BASE_URL}/tasks/${taskId}/reassign/${newRouteId}`, {
+        const response = await apiFetch(`/tasks/${taskId}/reassign/${newRouteId}`, {
             method: 'PUT',
         });
         if (!response.ok) throw new Error('Eșec la reasignarea sarcinii');
@@ -150,7 +150,7 @@ export const TaskService = {
      * Reassign multiple tasks to a different route
      */
     reassignTasks: async (taskIds: number[], newRouteId: number): Promise<Task[]> => {
-        const response = await fetch(`${API_BASE_URL}/tasks/reassign`, {
+        const response = await apiFetch('/tasks/reassign', {
             method: 'PUT',
             headers: {
                 'Content-Type': 'application/json',
@@ -165,7 +165,7 @@ export const TaskService = {
      * Update scheduled date for a task
      */
     updateScheduledDate: async (taskId: number, scheduledDate: string): Promise<Task> => {
-        const response = await fetch(`${API_BASE_URL}/tasks/${taskId}/scheduled-date`, {
+        const response = await apiFetch(`/tasks/${taskId}/scheduled-date`, {
             method: 'PATCH',
             headers: {
                 'Content-Type': 'application/json',
@@ -180,7 +180,7 @@ export const TaskService = {
      * Get all photo URLs for a specific task
      */
     getTaskPhotos: async (taskId: number): Promise<string[]> => {
-        const response = await fetch(`${API_BASE_URL}/tasks/${taskId}/photos`);
+        const response = await apiFetch(`/tasks/${taskId}/photos`);
         if (!response.ok) throw new Error('Eșec la preluarea pozelor sarcinii');
         return await response.json();
     },

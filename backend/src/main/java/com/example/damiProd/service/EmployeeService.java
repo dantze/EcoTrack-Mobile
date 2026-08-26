@@ -49,11 +49,10 @@ public class EmployeeService {
                 .collect(Collectors.toList());
     }
 
-    public Employee saveEmployee(Employee employee) {
-        return employeeRepository.save(employee);
-    }
-
-    public void deleteEmployee(Long id) {
-        employeeRepository.deleteById(id);
-    }
+    // No save/delete here on purpose. Both used to exist as bare repository
+    // passthroughs behind POST/DELETE /api/employees, which bound the raw
+    // Employee entity - so the request body chose its own roles and its
+    // password was persisted unencoded. Employee writes go through AdminService
+    // (/api/admin/employees), which bcrypts the password and resolves role
+    // names against the role table. See EmployeeController.
 }

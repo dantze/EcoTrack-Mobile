@@ -2,8 +2,8 @@ name: Deploy Backend to Production
 
 on:
   # Manual trigger - adds "Run workflow" button in GitHub
-  workflow_dispatch: 
-  
+  workflow_dispatch:
+
   # Auto trigger on push to main
   push:
     branches:
@@ -11,10 +11,36 @@ on:
     paths:
       - 'backend/**'  # Only deploy when backend changes
 
+# One deploy at a time, and never cancel one in flight: a cancelled run leaves
+# the box with a stopped service or a half-written jar and no rollback.
+# A second push queues behind the first instead.
+concurrency:
+  group: deploy-backend-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
 jobs:
+  # The gate. Runs the real backend CI - build + all tests + coverage - against
+  # this exact commit before anything touches the server. The deploy step below
+  # still builds with `-x test` on the VPS, which is only defensible because of
+  # this job: the tests already ran here, on a clean runner, for this commit.
+  #
+  # Yes, this duplicates the ci-backend run that a push to main triggers on its
+  # own. That is deliberate - deduplicating means making the deploy depend on
+  # another workflow's run having happened, which is exactly the kind of
+  # coupling that lets an untested commit through when it breaks.
+  verify:
+    name: Verify
+    uses: ./.github/workflows/ci-backend.yml
+
   deploy:
+    name: Deploy
+    needs: verify
     runs-on: ubuntu-latest
-    
+    timeout-minutes: 25
+
     steps:
       - name: Deploy to Production
         uses: appleboy/ssh-action@v1.0.3
@@ -30,64 +56,156 @@ jobs:
           host: ${{ secrets.SERVER_IP }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SSH_PRIVATE_KEY }}
-          command_timeout: 10m
+          # Build + startup + up to 2 min of health polling, twice if it has to
+          # roll back. 10m was too tight to survive a rollback.
+          command_timeout: 20m
           envs: DB_URL,DB_USER,DB_PASS,DO_SPACES_ACCESS_KEY,DO_SPACES_SECRET_KEY,DO_SPACES_BUCKET,DO_SPACES_REGION
           script: |
             echo "🚀 Starting deployment..."
-            echo "DB_URL=$DB_URL"
-            echo "DB_USER=$DB_USER"
-            
-            # Navigate to project directory
-            cd ~/Dami-Prod-EcoTrack
-            
-            # Pull latest changes
+            # NOTE: do not echo DB_URL / DB_USER / any secret here. GitHub only
+            # masks a value when it matches a secret exactly, so a reformatted
+            # or partial echo lands in the public run log in the clear.
+
+            APP_DIR=~/Dami-Prod-EcoTrack
+            RELEASES=~/releases
+            HEALTH_URL=http://127.0.0.1:8080/actuator/health
+            mkdir -p "$RELEASES"
+
+            # ---------------------------------------------------------------
+            # helpers
+            # ---------------------------------------------------------------
+
+            # Polls the actuator over localhost - no firewall change, no new
+            # secret. Replaces the old "PID is alive after 15s" check, which a
+            # Spring Boot process that cannot reach its database passes happily
+            # while serving nothing. /actuator/health answers 503 in that case.
+            wait_for_health() {
+              i=1
+              while [ "$i" -le 60 ]; do
+                if command -v curl >/dev/null 2>&1; then
+                  BODY=$(curl -fsS --max-time 5 "$HEALTH_URL" 2>/dev/null || true)
+                elif command -v wget >/dev/null 2>&1; then
+                  BODY=$(wget -q -T 5 -O - "$HEALTH_URL" 2>/dev/null || true)
+                else
+                  echo "⚠️  Neither curl nor wget on the box - cannot health check."
+                  return 1
+                fi
+
+                case "$BODY" in
+                  *'"status":"UP"'*)
+                    echo "✅ Healthy after $((i * 2))s"
+                    return 0
+                    ;;
+                esac
+                sleep 2
+                i=$((i + 1))
+              done
+              return 1
+            }
+
+            stop_app() {
+              if [ -f ~/app.pid ]; then
+                OLD_PID=$(cat ~/app.pid)
+                if ps -p "$OLD_PID" > /dev/null 2>&1; then
+                  kill "$OLD_PID" || true
+                  # Give it 10s to close its DB pool before insisting.
+                  j=1
+                  while [ "$j" -le 10 ] && ps -p "$OLD_PID" > /dev/null 2>&1; do
+                    sleep 1
+                    j=$((j + 1))
+                  done
+                  ps -p "$OLD_PID" > /dev/null 2>&1 && kill -9 "$OLD_PID" || true
+                fi
+                rm -f ~/app.pid
+              fi
+            }
+
+            # Single definition of the argument list, so a rollback starts the
+            # old jar exactly the way the new one was started.
+            start_app() {
+              nohup java -jar "$1" \
+                --spring.profiles.active=prod \
+                --spring.datasource.url="$DB_URL" \
+                --spring.datasource.username="$DB_USER" \
+                --spring.datasource.password="$DB_PASS" \
+                --spaces.access-key="$DO_SPACES_ACCESS_KEY" \
+                --spaces.secret-key="$DO_SPACES_SECRET_KEY" \
+                --spaces.bucket="$DO_SPACES_BUCKET" \
+                --spaces.region="$DO_SPACES_REGION" \
+                > ~/app.log 2>&1 &
+              echo $! > ~/app.pid
+            }
+
+            # ---------------------------------------------------------------
+            # keep the jar that is running right now, so we can go back to it
+            # ---------------------------------------------------------------
+            cd "$APP_DIR"
+            CURRENT_JAR=$(ls -t backend/build/libs/*.jar 2>/dev/null | grep -v plain | head -1 || true)
+            if [ -n "$CURRENT_JAR" ]; then
+              cp "$CURRENT_JAR" "$RELEASES/previous.jar"
+              echo "📦 Saved rollback copy of $(basename "$CURRENT_JAR")"
+            else
+              echo "📦 No existing jar to save - this looks like a first deploy."
+            fi
+
             echo "📥 Pulling latest code..."
             git pull origin main
-            
-            # Navigate to backend
+
             cd backend
-            
-            # Stop existing process using PID file (safer than pkill)
+
             echo "🛑 Stopping existing backend..."
-            if [ -f ~/app.pid ]; then
-              PID=$(cat ~/app.pid)
-              if ps -p $PID > /dev/null 2>&1; then
-                kill $PID || true
-                sleep 2
-              fi
-              rm -f ~/app.pid
-            fi
-            
-            # Build the application
+            stop_app
+
+            # `-x test` is fine HERE and only here: the `verify` job ran the
+            # full suite against this same commit before this step started.
             echo "🔨 Building application..."
-            ./gradlew build -x test
-            
-            # Start the application in background and save PID
-            echo "▶️ Starting application..."
-            # Use the Spring Boot executable jar (not the plain.jar)
-            JAR_FILE=$(ls build/libs/*.jar | grep -v plain | head -1)
-            echo "Using JAR: $JAR_FILE"
-            nohup java -jar $JAR_FILE \
-              --spring.profiles.active=prod \
-              --spring.datasource.url="$DB_URL" \
-              --spring.datasource.username="$DB_USER" \
-              --spring.datasource.password="$DB_PASS" \
-              --spaces.access-key="$DO_SPACES_ACCESS_KEY" \
-              --spaces.secret-key="$DO_SPACES_SECRET_KEY" \
-              --spaces.bucket="$DO_SPACES_BUCKET" \
-              --spaces.region="$DO_SPACES_REGION" \
-              > ~/app.log 2>&1 &
-            echo $! > ~/app.pid
-            
-            # Wait a moment for startup
-            sleep 15
-            
-            # Check if it's running
-            PID=$(cat ~/app.pid)
-            if ps -p $PID > /dev/null 2>&1; then
-              echo "✅ Deployment successful! App running with PID: $PID"
-            else
-              echo "❌ Deployment failed! Check ~/app.log"
-              tail -50 ~/app.log
+            if ! ./gradlew build -x test; then
+              echo "❌ Build failed on the server. Nothing was replaced; restarting the previous jar."
+              if [ -f "$RELEASES/previous.jar" ]; then
+                start_app "$RELEASES/previous.jar"
+                wait_for_health && echo "↩️  Previous version is back up." || echo "⚠️  Previous version did not come back - check ~/app.log"
+              fi
               exit 1
             fi
+
+            echo "▶️ Starting application..."
+            JAR_FILE=$(ls -t build/libs/*.jar | grep -v plain | head -1)
+            echo "Using JAR: $JAR_FILE"
+            start_app "$JAR_FILE"
+
+            echo "🩺 Waiting for $HEALTH_URL to report UP..."
+            if wait_for_health; then
+              echo "✅ Deployment successful! App running with PID: $(cat ~/app.pid)"
+              exit 0
+            fi
+
+            # -----------------------------------------------------------
+            # rollback
+            # -----------------------------------------------------------
+            echo "❌ New build never reported healthy. Rolling back."
+            # Copy the log aside first — start_app truncates ~/app.log, which
+            # would destroy the evidence of why this deploy failed.
+            cp ~/app.log ~/app.failed.log 2>/dev/null || true
+            echo "---- last 50 lines of the failed start ----"
+            tail -50 ~/app.failed.log || true
+            echo "-------------------------------------------"
+            echo "(kept at ~/app.failed.log)"
+
+            stop_app
+
+            if [ ! -f "$RELEASES/previous.jar" ]; then
+              echo "⚠️  No previous jar to roll back to. The service is DOWN."
+              exit 1
+            fi
+
+            echo "↩️  Restarting previous version..."
+            start_app "$RELEASES/previous.jar"
+            if wait_for_health; then
+              echo "↩️  Rolled back successfully. The service is up on the PREVIOUS build."
+            else
+              echo "🚨 Rollback ALSO failed to become healthy. The service is DOWN."
+              tail -50 ~/app.log || true
+            fi
+
+            # The deploy failed either way - the run must go red.
+            exit 1

@@ -121,40 +121,38 @@ class EmployeeControllerTest {
     }
 
     // -----------------------------------------------------------------------
-    // TEST 6 — POST /api/employees → create employee
+    // TEST 6 — POST /api/employees is gone → 405, and nothing is written
     // -----------------------------------------------------------------------
+    // It used to bind the raw Employee entity, so the request body could carry
+    // its own `roles` (mint an ADMIN) and its `password` was persisted as sent,
+    // unhashed. Writes belong to /api/admin/employees. See EmployeeController.
     @Test
-    void createEmployee_shouldReturn200() throws Exception {
-        Employee driver = buildDriver();
-        when(employeeService.saveEmployee(any(Employee.class))).thenReturn(driver);
-
+    void createEmployee_isNoLongerExposed() throws Exception {
         String body = """
                 {
                     "username": "sofer1",
                     "password": "pass123",
                     "fullName": "Ion Șofer",
-                    "phone": "0711000000",
-                    "county": "Cluj"
+                    "roles": [{"roleName": "ADMIN"}]
                 }
                 """;
 
         mockMvc.perform(post("/api/employees")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.fullName").value("Ion Șofer"));
+                .andExpect(status().isMethodNotAllowed());
+
+        verifyNoInteractions(employeeService);
     }
 
     // -----------------------------------------------------------------------
-    // TEST 7 — DELETE /api/employees/{id} → delete returns 204
+    // TEST 7 — DELETE /api/employees/{id} is gone → 405, and nothing is deleted
     // -----------------------------------------------------------------------
     @Test
-    void deleteEmployee_shouldReturn204() throws Exception {
-        doNothing().when(employeeService).deleteEmployee(1L);
-
+    void deleteEmployee_isNoLongerExposed() throws Exception {
         mockMvc.perform(delete("/api/employees/1"))
-                .andExpect(status().isNoContent());
+                .andExpect(status().isMethodNotAllowed());
 
-        verify(employeeService).deleteEmployee(1L);
+        verifyNoInteractions(employeeService);
     }
 }

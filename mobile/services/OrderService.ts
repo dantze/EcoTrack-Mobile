@@ -1,9 +1,9 @@
-import { API_BASE_URL } from '../constants/ApiConfig';
+import { apiFetch } from './http';
 
 export const OrderService = {
     getOrders: async () => {
         try {
-            const response = await fetch(`${API_BASE_URL}/orders`);
+            const response = await apiFetch('/orders');
             if (!response.ok) throw new Error('Eșec la preluarea comenzilor');
             return await response.json();
         } catch (error) {
@@ -14,7 +14,7 @@ export const OrderService = {
 
     deleteOrder: async (id: number) => {
         try {
-            const response = await fetch(`${API_BASE_URL}/orders/${id}`, {
+            const response = await apiFetch(`/orders/${id}`, {
                 method: 'DELETE',
             });
             if (!response.ok) throw new Error('Eșec la ștergerea comenzii');
@@ -26,7 +26,7 @@ export const OrderService = {
 
     getOrderById: async (id: number) => {
         try {
-            const response = await fetch(`${API_BASE_URL}/orders/${id}`);
+            const response = await apiFetch(`/orders/${id}`);
             if (!response.ok) throw new Error('Eșec la preluarea detaliilor comenzii');
             return await response.json();
         } catch (error) {
@@ -37,7 +37,7 @@ export const OrderService = {
 
     updateOrder: async (id: number, data: any) => {
         try {
-            const response = await fetch(`${API_BASE_URL}/orders/${id}`, {
+            const response = await apiFetch(`/orders/${id}`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',
@@ -54,7 +54,7 @@ export const OrderService = {
 
     getOrdersByRoute: async (routeId: number) => {
         try {
-            const response = await fetch(`${API_BASE_URL}/route-definitions/${routeId}/orders`);
+            const response = await apiFetch(`/route-definitions/${routeId}/orders`);
             if (!response.ok) throw new Error('Eșec la preluarea comenzilor rutei');
             return await response.json();
         } catch (error) {

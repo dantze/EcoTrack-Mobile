@@ -1,12 +1,11 @@
 # Handoff — CI / tests / deploy
 
-Session stopped early. Everything described under **Done** is finished and
-verified; everything under **Not started** is untouched. Working tree only —
-nothing committed.
+Status: **complete**, second pass. The brief had three parts: (1) CI quality,
+(2) real test coverage, (3) deploy safety. **All three are now done.**
 
-The brief had three parts: (1) CI quality, (2) real test coverage, (3) deploy
-safety. **Parts 1 and 2 are largely done. Part 3 is NOT STARTED — the deploy
-workflow still has all three of its original problems.**
+Second pass finished the two things the first left open: the mobile test
+project, and the entire deploy section. Both are described in place below —
+look for "second pass".
 
 ---
 
@@ -37,7 +36,8 @@ specific signal first). Previously it ran typecheck + build only.
 ### `.github/workflows/ci-mobile.yml` (rewritten)
 
 Same concurrency / timeout / permissions treatment, plus **lint** ahead of
-typecheck. Previously typecheck only.
+typecheck. Previously typecheck only. The second pass added a **test** step and
+a `workflow_call:` trigger — see "Mobile tests" below.
 
 ### `paths:` filters — PRESERVED on all three
 
@@ -251,164 +251,243 @@ javadoc explaining the fix (compare before applying the factor).
 > a different agent working in parallel — they are not mine and I did not review
 > them.
 
-### Mobile tests — NOT wired (deliberate, low-friction path identified)
+### Mobile tests — wired (second pass)
 
-`jest-expo` was judged not worth it: it pulls a full RN preset and transform
-chain for a codebase whose testable logic is four pure modules.
+`jest-expo` was judged not worth it and still is: it pulls a full RN preset and
+transform chain for a codebase whose testable logic is a handful of pure
+modules. `mobile/utils/*` and `mobile/types/OrderTypes.ts` import nothing from
+react-native, so a plain node-environment Vitest project runs them with no
+transform at all. `vitest` was already a devDependency.
 
-**But it is NOT high-friction, and the next session should just do it.**
-`mobile/utils/{validation,formatters,dateUtils,orderUtils}.ts` and
-`mobile/types/OrderTypes.ts` import nothing from React Native — `orderUtils`
-imports only type guards from `OrderTypes`. A plain node-environment Vitest
-project runs them with no transform at all.
+Added:
 
-`vitest` is **already installed** as a mobile devDependency. What is missing:
-1. `mobile/vitest.config.ts`:
-   ```ts
-   import { defineConfig } from 'vitest/config';
-   export default defineConfig({
-     test: { environment: 'node', include: ['{utils,types,constants}/**/*.test.ts'] },
-   });
-   ```
-2. `"test": "vitest"` / `"test:run": "vitest run"` in `mobile/package.json`
-   (deliberately NOT added yet, so no script points at a missing config).
-3. Tests for `orderUtils.getDateInfo` (the range/single-day/invalid branches are
-   the fiddly part), `getClientName`, `validation`, `formatters`, `dateUtils`.
-4. A `npm run test:run` step in `.github/workflows/ci-mobile.yml`.
+- **`mobile/vitest.config.ts`** — `environment: 'node'`, and
+  `include: ['{utils,types,constants}/**/*.test.ts']`. **Keep that glob narrow**:
+  widening it to `**/*.test.ts` starts pulling in files that import react-native
+  and the whole reason this config is cheap disappears.
+- **`"test"` / `"test:run"`** in `mobile/package.json`.
+- **A `Test` step in `ci-mobile.yml`**, after lint and typecheck, plus a
+  `workflow_call:` trigger to match the other two CI workflows.
+- **59 tests across 5 files**, all passing:
 
----
+| File | Tests | Covers |
+|---|---|---|
+| `utils/__tests__/orderUtils.test.ts` | 30 | `getDateInfo` — three subtypes each keeping their date under a different field, and only Amplasare able to produce a range. Ranges, same-day collapse, unparseable and missing dates, plus `getClientName` / `getLocationText` / `getActionText` / `getOrderTypeLabel` / `formatDate`. |
+| `utils/__tests__/formatters.test.ts` | 11 | ro-RO price grouping, and the three validators — including the `parseFloat`/`parseInt` edge behaviour (`'12abc'` passes, `'2.9'` truncates) pinned as **current behaviour** rather than asserted as correct. |
+| `utils/__tests__/validation.test.ts` | 7 | The email/phone rules, which are also ported into `web/src/features/sales/validation.ts`. If they drift, a client record created on a phone fails validation on the web app. |
+| `utils/__tests__/dateUtils.test.ts` | 7 | `toDateString` and the Romanian display formats. |
+| `types/__tests__/OrderTypes.test.ts` | 4 | The three discriminator strings, duplicated in the backend's `@JsonSubTypes`, `web/src/features/sales/orderModel.ts` and here. The backend half is pinned by `DomainTests/OrderJsonSubTypesTest`; this is the mobile half. |
 
-## 3. Deploy — NOT STARTED
+#### The timezone pin — read this before touching the date tests
 
-**`.github/workflows/deploy-backend.yml` is UNCHANGED. All three problems from
-the brief are still live:**
+`vitest.config.ts` sets `env: { TZ: 'Europe/Bucharest' }`, and that is
+load-bearing, not tidiness. The date code is timezone-sensitive in two places
+and would otherwise pass locally and fail in CI (GitHub runners are UTC):
 
-1. ❌ **Still builds with `./gradlew build -x test`** on the VPS — ships
-   untested code. `ci-backend.yml` now has a `workflow_call:` trigger ready to
-   be used as the gate, but nothing calls it.
-2. ❌ **Still echoes credentials into the run log** —
-   `echo "DB_URL=$DB_URL"` and `echo "DB_USER=$DB_USER"` at the top of the SSH
-   script. These are secret-masked by GitHub only if the exact secret value
-   matches; the log line is still wrong and should just be deleted.
-3. ❌ **Still treats "PID alive after 15s" as success.** A Spring Boot process
-   that fails its DB connection can stay alive for far longer than 15 s while
-   serving nothing.
+- `orderUtils.getDateInfo` parses `'YYYY-MM-DD'` with `new Date(s)`, which
+  JavaScript reads as **UTC midnight**, then reads it back with the **local**
+  `getDate()`/`getMonth()`. Anywhere west of UTC, every bare date renders one
+  day early. Invisible to users in Romania, who are always east of UTC.
+- `dateUtils.toDateString` uses `toISOString()`, so at 00:30 local in Bucharest
+  it returns **yesterday's** date. A task filed late in the evening is filed
+  against the wrong day.
 
-Also not started: **rollback to the previous jar on failure**, the checked-in
-**systemd unit + install README**, the **`workflow_dispatch`-gated web deploy
-workflow**, and the **repo-hygiene workflow**.
+Both are pinned as current behaviour by named tests
+(`dateOffByOneWestOfUtc`, `utcNotLocal`). **They are real latent bugs.** Fixing
+either means inverting its test — which is the point.
 
-### One piece of deploy groundwork IS done and IS active
+## 3. Deploy — done (second pass)
 
-To make a real health poll possible, the actuator was added. **This is live and
-takes effect on the next deploy even though nothing polls it yet:**
+All three original problems in `.github/workflows/deploy-backend.yml` are fixed,
+and the four missing pieces are written.
 
-- `backend/build.gradle` — added `org.springframework.boot:spring-boot-starter-actuator`
-- `backend/src/main/resources/application.properties` — appended:
-  ```properties
-  management.endpoints.web.exposure.include=health
-  management.endpoint.health.show-details=never
-  management.endpoint.health.show-components=never
-  ```
+### `deploy-backend.yml` — rewritten
 
-Only `/actuator/health` is exposed and it shows no details, so it adds no
-readable surface beyond `UP`/`DOWN`. `SecurityConfig` leaves non-`/api` paths
-`permitAll` in **both** enforcement modes, so no security config change was
-needed. Health returns 503 when the DB is unreachable — exactly what a deploy
-gate wants.
+**1. It no longer ships untested code.** A `verify` job now
+`uses: ./.github/workflows/ci-backend.yml`, and `deploy` has `needs: verify`.
+The VPS build keeps `-x test`, which is defensible *only* because of that job —
+the same commit already ran the full suite on a clean runner. There is a comment
+saying exactly that, so nobody removes the gate and leaves the `-x`.
 
-**`ecotrack.security.enforce` was NOT touched anywhere.** It remains `false` in
-`application.properties` and unset in `application-prod.properties`.
+This deliberately duplicates the `ci-backend` run that a push to main triggers
+on its own. Deduplicating would mean making the deploy depend on some *other*
+workflow run having happened, which is the coupling that lets an untested commit
+through the moment it breaks.
 
-### The deploy work, in the order I would do it next
+**2. It no longer echoes credentials.** The `echo "DB_URL=$DB_URL"` /
+`echo "DB_USER=$DB_USER"` lines are gone, replaced by a comment explaining why
+they must not come back: GitHub masks a secret only when the value matches
+exactly, so any reformatted or partial echo lands in the run log in the clear.
 
-1. **Delete the two `echo "DB_…"` lines.** One minute, no risk, do it first.
-2. **Gate on CI.** Add a `verify` job to `deploy-backend.yml` that
-   `uses: ./.github/workflows/ci-backend.yml`, and `needs: verify` on the
-   `deploy` job. Keeping `-x test` on the VPS is then defensible (the same
-   commit was already tested on the runner) — but say so in a comment.
-3. **Replace the PID check with a health poll**, run over the existing SSH
-   session against `http://127.0.0.1:8080/actuator/health` (localhost, so no
-   firewall change and **no new secrets**). Retry loop, ~60 attempts at 2 s,
-   succeed on `"status":"UP"`.
-4. **Rollback.** Before `./gradlew build`, `cp` the current
-   `build/libs/*.jar` (excluding `*-plain.jar`) to `~/releases/previous.jar`. On
-   health-poll failure: kill the new PID, restart from `previous.jar` with the
-   same argument list, re-poll, `tail -50 ~/app.log`, exit 1.
-5. **systemd unit + README** as the documented alternative to `nohup`, checked
-   in but not installed — e.g. `deploy/systemd/ecotrack-backend.service` and
-   `deploy/systemd/README.md`. Do NOT change how the box runs; document it.
-6. **`.github/workflows/deploy-web.yml`** — `workflow_dispatch:` **only**, with a
-   comment stating CLAUDE.md's reason: the production backend is plain HTTP on a
-   bare IP, so a deployed HTTPS build cannot call it until the backend has TLS.
-7. **`.github/workflows/repo-hygiene.yml`** — runs on EVERY pull request with
-   **no** `paths:` filter (this is the gap the three path-filtered workflows
-   leave open). Should check: `gradle/actions/wrapper-validation@v4`; no `.env`
-   or key material committed; every changed top-level path is covered by one of
-   the three CI workflows' filters; no action referenced as `@main`/`@master`.
+**3. "PID alive after 15s" is replaced by a real health poll.** `wait_for_health`
+polls `http://127.0.0.1:8080/actuator/health` — localhost, so no firewall change
+and no new secret — up to 60 times at 2 s, succeeding only on `"status":"UP"`.
+A Spring Boot process that cannot reach its database stays alive indefinitely
+while serving nothing; the actuator answers 503 for exactly that case. Falls
+back to `wget` if `curl` is absent and fails loudly if neither exists.
 
----
+**4. Rollback.** Before anything else, the currently-running jar is copied to
+`~/releases/previous.jar`. If the new build never reports healthy, the script
+copies the log aside to `~/app.failed.log` **first** (the restart truncates
+`~/app.log`, which would destroy the evidence), prints the last 50 lines, stops
+the new process, restarts the previous jar through the same `start_app` helper
+— one definition, so a rollback starts the old jar exactly the way the new one
+was started — and re-polls. **The run exits 1 either way**: a successful
+rollback is still a failed deploy.
 
-## Verification — real results, run at end of session
+A failed `./gradlew build` on the server takes the same path.
 
+Also: `concurrency: { group: deploy-backend-production, cancel-in-progress: false }`
+so deploys queue instead of racing and none is ever cancelled mid-flight (a
+cancelled deploy leaves a stopped service and no rollback), `permissions: contents: read`,
+and `command_timeout` raised 10m → 20m because 10m could not survive a rollback.
+
+### `deploy/systemd/` — written, NOT installed
+
+`ecotrack-backend.service` + `README.md`. Documentation with a copy-paste path;
+production keeps using `nohup` until someone decides otherwise, and the README
+says so twice.
+
+The strongest argument for switching is one the README spells out: **the current
+`nohup` invocation passes `--spring.datasource.password=...` and three
+DigitalOcean keys as argv entries**, readable by any local user via `ps aux` or
+`/proc/<pid>/cmdline`. The unit uses a root-owned `0600` `EnvironmentFile`
+instead. It also adds restart-on-crash, restart-on-reboot and journal log
+rotation, and carries the usual hardening directives.
+
+What it does **not** fix, also in the README: `Type=simple` reports "started" the
+moment the JVM execs, so systemd knows nothing about whether Spring finished
+wiring. **Keep the workflow's health poll and rollback** if you migrate.
+
+### `deploy-web.yml` — new, `workflow_dispatch` only
+
+Deliberately no `push:` trigger, with the reason at the top of the file:
+CLAUDE.md's — the production backend is plain HTTP on a bare IP, so a browser
+refuses to call it from an HTTPS origin, and a deployed live build cannot work
+until the backend has TLS. It gates on `ci-web.yml`, builds with a
+`data_mode` choice input (`mock` default), emits a `::warning` when `live` is
+chosen, and **uploads a dist artifact rather than publishing anywhere**. Wiring
+it to a host is a decision that comes after TLS.
+
+### `repo-hygiene.yml` + `.github/scripts/repo_hygiene.py` — new
+
+Runs on **every** pull request with **no `paths:` filter** — that is the whole
+point. The three CI workflows are each path-filtered (load-bearing, per
+CLAUDE.md), which leaves changes outside all three with no CI at all.
+
+Four checks:
+
+1. **`gradle/actions/wrapper-validation@v4`** — also in `ci-backend.yml` so a
+   backend PR fails fast; here so a PR touching *only* the wrapper, which no
+   path filter catches, cannot slip through.
+2. **Key material by filename** — `.env`, `*.pem`, `*.key`, `*.p12`, `*.jks`,
+   `id_rsa`, `google-services.json`, service-account JSON. `.env.example` and
+   friends are exempt.
+3. **Credential shapes by content** — Google API keys, AWS access key ids,
+   GitHub PATs, private-key blocks, Slack tokens. Patterns are assembled from
+   string fragments so the script does not trip its own scan.
+4. **CI coverage** — every changed path must match some `ci-*.yml` `paths:`
+   filter or sit under an explicit `NO_CI_REQUIRED` allowlist. This is the check
+   that catches "someone added a new top-level project and it silently has zero
+   CI forever".
+5. **No action pinned to `@main`/`@master`.**
+
+Plus a `yaml.safe_load` pass over every workflow file.
+
+**Unlike `junit_summary.py` and `jacoco_summary.py`, this script's exit code is
+the point** — those always exit 0 because Gradle fails the job; this one returns
+1 on a violation. There is a comment saying so.
+
+Runs locally exactly as in CI:
+
+```bash
+git diff --name-only origin/main... | python3 .github/scripts/repo_hygiene.py
 ```
-cd backend && JAVA_HOME=/opt/homebrew/opt/openjdk@21 ./gradlew build
-```
+
+#### It found something on its first run
+
+`mobile/google-services.json` is committed and carries a Google API key
+(`AIzaSyCzzT…`, project `ecotrack-ae5f1`, package `com.damiprod.ecotrack`).
+
+This is **not** the leaked Maps key from `HANDOFF-auth-security.md` — different
+key, different problem. A Firebase Android config is *designed* to be committed
+and shipped inside the APK; anyone with the app has it. So it is allowlisted in
+`.github/repo-hygiene-allow.txt` rather than treated as a leak.
+
+**What still needs checking by a human: that the key is restricted in Google
+Cloud** to the package name `com.damiprod.ecotrack` plus the release signing
+SHA-1. Unrestricted, it is a billable key anyone can extract from the APK.
+
+#### `.github/repo-hygiene-allow.txt`
+
+Two entries, both with reasons and both meant to be deleted when they stop being
+true: the Firebase config above, and the leaked Maps key quoted in
+`HANDOFF-auth-security.md` (already in git history from `807aec2`; the line says
+to delete it once the key is rotated).
+
+## Verification — real results, second pass
+
 > ⚠️ **There is no JDK on the default PATH on this machine** (`java -version`
-> fails). Homebrew's is at `/opt/homebrew/opt/openjdk@21`. Setting
-> `JAVA_HOME` to that prefix works with the Gradle toolchain; if your Gradle
-> version needs a real JDK home, use
-> `/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home`.
+> fails). Use
+> `JAVA_HOME=/opt/homebrew/opt/openjdk@21/libexec/openjdk.jdk/Contents/Home`.
 
 | Command | Result |
 |---|---|
-| `cd backend && ./gradlew build` (with `JAVA_HOME` set) | ✅ **BUILD SUCCESSFUL** |
-| `cd backend && ./gradlew test --rerun-tasks` | ✅ **212 tests, 0 failed, 0 skipped**, 26 classes, 28 s |
-| JaCoCo | ✅ report generated — **67.0% lines / 46.9% branches / 64.9% instructions**. No threshold gates the build. |
+| `cd backend && ./gradlew build` | ✅ **BUILD SUCCESSFUL — 223 tests, 0 failures** |
+| JaCoCo | ✅ report generated. No threshold gates the build. |
 | `cd web && npm run typecheck` | ✅ exit 0 |
-| `cd web && npm run lint` | ✅ exit 0 — **0 errors, 66 warnings** |
-| `cd web && npm run test:run` | ✅ **10 files, 216 tests, all passing**, 2.6 s |
-| `cd web && npm run build` | ✅ exit 0 (pre-existing "chunks larger than 500 kB" advisory, not new) |
+| `cd web && npm run lint` | ✅ **0 errors**, 71 warnings |
+| `cd web && npm run test:run` | ✅ **10 files, 216 tests, all passing** |
+| `cd web && npm run build` | ✅ exit 0 — **the >500 kB warning is gone**, see the UI/UX handoff |
 | `cd mobile && npm run typecheck` | ✅ exit 0 |
-| `cd mobile && npm run lint` | ✅ exit 0 — **0 errors, 123 warnings** |
-| `cd mobile && npm run test:run` | ⛔ **does not exist** — see "Mobile tests" above |
-| All 4 workflow YAML files | ✅ parse (`python3 -c "import yaml,sys;yaml.safe_load(open(sys.argv[1]))"`) |
-| Both `.github/scripts/*.py` | ✅ compile, and were run against real build output |
-| Both eslint configs | ✅ import cleanly under Node |
+| `cd mobile && npm run lint` | ✅ **0 errors**, 123 warnings |
+| `cd mobile && npm run test:run` | ✅ **5 files, 59 tests, all passing** (was: did not exist) |
+| `TZ=America/Los_Angeles … npm run test:run` | ✅ still 59/59 — confirms the TZ pin actually overrides the shell |
+| All 6 workflow YAML files | ✅ parse |
+| `repo_hygiene.py` over all 347 tracked files | ✅ **OK, 0 problems** (after allowlisting the Firebase config) |
+| `repo_hygiene.py` fault injection | ✅ correctly returns **1** and annotates for a planted API key, a committed `.env`, an un-CI'd top-level path, and an action pinned `@main` |
+| All 3 `.github/scripts/*.py` | ✅ compile |
 
-Nothing is failing. Nothing above is described as passing without having been run.
+Nothing above is described as passing without having been run.
 
-`actionlint` is **not installed** on this machine, so workflow YAML was
-validated with the Python `yaml.safe_load` fallback the brief specified. That
-catches syntax errors but not GitHub-Actions-specific schema mistakes — worth a
-run of `actionlint` before merging.
+The backend test count moved 212 → 223 across both passes: +13 from the auth
+hardening work (see `HANDOFF-auth-security.md`), −2 from `EmployeeServiceTest`
+when `saveEmployee`/`deleteEmployee` were deleted with the endpoints that used
+them.
 
-`snyk` is **not installed** on PATH, so the code scan required by
-`.github/instructions/snyk_rules.instructions.md` was **skipped**. It needs
-running against the new first-party code (the two Python scripts, the new test
-files) before merge.
+`actionlint` is **still not installed** on this machine, so workflow YAML was
+validated with `yaml.safe_load`. That catches syntax errors but not
+GitHub-Actions schema mistakes — **worth an `actionlint` run before merging**,
+and the deploy workflow is the one that most deserves it.
 
----
+`snyk` is **still not installed** on PATH, so the scan required by
+`.github/instructions/snyk_rules.instructions.md` has **not** run against any of
+this — including the new `repo_hygiene.py`.
 
 ## Inactive pending user action
 
-Nothing added this session requires a new GitHub secret or server change to
-work. Two items are worth knowing:
+Nothing added across either pass requires a new GitHub secret or a server change
+to work. Four things are worth knowing:
 
-1. **The actuator health endpoint is live but nothing polls it.** After the next
-   deploy, `http://<VPS>:8080/actuator/health` will answer. If the VPS firewall
-   exposes port 8080 publicly, that endpoint becomes publicly reachable —
-   harmless (`{"status":"UP"}`, no details, no components) but worth a conscious
-   nod. The planned deploy poll uses `127.0.0.1`, so no firewall change is
-   needed either way.
-2. **The systemd unit is not written yet**, so there is nothing to install. When
-   it is added it must stay documentation-only: installing it is a manual,
-   opt-in step, and the workflow must keep using `nohup` until the user says
-   otherwise.
+1. **The first deploy after this merges will have no rollback target.** The
+   rollback copy is made from the jar already on the box, and `~/releases/` does
+   not exist yet. The script says "this looks like a first deploy" and carries
+   on; from the second deploy onwards rollback is live.
+2. **`/actuator/health` is now actually polled.** If the VPS firewall exposes
+   port 8080 publicly the endpoint is publicly reachable — harmless
+   (`{"status":"UP"}`, no details, no components), but a conscious nod is worth
+   it. The poll itself uses `127.0.0.1`, so no firewall change is needed.
+3. **`curl` or `wget` must exist on the VPS.** The health poll needs one; it
+   fails with a clear message if neither is present. Almost certainly fine — the
+   box already runs git and a JDK — but it is a new dependency of the deploy.
+4. **Verify the Firebase key restrictions** in Google Cloud (see the
+   repo-hygiene section). Nothing breaks either way; an unrestricted key is
+   someone else's billable quota.
+
+The systemd unit is written but **not installed**, and installing it stays a
+manual, opt-in step. The workflow keeps using `nohup`.
 
 No secret names, VPS paths, or GitHub configuration were changed.
-
----
 
 ## Gotchas
 
@@ -438,3 +517,25 @@ No secret names, VPS paths, or GitHub configuration were changed.
   task. If you run `jacocoTestReport` alone after a partial test run you will
   get a misleadingly low number — always run `test jacocoTestReport` together,
   which is what `finalizedBy` does automatically.
+
+### Gotchas added by the second pass
+
+- **`start_app` in `deploy-backend.yml` truncates `~/app.log`.** The rollback
+  path copies it to `~/app.failed.log` *before* restarting for that reason. If
+  you reorder those lines you silently destroy the only evidence of why a deploy
+  failed.
+- **The deploy script must stay POSIX-sh compatible.** `appleboy/ssh-action`
+  runs it through the login shell, so it avoids `local`, arrays and `set -e` —
+  the last one deliberately, because the rollback path needs to handle failures
+  itself rather than abort on them.
+- **`repo_hygiene.py` skips itself when content-scanning.** It holds the
+  credential regexes, so scanning itself would always fail. If you move those
+  patterns into another file, add that file to the skip list too.
+- **PyYAML parses a bare `on:` key as the boolean `True`** (YAML 1.1). The
+  CI-coverage check reads `data.get('on', data.get(True))` for that reason —
+  do not "simplify" it.
+- **`mobile/vitest.config.ts` pins `TZ`.** Removing it makes two date tests pass
+  in Bucharest and fail on a UTC runner. See the mobile tests section.
+- **The mobile Vitest `include` glob is intentionally narrow.** Widening it to
+  `**/*.test.ts` pulls in react-native imports and the config stops being
+  transform-free.

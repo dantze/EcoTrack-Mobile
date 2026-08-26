@@ -1,14 +1,16 @@
 # Handoff — web UI/UX pass
 
 Branch `chore/monorepo`. Everything below is uncommitted in the working tree.
-Scope was **`web/src/**` only**. Nothing under `backend/`, `mobile/`,
-`.github/`, `web/package.json`, `web/vite.config.ts` or `web/tsconfig*.json`
-was touched, and `web/src/auth/**` + `web/src/api/live/http.ts` were left alone
-(another agent owns those).
 
-**Zero new npm dependencies were added.** Everything is built on React 19,
-Tailwind 4, TanStack Query, React Router 7 and @dnd-kit, which were already
-installed.
+The **first** pass was scoped to `web/src/**` only. The **second** pass (§4) also
+touched `web/vite.config.ts`, for the code-splitting work — that was the one
+file the original scope excluded that item (7) could not be done without.
+`web/src/auth/**` and `web/src/api/live/http.ts` are still untouched here; the
+auth session owns those, see `HANDOFF-auth-security.md`.
+
+**Zero new npm dependencies were added, in either pass.** Everything is built on
+React 19, Tailwind 4, TanStack Query, React Router 7 and @dnd-kit, which were
+already installed.
 
 ---
 
@@ -16,24 +18,20 @@ installed.
 
 ```bash
 cd web
-npm run typecheck   # PASSES (no output beyond the npm notice)
-npm run build       # PASSES — dist built, only the pre-existing >500 kB chunk warning
+npm run typecheck   # PASSES
+npm run lint        # PASSES — 0 errors, 71 warnings
+npm run build       # PASSES — no chunk-size warning any more (see §7)
 npm run test:run    # PASSES — 10 files, 216 tests
 ```
 
-Real output at handoff time:
-
-```
-Test Files  10 passed (10)
-     Tests  216 passed (216)
-```
-
 `npm run dev` (mock data mode, the default) serves on http://localhost:5173.
-I could **not** open a browser in this session — the Claude-in-Chrome extension
-was not connected — so **none of this has been visually confirmed in a real
-browser.** It typechecks, builds, and the pure logic + the Autocomplete widget
-are covered by tests, but a human should click through the four screens before
-this is considered done. That is the single biggest caveat in this document.
+
+**No browser was available in either session** — Claude-in-Chrome was not
+connected the first time and was declined the second — so **none of this UI has
+ever been rendered on a screen.** It typechecks, lints, builds, and the pure
+logic plus the Autocomplete widget are covered by 216 tests, but a human still
+has to click through the screens before any of it is considered done. **That is
+the single biggest caveat in this document, and it is now two sessions old.**
 
 `snyk` is **not installed** on this machine (`which snyk` → not found), so the
 scan required by `.github/instructions/snyk_rules.instructions.md` was skipped.
@@ -134,6 +132,9 @@ shareable URL.
 | `/sarcini?sarcina=<id>` | opens that task's drawer |
 | `/rute?ruta=<id>` | selects that route (and clears the date filter, since a linked route is rarely on today) |
 | `/rute?nou=1` | opens the route form |
+| `/recurente?plan=<id>` | opens that plan's drawer (added in the second pass, §4) |
+| `/soferi?sofer=<id>` | opens that driver's drawer (added in the second pass, §4) |
+| `/soferi?nou=1` | opens an empty employee form (added in the second pass, §4) |
 
 Consumed params are cleared with `replace: true` so Back does not walk the user
 through re-opened drawers.
@@ -275,50 +276,154 @@ added by a **different agent** during this session — I only added test files.
 
 ---
 
-## 4. In progress
+## 4. Done in the second pass
 
-**Nothing is half-built.** Every file compiles, the build succeeds and the whole
-suite passes. There is no fragment left mid-edit.
+Everything in the old §5 list except items 1, 4 and 5. Numbering below matches
+that list so the two can be read side by side.
 
-The one honest gap is **visual verification**: no browser was available, so the
-new UI (palette modal, help overlay, suggestion cards, autocomplete popups,
-the chord hint) has never been rendered on screen. The most likely problems are
-cosmetic and cheap to fix:
+### (2) `AssignRecurringModal` — keyboard-first
 
-- The dispatch suggestion panel sits in the 24 rem-wide route column. It already
-  uses `layout="stacked"` on `SuggestionCard` for that reason, but the candidate
-  list may still feel cramped — check it first.
-- Popup z-indices were chosen to stack (`Select` 60, `Modal`/`Drawer` 50/70,
-  `Autocomplete` 80, chord hint 80). Verify an Autocomplete popup inside the
-  order drawer actually paints above the drawer.
+Rewritten on the same pattern as `pickers.tsx`, and now literally sharing its
+machinery: `useListKeyboard` and `PickerRow` were exported from `pickers.tsx`
+rather than reimplemented. The filter box takes focus on open (`data-autofocus`),
+↑ ↓ move a highlight, Enter assigns, and the list is a real `listbox` driven by
+`aria-activedescendant`. It also gained a **search filter it never had** — it was
+previously a flat list of every unassigned plan — and empty-filter ordering by
+`lib/recents`, so plans for clients the operator has been working on come first.
+
+`PickerRow` gained an optional `trailing` slot for the "Asignează" button. Two
+things about it that are easy to get wrong and are commented in place:
+
+- Its clicks are **stopped from reaching the row**, or an explicit button press
+  would fire the mutation twice.
+- It is `aria-hidden` and **must be `tabIndex={-1}`**. A `role="option"` may not
+  contain interactive descendants, and this button only duplicates what
+  activating the row already does. Keyboard users reach it via ↑ ↓ / Enter.
+
+**`EmployeeFormModal` was left alone.** It is a plain create/edit form — name,
+username, phone, county, roles — with no list to navigate and nothing to
+typeahead against. The keyboard treatment `pickers.tsx` got does not apply to
+it; what it would actually want is the generic form-focus work in item (5).
+
+### (3) `RecurringPage` and `DriversPage` — deep links, shortcuts, palette
+
+| URL | Effect |
+|---|---|
+| `/recurente?plan=<id>` | opens that plan's drawer |
+| `/soferi?sofer=<id>` | opens that driver's drawer |
+| `/soferi?nou=1` | opens an empty employee form |
+
+Shortcuts: Recurente `/` search, `u` unassigned, `a` all, `r` refresh. Șoferi
+`n` new employee, `/` search, `t` today, `r` refresh. Both register into the
+live registry, so they appear in the `?` overlay automatically.
+
+Palette gained two record kinds (`recurring`, `driver`) and one action
+("Angajat nou"). `RecentKind` in `lib/recents.ts` grew the two matching kinds.
+
+Two things worth knowing:
+
+- **`useDrivers` and `useRecurring` gained the `enabled` option** the other four
+  read hooks already had, for the same reason: the palette subscribes to them
+  from the shell, and without the gate a Sales-only account fires a request it
+  is not allowed to make.
+- **The `?plan=` effect reads from `useRecurring('all')`, not the visible tab.**
+  The default tab is "unassigned" and a linked plan is usually assigned, so
+  reading the visible list would make the link a silent no-op. It waits for the
+  full list before clearing the param — clearing early breaks the link on a cold
+  cache — and switches the tab to "all" on success, so closing the drawer does
+  not leave the operator staring at a list the plan is not in.
+
+### (6) Ridicare edit-mode address field
+
+Now takes `suggestions` / `coordinatesFor` like the placement and sanitation
+addresses. The original reasoning for leaving it out still holds — pickup
+addresses come from the packet group, not free text — but once someone *is*
+editing it by hand there is no reason to withhold the typeahead. Required
+threading `addressOptions` / `coordinatesForAddress` down into `RidicareFields`,
+which did not take them.
+
+### (7) Code-splitting — the chunk warning is gone
+
+Two changes, and the numbers are real (`npm run build`):
+
+| | before | after |
+|---|---|---|
+| entry chunk | 632.91 kB (194.39 kB gz) | **294.89 kB (92.55 kB gz)** |
+| Vite >500 kB warning | yes | **no** |
+
+1. **`src/routes/router.tsx`** loads the eight feature screens with React
+   Router's own `lazy`. Not `React.lazy` + `Suspense`: the data router already
+   has a pending state, so the current screen stays on-screen during the fetch
+   instead of blanking to a spinner. Each screen becomes its own chunk, which
+   matters twice over — nobody has both role sets in practice, so a dispatcher
+   was downloading the whole Vânzări module to look at a route; and **@dnd-kit
+   is used by exactly one screen**, so `RoutesPage` now carries it (72.6 kB) and
+   nobody else pays for it.
+
+   The auth screens stay eager on purpose: making `LoginPage` a second round
+   trip puts a network hop on the critical path to the login form.
+
+2. **`vite.config.ts` `manualChunks`** splits `react`/`react-dom`/`react-router-dom`
+   (95.8 kB) and `@tanstack/react-query` (50.7 kB) into their own chunks. The
+   point here is **cache lifetime, not first load**: those change only on a
+   version bump, while app code changes every deploy. Left in the entry chunk,
+   one CSS tweak invalidates ~140 kB of framework for every user.
+
+   Keep react and react-dom in the same chunk — splitting them risks two copies
+   of the reconciler.
+
+**Not fixed, and worth knowing:** `src/api/index.ts` statically imports *both*
+`liveApi` and `mockApi`, so a `VITE_DATA_MODE=live` build still bundles the
+entire mock implementation and its seeded dataset (~2,500 lines). Fixing it
+properly means making the selection dynamic, which turns `api` from a value into
+a promise and breaks the "feature code imports only `{ api } from '@/api'`" rule
+CLAUDE.md calls load-bearing. Not worth it while mock is the deployed default
+and a live build cannot reach the backend anyway (no TLS) — but that is why the
+entry chunk is still 295 kB rather than ~150 kB.
 
 ---
 
-## 5. Not started — suggested order for the next session
+## 5. Still not done
 
-1. **Click through all four screens in a browser** (`cd web && npm run dev`,
-   mock mode). This is the prerequisite for everything else.
-2. **`AssignRecurringModal` and `EmployeeFormModal`** never got the
-   keyboard/typeahead treatment that `pickers.tsx` and `ClientPicker` did.
-   `web/src/features/technical/components/AssignRecurringModal.tsx` is the more
-   valuable of the two.
-3. **`RecurringPage` and `DriversPage`** got no deep links, no page shortcuts and
-   no palette entries. Adding them is mechanical — copy the `useDeepLink` +
-   `useShortcuts` block from `TasksPage.tsx`.
-4. **Product selection in the order form is still a plain `Select`.** With 15
-   seeded products that is fine; past ~50 it wants the `Autocomplete`, and a
-   "products this client usually orders" group would fall straight out of
-   `suggestions.ts` (`weightedMode` is already there and already exported-adjacent).
-5. **A proper accessibility pass.** New widgets were built with roles,
-   `aria-activedescendant` and focus management, but nothing was run through a
-   screen reader or an axe audit, and the pre-existing screens were not audited.
-6. **Ridicare edit-mode address field** still uses the plain `TextInput` — it was
-   left out because pickup addresses come from the packet group, not free text,
-   but it could take `suggestions` for consistency.
-7. **Code-splitting.** The bundle is 629 kB (193 kB gzip) and Vite warns. Would
-   need `vite.config.ts`, which was out of scope this session.
+### (1) Click through it in a browser — **still the prerequisite for everything**
 
----
+Two sessions, no browser either time. This has never been rendered. Start here.
+
+### (4) Product Autocomplete — **deliberately not done, and I think it is the wrong change**
+
+The old note said "with 15 seeded products a `Select` is fine; past ~50 it wants
+the `Autocomplete`". Having looked at it: past ~50 it wants *a searchable
+picker*, but **not this one**.
+
+`Autocomplete` is by design an *editable* combobox — "what you type is the
+value", as §3.4 says — while product selection stores `form.productId: number`
+and the order payload needs a real id. Swapping it in would let a typo produce a
+valid-looking field that resolves to no product, and would need an
+id-resolution layer plus new validation on top. That is a data-integrity
+regression bought for a UX gain that does not apply at the current catalogue
+size.
+
+The right change when it is needed is a **constrained** searchable listbox — the
+`ClientPicker` / `pickers.tsx` pattern, which filters but cannot produce a value
+outside the list. That component does not exist in a generic form yet.
+
+### (5) Accessibility pass — mostly still open
+
+What was checkable statically was checked: a scan for icon-only controls with no
+accessible name came back **clean**, because `IconButton` requires a `label:
+string` and maps it to both `aria-label` and `title` — the type system makes
+that class of defect unrepresentable. One real issue was found and fixed, in
+code written this session (the `role="option"` / interactive-descendant problem
+in `PickerRow`, above).
+
+Everything that actually needs the browser is still open: contrast ratios, focus
+order, focus-trap behaviour in nested overlays, and anything a screen reader
+would tell you. An `axe-core` run in jsdom would catch a further slice and would
+be a reasonable next step — it is a new devDependency, which is why it was not
+added unilaterally.
+
+Also still open from the original list: nothing else. Items 2, 3, 6 and 7 are
+done above.
 
 ## 6. Gotchas
 
@@ -350,3 +455,24 @@ cosmetic and cheap to fix:
   That is correct behaviour, not a bug.
 - **`snyk` is not installed**, so the repo-wide scan instruction was not
   satisfied. Run it before merging.
+
+### Gotchas added by the second pass
+
+- **`PickerRow`'s `trailing` slot is `aria-hidden` and its content must be
+  `tabIndex={-1}`.** It sits inside a `role="option"`, which may not contain
+  interactive descendants. Dropping either half reintroduces the violation.
+- **`useListKeyboard` and `PickerRow` are now exported from `pickers.tsx`** and
+  used by `AssignRecurringModal`. Changing their behaviour changes three
+  screens, not one.
+- **The `?plan=` deep link waits for `useRecurring('all')` before clearing its
+  param.** Clearing on the first render makes the link a no-op on a cold cache.
+- **React Router `lazy` route objects return `{ Component }`, not an element.**
+  The `lazyPage` helper in `router.tsx` does that mapping; adding a screen means
+  adding a `lazy:` entry, not an `element:`.
+- **`manualChunks` keeps react and react-dom together deliberately.** Splitting
+  them can load two copies of the reconciler.
+- **The new deep-link effects produce `set-state-in-effect` warnings**, exactly
+  like the existing ones on `TasksPage`/`RoutesPage`/`OrdersPage`. That rule is
+  one of the React-Compiler diagnostics deliberately downgraded to a warning
+  (see `HANDOFF-ci-tests-deploy.md` §1). Lint count went 66 → 71; all five new
+  warnings are that rule, on the pattern the codebase already uses.

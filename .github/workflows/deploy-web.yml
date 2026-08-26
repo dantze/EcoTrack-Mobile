@@ -1,0 +1,78 @@
+name: Deploy Web
+
+# MANUAL ONLY — deliberately no `push:` trigger.
+#
+# CLAUDE.md: the production backend is plain HTTP on a bare IP
+# (http://146.190.224.202:8080). A browser refuses to call that from an HTTPS
+# origin, so a live-mode web build served over HTTPS cannot talk to the API at
+# all. Until the backend has TLS, the only builds that work are:
+#   - mock mode (VITE_DATA_MODE unset/mock), which needs no backend, or
+#   - live mode served from a local dev server, which is not this.
+#
+# This workflow therefore builds and uploads an artifact and stops there. It
+# does not publish anywhere. Wiring it to a host is a decision that comes AFTER
+# the backend has TLS — at which point delete this comment and add the step.
+on:
+  workflow_dispatch:
+    inputs:
+      data_mode:
+        description: 'VITE_DATA_MODE for the build'
+        required: true
+        default: 'mock'
+        type: choice
+        options:
+          - mock
+          - live
+
+concurrency:
+  group: deploy-web
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  # Same gate as the backend: lint, typecheck, test, build on a clean runner
+  # before anything is packaged.
+  verify:
+    name: Verify
+    uses: ./.github/workflows/ci-web.yml
+
+  build:
+    name: Build artifact
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      - run: npm ci
+
+      - name: Build
+        env:
+          VITE_DATA_MODE: ${{ inputs.data_mode }}
+        run: npm run build
+
+      - name: Warn when building live against a plain-HTTP backend
+        if: inputs.data_mode == 'live'
+        run: |
+          echo "::warning title=Live build::VITE_DATA_MODE=live was requested. \
+          This bundle can only reach the API from a non-HTTPS origin until the \
+          backend has TLS. See the comment at the top of deploy-web.yml."
+
+      - name: Upload dist
+        uses: actions/upload-artifact@v4
+        with:
+          name: web-dist-${{ inputs.data_mode }}-${{ github.run_id }}
+          path: web/dist/
+          retention-days: 14
+          if-no-files-found: error

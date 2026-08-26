@@ -123,30 +123,10 @@ class EmployeeServiceTest {
         assertThat(result.get(0).getUsername()).isEqualTo("sofer1");
     }
 
-    // -----------------------------------------------------------------------
-    // TEST 7 — saveEmployee
-    // -----------------------------------------------------------------------
-    @Test
-    void saveEmployee_shouldReturnSavedEmployee() {
-        when(employeeRepository.save(any(Employee.class))).thenReturn(driver);
-
-        Employee result = employeeService.saveEmployee(driver);
-
-        assertThat(result.getFullName()).isEqualTo("Ion Șofer");
-        verify(employeeRepository).save(driver);
-    }
-
-    // -----------------------------------------------------------------------
-    // TEST 8 — deleteEmployee
-    // -----------------------------------------------------------------------
-    @Test
-    void deleteEmployee_shouldCallRepositoryDelete() {
-        doNothing().when(employeeRepository).deleteById(1L);
-
-        employeeService.deleteEmployee(1L);
-
-        verify(employeeRepository).deleteById(1L);
-    }
+    // TESTS 7 and 8 (saveEmployee / deleteEmployee) are gone with the methods
+    // themselves - see EmployeeService. Employee writes are AdminService's, and
+    // AdminServiceTest covers them including the password encoding those two
+    // passthroughs skipped.
 
     // -----------------------------------------------------------------------
     // TEST 9 — getEmployeeByUsername

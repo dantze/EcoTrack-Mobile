@@ -1,39 +1,39 @@
-import { API_BASE_URL } from '../constants/ApiConfig';
+import { apiFetch } from './http';
 
 export const RecurringIgienizareService = {
 
     getAll: async () => {
-        const response = await fetch(`${API_BASE_URL}/recurring-igienizari`);
+        const response = await apiFetch('/recurring-igienizari');
         if (!response.ok) throw new Error('Eșec la preluarea igienizărilor recurente');
         return await response.json();
     },
 
     getActive: async () => {
-        const response = await fetch(`${API_BASE_URL}/recurring-igienizari/active`);
+        const response = await apiFetch('/recurring-igienizari/active');
         if (!response.ok) throw new Error('Eșec la preluarea igienizărilor recurente active');
         return await response.json();
     },
 
     getUnassigned: async () => {
-        const response = await fetch(`${API_BASE_URL}/recurring-igienizari/unassigned`);
+        const response = await apiFetch('/recurring-igienizari/unassigned');
         if (!response.ok) throw new Error('Eșec la preluarea igienizărilor recurente neasignate');
         return await response.json();
     },
 
     getById: async (id: number) => {
-        const response = await fetch(`${API_BASE_URL}/recurring-igienizari/${id}`);
+        const response = await apiFetch(`/recurring-igienizari/${id}`);
         if (!response.ok) throw new Error('Igienizare recurentă nu a fost găsită');
         return await response.json();
     },
 
     getByClient: async (clientId: number) => {
-        const response = await fetch(`${API_BASE_URL}/recurring-igienizari/client/${clientId}`);
+        const response = await apiFetch(`/recurring-igienizari/client/${clientId}`);
         if (!response.ok) throw new Error('Eșec la preluarea igienizărilor recurente ale clientului');
         return await response.json();
     },
 
     create: async (clientId: number, data: any) => {
-        const response = await fetch(`${API_BASE_URL}/recurring-igienizari/client/${clientId}`, {
+        const response = await apiFetch(`/recurring-igienizari/client/${clientId}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data),
@@ -46,7 +46,7 @@ export const RecurringIgienizareService = {
     },
 
     assignRoute: async (planId: number, routeId: number) => {
-        const response = await fetch(`${API_BASE_URL}/recurring-igienizari/${planId}/assign-route`, {
+        const response = await apiFetch(`/recurring-igienizari/${planId}/assign-route`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ routeId }),
@@ -56,7 +56,7 @@ export const RecurringIgienizareService = {
     },
 
     deactivate: async (planId: number) => {
-        const response = await fetch(`${API_BASE_URL}/recurring-igienizari/${planId}/deactivate`, {
+        const response = await apiFetch(`/recurring-igienizari/${planId}/deactivate`, {
             method: 'PUT',
         });
         if (!response.ok) throw new Error('Eșec la dezactivarea igienizării recurente');

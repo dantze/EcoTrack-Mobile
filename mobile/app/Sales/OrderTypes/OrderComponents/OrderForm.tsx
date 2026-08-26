@@ -10,7 +10,7 @@ import LocationPicker from './LocationPicker';
 import { ClientService } from '../../../../services/ClientService';
 import { TaskService } from '../../../../services/TaskService';
 import { SubscriptionService, Subscription } from '../../../../services/SubscriptionService';
-import { API_BASE_URL } from '../../../../constants/ApiConfig';
+import { apiFetch } from '../../../../services/http';
 import * as Location from 'expo-location';
 import PhoneInputField from '../../../../components/forms/PhoneInputField';
 
@@ -134,7 +134,7 @@ const OrderForm: React.FC<OrderFormProps> = ({
     // Amplasari → Fetch products
     useEffect(() => {
         if (orderType !== 'Amplasari') return;
-        fetch(`${API_BASE_URL}/products`)
+        apiFetch('/products')
             .then(res => res.json())
             .then(data => {
                 if (data?.length > 0) {

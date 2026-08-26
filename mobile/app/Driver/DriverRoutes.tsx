@@ -104,6 +104,13 @@ const DriverRoutes = () => {
         router.replace('/Driver/DriverSelection');
     };
 
+    // Revokes the session server-side before leaving the screen; navigating
+    // away on its own left this device's refresh token valid for 60 more days.
+    const handleLogout = async () => {
+        await AuthService.logout();
+        router.replace('/login');
+    };
+
     if (loading) {
         return (
             <View style={[styles.container, styles.loadingContainer]}>
@@ -132,7 +139,7 @@ const DriverRoutes = () => {
                     </View>
                     <Pressable
                         style={styles.logoutButton}
-                        onPress={() => router.replace('/login')}
+                        onPress={handleLogout}
                     >
                         <Ionicons name="log-out-outline" size={24} color={AppColors.errorRed} />
                     </Pressable>

@@ -2,7 +2,6 @@ package com.example.damiProd.repository;
 
 import com.example.damiProd.domain.Session;
 import org.springframework.data.jpa.repository.JpaRepository;
-import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -16,7 +15,14 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
 
     Optional<Session> findByRefreshTokenHash(String refreshTokenHash);
 
-    Optional<Session> findByPreviousTokenHashAndRevokedAtIsNull(String previousTokenHash);
+    /**
+     * Finds the still-live session that has already rotated away from this
+     * refresh-token hash - i.e. someone is replaying a spent token. Matches
+     * anywhere in the retained chain, not just the most recent rotation.
+     */
+    @Query("SELECT s FROM Session s JOIN s.retiredRefreshTokenHashes h "
+            + "WHERE h = :tokenHash AND s.revokedAt IS NULL")
+    Optional<Session> findActiveByRetiredRefreshTokenHash(@Param("tokenHash") String tokenHash);
 
     // Employee is a LAZY @ManyToOne on Session; the caller (TokenService#validateAccessToken)
     // hands the resolved Employee to a servlet filter that runs after this method's own
@@ -30,12 +36,16 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
     Optional<Session> findByIdAndEmployeeId(Long id, Long employeeId);
 
     /**
-     * Deletes sessions that can no longer authenticate anyone and are older than
-     * the retention cutoff: revoked before it, or expired before it. Called from
+     * Sessions that can no longer authenticate anyone and are older than the
+     * retention cutoff: revoked before it, or expired before it. Called from
      * TokenService#pruneStaleSessions (nightly), never on a request path.
+     *
+     * Deliberately a SELECT feeding entity-level deletes rather than a bulk
+     * `DELETE FROM Session`: a bulk JPQL delete goes straight to SQL and would
+     * leave the session_retired_tokens rows behind, orphaned or blocking the
+     * delete on the foreign key. The nightly volume does not justify the risk.
      */
-    @Modifying(clearAutomatically = true)
-    @Query("DELETE FROM Session s WHERE (s.revokedAt IS NOT NULL AND s.revokedAt < :cutoff) "
+    @Query("SELECT s FROM Session s WHERE (s.revokedAt IS NOT NULL AND s.revokedAt < :cutoff) "
             + "OR s.expiresAt < :cutoff")
-    int deleteStaleSessions(@Param("cutoff") Instant cutoff);
+    List<Session> findStaleSessions(@Param("cutoff") Instant cutoff);
 }

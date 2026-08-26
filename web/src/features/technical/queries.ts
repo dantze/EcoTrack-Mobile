@@ -9,6 +9,7 @@
  * screens only supply the success/error toasts.
  */
 
+import { useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { UseMutationResult, UseQueryResult } from '@tanstack/react-query';
 import { api } from '@/api';
@@ -127,6 +128,60 @@ export function useRecurring(
     },
     enabled,
   });
+}
+
+// ---------------------------------------------------------------------------
+// Undo inverses
+// ---------------------------------------------------------------------------
+
+export interface StatusSnapshot {
+  taskId: number;
+  status: TaskStatus;
+}
+
+export interface RouteSnapshot {
+  taskId: number;
+  routeId: number;
+}
+
+/**
+ * The inverse operations behind ⌘Z, kept here rather than in the screens
+ * because this module owns every `api` call in the Tehnic feature — the rule
+ * that feature code imports only `@/api` is what keeps mock and live
+ * substitutable, and a page reaching past it would quietly break that.
+ *
+ * All of them run sequentially and invalidate once at the end. Sequential
+ * because the backend has no optimistic locking (CLAUDE.md, "Known gaps"), so
+ * firing twenty concurrent writes is the wrong way to find that out; one
+ * invalidation because twenty would restart the same refetch twenty times.
+ */
+export function useTaskUndoActions() {
+  const client = useQueryClient();
+
+  return useMemo(
+    () => ({
+      restoreStatuses: async (snapshots: readonly StatusSnapshot[]) => {
+        for (const entry of snapshots) {
+          await api.tasks.updateStatus(entry.taskId, entry.status);
+        }
+        await client.invalidateQueries({ queryKey: ['technical'] });
+      },
+
+      restoreRoutes: async (snapshots: readonly RouteSnapshot[]) => {
+        for (const entry of snapshots) {
+          await api.tasks.reassign(entry.taskId, entry.routeId);
+        }
+        await client.invalidateQueries({ queryKey: ['technical'] });
+      },
+
+      restoreOrder: async (routeId: number, taskIds: readonly number[]) => {
+        await api.routes.reorderTasks(routeId, [...taskIds]);
+        await client.invalidateQueries({ queryKey: keys.routeTasks(routeId) });
+        await client.invalidateQueries({ queryKey: keys.routes() });
+      },
+    }),
+    [client],
+  );
 }
 
 // ---------------------------------------------------------------------------

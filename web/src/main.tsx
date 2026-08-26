@@ -9,8 +9,20 @@ import './index.css';
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 30_000,
+      // Five minutes, not thirty seconds. Dispatchers move between Rute,
+      // Sarcini and Hartă constantly, and every screen is a fresh mount — at
+      // 30s almost every return trip re-fetched lists that had not changed and
+      // flashed a loading state over data already on screen. The write paths
+      // all invalidate explicitly, so freshness comes from mutations rather
+      // than from re-asking on a timer.
+      staleTime: 5 * 60_000,
+      // Keep the cache well past staleTime so a revisit renders instantly from
+      // cache and revalidates behind the existing content instead of blanking.
+      gcTime: 30 * 60_000,
+      // Alt-tabbing back to the browser is not a reason to re-query.
       refetchOnWindowFocus: false,
+      // Nor is a mount, while the data is still inside staleTime.
+      refetchOnMount: true,
       retry: 1,
     },
   },

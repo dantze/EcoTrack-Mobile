@@ -6,11 +6,13 @@ on:
     paths:
       - 'web/**'
       - '.github/workflows/ci-web.yml'
+      - '.github/scripts/bundle_budget.py'
   push:
     branches: [main]
     paths:
       - 'web/**'
       - '.github/workflows/ci-web.yml'
+      - '.github/scripts/bundle_budget.py'
   # deploy-web.yml (workflow_dispatch only) can call this as its gate.
   workflow_call:
 
@@ -55,3 +57,10 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      # Bundle size only ever drifts upward, one innocent import at a time.
+      # Budgets the EAGER chunks only — lazy route chunks are excluded on
+      # purpose, see the script header.
+      - name: Bundle budget
+        working-directory: .
+        run: python3 .github/scripts/bundle_budget.py web/dist

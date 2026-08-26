@@ -1,0 +1,56 @@
+# Dependency updates, grouped so this produces a handful of reviewable PRs a
+# month rather than a wall of noise nobody merges.
+#
+# Each ecosystem is scoped to its own directory, matching the repo layout:
+# three independently deployed projects that share one repo.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /web
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 5
+    groups:
+      # Patch/minor together: individually they are noise, as a batch they are
+      # one CI run and one review.
+      web-minor-patch:
+        update-types: [minor, patch]
+    labels: [dependencies, web]
+
+  - package-ecosystem: npm
+    directory: /mobile
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 5
+    groups:
+      mobile-minor-patch:
+        update-types: [minor, patch]
+    # Expo pins its own SDK dependency set; bumping these individually breaks
+    # `expo-doctor` and is undone by the next `expo install`. Upgrade the SDK
+    # deliberately instead.
+    ignore:
+      - dependency-name: expo
+      - dependency-name: expo-*
+      - dependency-name: react-native
+      - dependency-name: react-native-*
+    labels: [dependencies, mobile]
+
+  - package-ecosystem: gradle
+    directory: /backend
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 5
+    groups:
+      backend-minor-patch:
+        update-types: [minor, patch]
+    labels: [dependencies, backend]
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    open-pull-requests-limit: 5
+    groups:
+      actions:
+        patterns: ['*']
+    labels: [dependencies, ci]

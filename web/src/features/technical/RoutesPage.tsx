@@ -51,6 +51,7 @@ import { formatDate, weekdayLabel } from '@/components/domain';
 import type { Route, Task } from '@/types/domain';
 import { useDeepLink } from '@/lib/deepLink';
 import { useShortcuts } from '@/lib/hotkeys';
+import { useUndo } from '@/lib/undo';
 import { recordUse } from '@/lib/recents';
 import {
   useAssignDriver,
@@ -64,6 +65,7 @@ import {
   useRouteTasks,
   useRoutes,
   useTasks,
+  useTaskUndoActions,
 } from './queries';
 import {
   driverLabel,
@@ -95,13 +97,24 @@ import {
   Toolbar,
 } from './components/display';
 import { FeedbackProvider, useFeedback } from './components/feedback';
+import {
+  HeldTray,
+  InsertionSlot,
+  PlacementProvider,
+  insertAtSlot,
+  moveToSlot,
+  readSlotIndex,
+  usePlacement,
+} from './components/placement';
 import { DriverPickerModal, RoutePickerModal } from './components/pickers';
 import { DispatchSuggestions } from './components/suggestions';
 
 export function RoutesPage() {
   return (
     <FeedbackProvider>
-      <RoutesScreen />
+      <PlacementProvider>
+        <RoutesScreen />
+      </PlacementProvider>
     </FeedbackProvider>
   );
 }
@@ -184,6 +197,9 @@ function RoutesScreen() {
   const createRoute = useCreateRoute();
   const deleteRoute = useDeleteRoute();
   const assignDriver = useAssignDriver();
+  const undoStack = useUndo();
+  const undoActions = useTaskUndoActions();
+  const placement = usePlacement();
   const reorderTasks = useReorderRouteTasks(selectedRouteId ?? -1);
   const moveTask = useMoveTaskToRoute(selectedRoute);
   const reassignTasks = useReassignTasks();
@@ -269,14 +285,43 @@ function RoutesScreen() {
     if (!payload) return;
 
     const overTaskId = typeof over.id === 'number' ? over.id : null;
+    const overSlot = readSlotIndex(over.id);
 
     if (payload.container === 'route') {
-      if (overTaskId === null) return; // dropped on the empty zone, order unchanged
       const from = routeTaskIds.indexOf(payload.taskId);
-      const to = routeTaskIds.indexOf(overTaskId);
-      if (from < 0 || to < 0 || from === to) return;
+      if (from < 0) return;
 
+      // Dropped on an insertion band: the band's index counts positions in the
+      // CURRENT list, so removing the dragged stop first shifts every band
+      // after it down by one.
+      if (overSlot !== null) {
+        const previousOrder = [...routeTaskIds];
+        const next = moveToSlot(routeTaskIds, from, overSlot);
+        if (next.every((id, i) => id === previousOrder[i])) return;
+        reorderTasks.mutate(next, {
+          onSuccess: () =>
+            undoStack.push({
+              label: `reordonarea opririlor pe ${routeLabel(selectedRoute)}`,
+              invert: () => undoActions.restoreOrder(selectedRoute.id, previousOrder),
+            }),
+          onError: (error) => toast.error(errorMessage(error)),
+        });
+        return;
+      }
+
+      if (overTaskId === null) return; // dropped on the empty zone, order unchanged
+      const to = routeTaskIds.indexOf(overTaskId);
+      if (to < 0 || from === to) return;
+
+      // Snapshot before the write — after it lands the cache holds the new
+      // order and the old one is unrecoverable.
+      const previousOrder = [...routeTaskIds];
       reorderTasks.mutate(arrayMove(routeTaskIds, from, to), {
+        onSuccess: () =>
+          undoStack.push({
+            label: `reordonarea opririlor pe ${routeLabel(selectedRoute)}`,
+            invert: () => undoActions.restoreOrder(selectedRoute.id, previousOrder),
+          }),
         onError: (error) => toast.error(errorMessage(error)),
       });
       return;
@@ -284,11 +329,16 @@ function RoutesScreen() {
 
     // Unassigned → route. `over` is either a stop (insert before it) or the
     // drop zone itself (append at the end).
-    if (over.id !== ROUTE_DROP_ID && overTaskId === null) return;
+    if (over.id !== ROUTE_DROP_ID && overTaskId === null && overSlot === null) return;
     const task = unassignedTasks.find((item) => item.id === payload.taskId);
     if (!task) return;
 
-    const insertAt = overTaskId === null ? routeTaskIds.length : routeTaskIds.indexOf(overTaskId);
+    const insertAt =
+      overSlot !== null
+        ? overSlot
+        : overTaskId === null
+          ? routeTaskIds.length
+          : routeTaskIds.indexOf(overTaskId);
     const orderedIds = [...routeTaskIds];
     orderedIds.splice(insertAt < 0 ? orderedIds.length : insertAt, 0, task.id);
 
@@ -301,6 +351,44 @@ function RoutesScreen() {
       },
     );
   };
+
+  /**
+   * Second half of the pick-up gesture: everything currently held drops in at
+   * `index`, in the order it was picked up. One `assignGroup` call, not one per
+   * task — the backend reassigns the batch and renumbers the whole route once.
+   */
+  const handlePlace = (index: number) => {
+    if (!selectedRoute || placement.held.length === 0) return;
+    const heldIds = placement.held.map((task) => task.id);
+    const orderedIds = insertAtSlot(routeTaskIds, heldIds, index);
+
+    assignGroup.mutate(
+      { taskIds: heldIds, orderedIds },
+      {
+        onSuccess: () => {
+          toast.success(
+            heldIds.length === 1
+              ? `Sarcina a fost adăugată pe ${routeLabel(selectedRoute)}.`
+              : `${heldIds.length} sarcini au fost adăugate pe ${routeLabel(selectedRoute)}.`,
+          );
+          placement.clear();
+        },
+        onError: (error) => toast.error(errorMessage(error)),
+      },
+    );
+  };
+
+  useShortcuts([
+    {
+      combo: 'escape',
+      description: 'Renunță la sarcinile ridicate',
+      group: 'Rute',
+      // Registered only while something is held, so Escape keeps closing
+      // drawers and modals the rest of the time.
+      disabled: !placement.active,
+      run: () => placement.clear(),
+    },
+  ]);
 
   // --- actions -------------------------------------------------------------
   const handleDelete = async (route: Route) => {
@@ -570,6 +658,8 @@ function RoutesScreen() {
               />
             )}
 
+            {selectedRoute && <HeldTray onCancel={placement.clear} />}
+
             <div className="min-h-0 flex-1 overflow-y-auto bg-surface-sunken">
               {!selectedRoute ? (
                 <EmptyState
@@ -585,21 +675,36 @@ function RoutesScreen() {
                 >
                   <RouteDropZone>
                     <SortableContext items={routeTaskIds} strategy={verticalListSortingStrategy}>
-                      <div className="flex flex-col gap-1.5">
+                      <div className="flex flex-col">
                         {routeTasks.map((task, index) => (
-                          <SortableRouteTask
-                            key={task.id}
-                            task={task}
-                            position={index + 1}
-                            onOpen={() => setOpenTaskId(task.id)}
-                          />
+                          <div key={task.id}>
+                            <InsertionSlot
+                              index={index}
+                              count={placement.held.length}
+                              onPlace={handlePlace}
+                              disabled={assignGroup.isPending}
+                            />
+                            <SortableRouteTask
+                              task={task}
+                              position={index + 1}
+                              onOpen={() => setOpenTaskId(task.id)}
+                            />
+                          </div>
                         ))}
+                        {/* Trailing band: append after the last stop. */}
+                        <InsertionSlot
+                          index={routeTasks.length}
+                          count={placement.held.length}
+                          onPlace={handlePlace}
+                          disabled={assignGroup.isPending}
+                        />
                       </div>
                     </SortableContext>
 
-                    {routeTasks.length === 0 && (
+                    {routeTasks.length === 0 && !placement.active && (
                       <p className="px-2 py-10 text-center text-sm text-ink-muted">
-                        Nicio sarcină pe această rută. Trage sarcini din coloana din dreapta.
+                        Nicio sarcină pe această rută. Alege sarcini din dreapta, apoi apasă unde
+                        să intre — sau trage-le direct.
                       </p>
                     )}
                   </RouteDropZone>
@@ -626,7 +731,12 @@ function RoutesScreen() {
                 <div className="flex flex-col gap-1.5">
                   {unassignedTasks.map((task) => (
                     <div key={task.id} className="group relative">
-                      <DraggablePoolTask task={task} onOpen={() => setOpenTaskId(task.id)} />
+                      <DraggablePoolTask
+                        task={task}
+                        onOpen={() => setOpenTaskId(task.id)}
+                        held={placement.isHeld(task.id)}
+                        onToggleHold={selectedRoute ? () => placement.toggle(task) : undefined}
+                      />
                       {/* Keyboard/precision fallback for the drag gesture. */}
                       <Button
                         size="sm"

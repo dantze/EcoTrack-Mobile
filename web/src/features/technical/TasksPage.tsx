@@ -22,6 +22,7 @@ import {
 import type { Column, RowKey } from '@/components/ui';
 import { useDeepLink } from '@/lib/deepLink';
 import { useShortcuts } from '@/lib/hotkeys';
+import { useUndo } from '@/lib/undo';
 import { recordUse } from '@/lib/recents';
 import type { Task } from '@/types/domain';
 import {
@@ -29,6 +30,7 @@ import {
   useReassignTasks,
   useRoutes,
   useTasks,
+  useTaskUndoActions,
   useUpdateManyTaskStatuses,
 } from './queries';
 import {
@@ -146,15 +148,34 @@ function TasksScreen() {
     [filtered, selected],
   );
 
+  const undoStack = useUndo();
+  const undoActions = useTaskUndoActions();
+
   const applyBulkStatus = (status: TaskStatus) => {
     if (selectedIds.length === 0) {
       toast.info('Selectează cel puțin o sarcină.');
       return;
     }
+    // Snapshot before the write: after it lands the cache is invalidated and
+    // the old statuses are gone. Rows whose status already matched are skipped
+    // so undo does not rewrite work it never touched.
+    const previousStatuses = filtered
+      .filter((task) => selected.has(task.id) && task.status !== status)
+      .map((task) => ({ taskId: task.id, status: task.status }));
+
     bulkStatus.mutate(
       { taskIds: selectedIds, status },
       {
         onSuccess: ({ updated, failed }) => {
+          if (updated > 0 && failed === 0 && previousStatuses.length > 0) {
+            undoStack.push({
+              label: `schimbarea statusului pentru ${previousStatuses.length} ${previousStatuses.length === 1 ? 'sarcină' : 'sarcini'}`,
+              // Sequential, like the forward mutation: there is no optimistic
+              // locking on the backend (CLAUDE.md, "Known gaps"), so a burst of
+              // concurrent writes is the wrong way to discover that.
+              invert: () => undoActions.restoreStatuses(previousStatuses),
+            });
+          }
           if (updated > 0) {
             toast.success(
               `${updated} ${updated === 1 ? 'sarcină marcată' : 'sarcini marcate'} „${TASK_STATUS_LABELS[status]}”.`,
@@ -421,10 +442,23 @@ function TasksScreen() {
             toast.info('Selectează cel puțin o sarcină.');
             return;
           }
+          // Only tasks that already had a route can be sent back: the backend's
+          // reassign endpoint takes a non-null route id, so "no route" is not
+          // an expressible destination and those moves stay one-way.
+          const restorable = filtered
+            .filter((task) => selected.has(task.id) && task.route && task.route.id !== target.id)
+            .map((task) => ({ taskId: task.id, routeId: task.route!.id }));
+
           reassign.mutate(
             { taskIds: selectedIds, routeId: target.id },
             {
               onSuccess: (updated) => {
+                if (restorable.length === selectedIds.length && restorable.length > 0) {
+                  undoStack.push({
+                    label: `mutarea a ${restorable.length} sarcini pe ${routeLabel(target)}`,
+                    invert: () => undoActions.restoreRoutes(restorable),
+                  });
+                }
                 toast.success(
                   `${updated.length || selectedIds.length} sarcini mutate pe ${routeLabel(target)}.`,
                 );

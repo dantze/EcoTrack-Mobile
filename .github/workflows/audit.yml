@@ -1,0 +1,84 @@
+name: Dependency Audit
+
+# Scheduled rather than per-PR on purpose: a new CVE gets published on a day
+# nobody opened a pull request, and blocking an unrelated PR because a
+# transitive dependency was disclosed that morning trains people to ignore the
+# check. This reports on its own cadence and can be run on demand.
+on:
+  schedule:
+    # Mondays 06:00 UTC — a finding lands at the start of the week, not Friday.
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+concurrency:
+  group: audit
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  npm:
+    name: npm audit (${{ matrix.project }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        project: [web, mobile]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: ${{ matrix.project }}/package-lock.json
+
+      - run: npm ci
+        working-directory: ${{ matrix.project }}
+
+      # Two passes. The first is the gate: production dependencies are what
+      # ships to a user's browser or phone, and a high/critical there is real.
+      # The second is a full report including dev tooling, which is worth
+      # seeing but is not a reason to page anyone — a vulnerable test runner
+      # does not reach production.
+      - name: Audit production dependencies
+        working-directory: ${{ matrix.project }}
+        run: npm audit --omit=dev --audit-level=high
+
+      - name: Full report (informational)
+        if: always()
+        working-directory: ${{ matrix.project }}
+        run: |
+          echo "### npm audit — ${{ matrix.project }} (incl. dev)" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          npm audit 2>&1 | tail -40 >> "$GITHUB_STEP_SUMMARY" || true
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+
+  gradle:
+    name: Gradle dependency report
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: gradle/actions/wrapper-validation@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: gradle/actions/setup-gradle@v4
+
+      # No OWASP dependency-check plugin here on purpose: it needs an NVD API
+      # key and a large cached database, which is a setup step someone has to
+      # own. This at least surfaces what versions are actually resolved, so a
+      # advisory can be checked against reality in one place.
+      - name: Resolved dependencies
+        run: |
+          echo "### Backend runtime dependencies" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          ./gradlew -q dependencies --configuration runtimeClasspath --no-daemon \
+            2>/dev/null | head -120 >> "$GITHUB_STEP_SUMMARY" || true
+          echo '```' >> "$GITHUB_STEP_SUMMARY"

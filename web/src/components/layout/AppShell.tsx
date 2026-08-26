@@ -26,6 +26,7 @@ import { AccountMenu } from '@/features/auth/AccountMenu';
 import { CommandPalette } from '@/features/command/CommandPalette';
 import { GLOBAL_GROUP, ShortcutHelp } from '@/features/command/ShortcutHelp';
 import { ShortcutProvider, comboLabel, useShortcuts, usePendingChord } from '@/lib/hotkeys';
+import { UndoProvider, focusIsEditable, useUndo } from '@/lib/undo';
 import type { Role } from '@/types/domain';
 
 interface NavItem {
@@ -106,7 +107,11 @@ function NavSection({ title, items }: { title: string; items: NavItem[] }) {
 export function AppShell() {
   return (
     <ShortcutProvider>
-      <ShellBody />
+      {/* Above the screens, so an undo entry survives navigating away from the
+          screen that pushed it — the inverse is a closure, not a component. */}
+      <UndoProvider>
+        <ShellBody />
+      </UndoProvider>
     </ShortcutProvider>
   );
 }
@@ -122,7 +127,20 @@ function ShellBody() {
     section.roles.some((role) => hasRole(role)),
   );
 
+  const undoStack = useUndo();
+
   useShortcuts([
+    {
+      combo: 'mod+z',
+      description: 'Anulează ultima acțiune',
+      group: GLOBAL_GROUP,
+      run: () => {
+        // `mod+…` fires even inside a field; ⌘Z there belongs to the browser's
+        // own text undo. See focusIsEditable().
+        if (focusIsEditable()) return;
+        undoStack.undo();
+      },
+    },
     {
       combo: 'mod+k',
       description: 'Căutare rapidă (clienți, comenzi, sarcini, rute, acțiuni)',

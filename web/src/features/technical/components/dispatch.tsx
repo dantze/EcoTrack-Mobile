@@ -14,6 +14,7 @@ import type { CSSProperties, ReactNode } from 'react';
 import { useDraggable, useDroppable } from '@dnd-kit/core';
 import { useSortable } from '@dnd-kit/sortable';
 import type { Transform } from '@dnd-kit/utilities';
+import { cx } from '@/components/ui';
 import type { Task } from '@/types/domain';
 import { TaskStatusBadge, formatDate } from '@/components/domain';
 import { TaskTypeBadge } from './display';
@@ -58,6 +59,7 @@ interface TaskCardProps {
   onOpen?: () => void;
   dragging?: boolean;
   overlay?: boolean;
+  held?: boolean;
 }
 
 export function DispatchTaskCard({
@@ -66,16 +68,16 @@ export function DispatchTaskCard({
   onOpen,
   dragging = false,
   overlay = false,
+  held = false,
 }: TaskCardProps) {
   return (
     <div
-      className={[
-        'rounded-md border bg-white px-2.5 py-2',
-        overlay ? 'border-brand-500 shadow-lg' : 'border-border',
-        dragging && !overlay ? 'opacity-40' : '',
-      ]
-        .filter(Boolean)
-        .join(' ')}
+      className={cx(
+        'rounded-md border px-2.5 py-2 transition-colors',
+        overlay ? 'border-brand-500 bg-white shadow-lg' : 'border-border',
+        held ? 'border-brand-500 bg-brand-50' : 'bg-white',
+        dragging && !overlay && 'opacity-40',
+      )}
     >
       <div className="flex items-start gap-2">
         {position !== undefined && (
@@ -140,7 +142,18 @@ export function SortableRouteTask({
 // Draggable pool item
 // ---------------------------------------------------------------------------
 
-export function DraggablePoolTask({ task, onOpen }: { task: Task; onOpen: () => void }) {
+export function DraggablePoolTask({
+  task,
+  onOpen,
+  held = false,
+  onToggleHold,
+}: {
+  task: Task;
+  onOpen: () => void;
+  /** Picked up and waiting for a position — see placement.tsx. */
+  held?: boolean;
+  onToggleHold?: () => void;
+}) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: poolItemId(task.id),
     data: { container: 'pool', taskId: task.id } satisfies DragPayload,
@@ -149,8 +162,24 @@ export function DraggablePoolTask({ task, onOpen }: { task: Task; onOpen: () => 
   const style: CSSProperties = { transform: translate(transform) };
 
   return (
-    <div ref={setNodeRef} style={style} {...attributes} {...listeners} className="cursor-grab">
-      <DispatchTaskCard task={task} onOpen={onOpen} dragging={isDragging} />
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      // A drag sensor with an activation distance is what lets one element be
+      // both draggable and clickable: a press that never travels is delivered
+      // here as a click, a press that moves becomes a drag and never fires it.
+      onClick={onToggleHold}
+      role={onToggleHold ? 'button' : undefined}
+      aria-pressed={onToggleHold ? held : undefined}
+      className={cx(
+        'rounded-md transition-shadow',
+        onToggleHold ? 'cursor-pointer' : 'cursor-grab',
+        held && 'ring-2 ring-brand-500 ring-offset-1',
+      )}
+    >
+      <DispatchTaskCard task={task} onOpen={onOpen} dragging={isDragging} held={held} />
     </div>
   );
 }

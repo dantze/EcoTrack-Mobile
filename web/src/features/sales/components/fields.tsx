@@ -5,9 +5,11 @@
  * scannable form instead of the mobile app's four-screen wizard.
  */
 
-import type { ReactNode } from 'react';
+import { Suspense, lazy, useState, type ReactNode } from 'react';
 import {
   Autocomplete,
+  Button,
+  PinIcon,
   Select,
   TextInput,
   type AutocompleteOption,
@@ -16,6 +18,17 @@ import {
 import { parseCoordinates } from '@/types/domain';
 import type { LocationValue } from '../orderModel';
 import { PHONE_CODES } from '../validation';
+import type { KnownPlace } from './LocationPickerModal';
+
+/**
+ * MapLibre is ~250 kB gzipped and reaching it eagerly from here would put it in
+ * the Comenzi chunk for every operator, most of whom type the address and never
+ * open the map. Loaded on the first click of `Alege pe hartă` instead — see the
+ * header of LocationPickerModal.
+ */
+const LocationPickerModal = lazy(() =>
+  import('./LocationPickerModal').then((module) => ({ default: module.LocationPickerModal })),
+);
 
 export function FormSection({
   title,
@@ -144,7 +157,7 @@ export function PhoneField({
 // ---------------------------------------------------------------------------
 
 /**
- * Address text plus optional manual coordinates.
+ * Address text plus optional manual coordinates, with a map picker beside them.
  *
  * When `suggestions` is supplied the address becomes a typeahead over places
  * this client (and then anyone) has been served before — the operator picks a
@@ -152,12 +165,11 @@ export function PhoneField({
  * "lat,lng" across too, via `coordinatesFor`. Free text is still allowed: the
  * list only offers shortcuts, it never constrains the value.
  *
- * TODO(map): the mobile app picks the point on a MapView with reverse
- * geocoding and shows the client's existing placements as markers. The desktop
- * equivalent is a map picker in this slot — it needs a mapping library, which
- * is deliberately not installed yet. Everything downstream already round-trips
- * the "lat,lng" string via parseCoordinates/formatCoordinates, so dropping a
- * picker in here is the only change needed.
+ * `Alege pe hartă` opens the same drag-a-pin picker the mobile app has, and
+ * writes both halves of the value at once. The typed fields stay: an operator
+ * copying an address out of an email should not have to open a map, and the
+ * coordinates box is still the fastest way to paste a point someone sent over
+ * WhatsApp.
  */
 export function LocationFields({
   label,
@@ -170,6 +182,7 @@ export function LocationFields({
   coordinatesId,
   suggestions,
   coordinatesFor,
+  knownPlaces,
 }: {
   label: string;
   value: LocationValue;
@@ -184,7 +197,10 @@ export function LocationFields({
   suggestions?: AutocompleteOption[];
   /** "lat,lng" for an accepted suggestion, so the point comes with it. */
   coordinatesFor?: (option: AutocompleteOption) => string | null;
+  /** The same known sites, as markers on the map picker. */
+  knownPlaces?: readonly KnownPlace[];
 }) {
+  const [pickerOpen, setPickerOpen] = useState(false);
   const point = parseCoordinates(value.coordinates);
   return (
     <FormGrid>
@@ -232,6 +248,28 @@ export function LocationFields({
           onChange={(event) => onChange({ ...value, coordinates: event.target.value })}
         />
       </Col>
+      <Col span={12}>
+        <Button size="sm" icon={<PinIcon />} onClick={() => setPickerOpen(true)}>
+          {point ? 'Ajustează pe hartă' : 'Alege pe hartă'}
+        </Button>
+      </Col>
+      {/* Rendered only while open so the lazy chunk is fetched on the first
+          click, not on every drawer that happens to contain a location. */}
+      {pickerOpen && (
+        <Suspense fallback={null}>
+          <LocationPickerModal
+            open
+            label={label}
+            value={value}
+            knownPlaces={knownPlaces}
+            onCancel={() => setPickerOpen(false)}
+            onConfirm={(picked) => {
+              setPickerOpen(false);
+              onChange(picked);
+            }}
+          />
+        </Suspense>
+      )}
     </FormGrid>
   );
 }

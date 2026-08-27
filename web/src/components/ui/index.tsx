@@ -77,6 +77,7 @@ export {
   CloseIcon,
   InfoIcon,
   PencilIcon,
+  PinIcon,
   SearchIcon,
   SortIcon,
 } from './icons';

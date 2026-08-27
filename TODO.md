@@ -196,12 +196,43 @@ weeks start **Monday**, matching `Route.dayOfWeek` and dodging the JS
 
 ## D. Comenzi (orders)
 
-### TODO-10 `[ ]` Map picker when choosing a location on an order
+### TODO-10 `[DONE]` Map picker when choosing a location on an order
 Choosing the location while creating an order should work like the mobile app:
 type an address, use search, **and then drag the pin** to get exact
 coordinates.
 *Note:* mobile does this in `LocationPicker`; that one deliberately does NOT go
 through `apiFetch` (it would leak the bearer token to Google).
+
+**Done.** `Alege pe hartă` sits under the address/coordinates pair in
+`LocationFields`, so it covers all three order types at once. The dialog is
+`sales/components/LocationPickerModal.tsx`: search an address, fly there, then
+drag the map under a fixed centre pin. **The confirmed point is always the map
+centre, never the geocoder's coordinates** — search lands you on the street,
+the drag puts you on the gate. A human drag re-labels the address by reverse
+geocoding; the programmatic `flyTo` that answers a search deliberately does
+not, or it would overwrite the label the operator just chose with a rounder one.
+
+The client's existing sites are drawn as numbered markers (their own in brand
+colour, everyone else's in grey) — the desktop equivalent of the mobile
+picker's `existingPlacements`, fed from the same `buildAddressSuggestions`
+history that already backs the address typeahead. Clicking one snaps to its
+exact coordinates.
+
+**Geocoder: Photon (`lib/geocoding.ts`), not Google.** No API key, no billing,
+built for as-you-type autocomplete — which Nominatim's usage policy forbids —
+and OSM-derived like the OpenFreeMap tiles the map screen already draws, so a
+result and the street it lands on come from the same data. Mobile keeps Google
+Places: it has a key provisioned through `app.config.js` already, and putting a
+billed key into a public SPA bundle to match would be a step backwards. Like
+mobile's, the call does NOT go through the app's fetch wrapper — that would
+attach our bearer token to a third party's host.
+
+Every geocoder failure degrades to "no label" rather than an error: the
+coordinates under the pin are the real output, and they keep working offline.
+
+The picker is behind `React.lazy` so MapLibre (~250 kB gzip) stays out of the
+Comenzi chunk for the operators who never open it;
+`__tests__/mapPickerIsLazy.test.ts` fails if a static import creeps back in.
 
 ### TODO-11 `[DONE]` Remove Activ/Inactiv from Abonamente
 Drop the active/inactive concept and its UI for subscriptions. It is

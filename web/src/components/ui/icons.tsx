@@ -1,8 +1,8 @@
 /**
  * The kit's icon set — hand-rolled 16px strokes.
  *
- * No icon package by design: we need eight glyphs, and a dependency for that
- * would outweigh the code below. All of them inherit `currentColor` and size
+ * No icon package by design: we need a handful of glyphs, and a dependency for
+ * that would outweigh the code below. All of them inherit `currentColor` and size
  * from the `size-*` class on the wrapper, so they tint with their button.
  */
 
@@ -59,6 +59,13 @@ export const SearchIcon = (props: IconProps) => (
   <Svg {...props}>
     <circle cx="7.2" cy="7.2" r="4.2" />
     <path d="m10.4 10.4 2.6 2.6" />
+  </Svg>
+);
+
+export const PinIcon = (props: IconProps) => (
+  <Svg {...props}>
+    <path d="M8 1.8a4.2 4.2 0 0 0-4.2 4.2c0 3 4.2 8 4.2 8s4.2-5 4.2-8A4.2 4.2 0 0 0 8 1.8Z" />
+    <circle cx="8" cy="6" r="1.5" />
   </Svg>
 );
 

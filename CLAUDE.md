@@ -196,6 +196,15 @@ held in memory only; only the refresh token survives a reload.
 A 401 from anything other than `/auth/**` triggers exactly one silent
 refresh-and-retry.
 
+**Third-party map calls bypass `@/api` on purpose.** Map tiles come from
+OpenFreeMap (`MAP_STYLE_URL` in `features/map/components/mapStyle.ts`) and
+address search/reverse geocoding from Photon (`src/lib/geocoding.ts`); neither
+is keyed, and neither goes through `http.ts`, because that would attach our
+bearer token to someone else's host. Same rule and same reason as
+`LocationPicker` in `mobile/`. MapLibre is ~250 kB gzipped, so everything that
+imports it must stay behind a dynamic import — `/harta` via the route table,
+the order location picker via `React.lazy` in `sales/components/fields.tsx`.
+
 **Server state is TanStack Query.** Query keys and the mutations that invalidate
 them live together in each feature's `queries.ts`, namespaced by module
 (`'technical'`, `'sales'`) so invalidating a parent key cascades. Screens supply

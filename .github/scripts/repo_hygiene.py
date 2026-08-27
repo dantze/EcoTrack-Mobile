@@ -39,6 +39,7 @@ NO_CI_REQUIRED = {
     "deploy",           # documentation-only systemd unit + README
     "CLAUDE.md",
     "README.md",
+    "TODO.md",          # the backlog; prose, ships in no build
 }
 NO_CI_REQUIRED_GLOBS = ("HANDOFF-*.md",)
 

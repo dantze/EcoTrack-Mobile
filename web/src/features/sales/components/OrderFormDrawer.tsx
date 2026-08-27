@@ -38,6 +38,7 @@ import {
   type Order,
   type OrderTypeTag,
   clientName,
+  parseCoordinates,
 } from '@/types/domain';
 import {
   FREQUENCY_OPTIONS,
@@ -76,6 +77,7 @@ import {
   suggestOrderType,
 } from '../suggestions';
 import { ClientPicker } from './ClientPicker';
+import type { KnownPlace } from './LocationPickerModal';
 import { Col, FormGrid, FormSection, LocationFields, PhoneField, ToggleField } from './fields';
 import { errorMessage, toast } from './Toaster';
 
@@ -203,6 +205,20 @@ export function OrderFormDrawer({ order = null, initialClient = null, onClose }:
 
   const coordinatesForAddress = (option: AutocompleteOption) =>
     addressSuggestions.find((entry) => entry.address === option.value)?.coordinates ?? null;
+
+  // The same history, for the map picker's markers. Only the entries that
+  // actually carry a point can be drawn — an address with no coordinates is a
+  // typeahead row and nothing more.
+  const knownPlaces = useMemo<KnownPlace[]>(
+    () =>
+      addressSuggestions.flatMap((entry) => {
+        const point = parseCoordinates(entry.coordinates);
+        return point
+          ? [{ address: entry.address, point, count: entry.count, scope: entry.scope }]
+          : [];
+      }),
+    [addressSuggestions],
+  );
 
   const quantityWarning = useMemo(() => {
     if (form.orderType !== 'Amplasari') return null;
@@ -410,6 +426,7 @@ export function OrderFormDrawer({ order = null, initialClient = null, onClose }:
           patch={patch}
           addressOptions={addressOptions}
           coordinatesForAddress={coordinatesForAddress}
+          knownPlaces={knownPlaces}
           quantityWarning={quantityWarning?.message ?? null}
           productOptions={products.map((product) => ({
             value: String(product.id),
@@ -436,6 +453,7 @@ export function OrderFormDrawer({ order = null, initialClient = null, onClose }:
           groupsError={clientOrdersQuery.isError}
           addressOptions={addressOptions}
           coordinatesForAddress={coordinatesForAddress}
+          knownPlaces={knownPlaces}
         />
       )}
 
@@ -447,6 +465,7 @@ export function OrderFormDrawer({ order = null, initialClient = null, onClose }:
           editing={editing}
           addressOptions={addressOptions}
           coordinatesForAddress={coordinatesForAddress}
+          knownPlaces={knownPlaces}
           subscriptionOptions={subscriptions.map((subscription) => ({
             value: String(subscription.id),
             label: subscriptionLabel(subscription),
@@ -502,6 +521,7 @@ function AmplasareFields({
   totalPrice,
   addressOptions,
   coordinatesForAddress,
+  knownPlaces,
   quantityWarning,
 }: FieldsProps & {
   productOptions: SelectOption<string>[];
@@ -509,6 +529,7 @@ function AmplasareFields({
   totalPrice: number | null;
   addressOptions: AutocompleteOption[];
   coordinatesForAddress: (option: AutocompleteOption) => string | null;
+  knownPlaces: readonly KnownPlace[];
   /** Non-blocking note when the quantity is unlike this client's usual. */
   quantityWarning: string | null;
 }) {
@@ -565,6 +586,7 @@ function AmplasareFields({
           coordinatesId="placementCoordinates"
           suggestions={addressOptions}
           coordinatesFor={coordinatesForAddress}
+          knownPlaces={knownPlaces}
           onChange={(placementLocation) => patch({ placementLocation })}
         />
       </FormSection>
@@ -652,6 +674,7 @@ function RidicareFields({
   groupsError,
   addressOptions,
   coordinatesForAddress,
+  knownPlaces,
 }: FieldsProps & {
   editing: boolean;
   clientChosen: boolean;
@@ -660,6 +683,7 @@ function RidicareFields({
   groupsError: boolean;
   addressOptions: AutocompleteOption[];
   coordinatesForAddress: (option: AutocompleteOption) => string | null;
+  knownPlaces: readonly KnownPlace[];
 }) {
   const step = (group: PacketGroup, delta: number) => {
     const current = form.pickupSelection[group.key] ?? 0;
@@ -779,6 +803,7 @@ function RidicareFields({
                 value={form.pickupLocation}
                 suggestions={addressOptions}
                 coordinatesFor={coordinatesForAddress}
+                knownPlaces={knownPlaces}
                 onChange={(pickupLocation) => patch({ pickupLocation })}
               />
             </Col>
@@ -817,12 +842,14 @@ function IgienizareFields({
   subscriptionsLoading,
   addressOptions,
   coordinatesForAddress,
+  knownPlaces,
 }: FieldsProps & {
   editing: boolean;
   subscriptionOptions: SelectOption<string>[];
   subscriptionsLoading: boolean;
   addressOptions: AutocompleteOption[];
   coordinatesForAddress: (option: AutocompleteOption) => string | null;
+  knownPlaces: readonly KnownPlace[];
 }) {
   return (
     <>
@@ -854,6 +881,7 @@ function IgienizareFields({
           coordinatesId="sanitationCoordinates"
           suggestions={addressOptions}
           coordinatesFor={coordinatesForAddress}
+          knownPlaces={knownPlaces}
           onChange={(sanitationLocation) => patch({ sanitationLocation })}
         />
       </FormSection>

@@ -1,40 +1,20 @@
 /**
- * Dispatch heuristics: which unassigned jobs belong on this route, and in what
- * order should its stops be driven.
+ * Dispatch geometry: in what order should a route's stops be driven?
  *
  * All of it is geometry over data the board already has — `Task.coordinates`
- * is a "lat,lng" string the backend stores, `Route.dayOfWeek` is the weekday
- * being planned (routes are weekly, not dated). No routing service, no traffic, no API: straight-line kilometres
- * and a greedy nearest-neighbour walk. That is deliberately crude, and it is
- * why the output is a *proposal* with its numbers shown, not an auto-assign.
- * The dispatcher knows about the bridge that is closed; this only knows that
- * two sites are 3 km apart.
+ * is a "lat,lng" string the backend stores. No routing service, no traffic, no
+ * API: straight-line kilometres and a greedy nearest-neighbour walk. That is
+ * deliberately crude, and it is why the output is a *proposal* with its
+ * numbers shown, not an auto-reorder. The dispatcher knows about the bridge
+ * that is closed; this only knows that two sites are 3 km apart.
  *
- * Two independent suggestions:
- *   suggestRouteGroup  jobs near this route's stops, on this route's day
- *   suggestStopOrder   the same stops re-sequenced to cut dead mileage
+ * There used to be a second heuristic here, `suggestRouteGroup`, which
+ * proposed unassigned jobs to add to a route. It was removed (TODO-16):
+ * recommended additions to routes are not wanted. `distanceKm` is also used by
+ * the map feature.
  */
 
-import { parseCoordinates, type LatLng, type Route, type Task } from '@/types/domain';
-import { taskDate } from './utils';
-
-/**
- * Weekday (1 = Monday … 7 = Sunday) of an ISO date, matching
- * java.time.DayOfWeek — which is what `Route.dayOfWeek` holds.
- */
-function weekdayOf(isoDate: string | null): number | null {
-  if (!isoDate) return null;
-  const parsed = new Date(`${isoDate}T00:00:00`);
-  if (Number.isNaN(parsed.getTime())) return null;
-  const jsDay = parsed.getDay(); // 0 = Sunday
-  return jsDay === 0 ? 7 : jsDay;
-}
-
-/** True when a task is scheduled on a different weekday than this route runs. */
-function fallsOnAnotherDay(route: Route, isoDate: string | null): boolean {
-  const day = weekdayOf(isoDate);
-  return route.dayOfWeek !== null && day !== null && day !== route.dayOfWeek;
-}
+import { parseCoordinates, type LatLng, type Task } from '@/types/domain';
 
 const EARTH_RADIUS_KM = 6371;
 
@@ -63,22 +43,6 @@ export function pathLengthKm(tasks: readonly Task[]): number {
   }
   return total;
 }
-
-/**
- * The locality of an address: the last comma-separated chunk, which is how
- * every address in this system is written ("Str. Exemplu nr. 12, Otopeni").
- * Used as a fallback grouping key for tasks that have no coordinates.
- */
-export function localityOf(address: string | null | undefined): string | null {
-  if (!address) return null;
-  const parts = address
-    .split(',')
-    .map((part) => part.trim())
-    .filter(Boolean);
-  const last = parts[parts.length - 1];
-  return last ? last.toLocaleLowerCase('ro') : null;
-}
-
 /** Greedy nearest-neighbour ordering, starting from `from` (or the first task). */
 export function orderByProximity(tasks: readonly Task[], from: LatLng | null): Task[] {
   const remaining = [...tasks];
@@ -107,176 +71,6 @@ export function orderByProximity(tasks: readonly Task[], from: LatLng | null): T
   }
 
   return ordered;
-}
-
-// ---------------------------------------------------------------------------
-// Which unassigned jobs belong on this route?
-// ---------------------------------------------------------------------------
-
-/** Nothing further than this from the route's stops is offered. */
-export const NEARBY_RADIUS_KM = 25;
-const DEFAULT_LIMIT = 8;
-
-export interface GroupCandidate {
-  task: Task;
-  /** Straight-line km to the nearest existing stop; null when unknown. */
-  distanceKm: number | null;
-  /** Romanian one-liner explaining why this task is in the list. */
-  reason: string;
-}
-
-export interface GroupSuggestion {
-  candidates: GroupCandidate[];
-  /** Existing stop ids followed by the proposed ones, in driving order. */
-  orderedIds: number[];
-  /** Estimated extra straight-line distance the additions cost. */
-  addedKm: number;
-  /** Romanian summary line for the panel header. */
-  summary: string;
-}
-
-/**
- * The pool point with the most neighbours inside the radius — the middle of
- * the densest cluster of unassigned work. Used only to anchor a route that has
- * no stops of its own yet.
- */
-function densestSeed(tasks: readonly Task[]): LatLng | null {
-  const points = tasks.map(pointOf).filter((point): point is LatLng => point !== null);
-  if (points.length === 0) return null;
-
-  let best: LatLng | null = null;
-  let bestCount = -1;
-  for (const candidate of points) {
-    const count = points.filter(
-      (other) => distanceKm(candidate, other) <= NEARBY_RADIUS_KM,
-    ).length;
-    if (count > bestCount) {
-      bestCount = count;
-      best = candidate;
-    }
-  }
-  return best;
-}
-
-/**
- * Proposes unassigned tasks to append to `route`.
- *
- * Filters, in order:
- *   1. day — a task already scheduled for another date is never proposed;
- *      moving a job to a different day is a decision, not a convenience.
- *   2. place — within NEARBY_RADIUS_KM of one of the route's existing stops
- *      (or, for a route with no stops yet, of the densest cluster in the
- *      pool), falling back to a locality the route already serves, or the
- *      route's county, for tasks with no coordinates at all.
- * Survivors are ranked nearest-first and sequenced by `orderByProximity`
- * starting from the route's current last stop.
- */
-export function suggestRouteGroup(
-  route: Route,
-  routeTasks: readonly Task[],
-  pool: readonly Task[],
-  limit = DEFAULT_LIMIT,
-): GroupSuggestion | null {
-  if (pool.length === 0) return null;
-
-  const stopPoints = routeTasks
-    .map(pointOf)
-    .filter((point): point is LatLng => point !== null);
-  const stopLocalities = new Set(
-    routeTasks
-      .map((task) => localityOf(task.address))
-      .filter((value): value is string => value !== null),
-  );
-  const routeCounty = route.county?.toLocaleLowerCase('ro') ?? null;
-
-  // An empty route has no geometry to attract anything, and that is exactly
-  // when a grouping is most useful. So seed from the pool instead: the task
-  // with the most neighbours inside the radius anchors the densest cluster of
-  // work available on this day, and the route is built around it.
-  const eligible = pool.filter((task) => !fallsOnAnotherDay(route, taskDate(task)));
-  const seedPoint =
-    stopPoints.length > 0 ? null : densestSeed(eligible);
-  const anchors = stopPoints.length > 0 ? stopPoints : seedPoint ? [seedPoint] : [];
-
-  const candidates: GroupCandidate[] = [];
-
-  for (const task of pool) {
-    const scheduled = taskDate(task);
-    if (fallsOnAnotherDay(route, scheduled)) continue;
-
-    const point = pointOf(task);
-    const nearest =
-      point && anchors.length > 0
-        ? Math.min(...anchors.map((anchor) => distanceKm(anchor, point)))
-        : null;
-
-    if (nearest !== null) {
-      if (nearest > NEARBY_RADIUS_KM) continue;
-      const sameDay = weekdayOf(scheduled) !== null && weekdayOf(scheduled) === route.dayOfWeek;
-      candidates.push({
-        task,
-        distanceKm: nearest,
-        reason:
-          stopPoints.length > 0
-            ? `la ${nearest.toFixed(1)} km de traseul actual${sameDay ? ' · aceeași zi' : ''}`
-            : `în aceeași zonă (${nearest.toFixed(1)} km de centrul grupului)${
-                sameDay ? ' · aceeași zi' : ''
-              }`,
-      });
-      continue;
-    }
-
-    // No usable geometry — fall back to place names.
-    const locality = localityOf(task.address);
-    const matchesLocality = locality !== null && stopLocalities.has(locality);
-    const matchesCounty =
-      routeCounty !== null &&
-      task.address !== null &&
-      task.address.toLocaleLowerCase('ro').includes(routeCounty);
-
-    if (!matchesLocality && !matchesCounty) continue;
-    candidates.push({
-      task,
-      distanceKm: null,
-      reason: matchesLocality
-        ? `aceeași localitate (${locality})`
-        : `același județ (${route.county})`,
-    });
-  }
-
-  if (candidates.length === 0) return null;
-
-  candidates.sort((left, right) => {
-    if (left.distanceKm === null && right.distanceKm === null) return 0;
-    if (left.distanceKm === null) return 1;
-    if (right.distanceKm === null) return -1;
-    return left.distanceKm - right.distanceKm;
-  });
-
-  // One nearby job is a drag-and-drop, not a grouping — staying quiet below
-  // two keeps the panel from nagging on every route.
-  if (candidates.length < 2) return null;
-
-  const chosen = candidates.slice(0, limit);
-  const lastStop = [...routeTasks].reverse().map(pointOf).find((point) => point !== null) ?? null;
-  const sequenced = orderByProximity(
-    chosen.map((candidate) => candidate.task),
-    lastStop,
-  );
-
-  const before = pathLengthKm(routeTasks);
-  const after = pathLengthKm([...routeTasks, ...sequenced]);
-
-  return {
-    candidates: sequenced.map(
-      (task) => chosen.find((candidate) => candidate.task.id === task.id)!,
-    ),
-    orderedIds: [...routeTasks.map((task) => task.id), ...sequenced.map((task) => task.id)],
-    addedKm: Math.max(0, after - before),
-    summary:
-      `${sequenced.length} ${sequenced.length === 1 ? 'sarcină neasignată se potrivește' : 'sarcini neasignate se potrivesc'}` +
-      ` pe această rută (+${(after - before).toFixed(1)} km estimat).`,
-  };
 }
 
 // ---------------------------------------------------------------------------

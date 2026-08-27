@@ -18,6 +18,7 @@ import {
   type RecurringIgienizare,
   type RidicareOrder,
   type Subscription,
+  type TaskStatus,
   formatCoordinates,
   parseCoordinates,
 } from '@/types/domain';
@@ -38,6 +39,40 @@ export function isRidicare(order: Order): order is RidicareOrder {
 
 export function isIgienizare(order: Order): order is IgienizareOrder {
   return order.orderType === 'Igienizari';
+}
+
+// ---------------------------------------------------------------------------
+// Fulfilment (TODO-21 / TODO-20 share this definition)
+// ---------------------------------------------------------------------------
+
+/**
+ * Is this order's work finished — i.e. does it belong in Arhivă rather than in
+ * Comenzi?
+ *
+ * **The rule is: a COMPLETED task, and nothing else.** An order with no task at
+ * all has certainly not been carried out, so it stays current even when its
+ * date is long past.
+ *
+ * This is deliberately NOT `deriveLifecycle` in `@/features/map/data.ts`, which
+ * falls back to date reasoning and will call a task-less past-dated order
+ * `'done'`. That fallback is fine for colouring a map pin and wrong here: an
+ * order that nobody ever executed must not disappear out of the operator's
+ * list because a date rolled over.
+ *
+ * It is the same rule the backend enforces in
+ * `OrderRepository.findLiveBySubscriptionId` (TODO-20), which refuses to retire
+ * a subscription while an order with no COMPLETED task still points at it.
+ * "Live orders that block deleting a subscription" and "current orders that
+ * stay out of the archive" are one question — keep the two answers identical.
+ *
+ * @param taskStatus the order's summarised task status, as served by
+ *   `api.tasks.statusForOrder` / `useOrderTaskStatuses`; `null` means the order
+ *   has no task, and `undefined` means the status has not loaded yet. Both read
+ *   as "not fulfilled", so an order is only ever hidden from Comenzi on
+ *   positive evidence.
+ */
+export function isOrderFulfilled(taskStatus: TaskStatus | null | undefined): boolean {
+  return taskStatus === 'COMPLETED';
 }
 
 /** The date the order is *about* — used for sorting, filtering and display. */

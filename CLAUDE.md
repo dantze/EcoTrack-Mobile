@@ -314,6 +314,12 @@ reintroduce one (TODO-08).
   renaming them is a migration, not a cleanup.
 - `TODO.md` items keep their id forever. Never delete or cross one out — mark it
   `[DONE]` and leave the text intact, and append new ideas with the next free id.
+- **Anything found open goes into `TODO.md`, always — this is a standing rule.**
+  A loose end noticed while doing something else (a gap, a stale comment, a
+  cleanup deferred, a thing declined as out of scope, a follow-up handed over by
+  another agent) gets its own item at the next free id, saying what was found,
+  why it was not done, and what deciding it needs. Mentioning a finding in a
+  reply does not record it — replies scroll away, `TODO.md` is the memory.
 
 ## Known gaps
 

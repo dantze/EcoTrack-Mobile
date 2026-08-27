@@ -2,10 +2,14 @@ package com.example.damiProd.dto;
 
 import java.util.Set;
 
+// The body of a successful POST /api/enrollment/claim - the only place a
+// session is ever handed out. The name predates the removal of password login;
+// EnrollmentController is now its sole producer.
+//
 // NOTE ON SHAPE: the "flat" fields below (id/username/fullName/phone/county/roles)
 // are duplicated inside `user` on purpose. The existing mobile app reads the flat
 // fields; new web clients should read `user` + the token fields. Do not remove
-// the flat fields - see AuthController/AuthService.
+// the flat fields - both clients are written against this shape.
 public class LoginResponse {
     private Long id;
     private String username;

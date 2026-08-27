@@ -5,9 +5,11 @@ description: Use before committing, pushing, or opening a PR in this monorepo, a
 
 # Verify a change the way CI will
 
-CI is four workflows. Three are path-filtered per project; the fourth runs on
-every PR regardless. Running everything wastes minutes (`./gradlew build` is the
-long pole); running the wrong subset produces a red PR.
+Four workflows gate a PR. Three are path-filtered per project; the fourth runs
+on every PR regardless. (`audit.yml` also exists but is scheduled weekly and on
+demand — it is not part of PR gating, so never wait on it.) Running everything
+wastes minutes (`./gradlew build` is the long pole); running the wrong subset
+produces a red PR.
 
 ## Step 1 — what changed
 
@@ -75,7 +77,8 @@ npm run typecheck
 npm run test:run
 ```
 
-There is no build step in mobile CI.
+There is no build step in mobile CI. Do not substitute `npx expo` anything —
+CI runs exactly these three.
 
 ### hygiene — every change, no exceptions
 
@@ -106,3 +109,6 @@ check; do not describe a partial run as passing.
 - **Don't run `npm run test`** when you mean `test:run`. Watch mode never exits.
 - **Don't skip the hygiene script** because your change looks project-local.
   It runs on every PR; if it fails, your PR is red no matter how green the rest is.
+- **Don't assume a doc-only or `.claude/`-only change needs nothing.** Those
+  paths match no project filter, which is exactly the case the hygiene script
+  exists for — it is the only check that will run, so run it.

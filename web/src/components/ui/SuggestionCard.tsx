@@ -1,6 +1,6 @@
 /**
- * The one shape every suggestion in this app takes — Sales pre-fills, dispatch
- * groupings, route reordering.
+ * The one shape every suggestion in this app takes — the Sales order pre-fill
+ * and the dispatch board's stop reordering.
  *
  * Rules it exists to enforce:
  *   - a suggestion is always visibly a suggestion, never a filled-in field;
@@ -24,7 +24,6 @@ export function SuggestionCard({
   busy = false,
   onApply,
   onDismiss,
-  children,
 }: {
   title: string;
   /** Bullet list of what applying would set. */
@@ -44,7 +43,6 @@ export function SuggestionCard({
   busy?: boolean;
   onApply: () => void;
   onDismiss: () => void;
-  children?: ReactNode;
 }) {
   const stacked = layout === 'stacked';
   return (
@@ -64,7 +62,6 @@ export function SuggestionCard({
               ))}
             </ul>
           )}
-          {children}
           {basis && <p className="mt-1.5 text-xs text-ink-subtle italic">{basis}</p>}
         </div>
         <div className={stacked ? 'flex justify-end gap-1.5' : 'flex shrink-0 gap-1.5'}>

@@ -12,21 +12,12 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
-import java.util.Set;
 
 @RestController
 @RequestMapping("/api")
 public class PhotosController {
 
     private static final Logger log = LoggerFactory.getLogger(PhotosController.class);
-    private static final Set<String> ALLOWED_IMAGE_TYPES = Set.of(
-            "image/jpeg",
-            "image/jpg",
-            "image/png",
-            "image/webp",
-            "image/heic",
-            "image/heif"
-    );
 
     private final PhotoService photoService;
     private final ClientRepository clientRepository;
@@ -44,7 +35,7 @@ public class PhotosController {
         }
 
         String contentType = file.getContentType();
-        if (contentType != null && !ALLOWED_IMAGE_TYPES.contains(contentType.toLowerCase())) {
+        if (contentType != null && !PhotoService.ALLOWED_IMAGE_TYPES.contains(contentType.toLowerCase())) {
             return ResponseEntity.status(HttpStatus.UNSUPPORTED_MEDIA_TYPE)
                     .body("Upload failed: Only standard image formats (JPEG, PNG, WEBP, HEIC) are accepted.");
         }

@@ -17,7 +17,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Button, Spinner, cx } from '@/components/ui';
 import { boost, recordUse } from '@/lib/recents';
-import { includesFolded, rankBy, splitHighlight, type MatchRange } from '@/lib/search';
+import { matchesQuery, rankBy, splitHighlight, type MatchRange } from '@/lib/search';
 import { type Client, clientName } from '@/types/domain';
 import { SearchInput } from './FilterBar';
 
@@ -27,16 +27,14 @@ import { SearchInput } from './FilterBar';
  * search box finds "Ștefan" for a typed "stefan" too.
  */
 export function matchesClient(client: Client, query: string): boolean {
-  const needle = query.trim();
-  if (!needle) return true;
-  const haystack = [
+  return matchesQuery(
+    query,
     clientName(client),
-    client.email ?? '',
-    client.phone ?? '',
-    client.address ?? '',
-    client.type === 'company' ? (client.CUI ?? '') : (client.CNP ?? ''),
-  ];
-  return haystack.some((value) => includesFolded(value, needle));
+    client.email,
+    client.phone,
+    client.address,
+    client.type === 'company' ? client.CUI : client.CNP,
+  );
 }
 
 function clientMeta(client: Client): string {

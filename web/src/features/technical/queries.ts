@@ -13,7 +13,7 @@ import { useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type { UseMutationResult, UseQueryResult } from '@tanstack/react-query';
 import { api } from '@/api';
-import type { CreateEmployeeInput, CreateRouteInput } from '@/api';
+import type { CreateRouteInput } from '@/api';
 import type {
   Employee,
   RecurringIgienizare,
@@ -40,8 +40,6 @@ export const keys = {
   taskPhotos: (taskId: number) => ['technical', 'tasks', taskId, 'photos'] as const,
 
   drivers: () => ['technical', 'drivers'] as const,
-  driverRoutes: (employeeId: number) => ['technical', 'drivers', employeeId, 'routes'] as const,
-  driverTasks: (employeeId: number) => ['technical', 'drivers', employeeId, 'tasks'] as const,
 
   recurring: (scope: RecurringScope) => ['technical', 'recurring', scope] as const,
 };
@@ -88,22 +86,6 @@ export function useDrivers({ enabled = true }: ReadOptions = {}): UseQueryResult
     queryKey: keys.drivers(),
     queryFn: () => api.employees.listDrivers(),
     enabled,
-  });
-}
-
-export function useDriverRoutes(employeeId: number | null): UseQueryResult<Route[]> {
-  return useQuery({
-    queryKey: keys.driverRoutes(employeeId ?? -1),
-    queryFn: () => api.routes.listForEmployee(employeeId as number),
-    enabled: employeeId !== null,
-  });
-}
-
-export function useDriverTasks(employeeId: number | null): UseQueryResult<Task[]> {
-  return useQuery({
-    queryKey: keys.driverTasks(employeeId ?? -1),
-    queryFn: () => api.tasks.listForEmployee(employeeId as number),
-    enabled: employeeId !== null,
   });
 }
 
@@ -521,43 +503,6 @@ export function useDeactivateRecurring(): UseMutationResult<
   });
 }
 
-// ---------------------------------------------------------------------------
-// Mutations — employees (admin endpoints, need the admin role on the caller's token)
-// ---------------------------------------------------------------------------
-
-function useEmployeeInvalidation() {
-  const client = useQueryClient();
-  return () => {
-    void client.invalidateQueries({ queryKey: keys.drivers() });
-    void client.invalidateQueries({ queryKey: keys.routes() });
-  };
-}
-
-export function useCreateEmployee(): UseMutationResult<Employee, unknown, CreateEmployeeInput> {
-  const invalidate = useEmployeeInvalidation();
-  return useMutation({
-    mutationFn: (input: CreateEmployeeInput) => api.employees.create(input),
-    onSuccess: invalidate,
-  });
-}
-
-export interface UpdateEmployeeVars {
-  id: number;
-  input: Partial<CreateEmployeeInput>;
-}
-
-export function useUpdateEmployee(): UseMutationResult<Employee, unknown, UpdateEmployeeVars> {
-  const invalidate = useEmployeeInvalidation();
-  return useMutation({
-    mutationFn: ({ id, input }: UpdateEmployeeVars) => api.employees.update(id, input),
-    onSuccess: invalidate,
-  });
-}
-
-export function useDeleteEmployee(): UseMutationResult<void, unknown, number> {
-  const invalidate = useEmployeeInvalidation();
-  return useMutation({
-    mutationFn: (id: number) => api.employees.remove(id),
-    onSuccess: invalidate,
-  });
-}
+// Employee writes are NOT here: they are admin endpoints, and the screen that
+// makes them is `features/admin/EmployeesPage`, which owns its own keys and
+// mutations. The old Tehnic → Șoferi roster that used to live here is gone.

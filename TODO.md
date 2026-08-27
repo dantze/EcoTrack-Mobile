@@ -9,6 +9,11 @@ unless its status says otherwise.
 - Items keep their ID forever, so they can be referenced in conversation
   ("do TODO-07").
 - New ideas get appended with the next free ID.
+- **Anything found open goes in here, always.** A loose end noticed while doing
+  something else — a gap, a stale comment, a deferred cleanup, a thing declined
+  as out of scope — gets an item at the next free ID rather than living in a
+  chat reply that scrolls away. Write down what was found, why it was not done,
+  and what deciding it needs. Reporting a finding is not recording it.
 
 **Status legend:** `[ ]` not started · `[~]` in progress · `[DONE]` done ·
 `[POSTPONED]` deliberately deferred · `[?]` needs a decision first
@@ -631,6 +636,101 @@ batches are green and low risk (`web-minor-patch` #159, `mobile-minor-patch`
 majors — Vite 6→8 (#164), Vitest 3→4 (#168, #161), async-storage 2→3 (#166).
 **Spring Boot 3.5 → 4.1.1 (#158) is a whole major generation** and would touch
 the security config, JPA setup and the enrollment code — close it.
+
+---
+
+## I. Found while doing something else
+
+*Each of these was noticed during other work (the TODO-15/16/21 pass and the
+refactoring that followed) and deliberately not fixed there: none is a
+behaviour-preserving cleanup, and each wants a decision of its own.*
+
+### TODO-22 `[ ]` No backend guard against demoting the last admin
+The last-admin lockout guard exists **only in `web/src/features/admin/EmployeesPage.tsx`**.
+`AdminService` has no equivalent check, so anything that is not that screen — a
+direct API call, a future mobile admin view, a script — can demote or delete the
+last `ADMIN` and permanently lock everyone out of `/api/admin/**`.
+
+*Why it matters more than it looks:* with passwords gone there is no
+break-glass path back in. The only recovery is the first-user-becomes-admin
+bootstrap, which only fires when the employee table is empty — i.e. restoring
+access would mean destroying data.
+
+Needs deciding:
+- Refuse the demote/delete with a 409 and a Romanian message (the shape TODO-20
+  used for subscriptions), or refuse only the *last* one and let the UI explain?
+- Does the same rule belong on session revocation — revoking the last admin's
+  only device is the same lockout by another route.
+- A `SecurityTests` case is the point of the change; the web guard stays as the
+  friendly half.
+
+### TODO-23 `[ ]` Dead Google sign-in plumbing outside the backend
+Google sign-in and password login are gone from the backend, and the orphaned
+`ecotrack.google.*` properties went with the refactor. The **deployment and
+build plumbing still passes the values**: `GOOGLE_CLIENT_ID` and
+`GOOGLE_ALLOWED_DOMAIN` in `.github/workflows/deploy.yml` and
+`docker-compose.yml`, `VITE_GOOGLE_CLIENT_ID` in `docker-compose.yml` and
+`web/Dockerfile`, and on the web side `GOOGLE_CLIENT_ID` in `src/lib/config.ts`,
+`VITE_GOOGLE_CLIENT_ID` in `src/vite-env.d.ts` and `MOCK_GOOGLE_DEMO_USERNAME`
+in `src/mocks/seed.ts`. Stale `/auth/google` comments sit on the `email` field
+in `types/domain.ts` and `mocks/store.ts`.
+
+Harmless but misleading — it reads as if the app still supports Google auth.
+**Do it as one sweep across all three layers**: deleting only the `web/src/`
+half leaves build args feeding a variable nobody reads, which is worse than
+either end alone. Confirm no deployment secret is still expected before removing
+the workflow entries.
+
+### TODO-24 `[ ]` Rotate the Google Maps key that is still in git history
+A Maps key was committed in `807aec2`. The file that quoted it
+(`HANDOFF-auth-security.md`) was deleted in `ada49c1` and its
+`.github/repo-hygiene-allow.txt` entry has now been retired — **but deleting a
+file does not rotate a key**. It remains reachable by anyone who can clone the
+repo.
+
+Rotate it in Google Cloud and restrict the replacement (referrer or package +
+SHA-1, as `mobile/google-services.json`'s allowlist entry already demands for
+the Firebase key). Only then remove the reminder comment left in
+`repo-hygiene-allow.txt`. History rewriting is *not* required and is not
+proposed here — rotation is what actually ends the exposure.
+
+### TODO-25 `[ ]` Backend logging: `System.out`/`System.err`, and a swallowed failure
+`DataLoader`, `RecurringTaskScheduler` and `PhotoService.deletePhoto` print to
+stdout/stderr while the rest of the backend uses slf4j — so those lines miss the
+log format, the levels and anything that ships logs off the VPS.
+
+`PhotoService.deletePhoto` is the one with teeth: it **swallows a delete failure
+to stderr**, so a photo that fails to delete leaves no trace anywhere anyone
+looks. Decide whether it should propagate, and at what level, before mechanically
+swapping the print for a logger call — the logger swap alone would tidy the
+symptom and keep the bug.
+
+### TODO-26 `[ ]` The web react-hooks lint backlog
+`npm run lint` is 0 errors / 105 warnings. Two clusters are real and deliberately
+deferred:
+- **`react-hooks/set-state-in-effect` (~25 sites)** — a derive-state-from-props
+  pattern spread across most of the feature layer. Clearing it is a repo-wide
+  refactor, not a cleanup, and each site needs its own reading.
+- **`react-hooks/refs` in `components/ui/utils.ts`** (`useEscapeKey`,
+  `useOutsideClick`, `useEvent`) — the same idiom that was fixed in
+  `lib/hotkeys.tsx`, but `useEvent`'s returned callback can legitimately run
+  before passive effects flush, so moving its ref write is a semantic change.
+  These hooks sit under every modal in the app.
+
+The 25 messages from `useStableBounds` in `MapPage.tsx` are **not** in scope: its
+comment argues that a render-time ref write is the correct idiom there, and it is.
+
+### TODO-27 `[ ]` The 60-day refresh-token arithmetic no longer describes production
+`ecotrack.security.refresh-token-ttl-days=365`, but `TokenService`'s javadoc and
+its worked example still reason in terms of the 60-day code default
+(`@Value(":60")`). Neither is strictly wrong — the comments document the
+fallback — but the arithmetic ("a session that refreshes every 30 minutes for
+its 60-day life") describes a configuration production does not run.
+
+Decide which number is intended, then make the property, the fallback and the
+prose agree. A 365-day refresh token is a year-long credential on a lost device;
+if that is deliberate it deserves a sentence saying so next to the session cap
+and the nightly prune.
 
 ---
 

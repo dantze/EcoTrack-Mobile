@@ -15,8 +15,9 @@ Failure modes when a file is missed:
 
 - missing `@JsonSubTypes` entry → Jackson throws at **runtime**, on first
   deserialisation of that type
-- missing web/mobile literal → silent: the type falls through switches and
-  renders as blank or "unknown", with no type error
+- missing web literal → mostly a compile error, if you widen `ORDER_TYPES` first
+- missing mobile literal → **silent**: the type falls through switches and
+  renders as blank or "unknown", with no type error anywhere
 
 ## Backend
 
@@ -34,8 +35,9 @@ Failure modes when a file is missed:
    ```
    The `name` must match the `orderType` string exactly — it is also persisted
    as a column.
-3. **`OrderService`** — creation and update are `@Transactional`; task
-   generation and any inventory adjustment for the new type go inside them.
+3. **`OrderService`** — `createOrder` and `updateOrder` are `@Transactional`;
+   task generation and any inventory adjustment for the new type go **inside**
+   them, not in the controller.
 4. **`DomainTests/OrderJsonSubTypesTest`** — add the round-trip case. This test
    exists *because* the names are duplicated; it is the closest thing to a
    guard.
@@ -55,48 +57,61 @@ type is a data change with no migration path; treat it as a separate decision.
    export type OrderTypeTag = (typeof ORDER_TYPES)[number];
    ```
    Widening `ORDER_TYPES` is what turns the remaining steps into **compile
-   errors** — do it early and let `tsc` find the rest.
-2. **`features/sales/orderModel.ts`** — the big one. Type guard
-   (`isAmplasare`-style) plus a branch in every `switch (order.orderType)`:
-   `orderPrimaryDate`, `orderDateLabel`, `orderAddress`, `orderCoordinates`,
-   `orderSummary`, `orderToForm`, `validateOrderForm`, and a
-   `build<Type>Payload`.
-3. **`components/domain`** — `ORDER_TYPE_LABELS` is a
-   `Record<OrderTypeTag, string>`, so a missing entry **is** a type error.
-   Labels are Romanian.
-4. **`features/sales/suggestions.ts`** — history heuristics switch on type; a
+   errors** — do it early and let `tsc` find the rest. Every
+   `Record<OrderTypeTag, …>` in the app becomes an error until it is filled in:
+   `ORDER_TYPE_LABELS` and `ORDER_TYPE_PLURAL_LABELS` in `components/domain.tsx`,
+   `TYPE_DOT` in `features/sales/components/MonthGrid.tsx`, `ORDER_TYPE_COLOR`
+   in `features/map/types.ts`, and `OrderCounts` in `features/sales/calendar.ts`.
+   All labels are Romanian.
+2. **`features/sales/orderModel.ts`** — the big one. Add the type guard
+   (`isAmplasare`-style), then a branch in every `switch` on the type:
+   `orderPrimaryDate`, `orderAddress`, `orderCoordinates`, `orderSummary`,
+   `orderToForm`, `validateOrderForm`. `orderDateLabel` branches through the
+   guards instead of a switch, so it needs reading rather than a mechanical
+   edit, and `emptyOrderForm` is a **flat** state bag covering all types at
+   once — the new type's fields go in there and it will not error if you forget.
+   Finally add a `build<Type>Payload`.
+   **`orderPrimaryDate` is the one definition of which day an order belongs to**
+   — the Comenzi table, its filters and the calendar all read it, so a new type
+   with no branch there lands nowhere.
+3. **`features/sales/suggestions.ts`** — history heuristics branch on type; a
    new type silently produces no suggestions until handled.
-5. **`api/live/normalize.ts`** and the mocks — see the `web-data-layer` skill.
+4. **`api/live/normalize.ts`** and the mocks — see the `web-data-layer` skill.
 
 ## Mobile
 
-`mobile/types/OrderTypes.ts` — the same shape, independently declared:
-
-```ts
-export type AmplasareOrder = { orderType: 'Amplasari'; /* … */ };
-export type Order = AmplasareOrder | RidicareOrder | IgienizareOrder;
-export const isAmplasare = (o: Order): o is AmplasareOrder => o.orderType === 'Amplasari';
-```
-
-Add the member, the union arm, and the `is<Type>` guard.
-
-Then the literals that are **not** in that file. Mobile has no single
-`ORDER_TYPES` constant — it has two local copies, and neither is typed against
-the union, so **nothing here fails at compile time**:
-
-- `mobile/modals/OrderFilterModal.tsx` — a local `ORDER_TYPES` array of
-  `{ value, label }` pairs (labels are the singular Romanian forms:
-  `Amplasare`, `Ridicare`, `Igienizare`)
-- `mobile/app/Sales/OrderDetails.tsx` — a bare
-  `["Amplasari", "Ridicari", "Igienizari"]`
-
-Grep before assuming those are the only two:
+**This is the project most likely to be left behind, and the only one where
+being left behind is silent.** There is no `ORDER_TYPES` constant and no
+exhaustive `Record`, so nothing here fails at compile time. Grep first and treat
+the hit list as the work list — there are well over a hundred occurrences:
 
 ```bash
-grep -rn "Amplasari\|Ridicari\|Igienizari" mobile/
+grep -rn "Amplasari\|Ridicari\|Igienizari" mobile/ --include="*.ts" --include="*.tsx"
 ```
 
-This is the project most likely to be left behind.
+The ones that always need editing:
+
+- **`mobile/types/OrderTypes.ts`** — the shape, independently declared:
+  ```ts
+  export type Order = AmplasareOrder | RidicareOrder | IgienizareOrder;
+  export const isAmplasare  = (o: Order): o is AmplasareOrder  => o.orderType === 'Amplasari';
+  export const isRidicari   = (o: Order): o is RidicareOrder   => o.orderType === 'Ridicari';
+  export const isIgienizari = (o: Order): o is IgienizareOrder => o.orderType === 'Igienizari';
+  ```
+  Add the member, the union arm, and the guard. (Note the guard names are
+  `isRidicari` / `isIgienizari`, not the singular forms web uses.)
+- **`mobile/utils/orderUtils.ts`** — `getDateInfo`, `getLocationText`,
+  `getActionText`, `getOrderTypeLabel` all branch on the type. A missing branch
+  is what produces a card with a blank date or address.
+- **`mobile/modals/OrderFilterModal.tsx`** — a local `ORDER_TYPES` array of
+  `{ value, label }` pairs (labels are the singular Romanian forms:
+  `Amplasare`, `Ridicare`, `Igienizare`).
+- **`mobile/app/Sales/OrderDetails.tsx`** — a bare
+  `["Amplasari", "Ridicari", "Igienizari"]` plus a `switch` rendering one of
+  `app/Sales/OrderTypes/{Amplasari,Ridicari,Igienizari}.tsx`; a new type needs a
+  screen of its own there.
+- **`mobile/types/__tests__/OrderTypes.test.ts`** — the mobile counterpart of
+  `OrderJsonSubTypesTest`. Extend it; it is the only automated guard on this side.
 
 ## Conventions
 

@@ -29,14 +29,15 @@ import java.util.List;
  *
  * IMPORTANT: {@code ecotrack.security.enforce} controls whether unauthenticated
  * requests to /api/** are rejected. It does NOT control whether the auth
- * machinery itself works - login/refresh/logout/sessions always work, and a
- * valid bearer token is always honoured by {@link BearerTokenAuthenticationFilter}.
- * When the flag is false, /api/** simply stays open to anonymous requests too,
- * which is what keeps the current React Native app (which sends no tokens)
- * working in production until it is updated.
+ * machinery itself works - enrollment/refresh/logout/sessions always work, and
+ * a valid bearer token is always honoured by {@link BearerTokenAuthenticationFilter}.
+ * When the flag is false, /api/** simply stays open to anonymous requests too.
+ * It now defaults to true (application.properties): every client obtains its
+ * session through device enrollment, so there is no token-less caller left for
+ * the open mode to protect.
  *
- * Two things deliberately apply in BOTH modes, because neither can break a
- * token-less caller:
+ * Two things deliberately apply in BOTH modes, because neither depends on the
+ * caller being authenticated:
  *   - the infrastructure deny-list below (/h2-console, actuator internals):
  *     nothing in either client app ever calls those;
  *   - the security response headers.

@@ -16,6 +16,11 @@
  * still edits and deletes, because correcting a typo on finished work is
  * ordinary, and a lock nobody asked for would be a new permission concept.
  *
+ * The two derivations behind the table — what the filter strip lets through,
+ * and which half each survivor lands in — are pure functions in
+ * `./orderFilters`, so they can be read and tested without rendering a screen
+ * this long.
+ *
  * Two entry points besides clicking a row: `?comanda=<id>` opens that order's
  * drawer and `?nou=1` opens an empty form, which is how the command palette
  * (⌘K) reaches this screen and what makes an order link shareable. A deep link
@@ -46,7 +51,6 @@ import {
 } from '@/components/domain';
 import { ORDER_TYPES, type Order, clientName } from '@/types/domain';
 import { useDeepLink } from '@/lib/deepLink';
-import { includesFolded } from '@/lib/search';
 import { useShortcuts } from '@/lib/hotkeys';
 import { recordUse } from '@/lib/recents';
 import { ErrorNotice, FilterBar, FilterField, SearchInput } from './components/FilterBar';
@@ -54,6 +58,12 @@ import { OrderDetailDrawer } from './components/OrderDetailDrawer';
 import { OrderFormDrawer } from './components/OrderFormDrawer';
 import { Toaster, errorMessage, toast } from './components/Toaster';
 import { useConfirm } from './components/useConfirm';
+import {
+  filterOrders,
+  hasActiveFilters,
+  splitByFulfilment,
+  type OrderFilters,
+} from './orderFilters';
 import {
   isOrderFulfilled,
   orderAddress,
@@ -158,42 +168,23 @@ export function OrdersPage() {
 
   const taskStatuses = statusesQuery.data;
 
-  /**
-   * The orders matching the filter strip, before the Curente/Arhivă split —
-   * so each tab can show how many of the matches landed on its side.
-   */
-  const matching = useMemo(() => {
-    const needle = search.trim();
-    return orders.filter((order) => {
-      if (needle) {
-        const haystack = [
-          String(order.number),
-          clientName(order.client),
-          orderAddress(order) ?? '',
-          orderSummary(order),
-        ];
-        // Diacritic-insensitive: a typed "bucuresti" has to find "București".
-        if (!haystack.some((value) => includesFolded(value, needle))) return false;
-      }
-      if (typeFilter && order.orderType !== typeFilter) return false;
-      if (clientFilter && String(order.client.id) !== clientFilter) return false;
-      if (dateFrom || dateTo) {
-        const date = orderPrimaryDate(order);
-        if (!date) return false;
-        const day = date.slice(0, 10);
-        if (dateFrom && day < dateFrom) return false;
-        if (dateTo && day > dateTo) return false;
-      }
-      return true;
-    });
-  }, [orders, search, typeFilter, clientFilter, dateFrom, dateTo]);
-
-  const archived = useMemo(
-    () => matching.filter((order) => isOrderFulfilled(taskStatuses?.[order.id])),
-    [matching, taskStatuses],
+  // Which rows the table shows: the filter strip narrows, then the tab picks a
+  // half. Both derivations live in `./orderFilters` — see that file for why the
+  // Curente/Arhivă split is computed rather than stored.
+  const filters = useMemo<OrderFilters>(
+    () => ({
+      search,
+      type: typeFilter,
+      clientId: clientFilter,
+      from: dateFrom,
+      to: dateTo,
+    }),
+    [search, typeFilter, clientFilter, dateFrom, dateTo],
   );
-  const current = useMemo(
-    () => matching.filter((order) => !isOrderFulfilled(taskStatuses?.[order.id])),
+
+  const matching = useMemo(() => filterOrders(orders, filters), [orders, filters]);
+  const { current, archived } = useMemo(
+    () => splitByFulfilment(matching, taskStatuses),
     [matching, taskStatuses],
   );
   const rows = view === 'archive' ? archived : current;
@@ -206,8 +197,7 @@ export function OrdersPage() {
     setSelected(new Set());
   };
 
-  const filtersActive =
-    search !== '' || typeFilter !== '' || clientFilter !== '' || dateFrom !== null || dateTo !== null;
+  const filtersActive = hasActiveFilters(filters);
 
   const resetFilters = () => {
     setSearch('');

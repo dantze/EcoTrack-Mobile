@@ -48,13 +48,6 @@ export function weekRange(offsetWeeks = 0): { from: string; to: string } {
   return { from: toIsoDate(monday), to: toIsoDate(sunday) };
 }
 
-export function shiftIsoDate(iso: string, days: number): string {
-  const parsed = new Date(`${iso}T00:00:00`);
-  if (Number.isNaN(parsed.getTime())) return iso;
-  parsed.setDate(parsed.getDate() + days);
-  return toIsoDate(parsed);
-}
-
 /** The scheduled date of a task, falling back to the date part of scheduledTime. */
 export function taskDate(task: Task): string | null {
   if (task.scheduledDate) return task.scheduledDate;
@@ -132,19 +125,6 @@ export function sortByOrderIndex(tasks: readonly Task[]): Task[] {
 
 export function isUnassigned(task: Task): boolean {
   return task.route === null || task.route === undefined;
-}
-
-/** Case-insensitive, diacritic-tolerant "does this row match the search box". */
-export function matchesQuery(query: string, ...fields: (string | null | undefined)[]): boolean {
-  const needle = normalise(query);
-  if (!needle) return true;
-  return fields.some((field) => normalise(field ?? '').includes(needle));
-}
-
-const DIACRITICS = /[\u0300-\u036f]/g;
-
-function normalise(value: string): string {
-  return value.trim().toLowerCase().normalize('NFD').replace(DIACRITICS, '');
 }
 
 // ---------------------------------------------------------------------------

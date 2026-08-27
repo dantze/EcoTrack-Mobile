@@ -104,10 +104,6 @@ export function Toolbar({ children }: { children: ReactNode }) {
   );
 }
 
-export function ToolbarSpacer() {
-  return <div className="ml-auto" />;
-}
-
 export function PanelHeader({
   title,
   subtitle,

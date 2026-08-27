@@ -12,4 +12,15 @@ public interface RecurringIgienizareRepository extends JpaRepository<RecurringIg
     List<RecurringIgienizare> findByActiveTrueAndRouteIsNull();
     List<RecurringIgienizare> findByClientId(Long clientId);
     List<RecurringIgienizare> findByRoute_Id(Long routeId);
+
+    /**
+     * Active plans still pointing at a subscription.
+     *
+     * These block a retire even harder than an unfinished order does: an active
+     * plan keeps GENERATING new orders on that subscription (see
+     * RecurringTaskScheduler, nightly at 02:00), so retiring the plan under it
+     * would manufacture fresh references to a retired row indefinitely — the
+     * dangling this rule exists to prevent.
+     */
+    List<RecurringIgienizare> findBySubscription_IdAndActiveTrue(Long subscriptionId);
 }

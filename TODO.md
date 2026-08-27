@@ -364,7 +364,7 @@ an edit, and edits live in the order form), a week/day zoom, and any task layer.
 month total is a second place that will start counting them differently — it uses
 `orderPrimaryDate`, not `deriveLifecycle`.
 
-### TODO-20 `[ ]` Block deleting a subscription that live orders still use
+### TODO-20 `[DONE — backend not compiled locally]` Block deleting a subscription that live orders still use
 Today a plan can be retired while orders still reference it. Instead, deleting
 should be **refused** until those orders are either fulfilled or deleted — or
 until they are moved onto a different subscription.
@@ -378,6 +378,77 @@ Needs deciding:
 *Context:* this is what makes TODO-11's soft-delete flag safe to keep. The flag
 protects old orders from dangling; this rule stops new dangling references being
 created in the first place.
+
+**Done.** `DELETE /api/subscriptions/{id}` now answers **409** with a Romanian
+message while anything live still points at the plan, and the Abonamente screen
+explains the refusal by naming the blockers instead of toasting a failure.
+
+**The three open questions, decided:**
+
+**1. "Still in use" = not finished — and that follows from the delete being
+SOFT.** The two guards in this repo are now deliberately different rules,
+because they protect against different damage:
+
+| | Delete is | Blocked by |
+|---|---|---|
+| Abonament | soft (`isActive = false`, row survives) | only **unfinished** work |
+| Produs | **hard** (row is gone) | **any** referencing order |
+
+A finished Igienizare keeps resolving through a retired plan, so it has no
+business blocking one — that *is* TODO-11's mechanism. A deleted product leaves
+nothing behind, so even a completed order would dangle. Same question, opposite
+answers, for a reason.
+
+"Finished" means **a COMPLETED task and nothing else.** An order with no task
+has certainly not been carried out, so it still blocks even when its date is
+long past. This is deliberately stricter than `deriveLifecycle`, which will call
+a task-less past-dated order `'done'` from its date alone — fine for colouring a
+map pin, wrong for a guard, which has to fail safe. **TODO-21 must adopt this
+same rule** rather than reusing the date fallback, or the archive and the guard
+will disagree about the same order.
+
+**2. Refuse and list — no bulk move.** `SubscriptionUsageModal` names every
+blocking order (number, client, date) and links each one through to Comenzi via
+`?comanda=<id>`, so the refusal ships with the way to resolve it. A bulk "move
+these to another plan" would be a sweeping write the operator asked for only
+obliquely by pressing Delete; it stays unbuilt on purpose.
+
+**3. Produse already had this guard — and it was half-built.** `ProductService`
+checked `AmplasareOrder.product` only, so a product used **solely by a Ridicare
+order** could be hard-deleted, leaving that order pointing at a row that no
+longer existed. Now both order types are checked. The mock had been checking
+both all along, so mock and live had quietly disagreed about this since they
+were written.
+
+**Recurring plans block too, and block harder.** An ACTIVE `RecurringIgienizare`
+on the plan refuses the retire even when no order is outstanding: it keeps
+generating fresh orders against that subscription every night
+(`RecurringTaskScheduler`, 02:00), which is precisely the new-dangling-reference
+this item exists to prevent. They are listed but NOT linked — Igienizări
+recurente is a Tehnic screen and a Vânzări-only account would land on "acces
+interzis".
+
+**New endpoint: `GET /api/subscriptions/{id}/usage`**, an advisory preflight so
+the UI can explain the refusal *before* the operator commits, rather than after
+a failed action. It changes nothing about who is allowed to do what: a GET under
+`/api/**` already resolves to "any authenticated employee" in `SecurityConfig`,
+so **no new matrix row** — and no `TaskAccessPolicy` call, since it is neither
+task-shaped nor employee-scoped. The DELETE remains the actual gate; the
+preflight failing just falls through to the normal confirm, and a 409 lost to a
+race re-fetches usage so the operator still gets the list.
+
+**Verification is uneven, and the backend half is the weak one:**
+
+- **Web — fully verified.** 360 tests green (was 350): 6 new contract tests
+  proving the mock refuses exactly what live refuses (including that a NEW task
+  does *not* unblock, and that COMPLETING the last order does), plus 5 on the
+  dialog. Typecheck clean, lint 0 errors, build clean, bundle 139.7/160 kB.
+- **Backend — WRITTEN BUT NEVER COMPILED.** This machine has no JDK 17+ (only a
+  Java 8 JRE) and no Docker, so Gradle cannot even load the Spring Boot plugin.
+  The 11 new/changed backend tests have never run. **`cd backend && ./gradlew
+  build` on a machine with JDK 21 is still owed** — in particular it is what
+  would catch a malformed `@Query`, which fails at context startup rather than
+  at compile time.
 
 ### TODO-21 `[ ]` Archive fulfilled orders out of Comenzi
 **Comenzi should show only current orders.** Fulfilled ones move to a separate

@@ -37,6 +37,7 @@ import type {
   OrderInput,
   OrderTaskStatus,
   SessionDevice,
+  SubscriptionUsage,
 } from '@/api/contract';
 import { readRefreshToken } from '@/auth/storage';
 import { getAccessToken } from '@/auth/tokenBridge';
@@ -62,6 +63,7 @@ import {
   cloneEmployee,
   compactRoute,
   db,
+  displayNameForClient,
   findClient,
   findOrderRow,
   findRecurringRow,
@@ -594,6 +596,58 @@ const productsApi: EcoTrackApi['products'] = {
 // Subscriptions
 // ---------------------------------------------------------------------------
 
+/**
+ * Mirrors OrderRepository.findLiveBySubscriptionId + the active-plan finder.
+ *
+ * "Live" is the same strict rule the backend uses: an Igienizare order counts
+ * until it has a COMPLETED task. No task at all means the visit has certainly
+ * not happened, so it still blocks — a past date is not evidence of work done.
+ */
+function subscriptionUsage(subscriptionId: number): SubscriptionUsage {
+  const orders = db.orders
+    .filter((order) => order.orderType === 'Igienizari' && order.subscriptionId === subscriptionId)
+    .filter(
+      (order) =>
+        !db.tasks.some((task) => task.orderId === order.id && task.status === 'COMPLETED'),
+    )
+    .sort((left, right) => left.number - right.number)
+    .map((order) => ({
+      id: order.id,
+      number: order.number,
+      clientName: displayNameForClient(order.clientId),
+      sanitationDate: order.orderType === 'Igienizari' ? order.sanitationDate : null,
+    }));
+
+  const recurringPlans = db.recurring
+    .filter((plan) => plan.subscriptionId === subscriptionId && plan.active)
+    .map((plan) => ({
+      id: plan.id,
+      clientName: displayNameForClient(plan.clientId),
+      frequencyDays: plan.frequencyDays,
+    }));
+
+  return { blocked: orders.length > 0 || recurringPlans.length > 0, orders, recurringPlans };
+}
+
+/** Same Romanian counting as SubscriptionService.blockedMessage(). */
+function blockedSubscriptionMessage(orderCount: number, planCount: number): string {
+  const count = (value: number, singular: string, plural: string) => {
+    if (value === 1) return `1 ${singular}`;
+    const lastTwo = value % 100;
+    return `${value} ${lastTwo === 0 || lastTwo >= 20 ? 'de ' : ''}${plural}`;
+  };
+
+  const parts: string[] = [];
+  if (orderCount > 0) parts.push(count(orderCount, 'comandă nefinalizată', 'comenzi nefinalizate'));
+  if (planCount > 0) parts.push(count(planCount, 'plan recurent activ', 'planuri recurente active'));
+
+  const verb = orderCount + planCount === 1 ? 'îl folosește încă' : 'îl folosesc încă';
+  return (
+    `Nu se poate șterge abonamentul: ${parts.join(' și ')} ${verb}. ` +
+    'Finalizează sau șterge-le, ori mută-le pe alt abonament.'
+  );
+}
+
 const subscriptionsApi: EcoTrackApi['subscriptions'] = {
   list: () => respond(() => db.subscriptions.filter((sub) => sub.isActive).map((sub) => ({ ...sub }))),
 
@@ -622,10 +676,29 @@ const subscriptionsApi: EcoTrackApi['subscriptions'] = {
       return { ...updated };
     }),
 
+  usage: (id) =>
+    respond(() => {
+      const sub = db.subscriptions.find((entry) => entry.id === id);
+      if (!sub) notFound('Subscription', id);
+      return subscriptionUsage(id);
+    }),
+
   remove: (id) =>
     respond(() => {
       const sub = db.subscriptions.find((entry) => entry.id === id);
       if (!sub) notFound('Subscription', id);
+
+      // Same rule as SubscriptionService.deactivate(), and enforced here too —
+      // the mock has to refuse what live refuses or the UI's error path is only
+      // ever exercised in production.
+      const usage = subscriptionUsage(id);
+      if (usage.blocked) {
+        throw new MockApiError(
+          blockedSubscriptionMessage(usage.orders.length, usage.recurringPlans.length),
+          409,
+        );
+      }
+
       // Soft delete, exactly like SubscriptionService.deactivate().
       sub.isActive = false;
     }),

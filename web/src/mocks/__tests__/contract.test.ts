@@ -391,6 +391,109 @@ describe('the failures the UI must render', () => {
     await expect(api.products.remove(product.id)).resolves.toBeUndefined();
   });
 
+  // ── Retiring a subscription (TODO-20) ──────────────────────────────────
+  //
+  // The rule differs from the product one above because the DELETE differs: a
+  // product is hard-deleted, so any reference at all blocks it, while a
+  // subscription is only retired (isActive = false) and the row survives — so
+  // only work that has NOT been carried out yet blocks.
+
+  async function planWithOrder(name: string) {
+    const client = await api.clients.create({ type: 'company', name: `${name} SRL` });
+    const subscription = await api.subscriptions.create({
+      name,
+      description: null,
+      type: 'ONE_TIME',
+      price: 200,
+      visitsPerMonth: 1,
+      durationMonths: null,
+      isIndefinite: false,
+      isActive: true,
+    });
+    const order = await api.orders.create(client.id, {
+      orderType: 'Igienizari',
+      subscription: { id: subscription.id },
+      sanitationDate: '2026-09-14',
+      sanitationLocationAddress: 'Str. Abonament 1',
+    });
+    return { client, subscription, order };
+  }
+
+  it('refuses to retire a subscription an unfinished order still uses (409)', async () => {
+    const { subscription } = await planWithOrder('Blocat de comandă');
+
+    const usage = await api.subscriptions.usage(subscription.id);
+    expect(usage.blocked).toBe(true);
+    expect(usage.orders).toHaveLength(1);
+
+    await expect(api.subscriptions.remove(subscription.id)).rejects.toMatchObject({ status: 409 });
+
+    // Still sellable — a refused retire must not half-apply.
+    const live = await api.subscriptions.list();
+    expect(live.some((entry) => entry.id === subscription.id)).toBe(true);
+  });
+
+  it('names the blocking order so the UI can list it', async () => {
+    const { subscription, order } = await planWithOrder('Listă blocaje');
+
+    const usage = await api.subscriptions.usage(subscription.id);
+
+    expect(usage.orders[0]).toMatchObject({
+      id: order.id,
+      number: order.number,
+      sanitationDate: '2026-09-14',
+    });
+    expect(usage.orders[0].clientName).toContain('Listă blocaje');
+  });
+
+  /**
+   * The whole point of the soft delete: once the visit is COMPLETED the order
+   * keeps resolving through the retired row, so it stops blocking.
+   */
+  it('allows retiring once the only order is completed', async () => {
+    const { subscription, order } = await planWithOrder('Eliberat de finalizare');
+
+    const task = await api.tasks.create({ orderId: order.id, type: 'SANITIZATION' });
+    await api.tasks.updateStatus(task.id, 'COMPLETED');
+
+    const usage = await api.subscriptions.usage(subscription.id);
+    expect(usage.blocked).toBe(false);
+
+    await expect(api.subscriptions.remove(subscription.id)).resolves.toBeUndefined();
+    const live = await api.subscriptions.list();
+    expect(live.some((entry) => entry.id === subscription.id)).toBe(false);
+  });
+
+  /**
+   * A task that exists but is not finished is not a reason to allow it — only
+   * COMPLETED counts. A NEW task means it is scheduled, not done.
+   */
+  it('still refuses while the order has a task that is not COMPLETED', async () => {
+    const { subscription, order } = await planWithOrder('Programat dar nefinalizat');
+    await api.tasks.create({ orderId: order.id, type: 'SANITIZATION' });
+
+    const usage = await api.subscriptions.usage(subscription.id);
+
+    expect(usage.blocked).toBe(true);
+    await expect(api.subscriptions.remove(subscription.id)).rejects.toMatchObject({ status: 409 });
+  });
+
+  it('allows retiring a subscription nothing has ever used', async () => {
+    const subscription = await api.subscriptions.create({
+      name: 'Niciodată folosit',
+      description: null,
+      type: 'ONE_TIME',
+      price: 100,
+      visitsPerMonth: 1,
+      durationMonths: null,
+      isIndefinite: false,
+      isActive: true,
+    });
+
+    expect((await api.subscriptions.usage(subscription.id)).blocked).toBe(false);
+    await expect(api.subscriptions.remove(subscription.id)).resolves.toBeUndefined();
+  });
+
   it('refuses a second task for the same order (409)', async () => {
     const client = await api.clients.create({ type: 'company', name: 'One Task SRL' });
     const order = await api.orders.create(client.id, {

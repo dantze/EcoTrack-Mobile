@@ -1,6 +1,7 @@
 package com.example.damiProd.controller;
 
 import com.example.damiProd.domain.Subscription;
+import com.example.damiProd.dto.SubscriptionUsageResponse;
 import com.example.damiProd.service.SubscriptionService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -44,7 +45,21 @@ public class SubscriptionController {
         return ResponseEntity.ok(subscriptionService.update(id, subscription));
     }
 
-    /** Soft-delete: marks the plan as inactive, does not remove it */
+    /**
+     * What still holds this plan open, so the UI can explain a refusal before
+     * the operator commits to one. Advisory only — DELETE re-checks.
+     */
+    @GetMapping("/{id}/usage")
+    public ResponseEntity<SubscriptionUsageResponse> usage(@PathVariable Long id) {
+        return ResponseEntity.ok(subscriptionService.usage(id));
+    }
+
+    /**
+     * Soft-delete: marks the plan as inactive, does not remove it.
+     *
+     * Answers 409 while unfinished orders or active recurring plans still use
+     * it — see SubscriptionService.deactivate().
+     */
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> deactivate(@PathVariable Long id) {
         subscriptionService.deactivate(id);

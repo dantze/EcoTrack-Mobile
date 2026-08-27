@@ -12,6 +12,8 @@
  */
 
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { ApiError, type SubscriptionUsage } from '@/api';
 import {
   Badge,
   Button,
@@ -32,7 +34,9 @@ import { ErrorNotice, FilterBar, FilterField, SearchInput } from './components/F
 import { ToggleField } from './components/fields';
 import { Toaster, errorMessage, toast } from './components/Toaster';
 import { useConfirm } from './components/useConfirm';
+import { SubscriptionUsageModal } from './components/SubscriptionUsageModal';
 import {
+  useCheckSubscriptionUsage,
   useCreateSubscription,
   useDeleteSubscription,
   useSubscriptions,
@@ -141,7 +145,15 @@ export function SubscriptionsPage() {
   const deleteSubscription = useDeleteSubscription();
   const { confirm, confirmDialog } = useConfirm();
 
+  const checkUsage = useCheckSubscriptionUsage();
+  const navigate = useNavigate();
+
   const [search, setSearch] = useState('');
+  /** Set when a delete was refused — drives the "what still uses it" dialog. */
+  const [blocked, setBlocked] = useState<{
+    subscription: Subscription;
+    usage: SubscriptionUsage;
+  } | null>(null);
   const [editing, setEditing] = useState<Subscription | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [draftErrors, setDraftErrors] = useState<DraftErrors>({});
@@ -203,7 +215,26 @@ export function SubscriptionsPage() {
     }
   };
 
+  /**
+   * Ask the server what still uses the plan BEFORE offering to delete it, so a
+   * refusal arrives as an explanation with the blockers named rather than as a
+   * failed action. The preflight is advisory — `deleteSubscription` re-checks
+   * server-side, and the catch below handles losing that race.
+   */
   const remove = async (subscription: Subscription) => {
+    let usage: SubscriptionUsage | null = null;
+    try {
+      usage = await checkUsage(subscription.id);
+    } catch {
+      // The preflight is a convenience, not the guard. If it fails, carry on to
+      // the confirm — the DELETE is what actually enforces the rule.
+    }
+
+    if (usage?.blocked) {
+      setBlocked({ subscription, usage });
+      return;
+    }
+
     const confirmed = await confirm({
       title: 'Șterge abonamentul?',
       body: `„${subscription.name}” va fi șters definitiv.`,
@@ -215,6 +246,19 @@ export function SubscriptionsPage() {
       await deleteSubscription.mutateAsync(subscription.id);
       toast.success('Abonamentul a fost șters.');
     } catch (error) {
+      // Lost the race: something started using the plan between the preflight
+      // and the delete. Re-ask, so the operator still gets the list.
+      if (error instanceof ApiError && error.status === 409) {
+        try {
+          const fresh = await checkUsage(subscription.id);
+          if (fresh.blocked) {
+            setBlocked({ subscription, usage: fresh });
+            return;
+          }
+        } catch {
+          /* fall through to the toast */
+        }
+      }
       toast.error(errorMessage(error, 'Nu s-a putut șterge abonamentul'));
     }
   };
@@ -497,6 +541,15 @@ export function SubscriptionsPage() {
           </div>
         )}
       </Modal>
+
+      {blocked && (
+        <SubscriptionUsageModal
+          subscription={blocked.subscription}
+          usage={blocked.usage}
+          onClose={() => setBlocked(null)}
+          onOpenOrder={(orderId) => navigate(`/comenzi?comanda=${orderId}`)}
+        />
+      )}
 
       {confirmDialog}
       <Toaster />

@@ -289,8 +289,43 @@ export interface SubscriptionsApi {
   create(input: Omit<Subscription, 'id'>): Promise<Subscription>;
   /** PUT /subscriptions/{id} */
   update(id: number, input: Omit<Subscription, 'id'>): Promise<Subscription>;
-  /** DELETE /subscriptions/{id} */
+  /**
+   * GET /subscriptions/{id}/usage — what still holds this plan open.
+   *
+   * Advisory: it exists so the UI can name the blockers BEFORE the operator
+   * commits to a delete. `remove()` enforces the same rule server-side and
+   * answers 409, so skipping this call cannot retire a plan that is in use.
+   */
+  usage(id: number): Promise<SubscriptionUsage>;
+  /**
+   * DELETE /subscriptions/{id} — soft delete (isActive = false).
+   *
+   * Throws 409 while unfinished orders or active recurring plans still use it.
+   */
   remove(id: number): Promise<void>;
+}
+
+/** One thing standing in the way of retiring a subscription. */
+export interface BlockingOrder {
+  id: number;
+  number: number;
+  clientName: string;
+  sanitationDate: string | null;
+}
+
+export interface BlockingPlan {
+  id: number;
+  clientName: string;
+  frequencyDays: number | null;
+}
+
+export interface SubscriptionUsage {
+  /** True when anything below is non-empty — the server's own verdict. */
+  blocked: boolean;
+  /** Igienizare orders with no COMPLETED task. */
+  orders: BlockingOrder[];
+  /** Active plans, which would keep generating new orders on this plan. */
+  recurringPlans: BlockingPlan[];
 }
 
 export interface EmployeesApi {

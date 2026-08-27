@@ -67,6 +67,7 @@ class ProductServiceTest {
     @Test
     void deleteProduct_shouldDeleteWhenNotInUse() {
         when(orderRepository.existsByAmplasareOrderProductId(1L)).thenReturn(false);
+        when(orderRepository.existsByRidicareOrderProductId(1L)).thenReturn(false);
 
         productService.deleteProduct(1L);
 
@@ -79,6 +80,23 @@ class ProductServiceTest {
     @Test
     void deleteProduct_shouldThrowWhenProductInUse() {
         when(orderRepository.existsByAmplasareOrderProductId(1L)).thenReturn(true);
+
+        assertThatThrownBy(() -> productService.deleteProduct(1L))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Nu se poate șterge produsul");
+
+        verify(productRepository, never()).deleteById(any());
+    }
+
+    /**
+     * A product used ONLY by a pickup order used to be deletable: the guard
+     * checked Amplasari alone, and this delete is a hard one, so the Ridicare
+     * order was left pointing at a row that no longer existed.
+     */
+    @Test
+    void deleteProduct_shouldThrowWhenOnlyARidicareOrderUsesIt() {
+        when(orderRepository.existsByAmplasareOrderProductId(1L)).thenReturn(false);
+        when(orderRepository.existsByRidicareOrderProductId(1L)).thenReturn(true);
 
         assertThatThrownBy(() -> productService.deleteProduct(1L))
                 .isInstanceOf(IllegalStateException.class)

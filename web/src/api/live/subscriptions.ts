@@ -4,9 +4,14 @@
  * `remove()` is a SOFT delete: the controller calls deactivate(), flipping
  * isActive to false. The plan disappears from list() but is still returned by
  * listAll(). Nothing is ever removed from the database.
+ *
+ * It is REFUSED with a 409 while unfinished orders or active recurring plans
+ * still point at the plan; the Romanian message arrives as ApiError.body.
+ * `usage()` is the advisory preflight that names those blockers, so the UI can
+ * explain the refusal before the operator commits to a delete.
  */
 
-import type { SubscriptionsApi } from '../contract';
+import type { SubscriptionUsage, SubscriptionsApi } from '../contract';
 import type { Subscription } from '@/types/domain';
 import { request } from '../http';
 import { normalizeSubscription, type RawSubscription } from './normalize';
@@ -38,6 +43,17 @@ export const subscriptionsApi: SubscriptionsApi = {
     return normalizeSubscription(
       await request<RawSubscription>(`/subscriptions/${id}`, { method: 'PUT', body: input }),
     );
+  },
+
+  async usage(id: number): Promise<SubscriptionUsage> {
+    const raw = await request<SubscriptionUsage>(`/subscriptions/${id}/usage`);
+    // The DTO is already domain-shaped (ids, numbers, resolved client names),
+    // so there is nothing for normalize.ts to absorb here.
+    return {
+      blocked: raw?.blocked ?? false,
+      orders: raw?.orders ?? [],
+      recurringPlans: raw?.recurringPlans ?? [],
+    };
   },
 
   async remove(id: number): Promise<void> {

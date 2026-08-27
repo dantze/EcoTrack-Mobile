@@ -14,7 +14,7 @@ import {
   type UseMutationResult,
   type UseQueryResult,
 } from '@tanstack/react-query';
-import { api, type ClientInput, type OrderInput } from '@/api';
+import { api, type ClientInput, type OrderInput, type SubscriptionUsage } from '@/api';
 import type {
   Client,
   Order,
@@ -34,6 +34,7 @@ export const salesKeys = {
   products: ['products'] as const,
   subscriptions: ['subscriptions'] as const,
   activeSubscriptions: ['subscriptions', 'active'] as const,
+  subscriptionUsage: (id: number) => ['subscriptions', id, 'usage'] as const,
 };
 
 // ---------------------------------------------------------------------------
@@ -398,6 +399,25 @@ export function useUpdateSubscription(): UseMutationResult<
       void queryClient.invalidateQueries({ queryKey: salesKeys.subscriptions });
     },
   });
+}
+
+/**
+ * One-shot `GET /subscriptions/{id}/usage` for the delete guard, in the same
+ * shape as `useCheckClientHasOrders`: an event handler asks, rather than every
+ * row holding a query it will probably never need.
+ *
+ * `staleTime: 0` on purpose — a plan can be freed up by finishing its last
+ * order in another tab, and a cached "still blocked" would refuse a delete the
+ * server would now allow.
+ */
+export function useCheckSubscriptionUsage(): (id: number) => Promise<SubscriptionUsage> {
+  const queryClient = useQueryClient();
+  return (id: number) =>
+    queryClient.fetchQuery({
+      queryKey: salesKeys.subscriptionUsage(id),
+      queryFn: () => api.subscriptions.usage(id),
+      staleTime: 0,
+    });
 }
 
 export function useDeleteSubscription(): UseMutationResult<void, Error, number> {

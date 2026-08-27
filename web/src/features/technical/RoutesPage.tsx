@@ -11,10 +11,10 @@
  * a bare ordered array of ids — and is applied optimistically so the list never
  * snaps back while the request is in flight.
  *
- * Above the stop list sit the two local suggestions from `./grouping.ts`:
- * unassigned jobs that fall on this route's day and near its stops, and a
- * shorter stop order. Both are proposals with their numbers on show — nothing
- * is assigned or reordered until the dispatcher accepts.
+ * Above the stop list sits the one local suggestion left in `./grouping.ts`:
+ * a shorter stop order. It is a proposal with its numbers on show — nothing is
+ * reordered until the dispatcher accepts. (The "Grupare sugerată" card that
+ * proposed unassigned jobs for the route was removed — TODO-16.)
  *
  * `?ruta=<id>` selects a route and `?nou=1` opens the create form, which is how
  * the command palette (⌘K) lands here.
@@ -629,20 +629,7 @@ function RoutesScreen() {
               <DispatchSuggestions
                 route={selectedRoute}
                 routeTasks={routeTasks}
-                pool={unassignedTasks}
-                busy={assignGroup.isPending || reorderTasks.isPending}
-                onApplyGroup={(taskIds, orderedIds) =>
-                  assignGroup.mutate(
-                    { taskIds, orderedIds },
-                    {
-                      onSuccess: () =>
-                        toast.success(
-                          `${taskIds.length} sarcini au fost adăugate pe ${routeLabel(selectedRoute)}.`,
-                        ),
-                      onError: (error) => toast.error(errorMessage(error)),
-                    },
-                  )
-                }
+                busy={reorderTasks.isPending}
                 onApplyOrder={(orderedIds) =>
                   reorderTasks.mutate(orderedIds, {
                     onSuccess: () => toast.success('Ordinea opririlor a fost actualizată.'),

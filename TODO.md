@@ -364,7 +364,7 @@ an edit, and edits live in the order form), a week/day zoom, and any task layer.
 month total is a second place that will start counting them differently — it uses
 `orderPrimaryDate`, not `deriveLifecycle`.
 
-### TODO-20 `[DONE — backend not compiled locally]` Block deleting a subscription that live orders still use
+### TODO-20 `[DONE]` Block deleting a subscription that live orders still use
 Today a plan can be retired while orders still reference it. Instead, deleting
 should be **refused** until those orders are either fulfilled or deleted — or
 until they are moved onto a different subscription.
@@ -437,6 +437,13 @@ task-shaped nor employee-scoped. The DELETE remains the actual gate; the
 preflight failing just falls through to the normal confirm, and a 409 lost to a
 race re-fetches usage so the operator still gets the list.
 
+**UPDATE (while doing TODO-15/16/21): the owed backend build has now been run.**
+`cd backend && ./gradlew build` on JDK 21 — **BUILD SUCCESSFUL, 232 tests, 0
+failures**. The 11 new/changed backend tests from this item ran for the first
+time and passed, and the `@Query` in `OrderRepository.findLiveBySubscriptionId`
+loads at context startup. Nothing below is outstanding any more; it is kept for
+the record.
+
 **Verification is uneven, and the backend half is the weak one:**
 
 - **Web — fully verified.** 360 tests green (was 350): 6 new contract tests
@@ -450,7 +457,7 @@ race re-fetches usage so the operator still gets the list.
   would catch a malformed `@Query`, which fails at context startup rather than
   at compile time.
 
-### TODO-21 `[ ]` Archive fulfilled orders out of Comenzi
+### TODO-21 `[DONE]` Archive fulfilled orders out of Comenzi
 **Comenzi should show only current orders.** Fulfilled ones move to a separate
 **Arhivă** view — same UI shape as the old Active/Inactive split on Abonamente,
 just applied to something that genuinely has a lifecycle.
@@ -476,6 +483,41 @@ Needs deciding:
 subscription" and "current orders that stay out of the archive" are the same
 question — decide once, implement once, or they will drift apart.
 
+**Done (web only — no backend or mobile change).** Comenzi now opens on a
+`Curente` / `Arhivă` tab strip, both drawn from the same table; the counts on
+the tabs are of the *filtered* set, so a search says how many of its matches are
+finished.
+
+**The three open questions, decided:**
+
+**1. Derived, and from TODO-20's rule — not from `deriveLifecycle`.** The split
+is `isOrderFulfilled` in `web/src/features/sales/orderModel.ts`: **a COMPLETED
+task, and nothing else.** No stored flag, so there is nothing to keep in sync
+and nothing that can drift from the tasks it summarises. It deliberately does
+NOT reuse `deriveLifecycle` from `features/map/data.ts`, per TODO-20's decision:
+that one falls back to date reasoning and calls a task-less past-dated order
+`'done'`, which is fine for colouring a map pin and wrong here — an order nobody
+ever executed would vanish out of the operator's list because a date rolled
+over. A status that is missing or still loading also reads as unfinished: an
+order only leaves Comenzi on positive evidence.
+
+**2. It lives in `orderModel.ts`,** which is the shared place already — the map
+feature imports from it, so the map can adopt the same rule later without a new
+module. `deriveLifecycle` stays where it is and keeps its date fallback; the two
+now answer different questions on purpose, and each says so in its own comment.
+
+**3. Nothing archives or un-archives by hand, and archived orders are not
+read-only.** There is no button, because the state is derived: an order leaves
+Arhivă exactly when its task stops being COMPLETED (a driver reopening it),
+which is the only thing that could honestly un-archive it. The detail drawer
+still edits and deletes from the archive — correcting a typo on finished work is
+ordinary, and a lock nobody asked for would be a new permission concept. A
+`?comanda=<id>` deep link to a finished order switches to Arhivă, so the row
+behind the drawer is the one the link named.
+
+**Verified:** 355 web tests green (349 + 6 new: 3 on the split against the mock
+API, 3 on the rule itself), typecheck clean, lint 0 errors, build clean.
+
 *Related:* OQ-1 — archiving depends on knowing when an order is finished, which
 depends on the order/task relationship being clear.
 
@@ -500,15 +542,45 @@ CNP + ID photo is sensitive personal data (GDPR).
 
 ## F. AI
 
-### TODO-15 `[ ]` Delete the Mistral-based AI work
+### TODO-15 `[DONE]` Delete the Mistral-based AI work
 Remove what was built with Mistral (intake/extraction: `IntakeConfig`,
 `service/intake/**`, `IntakeMessage`, `OrderDraft`, the
 `ecotrack.intake.mistral.*` config).
 *Intent:* AI in this app should eventually only **autofill** things — how
 exactly is undecided.
 
-### TODO-16 `[ ]` Remove recommended additions to routes
+**Done.** All 12 files deleted: `config/IntakeConfig.java`,
+`service/intake/**` (7 files, including `MistralOrderDraftExtractor` and the
+heuristic fallback), the `IntakeMessage` / `OrderDraft` entities and both
+repositories. Nothing else referenced them — no controller, no test, no
+property, and the `Clock` bean `IntakeConfig` declared had no other consumer —
+so the removal is self-contained.
+
+**Verified:** `cd backend && ./gradlew build` — BUILD SUCCESSFUL, 232 tests, 0
+failures.
+
+*Note:* `IntakeMessage` and `OrderDraft` were JPA entities, and
+`ddl-auto=update` never drops anything, so their tables survive in H2 and in the
+prod Postgres. They are orphaned, not gone; drop them by hand if the dead
+columns bother you.
+
+### TODO-16 `[DONE — one judgement call, see below]` Remove recommended additions to routes
 The "recommended additions" suggestions on routes are not wanted. Remove them.
+
+**Done.** The "Grupare sugerată pentru această rută" card is gone from the
+dispatch board, and with it `suggestRouteGroup` and everything only it used
+(`NEARBY_RADIUS_KM`, `densestSeed`, `localityOf`, the weekday filter) plus its
+9 tests. `RoutesPage` no longer passes the unassigned pool to the panel; adding
+work to a route is now a drag from "Neasignate" and nothing else. The
+`useAssignTasksToRoute` mutation stays — the drag-and-drop multi-assign uses it
+too.
+
+**What was kept, and why you may want it gone as well:** the second card,
+"Ordine mai scurtă a opririlor" (`suggestStopOrder`), still stands. It proposes
+no *additions* — it re-sequences stops the dispatcher already put on the route —
+so it read as outside "recommended additions to routes". **Say the word and it
+goes too**; `grouping.ts` would then be left with `distanceKm`, which the map
+feature imports.
 
 ### TODO-17 `[POSTPONED]` All other AI ideas
 Deliberately deferred. Do not build AI features until the autofill use case is

@@ -5,9 +5,22 @@
  * record detail and the create/edit form are slide-overs, so the list never
  * unmounts and the filters survive.
  *
+ * **Two views, one table (TODO-21).** `Curente` holds the work still to do and
+ * `Arhivă` the orders that are finished, split by `isOrderFulfilled` in
+ * `./orderModel` — a COMPLETED task and nothing else, the same rule the backend
+ * uses to decide which orders block retiring a subscription (TODO-20). The
+ * split is DERIVED, not stored: there is no archive flag to keep in sync, and
+ * nothing to press. An order leaves Arhivă exactly when its task stops being
+ * COMPLETED (a driver reopening it), which is the only thing that could
+ * honestly un-archive it. Archived orders are not read-only either — the drawer
+ * still edits and deletes, because correcting a typo on finished work is
+ * ordinary, and a lock nobody asked for would be a new permission concept.
+ *
  * Two entry points besides clicking a row: `?comanda=<id>` opens that order's
  * drawer and `?nou=1` opens an empty form, which is how the command palette
- * (⌘K) reaches this screen and what makes an order link shareable.
+ * (⌘K) reaches this screen and what makes an order link shareable. A deep link
+ * to a finished order switches to Arhivă, so the row behind the drawer is the
+ * one the link named.
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -20,6 +33,7 @@ import {
   PageHeader,
   Select,
   Skeleton,
+  Tabs,
   type Column,
   type RowKey,
   type SelectOption,
@@ -40,13 +54,27 @@ import { OrderDetailDrawer } from './components/OrderDetailDrawer';
 import { OrderFormDrawer } from './components/OrderFormDrawer';
 import { Toaster, errorMessage, toast } from './components/Toaster';
 import { useConfirm } from './components/useConfirm';
-import { orderAddress, orderDateLabel, orderPrimaryDate, orderSummary } from './orderModel';
+import {
+  isOrderFulfilled,
+  orderAddress,
+  orderDateLabel,
+  orderPrimaryDate,
+  orderSummary,
+} from './orderModel';
 import { useClients, useDeleteOrders, useOrderTaskStatuses, useOrders } from './queries';
 
 const TYPE_OPTIONS: SelectOption<string>[] = [
   { value: '', label: 'Toate tipurile' },
   ...ORDER_TYPES.map((type) => ({ value: type, label: ORDER_TYPE_LABELS[type] })),
 ];
+
+/** Which half of the split the table is showing. */
+type View = 'current' | 'archive';
+
+const VIEW_LABELS: Record<View, string> = {
+  current: 'Curente',
+  archive: 'Arhivă',
+};
 
 type DrawerState =
   | { kind: 'none' }
@@ -65,6 +93,7 @@ export function OrdersPage() {
   const [clientFilter, setClientFilter] = useState('');
   const [dateFrom, setDateFrom] = useState<string | null>(null);
   const [dateTo, setDateTo] = useState<string | null>(null);
+  const [view, setView] = useState<View>('current');
   const [selected, setSelected] = useState<Set<RowKey>>(new Set());
   const [drawer, setDrawer] = useState<DrawerState>({ kind: 'none' });
   const searchRef = useRef<HTMLInputElement>(null);
@@ -127,7 +156,13 @@ export function OrdersPage() {
     [clientsQuery.data],
   );
 
-  const rows = useMemo(() => {
+  const taskStatuses = statusesQuery.data;
+
+  /**
+   * The orders matching the filter strip, before the Curente/Arhivă split —
+   * so each tab can show how many of the matches landed on its side.
+   */
+  const matching = useMemo(() => {
     const needle = search.trim();
     return orders.filter((order) => {
       if (needle) {
@@ -153,6 +188,24 @@ export function OrdersPage() {
     });
   }, [orders, search, typeFilter, clientFilter, dateFrom, dateTo]);
 
+  const archived = useMemo(
+    () => matching.filter((order) => isOrderFulfilled(taskStatuses?.[order.id])),
+    [matching, taskStatuses],
+  );
+  const current = useMemo(
+    () => matching.filter((order) => !isOrderFulfilled(taskStatuses?.[order.id])),
+    [matching, taskStatuses],
+  );
+  const rows = view === 'archive' ? archived : current;
+
+  const showView = (next: View) => {
+    if (next === view) return;
+    setView(next);
+    // A selection made in one view must not be carried into a bulk delete in
+    // the other, where its rows are not even on screen.
+    setSelected(new Set());
+  };
+
   const filtersActive =
     search !== '' || typeFilter !== '' || clientFilter !== '' || dateFrom !== null || dateTo !== null;
 
@@ -167,6 +220,15 @@ export function OrdersPage() {
   const openOrder = drawer.kind === 'detail' || drawer.kind === 'edit'
     ? orders.find((order) => order.id === drawer.orderId) ?? null
     : null;
+
+  // A link (or the command palette) can name a finished order while the table
+  // is on Curente. Follow the order rather than opening a drawer over a list
+  // that does not contain its row.
+  const openOrderIsArchived = openOrder !== null && isOrderFulfilled(taskStatuses?.[openOrder.id]);
+  useEffect(() => {
+    if (!openOrder) return;
+    setView(openOrderIsArchived ? 'archive' : 'current');
+  }, [openOrder, openOrderIsArchived]);
 
   const removeOrders = async (ids: number[], label: string) => {
     const confirmed = await confirm({
@@ -254,7 +316,8 @@ export function OrdersPage() {
         subtitle={
           ordersQuery.isLoading
             ? 'Se încarcă…'
-            : `${rows.length} din ${orders.length} comenzi${filtersActive ? ' (filtrate)' : ''}`
+            : `${rows.length} ${view === 'archive' ? 'comenzi finalizate' : 'comenzi curente'}` +
+              ` din ${orders.length} în total${filtersActive ? ' (filtrate)' : ''}`
         }
         actions={
           <>
@@ -270,6 +333,15 @@ export function OrdersPage() {
             </Button>
           </>
         }
+      />
+
+      <Tabs
+        items={[
+          { id: 'current', label: VIEW_LABELS.current, count: current.length },
+          { id: 'archive', label: VIEW_LABELS.archive, count: archived.length },
+        ]}
+        active={view}
+        onChange={(id) => showView(id as View)}
       />
 
       <FilterBar>
@@ -341,25 +413,53 @@ export function OrdersPage() {
             </Button>
           }
           empty={
-            <EmptyState
-              title={filtersActive ? 'Nicio comandă pentru filtrele curente' : 'Nu există comenzi'}
-              body={
-                filtersActive
-                  ? 'Modificați filtrele sau resetați-le.'
-                  : 'Creați prima comandă pentru un client existent.'
-              }
-              action={
-                filtersActive ? (
-                  <Button variant="secondary" onClick={resetFilters}>
-                    Resetează filtrele
-                  </Button>
-                ) : (
-                  <Button variant="primary" onClick={() => setDrawer({ kind: 'create' })}>
-                    + Comandă
-                  </Button>
-                )
-              }
-            />
+            view === 'archive' ? (
+              <EmptyState
+                title={
+                  filtersActive
+                    ? 'Nicio comandă finalizată pentru filtrele curente'
+                    : 'Arhiva este goală'
+                }
+                body={
+                  filtersActive
+                    ? 'Modificați filtrele sau resetați-le.'
+                    : 'O comandă ajunge aici când sarcina ei este marcată finalizată.'
+                }
+                action={
+                  filtersActive ? (
+                    <Button variant="secondary" onClick={resetFilters}>
+                      Resetează filtrele
+                    </Button>
+                  ) : (
+                    <Button variant="secondary" onClick={() => showView('current')}>
+                      Vezi comenzile curente
+                    </Button>
+                  )
+                }
+              />
+            ) : (
+              <EmptyState
+                title={filtersActive ? 'Nicio comandă pentru filtrele curente' : 'Nu există comenzi'}
+                body={
+                  filtersActive
+                    ? 'Modificați filtrele sau resetați-le.'
+                    : archived.length > 0
+                      ? 'Toate comenzile sunt finalizate — sunt în Arhivă.'
+                      : 'Creați prima comandă pentru un client existent.'
+                }
+                action={
+                  filtersActive ? (
+                    <Button variant="secondary" onClick={resetFilters}>
+                      Resetează filtrele
+                    </Button>
+                  ) : (
+                    <Button variant="primary" onClick={() => setDrawer({ kind: 'create' })}>
+                      + Comandă
+                    </Button>
+                  )
+                }
+              />
+            )
           }
         />
       )}

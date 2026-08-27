@@ -55,6 +55,7 @@ const NAV_SECTIONS: NavSectionDef[] = [
     roles: ['SALES'],
     items: [
       { to: '/comenzi', label: 'Comenzi', chord: 'c' },
+      { to: '/calendar', label: 'Calendar', chord: 'd' },
       { to: '/clienti', label: 'Clienți', chord: 'l' },
       { to: '/produse', label: 'Produse', chord: 'p' },
       { to: '/abonamente', label: 'Abonamente', chord: 'a' },

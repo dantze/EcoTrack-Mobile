@@ -27,6 +27,31 @@ export const ORDER_TYPE_LABELS: Record<OrderTypeTag, string> = {
   Igienizari: 'Igienizare',
 };
 
+/** For counted lists — "2 Amplasări" reads wrong with the singular label. */
+export const ORDER_TYPE_PLURAL_LABELS: Record<OrderTypeTag, string> = {
+  Amplasari: 'Amplasări',
+  Ridicari: 'Ridicări',
+  Igienizari: 'Igienizări',
+};
+
+/** "1 Amplasare" / "3 Amplasări" — Romanian agrees at 1, like English. */
+export function orderTypeCountLabel(type: OrderTypeTag, count: number): string {
+  return count === 1 ? ORDER_TYPE_LABELS[type] : ORDER_TYPE_PLURAL_LABELS[type];
+}
+
+/**
+ * "1 comandă" · "3 comenzi" · "24 de comenzi".
+ *
+ * Romanian inserts "de" before the noun once the last two digits are 00 or
+ * 20–99, which is the bit an English-speaking pluraliser gets wrong.
+ */
+export function orderCountLabel(count: number): string {
+  if (count === 1) return '1 comandă';
+  const lastTwo = Math.abs(count) % 100;
+  const needsDe = count !== 0 && (lastTwo === 0 || lastTwo >= 20);
+  return `${count} ${needsDe ? 'de ' : ''}comenzi`;
+}
+
 export const ROLE_LABELS: Record<Role, string> = {
   SALES: 'Vânzări',
   DRIVER: 'Șofer',

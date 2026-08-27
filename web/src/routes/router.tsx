@@ -17,7 +17,7 @@
  *   A catch-all under AppShell renders NotFoundPage for anything else, and
  *     the root `errorElement` catches any render throw below it.
  *
- * The eight feature screens are loaded with React Router's own `lazy`, so each
+ * The feature screens are loaded with React Router's own `lazy`, so each
  * becomes its own chunk instead of riding in the entry bundle. That matters
  * here for two reasons: nobody has both role sets in practice, so a dispatcher
  * was downloading the whole Vânzări module (and vice versa) to look at a route;
@@ -86,6 +86,12 @@ export const router = createBrowserRouter([
                   {
                     path: 'comenzi',
                     lazy: lazyPage(() => import('@/features/sales/OrdersPage'), 'OrdersPage'),
+                  },
+                  {
+                    // Sits next to Comenzi and reads the same orders — the
+                    // month view of the list, not a separate record type.
+                    path: 'calendar',
+                    lazy: lazyPage(() => import('@/features/sales/CalendarPage'), 'CalendarPage'),
                   },
                   {
                     path: 'clienti',

@@ -293,11 +293,76 @@ retires it exactly as before. The flag stays in the model because old orders
 point at these rows and there is no migration tool — hard-deleting would break
 them irreversibly.
 
-### TODO-12 `[ ]` Calendar view next to Comenzi
+### TODO-12 `[DONE]` Calendar view next to Comenzi
 A big calendar laid out like an advent calendar ("Christmas sweets" style):
 - Each day cell shows a summary of that day's information underneath the date.
 - Clicking a day opens all orders for that day.
 *Blocked on:* OQ-1 — needs the order/task distinction settled first.
+
+**Done — web only.** No backend, mobile, API-contract or mock change: the screen
+reads the orders the app already fetches. New `Calendar` entry under **Vânzări**,
+directly under Comenzi, at `/calendar` (`g d`, and in ⌘K), lazily loaded like
+every other screen — its own 8.2 kB chunk, so Comenzi does not carry it.
+
+**The grid** (`features/sales/components/MonthGrid.tsx`) is one chunky tile per
+day, Monday-first, whole weeks only — five rows or six, never a blank trailing
+one. The date is the lid; underneath it the day's summary: a total pill plus one
+line per order type present that day (`2 Amplasări`, `1 Ridicare`), colour-dotted
+to match `OrderTypeBadge`. Today gets a brand ring, weekends a tint, the adjacent
+months' borrowed days recede. **Only a day that holds orders is a button** — an
+empty day is a plain div, because putting the month's ~20 empty days into the tab
+order buries the one busy Thursday a keyboard user is looking for.
+
+**OQ-1 is settled by scope, not by renaming anything.** A cell counts **orders**,
+because this is the Vânzări view of what was sold and when it is due. A `Task` is
+the driver-facing execution of an order; it lives on a **weekly** route
+(TODO-03), so it has no Sales-owned calendar date to plot. The distinction still
+surfaces where it is actionable rather than academic: every order in the day
+panel carries its task status, and a red **Neprogramat** when no task covers it
+yet — which is exactly the "sold but nobody is going" case the office needs to
+see. Dispatch keeps answering "which rows, which day, which driver" on Rute and
+Sarcini.
+
+**Which day an order lands on:** `orderPrimaryDate`, the same definition Comenzi
+already sorts and filters on — start date / pickup date / sanitation date. So an
+Amplasare sits on the day the cabins go out, **not** on every day of its rental
+window: the window is a contract, the placement is the work, and spreading it
+would report a 60-day rental as 60 days of work. Reusing the one definition is
+the point — a second one that disagreed would show an order in the table and hide
+it in the calendar. The day panel still spells out the full window per order.
+
+**Clicking a day** opens `DayOrdersDrawer`, the same slide-over shape the rest of
+Sales uses, listing that day's orders (number, type, client, what was ordered,
+address, window, task status). Picking one hands off to Comenzi through the
+existing `?comanda=<id>` deep link, so the calendar never becomes a second place
+to edit an order. Task status is fetched **there**, not on the page: the query
+fans out one `GET /tasks/order/{id}/exists` per order (there is no batch
+endpoint), so it should cover the ~5 orders of the opened day, not the ~120 of
+the month.
+
+Also added: `?zi=YYYY-MM-DD` opens a day directly (a shareable link to a day, the
+trick `?comanda=` plays for an order) — which is why `useDeepLink` grew a `raw()`
+alongside `number()`/`flag()`; a type filter and `‹ › Azi` month stepping; `t` for
+the current month and `r` to refetch; and `orderCountLabel` in
+`components/domain.tsx`, which gets the Romanian **"24 de comenzi"** rule right
+where an English pluraliser would write "24 comenzi".
+
+**Tests: 25 new, web suite 345 → 348 files-green.** `calendar.test.ts` (17) pins
+the arithmetic that actually breaks month views — Monday-first padding, the
+31-day → 28-day step, whole weeks, the 25-hour DST night in October, and orders
+with no date being dropped rather than given one. `MonthGrid.test.tsx` (5) pins
+the tile contract, including empty days staying out of the tab order.
+`CalendarPage.test.tsx` (3) mounts the real screen against the mock API and opens
+a day, because **the browser access OQ-2 asks for still does not exist** — this
+was built without ever looking at it, and a mount-level test is the honest
+substitute for eyes. Lint 0 errors, typecheck clean, bundle budget 139.3/160 kB.
+
+**Deliberately not built:** drag-and-drop rescheduling (moving an order's date is
+an edit, and edits live in the order form), a week/day zoom, and any task layer.
+
+*Note for TODO-21:* when fulfilled orders move to an Arhivă, the calendar's
+month total is a second place that will start counting them differently — it uses
+`orderPrimaryDate`, not `deriveLifecycle`.
 
 ### TODO-20 `[ ]` Block deleting a subscription that live orders still use
 Today a plan can be retired while orders still reference it. Instead, deleting

@@ -439,7 +439,6 @@ export function normalizeRoute(raw: RawRoute, relations: Relations = {}): Route 
   const self: Route = {
     id: num(raw.id),
     name: raw.name ?? '',
-    date: optStr(raw.date),
     dayOfWeek: optNum(raw.dayOfWeek),
     county: optStr(raw.county),
     employee,

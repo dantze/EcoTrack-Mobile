@@ -5,4 +5,9 @@
 export { AuthProvider, useAuth } from './AuthProvider';
 export type { AuthOutcome, AuthStatus } from './AuthProvider';
 export { RequireAuth, RequireRole } from './RequireAuth';
-export { renderGoogleButton } from './googleIdentity';
+export {
+  readOrCreateDeviceId,
+  readPendingTicket,
+  savePendingTicket,
+  clearPendingTicket,
+} from './storage';

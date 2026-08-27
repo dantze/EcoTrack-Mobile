@@ -2,7 +2,8 @@
  * Rute — the dispatch board.
  *
  * Three panes on one screen, which is the whole point of moving off the phone:
- *   left    every route, filterable by date/county/driver, with live progress
+ *   left    every route for the week, filterable by county/driver, with live
+ *           progress — scrolls vertically only, never sideways
  *   middle  the selected route's stops in execution order (drag to reorder)
  *   right   the unassigned queue, dragged directly onto the route
  *
@@ -25,11 +26,12 @@ import {
   DragOverlay,
   KeyboardSensor,
   PointerSensor,
-  closestCenter,
+  pointerWithin,
+  rectIntersection,
   useSensor,
   useSensors,
 } from '@dnd-kit/core';
-import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core';
+import type { CollisionDetection, DragEndEvent, DragStartEvent } from '@dnd-kit/core';
 import { restrictToWindowEdges } from '@dnd-kit/modifiers';
 import {
   SortableContext,
@@ -40,14 +42,14 @@ import {
 import {
   Button,
   DataTable,
-  DateInput,
   EmptyState,
+  IconButton,
   PageHeader,
   Select,
   TextInput,
 } from '@/components/ui';
 import type { Column } from '@/components/ui';
-import { formatDate, weekdayLabel } from '@/components/domain';
+import { weekdayLabel } from '@/components/domain';
 import type { Route, Task } from '@/types/domain';
 import { useDeepLink } from '@/lib/deepLink';
 import { useShortcuts } from '@/lib/hotkeys';
@@ -75,7 +77,6 @@ import {
   routeLabel,
   sortByOrderIndex,
   taskProgress,
-  todayIso,
 } from './utils';
 import { ALL, COUNTY_OPTIONS } from './constants';
 import { AssignRecurringModal } from './components/AssignRecurringModal';
@@ -127,7 +128,6 @@ function RoutesScreen() {
   const { toast, confirm } = useFeedback();
 
   // --- filters -------------------------------------------------------------
-  const [date, setDate] = useState<string | null>(todayIso());
   const [county, setCounty] = useState<string>(ALL);
   const [driver, setDriver] = useState<string>(ALL);
   const [query, setQuery] = useState('');
@@ -138,7 +138,10 @@ function RoutesScreen() {
   const [createOpen, setCreateOpen] = useState(false);
   const [driverPickerOpen, setDriverPickerOpen] = useState(false);
   const [recurringOpen, setRecurringOpen] = useState(false);
-  const [poolTargetTask, setPoolTargetTask] = useState<Task | null>(null);
+  // TODO-05: moving a stop off this route and onto another driver's route —
+  // the cover-a-sick-day case. Route-level driver swap is the other half and
+  // lives on the driver name in the routes table.
+  const [moveTargetTask, setMoveTargetTask] = useState<Task | null>(null);
   const [draggedTask, setDraggedTask] = useState<Task | null>(null);
 
   // --- server state --------------------------------------------------------
@@ -151,7 +154,6 @@ function RoutesScreen() {
   const filteredRoutes = useMemo(
     () =>
       routes.filter((route) => {
-        if (date && route.date !== date) return false;
         if (county !== ALL && route.county !== county) return false;
         if (driver === NO_DRIVER && route.employee) return false;
         if (driver !== ALL && driver !== NO_DRIVER && String(route.employee?.id) !== driver) {
@@ -159,7 +161,7 @@ function RoutesScreen() {
         }
         return matchesQuery(query, routeLabel(route), route.county, route.employee?.fullName);
       }),
-    [routes, date, county, driver, query],
+    [routes, county, driver, query],
   );
 
   // Keep a route selected whenever the filtered list has one to show.
@@ -212,8 +214,6 @@ function RoutesScreen() {
 
   useEffect(() => {
     if (linkedRouteId === null) return;
-    // Clear the date filter too: a linked route is rarely on the current day.
-    setDate(null);
     setSelectedRouteId(linkedRouteId);
     recordUse('route', linkedRouteId);
     deepLink.clear('ruta');
@@ -239,18 +239,6 @@ function RoutesScreen() {
       run: () => document.getElementById(SEARCH_FIELD_ID)?.focus(),
     },
     {
-      combo: 't',
-      description: 'Arată rutele de azi',
-      group: 'Rute',
-      run: () => setDate(todayIso()),
-    },
-    {
-      combo: 'a',
-      description: 'Arată toate datele',
-      group: 'Rute',
-      run: () => setDate(null),
-    },
-    {
       combo: 'd',
       description: 'Alege șoferul rutei selectate',
       group: 'Rute',
@@ -260,9 +248,32 @@ function RoutesScreen() {
   ]);
 
   // --- drag and drop -------------------------------------------------------
+  /**
+   * Only count a droppable the pointer is ACTUALLY over.
+   *
+   * This replaces `closestCenter`, which caused a real bug: it returns the
+   * nearest droppable regardless of where the pointer is, so picking a task
+   * out of "Neasignate", nudging it a few pixels and dropping it back still
+   * resolved to a drop target — and the task silently landed on the route, at
+   * whichever slot happened to be closest. There was no way to "pick up and
+   * change your mind".
+   *
+   * `pointerWithin` requires genuine containment; `rectIntersection` is the
+   * fallback for the trailing band below the last stop, where the pointer can
+   * sit outside every rect while the dragged card still overlaps one. When
+   * neither matches, `over` is null and handleDragEnd returns without writing
+   * anything — which is exactly what dropping in dead space should do.
+   */
+  const collisionDetection: CollisionDetection = (args) => {
+    const withinPointer = pointerWithin(args);
+    return withinPointer.length > 0 ? withinPointer : rectIntersection(args);
+  };
+
   const sensors = useSensors(
     // A small threshold keeps plain clicks (open the drawer) working.
-    useSensor(PointerSensor, { activationConstraint: { distance: 5 } }),
+    // 8px, not 5: the gesture that starts a drag has to be deliberate, or a
+    // click that wobbles turns into an assignment.
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
@@ -333,14 +344,17 @@ function RoutesScreen() {
     const task = unassignedTasks.find((item) => item.id === payload.taskId);
     if (!task) return;
 
+    // The drop target has to be a REAL position on this route. A stop id that
+    // is not on the route means the pointer was over another unassigned card,
+    // which is not an assignment — silently appending it to the end is how a
+    // task used to land "somewhere" the dispatcher never chose.
+    const overIndex = overTaskId === null ? null : routeTaskIds.indexOf(overTaskId);
+    if (overIndex !== null && overIndex < 0) return;
+
     const insertAt =
-      overSlot !== null
-        ? overSlot
-        : overTaskId === null
-          ? routeTaskIds.length
-          : routeTaskIds.indexOf(overTaskId);
+      overSlot !== null ? overSlot : overIndex === null ? routeTaskIds.length : overIndex;
     const orderedIds = [...routeTaskIds];
-    orderedIds.splice(insertAt < 0 ? orderedIds.length : insertAt, 0, task.id);
+    orderedIds.splice(insertAt, 0, task.id);
 
     moveTask.mutate(
       { task, orderedIds },
@@ -424,35 +438,36 @@ function RoutesScreen() {
       ),
     },
     {
-      key: 'date',
-      header: 'Data',
-      width: '9rem',
-      sortValue: (route) => route.date,
-      render: (route) => (
-        <span className="block">
-          <span className="tabular block">{formatDate(route.date)}</span>
-          <span className="block text-xs text-ink-subtle">{weekdayLabel(route.dayOfWeek)}</span>
-        </span>
-      ),
+      key: 'day',
+      header: 'Ziua',
+      width: '7rem',
+      sortValue: (route) => route.dayOfWeek ?? 8,
+      render: (route) => <span className="block">{weekdayLabel(route.dayOfWeek)}</span>,
     },
     {
+      // The driver's NAME is the control: clicking it opens the picker. There
+      // is no separate "Șofer" action button any more — one thing, one place.
       key: 'driver',
       header: 'Șofer',
       width: '11rem',
       sortValue: (route) => route.employee?.fullName ?? null,
       render: (route) => (
-        <span className={route.employee ? 'truncate' : 'truncate text-amber-700'}>
+        <button
+          type="button"
+          className={
+            route.employee
+              ? 'truncate text-left underline-offset-2 hover:underline'
+              : 'truncate text-left text-amber-700 underline-offset-2 hover:underline'
+          }
+          onClick={(event) => {
+            event.stopPropagation();
+            setSelectedRouteId(route.id);
+            setDriverPickerOpen(true);
+          }}
+        >
           {driverLabel(route.employee)}
-        </span>
+        </button>
       ),
-    },
-    {
-      key: 'tasks',
-      header: 'Sarcini',
-      width: '5rem',
-      align: 'right',
-      sortValue: (route) => route.tasks?.length ?? 0,
-      render: (route) => <span className="tabular">{route.tasks?.length ?? 0}</span>,
     },
     {
       key: 'progress',
@@ -464,32 +479,21 @@ function RoutesScreen() {
     {
       key: 'actions',
       header: '',
-      width: '7rem',
+      width: '3.5rem',
       align: 'right',
       render: (route) => (
-        <span className="flex justify-end gap-1" onClick={(event) => event.stopPropagation()}>
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => {
-              setSelectedRouteId(route.id);
-              setDriverPickerOpen(true);
-            }}
-          >
-            Șofer
-          </Button>
-          <Button size="sm" variant="ghost" onClick={() => void handleDelete(route)}>
-            Șterge
-          </Button>
+        <span className="flex justify-end" onClick={(event) => event.stopPropagation()}>
+          <IconButton label="Șterge ruta" onClick={() => void handleDelete(route)}>
+            ✕
+          </IconButton>
         </span>
       ),
     },
   ];
 
   const selectedProgress = taskProgress(routeTasks);
-  const filtersActive = date !== null || county !== ALL || driver !== ALL || query !== '';
+  const filtersActive = county !== ALL || driver !== ALL || query !== '';
   const resetFilters = () => {
-    setDate(null);
     setCounty(ALL);
     setDriver(ALL);
     setQuery('');
@@ -512,16 +516,6 @@ function RoutesScreen() {
       />
 
       <Toolbar>
-        <div className="w-40">
-          <DateInput label="Data" value={date} onChange={setDate} />
-        </div>
-        <Button size="sm" variant="ghost" onClick={() => setDate(null)} disabled={date === null}>
-          Toate datele
-        </Button>
-        <Button size="sm" variant="ghost" onClick={() => setDate(todayIso())}>
-          Azi
-        </Button>
-
         <div className="w-44">
           <Select
             label="Județ"
@@ -568,7 +562,7 @@ function RoutesScreen() {
               rows={filteredRoutes}
               columns={columns}
               rowKey={(route) => route.id}
-              initialSort={{ key: 'date', dir: 'asc' }}
+              initialSort={{ key: 'day', dir: 'asc' }}
               loading={routesQuery.isPending}
               activeKey={selectedRouteId}
               onRowClick={(route) => {
@@ -603,7 +597,7 @@ function RoutesScreen() {
         {/* ---- dispatch board ----------------------------------------- */}
         <DndContext
           sensors={sensors}
-          collisionDetection={closestCenter}
+          collisionDetection={collisionDetection}
           modifiers={[restrictToWindowEdges]}
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
@@ -614,7 +608,7 @@ function RoutesScreen() {
               title={selectedRoute ? routeLabel(selectedRoute) : 'Nicio rută selectată'}
               subtitle={
                 selectedRoute
-                  ? `${formatDate(selectedRoute.date)} · ${weekdayLabel(selectedRoute.dayOfWeek)} · ${driverLabel(selectedRoute.employee)} · ${selectedProgress.done}/${selectedProgress.total} finalizate`
+                  ? `${weekdayLabel(selectedRoute.dayOfWeek)} · ${driverLabel(selectedRoute.employee)} · ${selectedProgress.done}/${selectedProgress.total} finalizate`
                   : 'Alege o rută din tabel'
               }
               actions={
@@ -684,11 +678,24 @@ function RoutesScreen() {
                               onPlace={handlePlace}
                               disabled={assignGroup.isPending}
                             />
-                            <SortableRouteTask
-                              task={task}
-                              position={index + 1}
-                              onOpen={() => setOpenTaskId(task.id)}
-                            />
+                            <div className="group relative">
+                              <SortableRouteTask
+                                task={task}
+                                position={index + 1}
+                                onOpen={() => setOpenTaskId(task.id)}
+                              />
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 focus:opacity-100"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  setMoveTargetTask(task);
+                                }}
+                              >
+                                Mută
+                              </Button>
+                            </div>
                           </div>
                         ))}
                         {/* Trailing band: append after the last stop. */}
@@ -737,15 +744,6 @@ function RoutesScreen() {
                         held={placement.isHeld(task.id)}
                         onToggleHold={selectedRoute ? () => placement.toggle(task) : undefined}
                       />
-                      {/* Keyboard/precision fallback for the drag gesture. */}
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 focus:opacity-100"
-                        onClick={() => setPoolTargetTask(task)}
-                      >
-                        Asignează
-                      </Button>
                     </div>
                   ))}
                 </div>
@@ -765,7 +763,6 @@ function RoutesScreen() {
         onClose={() => setCreateOpen(false)}
         submitting={createRoute.isPending}
         drivers={driversQuery.data}
-        defaultDate={date}
         onSubmit={(input) =>
           createRoute.mutate(input, {
             onSuccess: (route) => {
@@ -811,34 +808,36 @@ function RoutesScreen() {
       />
 
       <RoutePickerModal
-        open={poolTargetTask !== null}
-        onClose={() => setPoolTargetTask(null)}
-        title="Asignează sarcina pe rută"
+        open={moveTargetTask !== null}
+        onClose={() => setMoveTargetTask(null)}
+        title="Mută sarcina pe altă rută"
         subtitle={
-          poolTargetTask
-            ? `${poolTargetTask.clientName ?? 'Client necunoscut'} — ${poolTargetTask.address ?? 'fără adresă'}`
+          moveTargetTask
+            ? `${moveTargetTask.clientName ?? 'Client necunoscut'} — ${moveTargetTask.address ?? 'fără adresă'}`
             : undefined
         }
-        routes={routes}
+        // Excluding the current route: "move it to where it already is" is not
+        // an option worth offering.
+        routes={routes.filter((route) => route.id !== selectedRouteId)}
         isPending={routesQuery.isPending}
         error={routesQuery.error}
         busy={reassignTasks.isPending}
         onSelect={(route) => {
-          const task = poolTargetTask;
+          const task = moveTargetTask;
           if (!task) return;
           reassignTasks.mutate(
             { taskIds: [task.id], routeId: route.id },
             {
               onSuccess: () => {
-                toast.success(`Sarcina a fost adăugată pe ${routeLabel(route)}.`);
-                setSelectedRouteId(route.id);
-                setPoolTargetTask(null);
+                toast.success(`Sarcina a fost mutată pe ${routeLabel(route)}.`);
+                setMoveTargetTask(null);
               },
               onError: (error) => toast.error(errorMessage(error)),
             },
           );
         }}
       />
+
 
       <TaskDetailDrawer taskId={openTaskId} onClose={() => setOpenTaskId(null)} />
     </>

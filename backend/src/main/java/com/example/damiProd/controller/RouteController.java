@@ -51,12 +51,13 @@ public class RouteController {
         return ResponseEntity.ok(routes);
     }
 
-    // Get routes for a specific employee on a specific date
-    @GetMapping("/employee/{employeeId}/date/{date}")
-    public ResponseEntity<List<Route>> getRoutesByEmployeeAndDate(
+    // Routes a specific employee drives on a given weekday (1 = Monday ... 7 = Sunday).
+    // Weekday rather than date: a route recurs weekly, it is not scheduled per day.
+    @GetMapping("/employee/{employeeId}/day/{dayOfWeek}")
+    public ResponseEntity<List<Route>> getRoutesByEmployeeAndDay(
             @PathVariable Long employeeId,
-            @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
-        List<Route> routes = routeService.getRoutesByEmployeeIdAndDate(employeeId, date);
+            @PathVariable Integer dayOfWeek) {
+        List<Route> routes = routeService.getRoutesByEmployeeIdAndDayOfWeek(employeeId, dayOfWeek);
         return ResponseEntity.ok(routes);
     }
 

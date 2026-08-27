@@ -12,6 +12,7 @@ import type { EcoTrackApi } from '../contract';
 import { authApi } from './auth';
 import { clientsApi } from './clients';
 import { employeesApi } from './employees';
+import { enrollmentApi } from './enrollment';
 import { ordersApi } from './orders';
 import { productsApi } from './products';
 import { recurringApi } from './recurring';
@@ -21,6 +22,7 @@ import { tasksApi } from './tasks';
 
 export const liveApi: EcoTrackApi = {
   auth: authApi,
+  enrollment: enrollmentApi,
   clients: clientsApi,
   orders: ordersApi,
   products: productsApi,

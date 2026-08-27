@@ -3,8 +3,8 @@
  * order should its stops be driven.
  *
  * All of it is geometry over data the board already has — `Task.coordinates`
- * is a "lat,lng" string the backend stores, `Route.date` is the day being
- * planned. No routing service, no traffic, no API: straight-line kilometres
+ * is a "lat,lng" string the backend stores, `Route.dayOfWeek` is the weekday
+ * being planned (routes are weekly, not dated). No routing service, no traffic, no API: straight-line kilometres
  * and a greedy nearest-neighbour walk. That is deliberately crude, and it is
  * why the output is a *proposal* with its numbers shown, not an auto-assign.
  * The dispatcher knows about the bridge that is closed; this only knows that
@@ -17,6 +17,24 @@
 
 import { parseCoordinates, type LatLng, type Route, type Task } from '@/types/domain';
 import { taskDate } from './utils';
+
+/**
+ * Weekday (1 = Monday … 7 = Sunday) of an ISO date, matching
+ * java.time.DayOfWeek — which is what `Route.dayOfWeek` holds.
+ */
+function weekdayOf(isoDate: string | null): number | null {
+  if (!isoDate) return null;
+  const parsed = new Date(`${isoDate}T00:00:00`);
+  if (Number.isNaN(parsed.getTime())) return null;
+  const jsDay = parsed.getDay(); // 0 = Sunday
+  return jsDay === 0 ? 7 : jsDay;
+}
+
+/** True when a task is scheduled on a different weekday than this route runs. */
+function fallsOnAnotherDay(route: Route, isoDate: string | null): boolean {
+  const day = weekdayOf(isoDate);
+  return route.dayOfWeek !== null && day !== null && day !== route.dayOfWeek;
+}
 
 const EARTH_RADIUS_KM = 6371;
 
@@ -175,10 +193,7 @@ export function suggestRouteGroup(
   // when a grouping is most useful. So seed from the pool instead: the task
   // with the most neighbours inside the radius anchors the densest cluster of
   // work available on this day, and the route is built around it.
-  const eligible = pool.filter((task) => {
-    const scheduled = taskDate(task);
-    return !(route.date && scheduled && scheduled !== route.date);
-  });
+  const eligible = pool.filter((task) => !fallsOnAnotherDay(route, taskDate(task)));
   const seedPoint =
     stopPoints.length > 0 ? null : densestSeed(eligible);
   const anchors = stopPoints.length > 0 ? stopPoints : seedPoint ? [seedPoint] : [];
@@ -187,7 +202,7 @@ export function suggestRouteGroup(
 
   for (const task of pool) {
     const scheduled = taskDate(task);
-    if (route.date && scheduled && scheduled !== route.date) continue;
+    if (fallsOnAnotherDay(route, scheduled)) continue;
 
     const point = pointOf(task);
     const nearest =
@@ -197,7 +212,7 @@ export function suggestRouteGroup(
 
     if (nearest !== null) {
       if (nearest > NEARBY_RADIUS_KM) continue;
-      const sameDay = scheduled !== null && scheduled === route.date;
+      const sameDay = weekdayOf(scheduled) !== null && weekdayOf(scheduled) === route.dayOfWeek;
       candidates.push({
         task,
         distanceKm: nearest,

@@ -25,6 +25,29 @@ export function todayIso(): string {
   return toIsoDate(new Date());
 }
 
+/**
+ * Monday of the week containing `from`, as ISO.
+ *
+ * Weeks start Monday here because that is how the Romanian working week — and
+ * `Route.dayOfWeek` (1 = Monday, per java.time.DayOfWeek) — is numbered.
+ */
+export function weekStartIso(from: Date = new Date()): string {
+  const date = new Date(from);
+  const jsDay = date.getDay(); // 0 = Sunday
+  const daysSinceMonday = jsDay === 0 ? 6 : jsDay - 1;
+  date.setDate(date.getDate() - daysSinceMonday);
+  return toIsoDate(date);
+}
+
+/** Inclusive [Monday, Sunday] of the week `offsetWeeks` from the current one. */
+export function weekRange(offsetWeeks = 0): { from: string; to: string } {
+  const monday = new Date(`${weekStartIso()}T00:00:00`);
+  monday.setDate(monday.getDate() + offsetWeeks * 7);
+  const sunday = new Date(monday);
+  sunday.setDate(sunday.getDate() + 6);
+  return { from: toIsoDate(monday), to: toIsoDate(sunday) };
+}
+
 export function shiftIsoDate(iso: string, days: number): string {
   const parsed = new Date(`${iso}T00:00:00`);
   if (Number.isNaN(parsed.getTime())) return iso;

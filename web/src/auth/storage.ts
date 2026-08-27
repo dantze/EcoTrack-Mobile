@@ -43,3 +43,76 @@ export function saveRefreshToken(token: string): void {
 export function clearRefreshToken(): void {
   storage()?.removeItem(REFRESH_TOKEN_KEY);
 }
+
+// ---------------------------------------------------------------------------
+// Device identity + pending enrollment ticket
+// ---------------------------------------------------------------------------
+
+const DEVICE_ID_KEY = 'ecotrack.deviceId.v1';
+const PENDING_TICKET_KEY = 'ecotrack.enrollmentTicket.v1';
+
+/**
+ * A stable id for THIS browser, minted on first use.
+ *
+ * Self-asserted and therefore not a credential: anyone can send any value. It
+ * exists so the admin can tell one device from another in the request queue,
+ * and so a reload does not look like a brand-new device. What actually grants
+ * access is the one-time claim secret below.
+ */
+export function readOrCreateDeviceId(): string {
+  const store = storage();
+  const existing = store?.getItem(DEVICE_ID_KEY);
+  if (existing) return existing;
+
+  const id =
+    typeof crypto !== 'undefined' && 'randomUUID' in crypto
+      ? crypto.randomUUID()
+      : `dev-${Math.random().toString(36).slice(2)}${Date.now().toString(36)}`;
+  try {
+    store?.setItem(DEVICE_ID_KEY, id);
+  } catch {
+    /* private mode — a per-session id is still better than none */
+  }
+  return id;
+}
+
+export interface PendingTicket {
+  requestId: number;
+  claimSecret: string;
+  verificationCode: string;
+  expiresAt: string;
+}
+
+/**
+ * The in-flight request survives a reload on purpose: the user is told to keep
+ * the screen open while an admin approves, and closing the tab by accident
+ * should not force them to start over and read out a new code.
+ */
+export function readPendingTicket(): PendingTicket | null {
+  try {
+    const raw = storage()?.getItem(PENDING_TICKET_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as PendingTicket;
+    return typeof parsed?.requestId === 'number' && typeof parsed?.claimSecret === 'string'
+      ? parsed
+      : null;
+  } catch {
+    return null;
+  }
+}
+
+export function savePendingTicket(ticket: PendingTicket): void {
+  try {
+    storage()?.setItem(PENDING_TICKET_KEY, JSON.stringify(ticket));
+  } catch {
+    /* ignore */
+  }
+}
+
+export function clearPendingTicket(): void {
+  try {
+    storage()?.removeItem(PENDING_TICKET_KEY);
+  } catch {
+    /* ignore */
+  }
+}

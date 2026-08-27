@@ -40,7 +40,6 @@ public class RouteService {
     public Route createRoute(CreateRouteRequest request) {
         Route route = new Route();
         route.setName(request.getName());
-        route.setDate(request.getDate());
         route.setDayOfWeek(request.getDayOfWeek());
         route.setCounty(request.getCounty());
 
@@ -95,8 +94,8 @@ public class RouteService {
     }
 
     @Transactional(readOnly = true)
-    public List<Route> getRoutesByEmployeeIdAndDate(Long employeeId, LocalDate date) {
-        List<Route> routes = routeRepository.findByEmployee_IdAndDate(employeeId, date);
+    public List<Route> getRoutesByEmployeeIdAndDayOfWeek(Long employeeId, Integer dayOfWeek) {
+        List<Route> routes = routeRepository.findByEmployee_IdAndDayOfWeek(employeeId, dayOfWeek);
         // Force loading of tasks for each route
         routes.forEach(route -> route.getTasks().size());
         return routes;

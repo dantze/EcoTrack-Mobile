@@ -169,9 +169,13 @@ export interface Employee {
 export interface Route {
   id: number;
   name: string;
-  /** ISO date, "YYYY-MM-DD". */
-  date: string | null;
-  /** 1 = Monday … 7 = Sunday, per java.time.DayOfWeek. */
+  /**
+   * 1 = Monday … 7 = Sunday, per java.time.DayOfWeek.
+   *
+   * Routes are WEEKLY. There is deliberately no `date`: a route describes work
+   * that recurs on a weekday, so it cannot be edited in advance for one
+   * particular Tuesday — changing it changes every Tuesday from now on.
+   */
   dayOfWeek: number | null;
   county: string | null;
   employee: Employee | null;

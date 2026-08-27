@@ -12,7 +12,6 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
-import java.time.LocalDate;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -40,7 +39,7 @@ class RouteControllerTest {
         Employee driver = new Employee("driver1", "Ion Șofer", "0711000000");
         driver.setId(5L);
 
-        Route route = new Route("Ruta Cluj Nord", LocalDate.of(2025, 7, 1), "Cluj", driver);
+        Route route = new Route("Ruta Cluj Nord", 2, "Cluj", driver);
         route.setId(10L);
         route.setDayOfWeek(2); // Tuesday
         return route;
@@ -127,17 +126,18 @@ class RouteControllerTest {
     }
 
     // -----------------------------------------------------------------------
-    // TEST 6 — GET /api/routes/employee/{id}/date/{date} → filter by date
+    // TEST 6 — GET /api/routes/employee/{id}/day/{dayOfWeek} → filter by weekday
     // -----------------------------------------------------------------------
     @Test
-    void getRoutesByEmployeeAndDate_shouldReturn200() throws Exception {
+    void getRoutesByEmployeeAndDay_shouldReturn200() throws Exception {
+        // Weekday, not date: a route recurs every week, so there is no single
+        // calendar day to ask for.
         Route route = buildSampleRoute();
-        when(routeService.getRoutesByEmployeeIdAndDate(5L, LocalDate.of(2025, 7, 1)))
-                .thenReturn(List.of(route));
+        when(routeService.getRoutesByEmployeeIdAndDayOfWeek(5L, 2)).thenReturn(List.of(route));
 
-        mockMvc.perform(get("/api/routes/employee/5/date/2025-07-01"))
+        mockMvc.perform(get("/api/routes/employee/5/day/2"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].date").value("2025-07-01"));
+                .andExpect(jsonPath("$[0].dayOfWeek").value(2));
     }
 
     // -----------------------------------------------------------------------

@@ -19,7 +19,6 @@ import { normalizeEmployee, type RawEmployee } from './normalize';
 
 interface CreateEmployeeBody {
   username?: string;
-  password?: string;
   fullName?: string;
   phone?: string | null;
   county?: string | null;

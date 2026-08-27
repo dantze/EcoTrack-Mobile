@@ -14,7 +14,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
@@ -48,7 +47,7 @@ class RouteServiceTest {
     void createRoute_withEmployee_shouldLinkEmployee() {
         CreateRouteRequest request = new CreateRouteRequest();
         request.setName("Ruta Cluj Nord");
-        request.setDate(LocalDate.of(2025, 7, 1));
+        request.setDayOfWeek(2);
         request.setDayOfWeek(2);
         request.setCounty("Cluj");
         request.setEmployeeId(5L);
@@ -75,7 +74,7 @@ class RouteServiceTest {
     void createRoute_withoutEmployee_shouldNotSetEmployee() {
         CreateRouteRequest request = new CreateRouteRequest();
         request.setName("Ruta Fără Șofer");
-        request.setDate(LocalDate.of(2025, 7, 1));
+        request.setDayOfWeek(2);
         request.setCounty("Timiș");
         // employeeId is null
 
@@ -98,7 +97,7 @@ class RouteServiceTest {
     void createRoute_shouldThrowWhenEmployeeNotFound() {
         CreateRouteRequest request = new CreateRouteRequest();
         request.setName("Ruta X");
-        request.setDate(LocalDate.of(2025, 7, 1));
+        request.setDayOfWeek(2);
         request.setEmployeeId(999L);
 
         when(employeeRepository.findById(999L)).thenReturn(Optional.empty());
@@ -112,7 +111,7 @@ class RouteServiceTest {
     // -----------------------------------------------------------------------
     @Test
     void assignDriverToRoute_shouldUpdateEmployee() {
-        Route route = new Route("Ruta Cluj", LocalDate.of(2025, 7, 1), "Cluj", null);
+        Route route = new Route("Ruta Cluj", 2, "Cluj", null);
         route.setId(10L);
 
         when(routeRepository.findById(10L)).thenReturn(Optional.of(route));
@@ -141,7 +140,7 @@ class RouteServiceTest {
     // -----------------------------------------------------------------------
     @Test
     void getRoutesByEmployeeId_shouldReturnRoutes() {
-        Route route = new Route("Ruta Cluj", LocalDate.of(2025, 7, 1), "Cluj", mockDriver);
+        Route route = new Route("Ruta Cluj", 2, "Cluj", mockDriver);
         route.setId(10L);
 
         when(routeRepository.findByEmployee_Id(5L)).thenReturn(List.of(route));
@@ -153,20 +152,21 @@ class RouteServiceTest {
     }
 
     // -----------------------------------------------------------------------
-    // TEST 7 — getRoutesByEmployeeIdAndDate filters correctly
+    // TEST 7 — getRoutesByEmployeeIdAndDayOfWeek filters correctly
     // -----------------------------------------------------------------------
     @Test
-    void getRoutesByEmployeeIdAndDate_shouldFilterByDate() {
-        LocalDate date = LocalDate.of(2025, 7, 1);
-        Route route = new Route("Ruta Cluj", date, "Cluj", mockDriver);
+    void getRoutesByEmployeeIdAndDayOfWeek_shouldFilterByWeekday() {
+        // Routes are weekly, not dated: "Tuesday" is the whole schedule, and
+        // there is no per-date copy to pick between.
+        Route route = new Route("Ruta Cluj", 2, "Cluj", mockDriver);
         route.setId(10L);
 
-        when(routeRepository.findByEmployee_IdAndDate(5L, date)).thenReturn(List.of(route));
+        when(routeRepository.findByEmployee_IdAndDayOfWeek(5L, 2)).thenReturn(List.of(route));
 
-        List<Route> result = routeService.getRoutesByEmployeeIdAndDate(5L, date);
+        List<Route> result = routeService.getRoutesByEmployeeIdAndDayOfWeek(5L, 2);
 
         assertThat(result).hasSize(1);
-        assertThat(result.get(0).getDate()).isEqualTo(date);
+        assertThat(result.get(0).getDayOfWeek()).isEqualTo(2);
     }
 
     // -----------------------------------------------------------------------
@@ -174,9 +174,9 @@ class RouteServiceTest {
     // -----------------------------------------------------------------------
     @Test
     void getAllRoutes_shouldReturnAll() {
-        Route r1 = new Route("Ruta 1", LocalDate.of(2025, 7, 1), "Cluj", mockDriver);
+        Route r1 = new Route("Ruta 1", 2, "Cluj", mockDriver);
         r1.setId(1L);
-        Route r2 = new Route("Ruta 2", LocalDate.of(2025, 7, 2), "Timiș", null);
+        Route r2 = new Route("Ruta 2", 3, "Timiș", null);
         r2.setId(2L);
 
         when(routeRepository.findAll()).thenReturn(List.of(r1, r2));

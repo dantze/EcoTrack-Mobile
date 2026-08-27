@@ -20,9 +20,8 @@
  */
 
 import { beforeAll, describe, expect, it } from 'vitest';
-import { mockApi } from '@/mocks';
+import { mockApi, DEV_DEVICE_ID } from '@/mocks';
 import { MockApiError } from '@/mocks/store';
-import { MOCK_CREDENTIALS_HINT } from '@/mocks/seed';
 import type { EcoTrackApi } from '@/api/contract';
 import { setAccessToken } from '@/auth/tokenBridge';
 
@@ -71,43 +70,98 @@ describe('mock API surface', () => {
 // Auth — the token handshake the live backend performs
 // ---------------------------------------------------------------------------
 
-describe('auth', () => {
-  it('rejects a bad password with a Romanian message rather than throwing', async () => {
-    // A failed login is not an exception: LoginOutcome.success is false and
-    // `message` is copy the form renders as-is.
-    const outcome = await api.auth.login(MOCK_CREDENTIALS_HINT.username, 'gresit');
+describe('enrollment + auth', () => {
+  /** Drives the real request -> claim path the mock auto-approves for dev. */
+  async function enrollDevDevice() {
+    const ticket = await api.enrollment.request({
+      fullName: 'Administrator',
+      deviceId: DEV_DEVICE_ID,
+      deviceLabel: 'Vitest',
+    });
+    expect(ticket.autoApproved).toBe(true);
+    const claimed = await api.enrollment.claim(ticket.requestId, ticket.claimSecret);
+    expect(claimed.state).toBe('issued');
+    if (claimed.state !== 'issued') throw new Error('unreachable');
+    return claimed.session;
+  }
 
-    expect(outcome.success).toBe(false);
-    expect(outcome.session).toBeUndefined();
-    expect(outcome.message).toBeTruthy();
+  it('issues an access + refresh pair once a request is approved', async () => {
+    const session = await enrollDevDevice();
+
+    expect(session.tokens.accessToken).toBeTruthy();
+    expect(session.tokens.refreshToken).toBeTruthy();
+    expect(session.tokens.expiresIn).toBeGreaterThan(0);
+    expect(session.user.roles).toContain('ADMIN');
   });
 
-  it('rejects an unknown username the same way', async () => {
-    const outcome = await api.auth.login('nimeni', 'orice');
-    expect(outcome.success).toBe(false);
-    expect(outcome.message).toBeTruthy();
+  it('leaves an ordinary request pending until an admin decides', async () => {
+    const ticket = await api.enrollment.request({
+      fullName: 'Cineva Nou',
+      deviceId: 'some-other-device',
+    });
+    expect(ticket.autoApproved).toBe(false);
+
+    // 'pending' is an outcome, not an error — the waiting screen polls on it.
+    const claimed = await api.enrollment.claim(ticket.requestId, ticket.claimSecret);
+    expect(claimed.state).toBe('pending');
   });
 
-  it('issues an access + refresh pair on a good login', async () => {
-    const outcome = await api.auth.login(
-      MOCK_CREDENTIALS_HINT.username,
-      MOCK_CREDENTIALS_HINT.password,
-    );
+  it('refuses a wrong claim secret without saying why', async () => {
+    const ticket = await api.enrollment.request({
+      fullName: 'Cineva Nou',
+      deviceId: 'another-device',
+    });
 
-    expect(outcome.success).toBe(true);
-    expect(outcome.session?.user.username).toBe(MOCK_CREDENTIALS_HINT.username);
-    expect(outcome.session?.tokens.accessToken).toBeTruthy();
-    expect(outcome.session?.tokens.refreshToken).toBeTruthy();
-    expect(outcome.session?.tokens.expiresIn).toBeGreaterThan(0);
-    expect(outcome.session?.user.roles.length).toBeGreaterThan(0);
+    // Unknown id and wrong secret answer identically on purpose: telling them
+    // apart would confirm which request ids exist.
+    const claimed = await api.enrollment.claim(ticket.requestId, 'not-the-secret');
+    expect(claimed.state).toBe('unknown');
+  });
+
+  it('lets an admin approve a request, which then yields that role', async () => {
+    const session = await enrollDevDevice();
+    setAccessToken(session.tokens.accessToken);
+
+    const ticket = await api.enrollment.request({
+      fullName: 'Sofer Nou',
+      deviceId: 'driver-device',
+    });
+    await api.enrollment.approve(ticket.requestId, 'DRIVER');
+
+    const claimed = await api.enrollment.claim(ticket.requestId, ticket.claimSecret);
+    expect(claimed.state).toBe('issued');
+    if (claimed.state !== 'issued') throw new Error('unreachable');
+    expect(claimed.session.user.roles).toContain('DRIVER');
+  });
+
+  it('never yields tokens for a rejected request', async () => {
+    const session = await enrollDevDevice();
+    setAccessToken(session.tokens.accessToken);
+
+    const ticket = await api.enrollment.request({
+      fullName: 'Respins',
+      deviceId: 'rejected-device',
+    });
+    await api.enrollment.reject(ticket.requestId);
+
+    const claimed = await api.enrollment.claim(ticket.requestId, ticket.claimSecret);
+    expect(claimed.state).toBe('rejected');
+  });
+
+  it('never exposes the claim secret through the admin queue', async () => {
+    const session = await enrollDevDevice();
+    setAccessToken(session.tokens.accessToken);
+
+    const rows = await api.enrollment.listRequests();
+    for (const row of rows) {
+      expect(row).not.toHaveProperty('claimSecret');
+      expect(row.verificationCode).toMatch(/^\d{6}$/);
+    }
   });
 
   it('rotates the refresh token, killing the old one — same as the live backend', async () => {
-    const outcome = await api.auth.login(
-      MOCK_CREDENTIALS_HINT.username,
-      MOCK_CREDENTIALS_HINT.password,
-    );
-    const first = outcome.session!.tokens.refreshToken;
+    const session = await enrollDevDevice();
+    const first = session.tokens.refreshToken;
 
     const rotated = await api.auth.refresh(first);
     expect(rotated.refreshToken).not.toBe(first);
@@ -121,14 +175,11 @@ describe('auth', () => {
     setAccessToken(null);
     await expect(api.auth.me()).rejects.toMatchObject({ status: 401 });
 
-    const outcome = await api.auth.login(
-      MOCK_CREDENTIALS_HINT.username,
-      MOCK_CREDENTIALS_HINT.password,
-    );
-    setAccessToken(outcome.session!.tokens.accessToken);
+    const session = await enrollDevDevice();
+    setAccessToken(session.tokens.accessToken);
 
     const user = await api.auth.me();
-    expect(user.username).toBe(MOCK_CREDENTIALS_HINT.username);
+    expect(user.roles).toContain('ADMIN');
   });
 
   it('logout is best-effort and never rejects, so callers can clear state regardless', async () => {
@@ -382,7 +433,7 @@ describe('the failures the UI must render', () => {
 
 describe('cascades', () => {
   it('deleting a route unassigns its tasks rather than destroying them', async () => {
-    const route = await api.routes.create({ name: 'Ruta Temporară', date: '2026-05-04' });
+    const route = await api.routes.create({ name: 'Ruta Temporară', dayOfWeek: 1 });
     const client = await api.clients.create({ type: 'company', name: 'Cascade SRL' });
     const order = await api.orders.create(client.id, {
       orderType: 'Amplasari',

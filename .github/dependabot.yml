@@ -15,6 +15,11 @@ updates:
       # one CI run and one review.
       web-minor-patch:
         update-types: [minor, patch]
+    ignore:
+      # Majors are never grouped by Dependabot - each one opens its own PR.
+      # Upgrading a major is a deliberate decision, not a review-queue item.
+      - dependency-name: '*'
+        update-types: [version-update:semver-major]
     labels: [dependencies, web]
 
   - package-ecosystem: npm
@@ -33,6 +38,14 @@ updates:
       - dependency-name: expo-*
       - dependency-name: react-native
       - dependency-name: react-native-*
+      # SCOPED packages do not match `react-native-*` - the scope is part of the
+      # name - so without these two the Expo-pinned set leaks through anyway and
+      # `expo install` just undoes the bump.
+      - dependency-name: '@react-native-async-storage/*'
+      - dependency-name: '@react-native-community/*'
+      - dependency-name: '@expo/*'
+      - dependency-name: '*'
+        update-types: [version-update:semver-major]
     labels: [dependencies, mobile]
 
   - package-ecosystem: gradle
@@ -43,6 +56,11 @@ updates:
     groups:
       backend-minor-patch:
         update-types: [minor, patch]
+    ignore:
+      # Majors are never grouped by Dependabot - each one opens its own PR.
+      # Upgrading a major is a deliberate decision, not a review-queue item.
+      - dependency-name: '*'
+        update-types: [version-update:semver-major]
     labels: [dependencies, backend]
 
   - package-ecosystem: github-actions
@@ -53,4 +71,9 @@ updates:
     groups:
       actions:
         patterns: ['*']
+    ignore:
+      # Majors are never grouped by Dependabot - each one opens its own PR.
+      # Upgrading a major is a deliberate decision, not a review-queue item.
+      - dependency-name: '*'
+        update-types: [version-update:semver-major]
     labels: [dependencies, ci]

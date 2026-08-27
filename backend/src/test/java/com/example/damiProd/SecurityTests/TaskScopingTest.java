@@ -180,7 +180,7 @@ class TaskScopingTest {
 
     private Task seedTaskFor(Employee employee, String clientName) {
         Route route = routeRepository.save(
-                new Route("Ruta " + employee.getUsername(), LocalDate.now(), "Cluj", employee));
+                new Route("Ruta " + employee.getUsername(), 2, "Cluj", employee));
         Task task = new Task(TaskType.SANITIZATION, LocalDateTime.now(), "Str. Test 1", clientName);
         task.setRoute(route);
         task.setScheduledDate(LocalDate.now());

@@ -31,7 +31,7 @@ unless its status says otherwise.
 
 ## A. Access & admin (already designed, partly built)
 
-### TODO-01 `[~]` Admin section in the web sidebar
+### TODO-01 `[DONE]` Admin section in the web sidebar
 New `Admin` group in the left sidebar, visible to `ADMIN` only, containing:
 - **Cereri de acces** — pending enrollment requests: full name, 6-digit
   verification code, device, countdown, role picker, approve / reject.
@@ -41,27 +41,44 @@ New `Admin` group in the left sidebar, visible to `ADMIN` only, containing:
 Also replaces the old login screen with the enrollment flow (request button →
 6-digit code → waiting → *"Sunteți înregistrat cu rol de <Rol>"*).
 
-*State:* backend is **done and tested** (222 tests green) — `AccessRequest`,
-`EnrollmentService`, `/api/enrollment/**`, `/api/admin/enrollment/**`,
-first-user-becomes-admin, setup code. Web and mobile screens are **not built**.
-Web currently auto-signs-in as a seeded ADMIN in mock mode only.
+**Done (web + backend).** Backend: `AccessRequest`, `EnrollmentService`,
+`/api/enrollment/**`, `/api/admin/enrollment/**`, first-user-becomes-admin,
+setup code. Web: `EnrollmentPage` replaces the login screen (name → 6-digit
+code → polling → *"Sunteți înregistrat cu rol de X"*), `Admin` sidebar section
+gated on ADMIN, `Cereri de acces` with role picker + countdown, `Angajați` with
+role changes and a **last-admin lockout guard**. `CreateEmployeeInput` lost its
+`password` field; `AuthApi` lost `login`/`loginWithGoogle`; mock mode now boots
+by driving the real request→claim path against an auto-approved dev device id.
 
-### TODO-02 `[ ]` Fold Șoferi into Angajați
+**Still to do:** the MOBILE enrollment screens (see TODO-19).
+
+### TODO-02 `[DONE]` Fold Șoferi into Angajați
 `Șoferi` should not be its own sidebar entry under Tehnic. It becomes part of
 the **Angajați** overview under Admin, visible to admins only.
-*Note:* the current `/soferi` page is a driver roster built around route
-assignment and daily workload — decide what of that survives the merge.
+**Done.** `/soferi` and `DriversPage.tsx` are gone; `Angajați` (`/angajati`,
+ADMIN-only) replaces them. The command palette now points at `/angajati` and
+`/cereri`. The old page's route-assignment/daily-workload view was NOT carried
+over — it belongs on the Rute screen, and TODO-05 is where that lands.
 
 ---
 
 ## B. Rute (routes)
 
-### TODO-03 `[ ]` Routes are weekly, not dated
+### TODO-03 `[DONE]` Routes are weekly, not dated
 A route belongs to a **day of the week**, not a calendar date. Drop the date
 entirely. Changing a route changes it for every week from then on — routes are
 not edited in advance for a specific date.
 
-### TODO-04 `[ ]` Rework the Rute screen layout
+**Done, all three projects.** Backend: `Route.date` column removed, constructor
+now takes `dayOfWeek`, `CreateRouteRequest.date` gone, and
+`GET /routes/employee/{id}/date/{date}` became
+`GET /routes/employee/{id}/day/{dayOfWeek}`. Web: `Route.date` and
+`CreateRouteInput.date` removed, `listForEmployeeOnDate` → `listForEmployeeOnDay`,
+mock seed names routes after their weekday, `MapRouteLine.date` → `dayOfWeek`,
+and `grouping.ts` now compares weekdays instead of dates. Mobile:
+`RouteService` mirrors the same change. Backend 222 tests green, web 291, mobile 59.
+
+### TODO-04 `[DONE]` Rework the Rute screen layout
 - Not slidable left-to-right. One pane that scrolls **up and down**, that's it.
 - Remove the date filter UI: **Data**, **Toate Datele**, **Azi** all go.
 - Always display **all routes for a week** in the left pane.
@@ -71,7 +88,19 @@ not edited in advance for a specific date.
 - Remove the **Șofer** column/field as it exists now. Instead: tapping the
   driver's name should let you choose/assign that driver to the route.
 
-### TODO-05 `[ ]` Change the driver on a route
+**Done.** The `Data` column became `Ziua`; the date filter, *Toate datele* and
+*Azi* are gone (along with their `t`/`a` keyboard shortcuts); the `Sarcini`
+count column is gone because progress already carries it; `Șterge` is now an
+icon button; and the driver's NAME is the control that opens the picker, so the
+separate `Șofer` action button is gone. Horizontal scrolling was removed in
+`DataTable` itself (`overflow-x-hidden`) rather than only on this screen —
+a sideways-sliding table hides columns behind an edge nobody expects.
+
+**Not done here:** "always display all routes for a week" is currently "all
+routes, unfiltered by date" — which is the same thing while every route is
+weekly, but if a week-window selector is wanted later it is a separate change.
+
+### TODO-05 `[DONE]` Change the driver on a route
 Exists in the mobile app; needs an equivalent (probably directly on the Rute
 screen). Use case: a driver is off sick and someone covers for them.
 Two operations:
@@ -80,21 +109,51 @@ Two operations:
 *Note:* user recalls ~90% of the mobile feature — check
 `mobile/app/Technical/ChangeDriver.tsx` for the real behaviour before designing.
 
-### TODO-06 `[ ]` Remove the "Asignează" button on unassigned tasks
+**Done, both halves, on the Rute screen.**
+1. Swapping a route's driver: the driver's NAME in the routes table is now the
+   control that opens the picker (came with TODO-04).
+2. Moving individual stops: each stop on the selected route has a **Mută**
+   action opening a route picker, which excludes the current route. It reuses
+   the existing `reassignTasks` mutation — the same `PUT /tasks/reassign` the
+   mobile ChangeDriver screen calls.
+
+### TODO-06 `[DONE]` Remove the "Asignează" button on unassigned tasks
 Tasks in **Neasignate** currently have an *Asignează* button. Remove it — it
 gives no control over *which* route or *which* position the task lands in.
 
-### TODO-07 `[ ]` BUG: drag-and-drop from "Neasignate" assigns on a nudge
+**Done.** The button and the `RoutePickerModal` it opened are both gone.
+Dragging a task onto a specific slot remains the way to assign, which is the
+only route that actually says where the task lands.
+
+### TODO-07 `[DONE — needs your eyes]` BUG: drag-and-drop from "Neasignate" assigns on a nudge
 Picking up an order from *Neasignate* and moving it even slightly assigns it to
 a route — apparently to the first valid drop slot — even when it is put back
 where it started. Needs a proper fix, including the drag animation.
-*Blocked on:* OQ-2 (browser access) to observe it directly.
+**Cause found (read from the code, not observed).** `DndContext` used
+`closestCenter`, which returns the nearest droppable **regardless of where the
+pointer actually is**. So nudging a card past the 5px activation threshold and
+dropping it back still resolved to a drop target, and the task landed on the
+route at whichever slot was closest — there was no way to pick something up and
+change your mind.
+
+**Fix applied, three parts:**
+1. Collision detection is now `pointerWithin` with a `rectIntersection`
+   fallback, so only a droppable the pointer is genuinely over counts. Drop in
+   dead space → `over` is null → nothing is written.
+2. Pointer activation distance raised 5px → 8px, so a wobbly click cannot start
+   a drag.
+3. `handleDragEnd` now refuses a drop whose target is not a real position on the
+   selected route, instead of silently appending to the end.
+
+**Still needs visual confirmation** — this was fixed blind. The animation
+polish the request also asked for was NOT attempted for the same reason.
+See OQ-2.
 
 ---
 
 ## C. Sarcini (tasks)
 
-### TODO-08 `[ ]` Task status is driver-owned
+### TODO-08 `[DONE]` Task status is driver-owned
 Statuses are **Nou**, **În curs**, **Finalizat**.
 - Only the **driver** changes them: they mark *În curs* when they start, and
   finishing the photo upload effectively completes the task.
@@ -103,11 +162,35 @@ Statuses are **Nou**, **În curs**, **Finalizat**.
 *Related:* backend already restricts `PATCH /api/tasks/*/status` to the
 assigned driver (TaskAccessPolicy).
 
-### TODO-09 `[ ]` Better date filters on Sarcini
+**Done.** THREE web controls let the office set status, not two — the third was
+missed on the first pass and caught by the user:
+1. the Status dropdown in `TaskDetailDrawer`,
+2. the bulk "Schimbă statusul…" picker on `TasksPage`,
+3. `InlineStatusSelect`, an inline editor in the Sarcini table's Status column
+   (now a read-only `TaskStatusBadge`; the component is deleted).
+
+The status BADGE stays everywhere, so the web still observes progress — it just
+cannot write it. The filter dropdown ("Toate statusurile") stays too: filtering
+is not writing. The mutations themselves (`useUpdateTaskStatus`,
+`useUpdateManyTaskStatuses`) are left in `queries.ts`, since status legitimately
+changes from mobile.
+
+**Regression guard:** `__tests__/statusIsReadOnly.test.ts` fails if any file
+under `src/features` (outside `queries.ts`) calls a status-write hook. Added
+precisely because the control kept reappearing in new places.
+
+### TODO-09 `[DONE]` Better date filters on Sarcini
 Today there is a quick filter for **Azi**. Add:
 - A custom **interval** (from → to).
 - **Săptămâna Asta** (current week).
 - **Săptămâna Urmatoare** (next week).
+
+**Done.** The single `Data programată` picker became an inclusive **De la /
+Până la** range, with `Azi`, `Săptămâna asta`, `Săptămâna urmatoare` and `Toate
+datele` presets, plus a `w` shortcut for the current week. New `weekStartIso` /
+`weekRange` helpers live in `technical/utils.ts` and are covered by 5 tests —
+weeks start **Monday**, matching `Route.dayOfWeek` and dodging the JS
+`getDay()` Sunday-is-0 off-by-one.
 
 ---
 
@@ -120,16 +203,72 @@ coordinates.
 *Note:* mobile does this in `LocationPicker`; that one deliberately does NOT go
 through `apiFetch` (it would leak the bearer token to Google).
 
-### TODO-11 `[ ]` Remove Activ/Inactiv from Abonamente
+### TODO-11 `[DONE]` Remove Activ/Inactiv from Abonamente
 Drop the active/inactive concept and its UI for subscriptions. It is
 effectively the client's product catalogue — there is no sensible reason for
 entries to be inactive.
+
+**What `isActive` actually was:** not a status and not a usage indicator, but a
+**soft-delete flag**. `DELETE /api/subscriptions/{id}` never deleted anything —
+it set `isActive = false` so the plan stopped appearing in new-order dropdowns
+while old orders referencing it kept resolving.
+
+**Done — UI removed, mechanism kept (option A).** Gone: the Toate/Active/
+Inactive tabs and their counts, the `Stare` column, and the Dezactivează/
+Reactivează toggle. The list now shows only live plans, and deleting one
+retires it exactly as before. The flag stays in the model because old orders
+point at these rows and there is no migration tool — hard-deleting would break
+them irreversibly.
 
 ### TODO-12 `[ ]` Calendar view next to Comenzi
 A big calendar laid out like an advent calendar ("Christmas sweets" style):
 - Each day cell shows a summary of that day's information underneath the date.
 - Clicking a day opens all orders for that day.
 *Blocked on:* OQ-1 — needs the order/task distinction settled first.
+
+### TODO-20 `[ ]` Block deleting a subscription that live orders still use
+Today a plan can be retired while orders still reference it. Instead, deleting
+should be **refused** until those orders are either fulfilled or deleted — or
+until they are moved onto a different subscription.
+
+Needs deciding:
+- What counts as "still in use" — any referencing order, or only unfulfilled ones?
+- Does the UI offer a bulk "move these orders to another plan" action, or just
+  refuse and list the blocking orders?
+- Same question for Produse, which likely has the identical exposure.
+
+*Context:* this is what makes TODO-11's soft-delete flag safe to keep. The flag
+protects old orders from dangling; this rule stops new dangling references being
+created in the first place.
+
+### TODO-21 `[ ]` Archive fulfilled orders out of Comenzi
+**Comenzi should show only current orders.** Fulfilled ones move to a separate
+**Arhivă** view — same UI shape as the old Active/Inactive split on Abonamente,
+just applied to something that genuinely has a lifecycle.
+
+*Why this is not the thing TODO-11 removed:* on Abonamente the flag was a
+soft-delete masquerading as a status, so surfacing it was a lie. "Fulfilled" is
+a real state an order actually reaches, so a split view is the honest shape
+here. Don't "clean this up" later by analogy with TODO-11.
+
+Needs deciding:
+- **Derived or stored?** `deriveLifecycle` in `web/src/features/map/data.ts`
+  already computes `'done'` from the order's tasks — all COMPLETED means done,
+  with date reasoning as the fallback when an order has no tasks. Reusing it
+  means no new state to keep in sync; a stored flag would be cheaper to filter
+  on but can drift from the tasks it is supposed to summarise. **Prefer reusing
+  the existing derivation** — a second definition of "done" that disagrees with
+  the first is the failure mode here.
+- Where the derivation should live if both Sales and the map need it (today it
+  sits in the map feature).
+- Whether archived orders are read-only, and whether anything can un-archive.
+
+**Shares its definition with TODO-20.** "Live orders that block deleting a
+subscription" and "current orders that stay out of the archive" are the same
+question — decide once, implement once, or they will drift apart.
+
+*Related:* OQ-1 — archiving depends on knowing when an order is finished, which
+depends on the order/task relationship being clear.
 
 ---
 
@@ -166,6 +305,51 @@ The "recommended additions" suggestions on routes are not wanted. Remove them.
 Deliberately deferred. Do not build AI features until the autofill use case is
 decided. TODO-13 (ID scanning) is the one adjacent idea that may or may not end
 up AI-backed.
+
+---
+
+## H. Mobile
+
+### TODO-19 `[ ]` Mobile enrollment screens
+Replace the mobile password login with the same flow the web now has: one
+button + full name → six-digit code → waiting/polling → *"Sunteți înregistrat
+cu rol de X"*. The backend contract is settled and tested; `mobile/` is still
+untouched and still posts to the deleted `/api/auth/login`, so **the mobile app
+cannot log in at all until this is done**.
+
+---
+
+## G. Repo & CI
+
+### TODO-18 `[DONE]` Fix the Dependabot config
+`.github/dependabot.yml` is already grouped and monthly, but it still produced
+13 PRs in one batch (#156–#168). Two separate problems:
+
+1. **Majors are never grouped.** The `groups` only cover
+   `update-types: [minor, patch]`, so every major bump opens its own PR by
+   design. Add `ignore` entries with
+   `update-types: [version-update:semver-major]` per ecosystem so majors stop
+   opening PRs automatically and get upgraded deliberately instead — the same
+   treatment Expo already gets.
+
+2. **Scoped packages escape the mobile ignore list.** The rules are `expo`,
+   `expo-*`, `react-native`, `react-native-*`, which do **not** match
+   `@react-native-async-storage/async-storage` or
+   `@react-native-community/datetimepicker`. Dependabot is therefore proposing
+   exactly the Expo-SDK-pinned bumps that list exists to prevent (#166, #167),
+   and `expo install` would undo them. Add `@react-native-async-storage/*` and
+   `@react-native-community/*`.
+
+**Done:** major-version updates are now ignored in all four ecosystems, and the
+mobile ignore list gained `@react-native-async-storage/*`,
+`@react-native-community/*` and `@expo/*`. Config validated.
+
+*Note on the open PRs (user's call, not to be bulk-actioned):* the four grouped
+batches are green and low risk (`web-minor-patch` #159, `mobile-minor-patch`
+#163, `backend-minor-patch` #156, `actions` #162). The red ones are breaking
+majors — Vite 6→8 (#164), Vitest 3→4 (#168, #161), async-storage 2→3 (#166).
+**Spring Boot 3.5 → 4.1.1 (#158) is a whole major generation** and would touch
+the security config, JPA setup and the enrollment code — close it.
 
 ---
 

@@ -55,31 +55,11 @@ const DriverRoutes = () => {
         }
     };
 
-    const getDayOfWeekInfo = (dayOfWeek?: number, dateString?: string) => {
-        if (dayOfWeek) {
-            return {
-                dayName: getDayOfWeekLabel(dayOfWeek),
-                date: 'Săptămânal'
-            };
-        }
-
-        if (!dateString) return { dayName: 'N/A', date: '--' };
-
-        try {
-            const date = new Date(dateString);
-            if (isNaN(date.getTime())) return { dayName: 'N/A', date: '--' };
-
-            // Convert JS getDay() (0=Sunday) to RouteConstants (1=Mon..7=Sun)
-            const jsDay = date.getDay();
-            const routeDay = jsDay === 0 ? 7 : jsDay;
-
-            return {
-                dayName: getDayOfWeekLabel(routeDay),
-                date: date.toLocaleDateString('ro-RO', { day: 'numeric', month: 'short' })
-            };
-        } catch {
-            return { dayName: 'N/A', date: '--' };
-        }
+    // Routes are weekly, so the weekday IS the schedule - there is no date to
+    // fall back on any more.
+    const getDayOfWeekInfo = (dayOfWeek?: number) => {
+        if (!dayOfWeek) return { dayName: 'N/A', date: '--' };
+        return { dayName: getDayOfWeekLabel(dayOfWeek), date: 'Săptămânal' };
     };
 
     const getTasksCount = (route: Route) => {
@@ -93,7 +73,7 @@ const DriverRoutes = () => {
             pathname: "/Driver/RouteTasks",
             params: {
                 routeId: route.id,
-                routeDate: route.date,
+                routeDayOfWeek: route.dayOfWeek,
                 routeName: route.name
             }
         });
@@ -159,7 +139,7 @@ const DriverRoutes = () => {
                     </View>
                 ) : (
                     routes.map((route) => {
-                        const { dayName, date } = getDayOfWeekInfo(route.dayOfWeek, route.date);
+                        const { dayName, date } = getDayOfWeekInfo(route.dayOfWeek);
                         const { total, completed } = getTasksCount(route);
                         const isCompleted = total > 0 && completed === total;
 

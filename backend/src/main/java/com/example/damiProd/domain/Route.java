@@ -5,7 +5,6 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.Getter;
 import lombok.Setter;
 import jakarta.persistence.*;
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -21,9 +20,15 @@ public class Route {
 
     private String name;
 
-    private LocalDate date;
-
-    // Day of week: 1=Monday, 2=Tuesday, ..., 7=Sunday
+    /**
+     * 1 = Monday ... 7 = Sunday.
+     *
+     * A route is WEEKLY, not dated. It describes work that recurs on a given
+     * weekday, so editing one changes every week from now on - there is no
+     * per-date copy to edit in advance. The old `date` column is gone for
+     * exactly that reason: it invited "which Tuesday?" questions the domain
+     * has no answer to.
+     */
     private Integer dayOfWeek;
 
     private String county;
@@ -41,9 +46,9 @@ public class Route {
     public Route() {
     }
 
-    public Route(String name, LocalDate date, String county, Employee employee) {
+    public Route(String name, Integer dayOfWeek, String county, Employee employee) {
         this.name = name;
-        this.date = date;
+        this.dayOfWeek = dayOfWeek;
         this.county = county;
         this.employee = employee;
     }

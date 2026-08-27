@@ -22,6 +22,7 @@ import type {
   Order,
   Product,
   RecurringIgienizare,
+  Role,
   Route,
   Subscription,
   Task,
@@ -29,6 +30,7 @@ import type {
   TaskStatus,
   TaskType,
 } from '@/types/domain';
+import type { AccessRequestStatus } from '@/api/contract';
 import { clientName } from '@/types/domain';
 import { createSeedDb } from './seed';
 
@@ -39,7 +41,7 @@ import { createSeedDb } from './seed';
 export interface RouteRow {
   id: number;
   name: string;
-  date: string | null;
+  /** 1 = Monday … 7 = Sunday. Weekly, never dated — see domain.Route. */
   dayOfWeek: number | null;
   county: string | null;
   employeeId: number | null;
@@ -154,6 +156,23 @@ export interface AuthSessionRow {
   revoked: boolean;
 }
 
+/**
+ * One pending/decided device-enrollment request — the mock equivalent of the
+ * backend `access_requests` table. `claimSecret` is stored here but is stripped
+ * before anything leaves the API, exactly as the backend keeps only a hash.
+ */
+export interface AccessRequestRow {
+  id: number;
+  fullName: string;
+  verificationCode: string;
+  deviceLabel: string | null;
+  status: AccessRequestStatus;
+  createdAt: string;
+  expiresAt: string;
+  assignedRoleName: Role | null;
+  claimSecret: string;
+}
+
 export interface Sequences {
   client: number;
   product: number;
@@ -166,6 +185,7 @@ export interface Sequences {
   recurring: number;
   photo: number;
   session: number;
+  accessRequest: number;
 }
 
 export interface MockDb {
@@ -179,6 +199,7 @@ export interface MockDb {
   orders: OrderRow[];
   recurring: RecurringRow[];
   authSessions: AuthSessionRow[];
+  accessRequests: AccessRequestRow[];
   seq: Sequences;
 }
 
@@ -254,7 +275,6 @@ export function buildRouteShallow(row: RouteRow): Route {
   return {
     id: row.id,
     name: row.name,
-    date: row.date,
     dayOfWeek: row.dayOfWeek,
     county: row.county,
     employee: employee ? cloneEmployee(employee) : null,

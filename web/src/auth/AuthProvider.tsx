@@ -37,7 +37,7 @@ import {
   useState,
 } from 'react';
 import type { ReactNode } from 'react';
-import { api, MOCK_AUTO_LOGIN } from '@/api';
+import { api, DEV_DEVICE_ID } from '@/api';
 import { IS_MOCK } from '@/lib/config';
 import type { AuthSession } from '@/api/contract';
 import type { AuthUser, Role } from '@/types/domain';
@@ -54,8 +54,8 @@ export interface AuthOutcome {
 interface AuthContextValue {
   user: AuthUser | null;
   status: AuthStatus;
-  login: (username: string, password: string) => Promise<AuthOutcome>;
-  loginWithGoogle: (idToken: string) => Promise<AuthOutcome>;
+  /** Adopts a session minted by the enrollment flow (EnrollmentPage). */
+  adoptSession: (session: AuthSession) => void;
   logout: () => Promise<void>;
   hasRole: (role: Role) => boolean;
 }
@@ -173,17 +173,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Boot restore: never flash the login page for a user who has a live
   // refresh token — `status` stays 'loading' until this settles.
   //
-  // MOCK MODE SIGNS ITSELF IN. There is no password anywhere in this system
-  // any more (access comes from an admin approving a device), so a login form
-  // in local development would be asking for a credential that does not
-  // exist. Instead the seeded ADMIN account is adopted on boot and `npm run
-  // dev` drops straight into the app. This branch is dead in live builds.
+  // MOCK MODE ENROLLS ITSELF. There is no password anywhere in this system
+  // any more, and local development has no admin sitting there to approve a
+  // request — so the mock auto-approves one well-known device id as ADMIN and
+  // `npm run dev` drops straight into the app. This branch is dead in live
+  // builds, where the same two calls are driven by EnrollmentPage instead.
   useEffect(() => {
     void (async () => {
       if (IS_MOCK && !readRefreshToken()) {
-        const outcome = await api.auth.login(MOCK_AUTO_LOGIN.username, MOCK_AUTO_LOGIN.password);
-        if (outcome.success && outcome.session) {
-          applySession(outcome.session);
+        // Drives the REAL enrollment flow rather than a side door: the mock
+        // auto-approves this one device id, so dev exercises the same
+        // request -> claim path a real device takes.
+        const ticket = await api.enrollment.request({
+          fullName: 'Administrator',
+          deviceId: DEV_DEVICE_ID,
+          deviceLabel: 'Development',
+        });
+        const claimed = await api.enrollment.claim(ticket.requestId, ticket.claimSecret);
+        if (claimed.state === 'issued') {
+          applySession(claimed.session);
           return;
         }
       }
@@ -223,24 +231,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => clearTimer, [clearTimer]);
 
-  const login = useCallback(
-    async (username: string, password: string): Promise<AuthOutcome> => {
-      const outcome = await api.auth.login(username, password);
-      if (outcome.success && outcome.session) applySession(outcome.session);
-      return { success: outcome.success, message: outcome.message };
-    },
-    [applySession],
-  );
-
-  const loginWithGoogle = useCallback(
-    async (idToken: string): Promise<AuthOutcome> => {
-      const outcome = await api.auth.loginWithGoogle(idToken);
-      if (outcome.success && outcome.session) applySession(outcome.session);
-      return { success: outcome.success, message: outcome.message };
-    },
-    [applySession],
-  );
-
   const logout = useCallback(async () => {
     const refreshToken = readRefreshToken();
     // Clear local state immediately — don't make the UI wait on the network,
@@ -262,8 +252,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   );
 
   const value = useMemo<AuthContextValue>(
-    () => ({ user, status, login, loginWithGoogle, logout, hasRole }),
-    [user, status, login, loginWithGoogle, logout, hasRole],
+    () => ({ user, status, adoptSession: applySession, logout, hasRole }),
+    [user, status, applySession, logout, hasRole],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

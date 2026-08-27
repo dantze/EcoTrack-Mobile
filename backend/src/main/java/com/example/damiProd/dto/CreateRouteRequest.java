@@ -1,11 +1,8 @@
 package com.example.damiProd.dto;
 
-import java.time.LocalDate;
-
 public class CreateRouteRequest {
     private String name;
-    private LocalDate date;
-    // Day of week: 1=Monday, 2=Tuesday, ..., 7=Sunday
+    /** 1 = Monday ... 7 = Sunday. Routes are weekly, never dated. */
     private Integer dayOfWeek;
     private String county;
     private Long employeeId;
@@ -27,14 +24,6 @@ public class CreateRouteRequest {
 
     public void setName(String name) {
         this.name = name;
-    }
-
-    public LocalDate getDate() {
-        return date;
-    }
-
-    public void setDate(LocalDate date) {
-        this.date = date;
     }
 
     public String getCounty() {

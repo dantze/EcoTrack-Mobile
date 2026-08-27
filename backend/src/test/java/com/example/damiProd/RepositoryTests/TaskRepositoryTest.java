@@ -50,8 +50,8 @@ class TaskRepositoryTest {
     void seed() {
         driver = em.persist(new Employee("driver1", "Vasile Șofer", "0733"));
         acme = em.persist(new Company("office@acme.ro", "0311", "Bd. 20", "Acme SRL", "RO1", "Maria"));
-        routeA = em.persist(new Route("Ruta Nord", LocalDate.of(2026, 5, 4), "Ilfov", driver));
-        routeB = em.persist(new Route("Ruta Sud", LocalDate.of(2026, 5, 4), "Ilfov", null));
+        routeA = em.persist(new Route("Ruta Nord", 1, "Ilfov", driver));
+        routeB = em.persist(new Route("Ruta Sud", 1, "Ilfov", null));
         em.flush();
     }
 

@@ -3,8 +3,14 @@ import { apiFetch } from './http';
 // Definim structura datelor pentru crearea unei rute
 export interface CreateRouteData {
     name: string;
-    date?: string;
-    dayOfWeek?: number; // 1=Luni, 2=Marți, ..., 7=Duminică
+    /**
+     * 1=Luni, 2=Marți, ..., 7=Duminică.
+     *
+     * A route is WEEKLY, not dated — it recurs on its weekday, so changing it
+     * changes every week from now on. The old `date` field is gone for exactly
+     * that reason.
+     */
+    dayOfWeek?: number;
     county?: string;
     employeeId?: number;
 }
@@ -12,8 +18,8 @@ export interface CreateRouteData {
 export interface Route {
     id: number;
     name: string;
-    date?: string;
-    dayOfWeek?: number; // 1=Luni, 2=Marți, ..., 7=Duminică
+    /** 1=Luni, 2=Marți, ..., 7=Duminică. Weekly, never dated. */
+    dayOfWeek?: number;
     county?: string;
     employeeId: number;
     employeeName: string;
@@ -38,8 +44,8 @@ export const RouteService = {
         return await response.json();
     },
 
-    getRoutesByEmployeeIdAndDate: async (employeeId: number, date: string): Promise<Route[]> => {
-        const response = await apiFetch(`/routes/employee/${employeeId}/date/${date}`);
+    getRoutesByEmployeeIdAndDayOfWeek: async (employeeId: number, dayOfWeek: number): Promise<Route[]> => {
+        const response = await apiFetch(`/routes/employee/${employeeId}/day/${dayOfWeek}`);
         if (!response.ok) {
             throw new Error('Eșec la preluarea rutelor șoferului');
         }

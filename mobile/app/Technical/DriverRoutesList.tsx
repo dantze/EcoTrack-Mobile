@@ -41,7 +41,7 @@ const DriverRoutesList = () => {
             params: {
                 routeId: route.id.toString(),
                 driverName: driverName,
-                routeDate: route.date,
+                routeDayOfWeek: route.dayOfWeek,
             },
         });
     };

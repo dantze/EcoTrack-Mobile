@@ -76,7 +76,6 @@ function route(overrides: Partial<Route> = {}): Route {
   return {
     id: 500,
     name: 'Ruta Ilfov Nord',
-    date: TODAY,
     dayOfWeek: 1,
     county: 'Ilfov',
     employee: DRIVER,

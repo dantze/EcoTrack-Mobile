@@ -263,7 +263,13 @@ export function DataTable<T>({
         <div className="absolute inset-x-0 top-0 z-30 h-0.5 animate-pulse bg-brand-500/60" aria-hidden />
       )}
 
-      <div className="min-h-0 min-w-0 flex-1 overflow-auto overscroll-contain">
+      {/*
+        Vertical scrolling only. A sideways-sliding table hides columns behind
+        an edge the user has no reason to expect, and on the dispatch board it
+        made the route list feel like a carousel. Columns share the available
+        width instead; drop a column rather than reintroducing overflow-x.
+      */}
+      <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain">
         <table
           className="w-full border-separate border-spacing-0 text-left text-sm"
           style={{ minWidth, tableLayout: 'fixed' }}

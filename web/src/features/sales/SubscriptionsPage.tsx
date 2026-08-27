@@ -1,10 +1,14 @@
 /**
- * Abonamente — table over the Subscription model with an active/inactive
- * filter; create and edit happen in a modal.
+ * Abonamente — the product catalogue. Create and edit happen in a modal.
  *
- * The backend has no deactivate endpoint in the contract, so "Dezactivează" is
- * a normal update with `isActive: false` (the mobile app used a dedicated
- * endpoint for the same effect).
+ * There is deliberately NO active/inactive UI. `Subscription.isActive` is a
+ * SOFT-DELETE flag, not a status: `DELETE /api/subscriptions/{id}` sets it to
+ * false so retired plans stop appearing in new-order dropdowns while old
+ * orders that reference them keep resolving. Surfacing that as a toggle made
+ * the catalogue look like something with a lifecycle to manage, which it is
+ * not — you either sell a plan or you retire it.
+ *
+ * The list therefore shows only live plans; deleting one retires it.
  */
 
 import { useMemo, useState } from 'react';
@@ -16,7 +20,6 @@ import {
   Modal,
   PageHeader,
   Select,
-  Tabs,
   TextArea,
   TextInput,
   type Column,
@@ -130,7 +133,6 @@ function toInput(draft: Draft): SubscriptionInput {
   };
 }
 
-type StatusTab = 'all' | 'active' | 'inactive';
 
 export function SubscriptionsPage() {
   const subscriptionsQuery = useSubscriptions(true);
@@ -140,7 +142,6 @@ export function SubscriptionsPage() {
   const { confirm, confirmDialog } = useConfirm();
 
   const [search, setSearch] = useState('');
-  const [tab, setTab] = useState<StatusTab>('all');
   const [editing, setEditing] = useState<Subscription | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [draftErrors, setDraftErrors] = useState<DraftErrors>({});
@@ -150,25 +151,16 @@ export function SubscriptionsPage() {
     [subscriptionsQuery.data],
   );
 
-  const counts = useMemo(
-    () => ({
-      all: subscriptions.length,
-      active: subscriptions.filter((entry) => entry.isActive).length,
-      inactive: subscriptions.filter((entry) => !entry.isActive).length,
-    }),
-    [subscriptions],
-  );
-
   const rows = useMemo(() => {
     const needle = search.trim();
     return subscriptions.filter((subscription) => {
-      if (tab === 'active' && !subscription.isActive) return false;
-      if (tab === 'inactive' && subscription.isActive) return false;
+      // Retired plans are soft-deleted, so they simply do not appear.
+      if (!subscription.isActive) return false;
       if (!needle) return true;
       // Diacritic-insensitive, like every other search box in the app.
       return includesFolded(`${subscription.name} ${subscription.description ?? ''}`, needle);
     });
-  }, [subscriptions, search, tab]);
+  }, [subscriptions, search]);
 
   const openCreate = () => {
     setEditing(null);
@@ -208,28 +200,6 @@ export function SubscriptionsPage() {
       closeModal();
     } catch (mutationError) {
       toast.error(errorMessage(mutationError, 'Nu s-a putut salva abonamentul'));
-    }
-  };
-
-  const toggleActive = async (subscription: Subscription) => {
-    const next = !subscription.isActive;
-    const confirmed = await confirm({
-      title: next ? 'Reactivează abonamentul?' : 'Dezactivează abonamentul?',
-      body: next
-        ? `„${subscription.name}” va redeveni disponibil pentru comenzi noi.`
-        : `„${subscription.name}” nu va mai apărea la comenzi noi. Comenzile existente nu sunt afectate.`,
-      confirmLabel: next ? 'Reactivează' : 'Dezactivează',
-      destructive: !next,
-    });
-    if (!confirmed) return;
-    try {
-      await updateSubscription.mutateAsync({
-        id: subscription.id,
-        input: { ...draftFromSubscriptionInput(subscription), isActive: next },
-      });
-      toast.success(next ? 'Abonamentul a fost reactivat.' : 'Abonamentul a fost dezactivat.');
-    } catch (error) {
-      toast.error(errorMessage(error, 'Nu s-a putut actualiza abonamentul'));
     }
   };
 
@@ -310,20 +280,9 @@ export function SubscriptionsPage() {
             : '—',
     },
     {
-      key: 'status',
-      header: 'Stare',
-      width: '7rem',
-      sortValue: (subscription) => (subscription.isActive ? 'a' : 'b'),
-      render: (subscription) => (
-        <Badge tone={subscription.isActive ? 'success' : 'danger'}>
-          {subscription.isActive ? 'Activ' : 'Inactiv'}
-        </Badge>
-      ),
-    },
-    {
       key: 'actions',
       header: '',
-      width: '15rem',
+      width: '11rem',
       align: 'right',
       render: (subscription) => (
         <span
@@ -333,9 +292,6 @@ export function SubscriptionsPage() {
         >
           <Button size="sm" variant="ghost" onClick={() => openEdit(subscription)}>
             Editează
-          </Button>
-          <Button size="sm" variant="ghost" onClick={() => void toggleActive(subscription)}>
-            {subscription.isActive ? 'Dezactivează' : 'Reactivează'}
           </Button>
           <button
             type="button"
@@ -350,11 +306,8 @@ export function SubscriptionsPage() {
   ];
 
   const saving = createSubscription.isPending || updateSubscription.isPending;
-  const filtersActive = tab !== 'all' || search !== '';
-  const resetFilters = () => {
-    setTab('all');
-    setSearch('');
-  };
+  const filtersActive = search !== '';
+  const resetFilters = () => setSearch('');
 
   return (
     <>
@@ -379,16 +332,6 @@ export function SubscriptionsPage() {
             </Button>
           </>
         }
-      />
-
-      <Tabs
-        active={tab}
-        onChange={(id) => setTab(id as StatusTab)}
-        items={[
-          { id: 'all', label: 'Toate', count: counts.all },
-          { id: 'active', label: 'Active', count: counts.active },
-          { id: 'inactive', label: 'Inactive', count: counts.inactive },
-        ]}
       />
 
       <FilterBar>
@@ -559,10 +502,4 @@ export function SubscriptionsPage() {
       <Toaster />
     </>
   );
-}
-
-/** Same subscription, minus the id — for updates that only flip `isActive`. */
-function draftFromSubscriptionInput(subscription: Subscription): SubscriptionInput {
-  const { id: _id, ...rest } = subscription;
-  return rest;
 }

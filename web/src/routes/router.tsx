@@ -35,7 +35,7 @@ import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { AppShell } from '@/components/layout/AppShell';
 import { RequireAuth, RequireRole, useAuth } from '@/auth';
 import { ForbiddenPage } from '@/features/auth/ForbiddenPage';
-import { LoginPage } from '@/features/auth/LoginPage';
+import { EnrollmentPage } from '@/features/auth/EnrollmentPage';
 import { NotFoundPage } from '@/features/auth/NotFoundPage';
 import { ErrorPage } from './ErrorPage';
 
@@ -60,7 +60,7 @@ export const router = createBrowserRouter([
     path: '/',
     errorElement: <ErrorPage />,
     children: [
-      { path: 'login', element: <LoginPage /> },
+      { path: 'login', element: <EnrollmentPage /> },
       {
         element: <RequireAuth />,
         children: [
@@ -105,6 +105,28 @@ export const router = createBrowserRouter([
                 ],
               },
               {
+                // Admin-only. Access control lives entirely behind these two
+                // screens: nobody enters EcoTrack except by being approved in
+                // "Cereri de acces".
+                element: <RequireRole roles={['ADMIN']} />,
+                children: [
+                  {
+                    path: 'cereri',
+                    lazy: lazyPage(
+                      () => import('@/features/admin/AccessRequestsPage'),
+                      'AccessRequestsPage',
+                    ),
+                  },
+                  {
+                    path: 'angajati',
+                    lazy: lazyPage(
+                      () => import('@/features/admin/EmployeesPage'),
+                      'EmployeesPage',
+                    ),
+                  },
+                ],
+              },
+              {
                 element: <RequireRole roles={['TECH']} />,
                 children: [
                   {
@@ -114,10 +136,6 @@ export const router = createBrowserRouter([
                   {
                     path: 'sarcini',
                     lazy: lazyPage(() => import('@/features/technical/TasksPage'), 'TasksPage'),
-                  },
-                  {
-                    path: 'soferi',
-                    lazy: lazyPage(() => import('@/features/technical/DriversPage'), 'DriversPage'),
                   },
                   {
                     path: 'recurente',

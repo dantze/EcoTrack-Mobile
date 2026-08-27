@@ -425,7 +425,6 @@ describe('tasks and routes', () => {
     const route: Route = {
       id: 30,
       name: 'Ruta Nord',
-      date: '2026-05-04',
       dayOfWeek: 1,
       county: 'Ilfov',
       employee: driver,
@@ -465,7 +464,6 @@ describe('tasks and routes', () => {
     const raw: RawRoute = {
       id: 30,
       name: 'Ruta Nord',
-      date: '2026-05-04',
       dayOfWeek: 1,
       county: 'Ilfov',
       employeeId: 3,
@@ -518,7 +516,6 @@ describe('tasks and routes', () => {
     const route: Route = {
       id: 30,
       name: 'Ruta Nord',
-      date: null,
       dayOfWeek: null,
       county: null,
       employee: driver,

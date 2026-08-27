@@ -22,6 +22,11 @@
 
 import { MOCK_LATENCY_MS } from '@/lib/config';
 import type {
+  AccessRequest,
+  ClaimResult,
+  EnrollmentRequestInput,
+  EnrollmentStatus,
+  EnrollmentTicket,
   AuthSession,
   AuthTokens,
   ClientInput,
@@ -29,7 +34,6 @@ import type {
   CreateRouteInput,
   CreateTaskInput,
   EcoTrackApi,
-  LoginOutcome,
   OrderInput,
   OrderTaskStatus,
   SessionDevice,
@@ -67,13 +71,13 @@ import {
   notFound,
   placeOnRoute,
   tasksOfRoute,
+  type AccessRequestRow,
   type AuthSessionRow,
   type CredentialRow,
   type OrderRow,
   type RecurringRow,
   type TaskRow,
 } from './store';
-import { MOCK_GOOGLE_DEMO_USERNAME } from './seed';
 
 // ---------------------------------------------------------------------------
 // Latency
@@ -148,11 +152,15 @@ const addDays = (date: Date, days: number): Date => new Date(date.getTime() + da
 // Auth
 // ---------------------------------------------------------------------------
 //
-// Mocks the same token handshake the live backend performs: login/Google
-// hand back an access + refresh token pair, refresh rotates the refresh
-// token (the old value dies), and "who is this access token for" is decoded
-// from the token itself rather than looked up in any session store — there
-// isn't one, by design (see src/auth/storage.ts).
+// Mocks the same token handshake the live backend performs: enrollment hands
+// back an access + refresh token pair, refresh rotates the refresh token (the
+// old value dies), and "who is this access token for" is decoded from the
+// token itself rather than looked up in any session store — there isn't one,
+// by design (see src/auth/storage.ts).
+//
+// There is no login here because there is no login anywhere: passwords and
+// Google sign-in were removed from the backend. Sessions come from
+// `enrollmentApi.claim` below.
 //
 // Token formats are mock-only and never leave this file:
 //   accessToken  "mock.access.<employeeId>.<issuedAtMs>"
@@ -219,36 +227,6 @@ function issueSession(employee: Employee, credential: CredentialRow, device = 'A
 }
 
 const authApi: EcoTrackApi['auth'] = {
-  login(username: string, password: string): Promise<LoginOutcome> {
-    return respond((): LoginOutcome => {
-      const credential = db.credentials.find((row) => row.username === username);
-      if (!credential) return { success: false, message: 'Utilizator inexistent' };
-      if (credential.password !== password) return { success: false, message: 'Parolă incorectă' };
-
-      const employee = db.employees.find((e) => e.id === credential.employeeId);
-      if (!employee) return { success: false, message: 'Utilizator inexistent' };
-
-      return { success: true, message: 'Autentificare reușită', session: issueSession(employee, credential) };
-    });
-  },
-
-  loginWithGoogle(): Promise<LoginOutcome> {
-    // The mock never inspects the idToken — the demo Google button always
-    // signs in as the same seeded account (see MOCK_GOOGLE_DEMO_USERNAME).
-    return respond((): LoginOutcome => {
-      const credential = db.credentials.find((row) => row.username === MOCK_GOOGLE_DEMO_USERNAME);
-      const employee = credential && db.employees.find((e) => e.id === credential.employeeId);
-      if (!credential || !employee) {
-        return { success: false, message: 'Contul Google nu este asociat niciunui angajat.' };
-      }
-      return {
-        success: true,
-        message: 'Autentificare reușită',
-        session: issueSession(employee, credential, 'Cont Google (demo)'),
-      };
-    });
-  },
-
   refresh(refreshToken: string): Promise<AuthTokens> {
     return respond((): AuthTokens => {
       const row = db.authSessions.find((s) => s.refreshToken === refreshToken && !s.revoked);
@@ -694,7 +672,7 @@ const employeesApi: EcoTrackApi['employees'] = {
       db.credentials.push({
         employeeId: employee.id,
         username: input.username,
-        password: input.password,
+        password: '',
         email: `${input.username}@ecotrack.ro`,
       });
       return cloneEmployee(employee);
@@ -713,10 +691,7 @@ const employeesApi: EcoTrackApi['employees'] = {
       if (input.roles && input.roles.length > 0) employee.roles = [...input.roles];
 
       const credential = db.credentials.find((row) => row.employeeId === id);
-      if (credential) {
-        if (input.username) credential.username = input.username;
-        if (input.password) credential.password = input.password;
-      }
+      if (credential && input.username) credential.username = input.username;
 
       return cloneEmployee(employee);
     }),
@@ -758,10 +733,10 @@ const routesApi: EcoTrackApi['routes'] = {
   listForEmployee: (employeeId) =>
     respond(() => db.routes.filter((route) => route.employeeId === employeeId).map(buildRoute)),
 
-  listForEmployeeOnDate: (employeeId, date) =>
+  listForEmployeeOnDay: (employeeId, dayOfWeek) =>
     respond(() =>
       db.routes
-        .filter((route) => route.employeeId === employeeId && route.date === date)
+        .filter((route) => route.employeeId === employeeId && route.dayOfWeek === dayOfWeek)
         .map(buildRoute),
     ),
 
@@ -775,7 +750,6 @@ const routesApi: EcoTrackApi['routes'] = {
       const row = {
         id: nextId('route'),
         name: input.name,
-        date: input.date ?? null,
         dayOfWeek: input.dayOfWeek ?? null,
         county: input.county ?? null,
         employeeId: input.employeeId ?? null,
@@ -1251,8 +1225,128 @@ const recurringApi: EcoTrackApi['recurring'] = {
 // Root
 // ---------------------------------------------------------------------------
 
+/**
+ * Device enrollment, mocked.
+ *
+ * Two behaviours that differ from live, deliberately:
+ *
+ *   - The DEV device id short-circuits to an approved ADMIN ticket, so
+ *     `npm run dev` boots straight into the app. Local development has no
+ *     admin sitting there to approve anything, and there is no password to
+ *     fall back on any more.
+ *   - Any other request lands in the queue as PENDING, so the "Cereri de
+ *     acces" screen has something real to approve. The seed adds a couple of
+ *     rows for the same reason.
+ */
+export const DEV_DEVICE_ID = 'mock-dev-browser';
+
+function makeVerificationCode(): string {
+  return String(Math.floor(Math.random() * 1_000_000)).padStart(6, '0');
+}
+
+function findApprovableEmployee(role: Role): { employee: Employee; credential: CredentialRow } | null {
+  const employee = db.employees.find((e) => e.roles.includes(role));
+  const credential = employee && db.credentials.find((c) => c.employeeId === employee.id);
+  if (!employee || !credential) return null;
+  return { employee, credential };
+}
+
+const enrollmentApi: EcoTrackApi['enrollment'] = {
+  status(): Promise<EnrollmentStatus> {
+    // The mock db is always seeded with employees, so it is never a fresh
+    // instance and never asks for the first-run setup code.
+    return respond(() => ({ awaitingBootstrap: false, setupCodeRequired: false }));
+  },
+
+  request(input: EnrollmentRequestInput): Promise<EnrollmentTicket> {
+    return respond((): EnrollmentTicket => {
+      const isDev = input.deviceId === DEV_DEVICE_ID;
+      const row: AccessRequestRow = {
+        id: nextId('accessRequest'),
+        fullName: input.fullName,
+        verificationCode: makeVerificationCode(),
+        deviceLabel: input.deviceLabel ?? 'Acest browser',
+        status: isDev ? 'APPROVED' : 'PENDING',
+        createdAt: new Date().toISOString(),
+        expiresAt: new Date(Date.now() + 10 * 60_000).toISOString(),
+        assignedRoleName: isDev ? 'ADMIN' : null,
+        claimSecret: `mock.claim.${Math.random().toString(36).slice(2)}`,
+      };
+      db.accessRequests.push(row);
+      return {
+        requestId: row.id,
+        claimSecret: row.claimSecret,
+        verificationCode: row.verificationCode,
+        expiresAt: row.expiresAt,
+        autoApproved: isDev,
+      };
+    });
+  },
+
+  claim(requestId: number, claimSecret: string): Promise<ClaimResult> {
+    return respond((): ClaimResult => {
+      const row = db.accessRequests.find((r) => r.id === requestId);
+      // Unknown id and wrong secret answer identically, as live does.
+      if (!row || row.claimSecret !== claimSecret) {
+        return { state: 'unknown', message: 'Cererea nu a fost găsită' };
+      }
+      if (row.status === 'PENDING') return { state: 'pending' };
+      if (row.status === 'REJECTED') {
+        return { state: 'rejected', message: 'Cererea a fost respinsă' };
+      }
+      if (row.status !== 'APPROVED') {
+        return { state: 'expired', message: 'Cererea a expirat. Trimite o cerere nouă.' };
+      }
+
+      const match = findApprovableEmployee(row.assignedRoleName ?? 'DRIVER');
+      if (!match) return { state: 'unknown', message: 'Rol indisponibil' };
+
+      row.status = 'CLAIMED';
+      return {
+        state: 'issued',
+        session: issueSession(match.employee, match.credential, row.deviceLabel ?? 'Acest browser'),
+      };
+    });
+  },
+
+  listRequests(): Promise<AccessRequest[]> {
+    return respond((): AccessRequest[] => {
+      currentEmployee();
+      const now = Date.now();
+      return db.accessRequests
+        .filter((r) => r.status === 'PENDING' || r.status === 'APPROVED')
+        .filter((r) => new Date(r.expiresAt).getTime() > now)
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+        .map(({ claimSecret: _secret, ...rest }) => rest);
+    });
+  },
+
+  approve(id: number, role: Role): Promise<void> {
+    return respond((): void => {
+      currentEmployee();
+      const row = db.accessRequests.find((r) => r.id === id);
+      if (!row) throw new MockApiError('Cererea nu a fost găsită', 404);
+      if (row.status !== 'PENDING') throw new MockApiError('Cererea a fost deja procesată', 409);
+      row.status = 'APPROVED';
+      row.assignedRoleName = role;
+      row.expiresAt = new Date(Date.now() + 10 * 60_000).toISOString();
+    });
+  },
+
+  reject(id: number): Promise<void> {
+    return respond((): void => {
+      currentEmployee();
+      const row = db.accessRequests.find((r) => r.id === id);
+      if (!row) throw new MockApiError('Cererea nu a fost găsită', 404);
+      if (row.status !== 'PENDING') throw new MockApiError('Cererea a fost deja procesată', 409);
+      row.status = 'REJECTED';
+    });
+  },
+};
+
 export const mockApi: EcoTrackApi = {
   auth: authApi,
+  enrollment: enrollmentApi,
   clients: clientsApi,
   orders: ordersApi,
   products: productsApi,

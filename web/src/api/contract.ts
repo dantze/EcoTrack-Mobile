@@ -45,9 +45,10 @@ export type OrderInput = { orderType: OrderTypeTag } & Record<string, unknown>;
 
 export interface CreateRouteInput {
   name: string;
-  /** ISO date "YYYY-MM-DD". */
-  date?: string | null;
-  /** 1 = Monday … 7 = Sunday. */
+  /**
+   * 1 = Monday … 7 = Sunday. A route is WEEKLY, not dated — editing one
+   * changes every week from now on, so there is no calendar date to set.
+   */
   dayOfWeek?: number | null;
   county?: string | null;
   employeeId?: number | null;
@@ -68,9 +69,13 @@ export interface CreateTaskInput {
   orderId?: number | null;
 }
 
+/**
+ * Creating an employee makes a PERSON — someone a route can be assigned to. It
+ * grants no access: there is no password field because there are no passwords.
+ * Access comes from that person's device enrolling and an admin approving it.
+ */
 export interface CreateEmployeeInput {
   username: string;
-  password: string;
   fullName: string;
   phone?: string | null;
   county?: string | null;
@@ -112,6 +117,67 @@ export interface LoginOutcome {
   session?: AuthSession;
 }
 
+// ---------------------------------------------------------------------------
+// Device enrollment — the only way into the app
+// ---------------------------------------------------------------------------
+
+/** Lifecycle of one access request. Mirrors the backend enum exactly. */
+export type AccessRequestStatus = 'PENDING' | 'APPROVED' | 'REJECTED' | 'EXPIRED' | 'CLAIMED';
+
+/** One row in the admin's "Cereri de acces" queue. Never carries the claim secret. */
+export interface AccessRequest {
+  id: number;
+  fullName: string;
+  /** Six digits, shown to the requester too — the admin checks they match. */
+  verificationCode: string;
+  deviceLabel: string | null;
+  status: AccessRequestStatus;
+  createdAt: string;
+  expiresAt: string;
+  assignedRoleName: Role | null;
+}
+
+/** GET /enrollment/status — lets the request screen decide what to render. */
+export interface EnrollmentStatus {
+  /** No employees exist yet: the next approved request becomes ADMIN. */
+  awaitingBootstrap: boolean;
+  /** Show the one-time setup-code field (first run, and only when configured). */
+  setupCodeRequired: boolean;
+}
+
+/**
+ * What a device keeps after asking for access.
+ *
+ * `claimSecret` is returned exactly once and is the ONLY thing that can collect
+ * the approval — store it, and never show it to the user.
+ */
+export interface EnrollmentTicket {
+  requestId: number;
+  claimSecret: string;
+  verificationCode: string;
+  expiresAt: string;
+  /** True on a fresh instance: the first requester is admin, no waiting. */
+  autoApproved: boolean;
+}
+
+export interface EnrollmentRequestInput {
+  fullName: string;
+  deviceId: string;
+  deviceLabel?: string;
+  setupCode?: string;
+}
+
+/**
+ * Result of polling for the approval. `pending` is not an error — the waiting
+ * screen polls on it.
+ */
+export type ClaimResult =
+  | { state: 'issued'; session: AuthSession }
+  | { state: 'pending' }
+  | { state: 'rejected'; message: string }
+  | { state: 'expired'; message: string }
+  | { state: 'unknown'; message: string };
+
 /** One row of GET /auth/sessions — a device holding a live refresh token. */
 export interface SessionDevice {
   id: string;
@@ -125,11 +191,14 @@ export interface SessionDevice {
 // Per-resource interfaces
 // ---------------------------------------------------------------------------
 
+/**
+ * Session endpoints for a device that is ALREADY enrolled.
+ *
+ * There is no login and no Google handshake: both were removed from the
+ * backend outright. A first session comes from `EnrollmentApi.claim`, after an
+ * admin approved the device.
+ */
 export interface AuthApi {
-  /** POST /auth/login */
-  login(username: string, password: string): Promise<LoginOutcome>;
-  /** POST /auth/google — idToken is the Google Identity Services credential. */
-  loginWithGoogle(idToken: string): Promise<LoginOutcome>;
   /** POST /auth/refresh. Rotates the refresh token — the old one dies. */
   refresh(refreshToken: string): Promise<AuthTokens>;
   /** POST /auth/logout. Best-effort: callers clear local state regardless. */
@@ -142,6 +211,26 @@ export interface AuthApi {
   revokeSession(id: string): Promise<void>;
   /** DELETE /auth/sessions — every device but this one. */
   revokeOtherSessions(): Promise<void>;
+}
+
+/**
+ * Device enrollment. The first three calls are UNAUTHENTICATED by necessity —
+ * a device has no credential until an admin approves it. The last three are
+ * admin-only and ride the caller's access token.
+ */
+export interface EnrollmentApi {
+  /** GET /enrollment/status */
+  status(): Promise<EnrollmentStatus>;
+  /** POST /enrollment/request */
+  request(input: EnrollmentRequestInput): Promise<EnrollmentTicket>;
+  /** POST /enrollment/claim — polled by the waiting screen. */
+  claim(requestId: number, claimSecret: string): Promise<ClaimResult>;
+  /** GET /admin/enrollment/requests */
+  listRequests(): Promise<AccessRequest[]>;
+  /** POST /admin/enrollment/requests/{id}/approve */
+  approve(id: number, role: Role): Promise<void>;
+  /** POST /admin/enrollment/requests/{id}/reject */
+  reject(id: number): Promise<void>;
 }
 
 export interface ClientsApi {
@@ -229,7 +318,8 @@ export interface RoutesApi {
   /** GET /routes/employee/{employeeId} */
   listForEmployee(employeeId: number): Promise<Route[]>;
   /** GET /routes/employee/{employeeId}/date/{date} — date is "YYYY-MM-DD". */
-  listForEmployeeOnDate(employeeId: number, date: string): Promise<Route[]>;
+  /** GET /routes/employee/{id}/day/{dayOfWeek} — 1 = Monday … 7 = Sunday. */
+  listForEmployeeOnDay(employeeId: number, dayOfWeek: number): Promise<Route[]>;
   /** POST /routes */
   create(input: CreateRouteInput): Promise<Route>;
   /** DELETE /routes/{id} */
@@ -306,6 +396,7 @@ export interface RecurringApi {
 
 export interface EcoTrackApi {
   auth: AuthApi;
+  enrollment: EnrollmentApi;
   clients: ClientsApi;
   orders: OrdersApi;
   products: ProductsApi;

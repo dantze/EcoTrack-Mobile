@@ -44,9 +44,9 @@ export const routesApi: RoutesApi = {
     return (raw ?? []).map((route) => normalizeRoute(route, { employees }));
   },
 
-  async listForEmployeeOnDate(employeeId: number, date: string): Promise<Route[]> {
+  async listForEmployeeOnDay(employeeId: number, dayOfWeek: number): Promise<Route[]> {
     const { raw, employees } = await withEmployees(() =>
-      request<RawRoute[]>(`/routes/employee/${employeeId}/date/${date}`),
+      request<RawRoute[]>(`/routes/employee/${employeeId}/day/${dayOfWeek}`),
     );
     return (raw ?? []).map((route) => normalizeRoute(route, { employees }));
   },

@@ -25,13 +25,13 @@ import { useShortcuts } from '@/lib/hotkeys';
 import { useUndo } from '@/lib/undo';
 import { recordUse } from '@/lib/recents';
 import type { Task } from '@/types/domain';
+import { TaskStatusBadge } from '@/components/domain';
 import {
   useDrivers,
   useReassignTasks,
   useRoutes,
   useTasks,
   useTaskUndoActions,
-  useUpdateManyTaskStatuses,
 } from './queries';
 import {
   driverLabel,
@@ -40,12 +40,11 @@ import {
   routeLabel,
   taskDate,
   todayIso,
+  weekRange,
 } from './utils';
 import { ALL, TASK_STATUS_OPTIONS, TASK_TYPE_OPTIONS } from './constants';
-import { TASK_STATUS_LABELS } from '@/components/domain';
-import { TASK_STATUSES, type TaskStatus } from '@/types/domain';
 import { AddressCell, ErrorBlock, TaskTypeBadge, Toolbar } from './components/display';
-import { InlineDateInput, InlineStatusSelect } from './components/inline';
+import { InlineDateInput } from './components/inline';
 import { FeedbackProvider, useFeedback } from './components/feedback';
 import { RoutePickerModal } from './components/pickers';
 import { TaskDetailDrawer } from './components/TaskDetailDrawer';
@@ -67,7 +66,17 @@ function TasksScreen() {
 
   const [status, setStatus] = useState<string>(ALL);
   const [type, setType] = useState<string>(ALL);
-  const [date, setDate] = useState<string | null>(null);
+  // An inclusive [from, to] range rather than a single day: "this week" is the
+  // question dispatchers actually ask, and a one-day filter could not express it.
+  const [dateFrom, setDateFrom] = useState<string | null>(null);
+  const [dateTo, setDateTo] = useState<string | null>(null);
+
+  const setRange = ({ from, to }: { from: string | null; to: string | null }) => {
+    setDateFrom(from);
+    setDateTo(to);
+  };
+  /** A single day is just a range whose ends coincide. */
+  const setDay = (iso: string) => setRange({ from: iso, to: iso });
   const [route, setRoute] = useState<string>(ALL);
   const [driver, setDriver] = useState<string>(ALL);
   const [query, setQuery] = useState('');
@@ -80,7 +89,6 @@ function TasksScreen() {
   const routesQuery = useRoutes();
   const driversQuery = useDrivers();
   const reassign = useReassignTasks();
-  const bulkStatus = useUpdateManyTaskStatuses();
 
   const tasks = useMemo(() => tasksQuery.data ?? [], [tasksQuery.data]);
 
@@ -105,13 +113,19 @@ function TasksScreen() {
       combo: 't',
       description: 'Filtrează pe ziua de azi',
       group: 'Sarcini',
-      run: () => setDate(todayIso()),
+      run: () => setDay(todayIso()),
     },
     {
       combo: 'a',
       description: 'Arată toate datele',
       group: 'Sarcini',
-      run: () => setDate(null),
+      run: () => setRange({ from: null, to: null }),
+    },
+    {
+      combo: 'w',
+      description: 'Filtrează pe săptămâna asta',
+      group: 'Sarcini',
+      run: () => setRange(weekRange(0)),
     },
     {
       combo: 'r',
@@ -126,7 +140,9 @@ function TasksScreen() {
       tasks.filter((task) => {
         if (status !== ALL && task.status !== status) return false;
         if (type !== ALL && task.type !== type) return false;
-        if (date && taskDate(task) !== date) return false;
+        const scheduled = taskDate(task);
+        if (dateFrom && (!scheduled || scheduled < dateFrom)) return false;
+        if (dateTo && (!scheduled || scheduled > dateTo)) return false;
         if (route === NO_ROUTE && task.route) return false;
         if (route !== ALL && route !== NO_ROUTE && String(task.route?.id) !== route) return false;
         if (driver !== ALL && String(task.route?.employee?.id) !== driver) return false;
@@ -139,7 +155,7 @@ function TasksScreen() {
           task.internalNotes,
         );
       }),
-    [tasks, status, type, date, route, driver, query],
+    [tasks, status, type, dateFrom, dateTo, route, driver, query],
   );
 
   const selectedIds = useMemo(
@@ -151,47 +167,6 @@ function TasksScreen() {
   const undoStack = useUndo();
   const undoActions = useTaskUndoActions();
 
-  const applyBulkStatus = (status: TaskStatus) => {
-    if (selectedIds.length === 0) {
-      toast.info('Selectează cel puțin o sarcină.');
-      return;
-    }
-    // Snapshot before the write: after it lands the cache is invalidated and
-    // the old statuses are gone. Rows whose status already matched are skipped
-    // so undo does not rewrite work it never touched.
-    const previousStatuses = filtered
-      .filter((task) => selected.has(task.id) && task.status !== status)
-      .map((task) => ({ taskId: task.id, status: task.status }));
-
-    bulkStatus.mutate(
-      { taskIds: selectedIds, status },
-      {
-        onSuccess: ({ updated, failed }) => {
-          if (updated > 0 && failed === 0 && previousStatuses.length > 0) {
-            undoStack.push({
-              label: `schimbarea statusului pentru ${previousStatuses.length} ${previousStatuses.length === 1 ? 'sarcină' : 'sarcini'}`,
-              // Sequential, like the forward mutation: there is no optimistic
-              // locking on the backend (CLAUDE.md, "Known gaps"), so a burst of
-              // concurrent writes is the wrong way to discover that.
-              invert: () => undoActions.restoreStatuses(previousStatuses),
-            });
-          }
-          if (updated > 0) {
-            toast.success(
-              `${updated} ${updated === 1 ? 'sarcină marcată' : 'sarcini marcate'} „${TASK_STATUS_LABELS[status]}”.`,
-            );
-          }
-          if (failed > 0) {
-            toast.error(`${failed} sarcini nu au putut fi actualizate.`);
-          } else {
-            setSelected(new Set());
-          }
-        },
-        onError: (error) => toast.error(errorMessage(error)),
-      },
-    );
-  };
-
   const columns: Column<Task>[] = [
     {
       key: 'type',
@@ -201,11 +176,13 @@ function TasksScreen() {
       render: (task) => <TaskTypeBadge type={task.type} />,
     },
     {
+      // Read-only: status is the DRIVER's report from the field, not something
+      // the office sets. See TaskDetailDrawer for the same reasoning.
       key: 'status',
       header: 'Status',
       width: '9.5rem',
       sortValue: (task) => task.status,
-      render: (task) => <InlineStatusSelect task={task} />,
+      render: (task) => <TaskStatusBadge status={task.status} />,
     },
     {
       key: 'date',
@@ -259,14 +236,20 @@ function TasksScreen() {
   const resetFilters = () => {
     setStatus(ALL);
     setType(ALL);
-    setDate(null);
+    setRange({ from: null, to: null });
     setRoute(ALL);
     setDriver(ALL);
     setQuery('');
   };
 
   const filtersActive =
-    status !== ALL || type !== ALL || date !== null || route !== ALL || driver !== ALL || query !== '';
+    status !== ALL ||
+    type !== ALL ||
+    dateFrom !== null ||
+    dateTo !== null ||
+    route !== ALL ||
+    driver !== ALL ||
+    query !== '';
 
   return (
     <>
@@ -306,12 +289,26 @@ function TasksScreen() {
         </div>
 
         <div className="w-40">
-          <DateInput label="Data programată" value={date} onChange={setDate} />
+          <DateInput label="De la" value={dateFrom} onChange={setDateFrom} />
         </div>
-        <Button size="sm" variant="ghost" onClick={() => setDate(todayIso())}>
+        <div className="w-40">
+          <DateInput label="Până la" value={dateTo} onChange={setDateTo} />
+        </div>
+        <Button size="sm" variant="ghost" onClick={() => setDay(todayIso())}>
           Azi
         </Button>
-        <Button size="sm" variant="ghost" onClick={() => setDate(null)} disabled={date === null}>
+        <Button size="sm" variant="ghost" onClick={() => setRange(weekRange(0))}>
+          Săptămâna asta
+        </Button>
+        <Button size="sm" variant="ghost" onClick={() => setRange(weekRange(1))}>
+          Săptămâna urmatoare
+        </Button>
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={() => setRange({ from: null, to: null })}
+          disabled={dateFrom === null && dateTo === null}
+        >
           Toate datele
         </Button>
 
@@ -385,24 +382,6 @@ function TasksScreen() {
               >
                 Reasignează pe rută
               </Button>
-              {/* One click per status beats one click per row: closing out a
-                  finished route used to mean editing every line by hand. */}
-              <div className="w-44">
-                <Select
-                  size="sm"
-                  aria-label="Schimbă statusul selecției"
-                  value={null}
-                  placeholder={
-                    bulkStatus.isPending ? 'Se actualizează…' : 'Schimbă statusul…'
-                  }
-                  disabled={bulkStatus.isPending}
-                  options={TASK_STATUSES.map((status) => ({
-                    value: status,
-                    label: `Marchează „${TASK_STATUS_LABELS[status]}”`,
-                  }))}
-                  onChange={(value) => applyBulkStatus(value as TaskStatus)}
-                />
-              </div>
               <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>
                 Golește selecția
               </Button>

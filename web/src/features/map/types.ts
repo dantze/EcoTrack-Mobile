@@ -94,7 +94,8 @@ export interface MapRouteStop {
 export interface MapRouteLine {
   routeId: number;
   label: string;
-  date: string | null;
+  /** 1 = Monday … 7 = Sunday. Routes are weekly, not dated. */
+  dayOfWeek: number | null;
   county: string | null;
   driverName: string | null;
   /** Stable per-route colour, assigned in `data.ts` so legend and line agree. */

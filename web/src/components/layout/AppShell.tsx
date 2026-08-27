@@ -66,8 +66,17 @@ const NAV_SECTIONS: NavSectionDef[] = [
     items: [
       { to: '/rute', label: 'Rute', chord: 'r' },
       { to: '/sarcini', label: 'Sarcini', chord: 's' },
-      { to: '/soferi', label: 'Șoferi', chord: 'd' },
       { to: '/recurente', label: 'Igienizări recurente', chord: 'i' },
+    ],
+  },
+  {
+    // Admin-only. `hasRole` treats ADMIN as satisfying every gate, so this is
+    // the one section that is genuinely exclusive rather than additive.
+    title: 'Admin',
+    roles: ['ADMIN'],
+    items: [
+      { to: '/cereri', label: 'Cereri de acces', chord: 'q' },
+      { to: '/angajati', label: 'Angajați', chord: 'e' },
     ],
   },
 ];

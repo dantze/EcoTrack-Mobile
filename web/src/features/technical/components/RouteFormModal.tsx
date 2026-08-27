@@ -1,13 +1,16 @@
 /**
  * Create-route dialog.
  *
- * Mirrors the mobile CreateRoute screen's validation (name, weekday and county
- * are all required there) and adds the concrete date + driver the desktop
- * dispatch board sorts by. Picking a date fills the weekday automatically.
+ * Mirrors the mobile CreateRoute screen's validation: name, weekday and county
+ * are all required, plus the driver the desktop dispatch board sorts by.
+ *
+ * There is no date field. A route is WEEKLY — it recurs on its weekday, and
+ * editing it changes every week from now on — so asking for a calendar date
+ * would be asking a question the domain cannot answer.
  */
 
 import { useEffect, useState } from 'react';
-import { Button, DateInput, Modal, Select, TextInput } from '@/components/ui';
+import { Button, Modal, Select, TextInput } from '@/components/ui';
 import type { CreateRouteInput } from '@/api';
 import type { Employee } from '@/types/domain';
 import { COUNTY_OPTIONS, WEEKDAY_OPTIONS } from '../constants';
@@ -19,8 +22,6 @@ export interface RouteFormModalProps {
   onSubmit: (input: CreateRouteInput) => void;
   submitting?: boolean;
   drivers: Employee[] | undefined;
-  /** Pre-fills the date field, usually the date the board is filtered to. */
-  defaultDate?: string | null;
 }
 
 interface Errors {
@@ -30,12 +31,6 @@ interface Errors {
 }
 
 /** ISO "YYYY-MM-DD" → 1 = Monday … 7 = Sunday. */
-function weekdayFromIso(iso: string): number | null {
-  const parsed = new Date(`${iso}T00:00:00`);
-  if (Number.isNaN(parsed.getTime())) return null;
-  const jsDay = parsed.getDay();
-  return jsDay === 0 ? 7 : jsDay;
-}
 
 export function RouteFormModal({
   open,
@@ -43,10 +38,8 @@ export function RouteFormModal({
   onSubmit,
   submitting = false,
   drivers,
-  defaultDate = null,
 }: RouteFormModalProps) {
   const [name, setName] = useState('');
-  const [date, setDate] = useState<string | null>(defaultDate);
   const [dayOfWeek, setDayOfWeek] = useState<string | null>(null);
   const [county, setCounty] = useState<string | null>(null);
   const [employeeId, setEmployeeId] = useState<string | null>(null);
@@ -56,20 +49,11 @@ export function RouteFormModal({
   useEffect(() => {
     if (!open) return;
     setName('');
-    setDate(defaultDate);
-    setDayOfWeek(defaultDate ? String(weekdayFromIso(defaultDate) ?? '') || null : null);
+    setDayOfWeek(null);
     setCounty(null);
     setEmployeeId(null);
     setErrors({});
-  }, [open, defaultDate]);
-
-  const handleDateChange = (value: string | null) => {
-    setDate(value);
-    if (value) {
-      const derived = weekdayFromIso(value);
-      if (derived) setDayOfWeek(String(derived));
-    }
-  };
+  }, [open]);
 
   const submit = () => {
     const next: Errors = {};
@@ -84,7 +68,6 @@ export function RouteFormModal({
 
     onSubmit({
       name: name.trim(),
-      date,
       dayOfWeek: dayOfWeek ? Number(dayOfWeek) : null,
       county,
       employeeId: employeeId ? Number(employeeId) : null,
@@ -125,7 +108,6 @@ export function RouteFormModal({
         />
 
         <div className="grid grid-cols-2 gap-3">
-          <DateInput label="Data" value={date} onChange={handleDateChange} />
           <Select
             id="dayOfWeek"
             label="Ziua săptămânii"

@@ -12,5 +12,5 @@ public interface RouteRepository extends JpaRepository<Route, Long> {
 
     List<Route> findByEmployee_Id(Long employeeId);
 
-    List<Route> findByEmployee_IdAndDate(Long employeeId, LocalDate date);
+    List<Route> findByEmployee_IdAndDayOfWeek(Long employeeId, Integer dayOfWeek);
 }

@@ -330,7 +330,7 @@ function buildRouteLine(route: Route, color: string): MapRouteLine | null {
   return {
     routeId: route.id,
     label: routeLabel(route),
-    date: route.date,
+    dayOfWeek: route.dayOfWeek,
     county: route.county,
     driverName: route.employee?.fullName ?? null,
     color,

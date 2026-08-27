@@ -18,6 +18,7 @@
 import type { Client, Employee, Product, Role, Subscription, TaskStatus, TaskType } from '@/types/domain';
 import { clientName } from '@/types/domain';
 import type {
+  AccessRequestRow,
   AuthSessionRow,
   CredentialRow,
   MockDb,
@@ -71,8 +72,9 @@ const isoInstant = (date: Date, hour = 9): string =>
 
 const dayOfWeekIso = (date: Date): number => date.getUTCDay() || 7;
 
-const shortDate = (date: Date): string =>
-  `${String(date.getUTCDate()).padStart(2, '0')}.${String(date.getUTCMonth() + 1).padStart(2, '0')}`;
+/** Romanian weekday names, indexed 1 = Monday … 7 = Sunday. */
+const WEEKDAYS_RO = ['Luni', 'Marți', 'Miercuri', 'Joi', 'Vineri', 'Sâmbătă', 'Duminică'];
+
 
 // ---------------------------------------------------------------------------
 // Romanian vocabulary
@@ -430,8 +432,8 @@ export function createSeedDb(): MockDb {
 
       routes.push({
         id: routeId,
-        name: `Ruta ${area.zones[n % area.zones.length]} — ${shortDate(date)}`,
-        date: isoDate(date),
+        // Named for the weekday it runs, not a calendar day: routes recur.
+        name: `Ruta ${area.zones[n % area.zones.length]} — ${WEEKDAYS_RO[dayOfWeekIso(date) - 1]}`,
         dayOfWeek: dayOfWeekIso(date),
         county: plan.county,
         employeeId: driver ? driver.id : null,
@@ -742,6 +744,34 @@ export function createSeedDb(): MockDb {
   // A demo device or two per employee so "Sesiuni active" has something to
   // show and revoke on first login, rather than a lone current session.
   const authSessions: AuthSessionRow[] = [];
+
+  // Two pending enrollment requests so "Cereri de acces" has something real to
+  // approve in local development. Deliberately NOT auto-approved: the point of
+  // the screen is exercising the approve/reject decision.
+  const accessRequests: AccessRequestRow[] = [
+    {
+      id: 1,
+      fullName: 'Marius Ciobanu',
+      verificationCode: '481902',
+      deviceLabel: 'Samsung Galaxy A54',
+      status: 'PENDING',
+      createdAt: new Date(Date.now() - 2 * 60_000).toISOString(),
+      expiresAt: new Date(Date.now() + 8 * 60_000).toISOString(),
+      assignedRoleName: null,
+      claimSecret: 'mock.claim.seed.marius',
+    },
+    {
+      id: 2,
+      fullName: 'Elena Trandafir',
+      verificationCode: '250714',
+      deviceLabel: 'iPhone 13',
+      status: 'PENDING',
+      createdAt: new Date(Date.now() - 5 * 60_000).toISOString(),
+      expiresAt: new Date(Date.now() + 5 * 60_000).toISOString(),
+      assignedRoleName: null,
+      claimSecret: 'mock.claim.seed.elena',
+    },
+  ];
   let sessionId = 0;
   const DEMO_DEVICES = ['Chrome · Windows', 'Aplicație mobilă · Android', 'Safari · iPhone'] as const;
 
@@ -783,6 +813,7 @@ export function createSeedDb(): MockDb {
     orders,
     recurring,
     authSessions,
+    accessRequests,
     seq: {
       client: clients.length,
       product: products.length,
@@ -795,6 +826,7 @@ export function createSeedDb(): MockDb {
       recurring: recurring.length,
       photo: taskId * 10 + 10,
       session: sessionId,
+      accessRequest: accessRequests.length,
     },
   };
 }

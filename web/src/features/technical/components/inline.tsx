@@ -4,14 +4,17 @@
  * Each cell owns its own mutation so the pending state is per-row rather than
  * per-table, and each stops click propagation so editing never triggers the
  * row's own "open the drawer" handler.
+ *
+ * There is deliberately no inline STATUS editor. Status belongs to the driver
+ * — they mark "În curs" on arrival and the task completes when they finish
+ * uploading photos — so the web renders it as a badge and never writes it.
  */
 
 import type { ReactNode } from 'react';
-import { DateInput, Select } from '@/components/ui';
-import type { Task, TaskStatus } from '@/types/domain';
-import { useUpdateTaskDate, useUpdateTaskStatus } from '../queries';
+import { DateInput } from '@/components/ui';
+import type { Task } from '@/types/domain';
+import { useUpdateTaskDate } from '../queries';
 import { errorMessage, taskDate } from '../utils';
-import { TASK_STATUS_OPTIONS } from '../constants';
 import { useFeedback } from './feedback';
 
 function CellShell({ width, children }: { width: string; children: ReactNode }) {
@@ -23,30 +26,6 @@ function CellShell({ width, children }: { width: string; children: ReactNode }) 
     >
       {children}
     </div>
-  );
-}
-
-export function InlineStatusSelect({ task }: { task: Task }) {
-  const { toast } = useFeedback();
-  const mutation = useUpdateTaskStatus();
-
-  return (
-    <CellShell width="8.5rem">
-      <Select
-        value={task.status}
-        options={TASK_STATUS_OPTIONS}
-        disabled={mutation.isPending}
-        onChange={(value) =>
-          mutation.mutate(
-            { taskId: task.id, status: value as TaskStatus },
-            {
-              onSuccess: () => toast.success('Status actualizat.'),
-              onError: (error) => toast.error(errorMessage(error)),
-            },
-          )
-        }
-      />
-    </CellShell>
   );
 }
 

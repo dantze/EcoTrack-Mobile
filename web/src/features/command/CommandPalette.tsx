@@ -19,7 +19,7 @@
 import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Modal, SearchIcon, cx } from '@/components/ui';
-import { ORDER_TYPE_LABELS, TASK_TYPE_LABELS, formatDate } from '@/components/domain';
+import { ORDER_TYPE_LABELS, TASK_TYPE_LABELS, formatDate, weekdayLabel } from '@/components/domain';
 import { useAuth } from '@/auth';
 import { boost, recentIds, recordUse, recentsRevision, subscribeRecents } from '@/lib/recents';
 import { rankBy, splitHighlight, type MatchRange } from '@/lib/search';
@@ -109,7 +109,8 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
       { path: '/abonamente', label: 'Abonamente', roles: ['SALES'], keywords: 'subscriptii' },
       { path: '/rute', label: 'Rute', roles: ['TECH'], keywords: 'dispecerat planificare' },
       { path: '/sarcini', label: 'Sarcini', roles: ['TECH'], keywords: 'tasks lucrari' },
-      { path: '/soferi', label: 'Șoferi', roles: ['TECH'], keywords: 'angajati drivers' },
+      { path: '/angajati', label: 'Angajați', roles: ['ADMIN'], keywords: 'soferi angajati drivers acces' },
+      { path: '/cereri', label: 'Cereri de acces', roles: ['ADMIN'], keywords: 'aprobare acces enrollment' },
       { path: '/recurente', label: 'Igienizări recurente', roles: ['TECH'], keywords: 'planuri' },
     ];
 
@@ -164,7 +165,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
         subtitle: 'Deschide formularul de angajat',
         keywords: 'adauga creeaza sofer angajat nou employee',
         recentId: 'new:employee',
-        run: go('/soferi?nou=1', 'new:employee'),
+        run: go('/angajati?nou=1', 'new:employee'),
       });
     }
 
@@ -265,7 +266,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
         recentId: `driver:${driver.id}`,
         run: () => {
           recordUse('driver', driver.id);
-          navigate(`/soferi?sofer=${driver.id}`);
+          navigate(`/angajati?sofer=${driver.id}`);
           onClose();
         },
       });
@@ -277,7 +278,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
         kind: 'route',
         title: routeLabel(route),
         subtitle: [
-          formatDate(route.date),
+          weekdayLabel(route.dayOfWeek),
           route.county,
           route.employee?.fullName ?? 'Fără șofer',
           `${route.tasks?.length ?? 0} sarcini`,

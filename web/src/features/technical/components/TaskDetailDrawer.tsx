@@ -6,7 +6,7 @@
  */
 
 import { useState } from 'react';
-import { Button, DateInput, Drawer, Select } from '@/components/ui';
+import { Button, DateInput, Drawer } from '@/components/ui';
 import {
   ORDER_TYPE_LABELS,
   TASK_TYPE_LABELS,
@@ -14,13 +14,12 @@ import {
   formatDate,
 } from '@/components/domain';
 import { clientName } from '@/types/domain';
-import type { TaskStatus } from '@/types/domain';
+
 import {
   useRoutes,
   useTask,
   useTaskPhotos,
   useUpdateTaskDate,
-  useUpdateTaskStatus,
   useReassignTasks,
 } from '../queries';
 import {
@@ -31,7 +30,6 @@ import {
   routeLabel,
   taskDate,
 } from '../utils';
-import { TASK_STATUS_OPTIONS } from '../constants';
 import { AsyncPanel, DetailList, DetailRow, LocationBlock, TaskTypeBadge } from './display';
 import { RoutePickerModal } from './pickers';
 import { useFeedback } from './feedback';
@@ -49,22 +47,10 @@ export function TaskDetailDrawer({ taskId, onClose }: TaskDetailDrawerProps) {
   const photosQuery = useTaskPhotos(taskId);
   const routesQuery = useRoutes();
 
-  const updateStatus = useUpdateTaskStatus();
   const updateDate = useUpdateTaskDate();
   const reassign = useReassignTasks();
 
   const task = taskQuery.data ?? null;
-
-  const handleStatus = (value: string) => {
-    if (!task) return;
-    updateStatus.mutate(
-      { taskId: task.id, status: value as TaskStatus },
-      {
-        onSuccess: () => toast.success('Statusul sarcinii a fost actualizat.'),
-        onError: (error) => toast.error(errorMessage(error)),
-      },
-    );
-  };
 
   const handleDate = (value: string | null) => {
     if (!task || !value) return;
@@ -99,15 +85,19 @@ export function TaskDetailDrawer({ taskId, onClose }: TaskDetailDrawerProps) {
                 <span className="tabular text-xs text-ink-subtle">#{task.id}</span>
               </div>
 
-              {/* Inline edits — the two fields dispatchers change most often. */}
+              {/*
+                Status is READ-ONLY here, deliberately.
+
+                It is the driver's report from the field: they mark "În curs"
+                when they arrive and the task completes when they finish
+                uploading photos. A dispatcher setting it from the office would
+                be recording work that may not have happened — so the web app
+                observes status, it does not set it. The badge above shows the
+                current value; the backend enforces the same rule
+                (TaskAccessPolicy restricts PATCH /tasks/{id}/status to the
+                assigned driver).
+              */}
               <div className="grid grid-cols-2 gap-3 rounded-md border border-border bg-surface-sunken p-3">
-                <Select
-                  label="Status"
-                  value={task.status}
-                  options={TASK_STATUS_OPTIONS}
-                  disabled={updateStatus.isPending}
-                  onChange={handleStatus}
-                />
                 <DateInput
                   label="Dată programată"
                   hint="Serverul fixează ora la 08:00."

@@ -30,7 +30,6 @@ export interface EmployeeFormModalProps {
 interface Errors {
   fullName?: string;
   username?: string;
-  password?: string;
   roles?: string;
 }
 
@@ -46,7 +45,6 @@ export function EmployeeFormModal({
 
   const [fullName, setFullName] = useState('');
   const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
   const [phone, setPhone] = useState('');
   const [county, setCounty] = useState<string | null>(null);
   const [roles, setRoles] = useState<Role[]>(['DRIVER']);
@@ -56,7 +54,6 @@ export function EmployeeFormModal({
     if (!open) return;
     setFullName(employee?.fullName ?? '');
     setUsername(employee?.username ?? '');
-    setPassword('');
     setPhone(employee?.phone ?? '');
     setCounty(employee?.county ?? null);
     setRoles(employee?.roles?.length ? employee.roles : ['DRIVER']);
@@ -73,7 +70,6 @@ export function EmployeeFormModal({
     const next: Errors = {};
     if (!fullName.trim()) next.fullName = 'Numele este obligatoriu.';
     if (!username.trim()) next.username = 'Utilizatorul este obligatoriu.';
-    if (!isEdit && password.trim().length < 4) next.password = 'Minim 4 caractere.';
     if (roles.length === 0) next.roles = 'Alege cel puțin un rol.';
     setErrors(next);
     if (Object.keys(next).length > 0) {
@@ -84,8 +80,6 @@ export function EmployeeFormModal({
     onSubmit(
       {
         username: username.trim(),
-        // On edit an empty box means "keep the current password".
-        password: password.trim(),
         fullName: fullName.trim(),
         phone: phone.trim() || null,
         county,
@@ -143,17 +137,6 @@ export function EmployeeFormModal({
             value={username}
             error={errors.username}
             onChange={(event) => setUsername(event.target.value)}
-          />
-          <TextInput
-            id="password"
-            label="Parolă"
-            type="password"
-            autoComplete="new-password"
-            required={!isEdit}
-            hint={isEdit ? 'Lasă gol pentru a păstra parola.' : undefined}
-            value={password}
-            error={errors.password}
-            onChange={(event) => setPassword(event.target.value)}
           />
         </div>
         <div className="grid grid-cols-2 gap-3">

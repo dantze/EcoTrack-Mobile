@@ -18,7 +18,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { Button, Modal, TextInput, cx } from '@/components/ui';
-import { formatDate, weekdayLabel } from '@/components/domain';
+import { weekdayLabel } from '@/components/domain';
 import { boost, recordUse } from '@/lib/recents';
 import type { Employee, Route } from '@/types/domain';
 import { driverLabel, matchesQuery, routeLabel, taskProgress } from '../utils';
@@ -175,7 +175,7 @@ export function RoutePickerModal({
     return [...list].sort(
       (left, right) =>
         boost('route', right.id) - boost('route', left.id) ||
-        (left.date ?? '').localeCompare(right.date ?? ''),
+        (left.dayOfWeek ?? 8) - (right.dayOfWeek ?? 8),
     );
   }, [routes, query]);
 
@@ -240,7 +240,6 @@ export function RoutePickerModal({
                   index={index}
                   title={routeLabel(route)}
                   meta={[
-                    formatDate(route.date),
                     weekdayLabel(route.dayOfWeek),
                     route.county ?? 'fără județ',
                     driverLabel(route.employee),

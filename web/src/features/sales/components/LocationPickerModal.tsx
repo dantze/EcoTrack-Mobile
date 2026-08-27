@@ -1,20 +1,22 @@
 /**
  * Map picker for an order's location (TODO-10).
  *
- * The desktop equivalent of `mobile/app/Sales/OrderTypes/OrderComponents/
- * LocationPicker.tsx`, and deliberately the same interaction model: search an
- * address, then drag the map under a fixed centre pin until the pin is on the
- * actual gate/manhole. Coordinates come from where the pin ENDS UP, never from
- * the geocoder — a search result lands you on the right street, the drag is
- * what makes it the right spot on it.
+ * The desktop counterpart of `mobile/app/Sales/OrderTypes/OrderComponents/
+ * LocationPicker.tsx`. Interaction model: **click anywhere on the map to drop
+ * the pin, drag the pin to fine-tune it.** The pin is a real marker pinned to
+ * the ground, not a crosshair fixed to the middle of the viewport — panning the
+ * map moves the view, not the point, so the operator can look around without
+ * losing the spot they already chose.
  *
  * Three things fill the value, in the order an operator reaches for them:
  *   1. a known place — somewhere this client (or anyone) has been served
  *      before, drawn as a numbered marker. Exact coordinates, zero typing.
- *   2. an address search, which flies the map to the result.
- *   3. dragging the map, which reverse-geocodes a label for the new point.
+ *   2. an address search, which flies the map to the result and drops the pin
+ *      on it.
+ *   3. clicking or dragging on the map, which reverse-geocodes a label for the
+ *      new point.
  *
- * A dragged pin overwrites the address label on purpose. An address that no
+ * A hand-placed pin overwrites the address label on purpose. An address that no
  * longer matches its coordinates is worse than no address at all: the point is
  * what the driver navigates to, and the text is what the office reads to check
  * the point is right. They have to agree.
@@ -28,6 +30,7 @@
 import { useEffect, useId, useMemo, useRef, useState, type JSX } from 'react';
 import { Map as MapLibreMap, Marker, AttributionControl } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
+import '@/features/map/components/mapCanvas.css';
 import { Button, Modal, SearchIcon, Spinner, TextInput, cx } from '@/components/ui';
 import { parseCoordinates, type LatLng } from '@/types/domain';
 import { DEFAULT_VIEW } from '@/features/map/types';
@@ -64,8 +67,54 @@ export interface LocationPickerModalProps {
 /** Close enough to read house numbers, far enough to see the street. */
 const PICK_ZOOM = 16;
 const SEARCH_DEBOUNCE_MS = 300;
-/** Longer than the search debounce: dragging is continuous, typing is not. */
-const REVERSE_DEBOUNCE_MS = 700;
+/** Longer than the search debounce: a pin can be nudged several times in a row. */
+const REVERSE_DEBOUNCE_MS = 600;
+/**
+ * Generous, because it has to be certain: a cold vector-tile cache on a slow
+ * connection legitimately takes a while, and telling someone the map is broken
+ * while it is merely still arriving is worse than making them wait. Same number
+ * and same reasoning as MapCanvas.
+ */
+const STYLE_TIMEOUT_MS = 20_000;
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+/**
+ * The draggable pin, as DOM rather than JSX: MapLibre positions a marker by
+ * transforming an element it owns, so the element has to exist outside React's
+ * tree. Built node by node instead of through `innerHTML` — nothing here is
+ * user data, but a sink that could accept it is the kind of thing that gets
+ * copied somewhere it matters.
+ */
+function createPinElement(): HTMLDivElement {
+  const wrapper = document.createElement('div');
+  wrapper.className = 'cursor-grab active:cursor-grabbing';
+  wrapper.setAttribute('aria-hidden', 'true');
+
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('viewBox', '0 0 24 24');
+  svg.setAttribute('width', '36');
+  svg.setAttribute('height', '36');
+  svg.style.display = 'block';
+  svg.style.filter = 'drop-shadow(0 2px 3px rgba(15, 23, 42, 0.35))';
+
+  const body = document.createElementNS(SVG_NS, 'path');
+  body.setAttribute(
+    'd',
+    'M12 1.5a7.5 7.5 0 0 0-7.5 7.5c0 5.4 6.6 12.9 6.9 13.2a.8.8 0 0 0 1.2 0c.3-.3 6.9-7.8 6.9-13.2A7.5 7.5 0 0 0 12 1.5Z',
+  );
+  body.setAttribute('fill', '#dc2626');
+
+  const dot = document.createElementNS(SVG_NS, 'circle');
+  dot.setAttribute('cx', '12');
+  dot.setAttribute('cy', '9');
+  dot.setAttribute('r', '2.8');
+  dot.setAttribute('fill', '#ffffff');
+
+  svg.append(body, dot);
+  wrapper.append(svg);
+  return wrapper;
+}
 
 export function LocationPickerModal({
   open,
@@ -113,23 +162,37 @@ function PickerBody({
   const fieldId = useId();
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
+  const markerRef = useRef<Marker | null>(null);
+  /** `Marker.addTo` re-appends the element, so it is called once, not per move. */
+  const markerAddedRef = useRef(false);
 
   const initialPoint = useMemo(() => parseCoordinates(value.coordinates), [value.coordinates]);
 
   const [point, setPoint] = useState<LatLng | null>(initialPoint);
   const [address, setAddress] = useState(value.address);
-  const [moving, setMoving] = useState(false);
+  const [dragging, setDragging] = useState(false);
   const [resolving, setResolving] = useState(false);
+  /**
+   * Set only when a HUMAN placed the pin. A search result and a known place
+   * arrive with a better label than reverse geocoding would invent for the same
+   * spot, so they set the address directly and leave this alone — otherwise the
+   * answer to a search would immediately overwrite itself with a rounder,
+   * less specific street name.
+   */
+  const [pendingReverse, setPendingReverse] = useState<LatLng | null>(null);
+  const [status, setStatus] = useState<'loading' | 'ready' | 'failed'>('loading');
 
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<GeocodeResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [highlighted, setHighlighted] = useState(-1);
 
-  // ── Mount once: build the map, wire the drag → point → reverse chain. ─────
+  // ── Mount once: build the map and the pin it drops. ──────────────────────
   useEffect(() => {
     const container = containerRef.current;
     if (!container) return;
+
+    setStatus('loading');
 
     const start = initialPoint ?? { lat: DEFAULT_VIEW.latitude, lng: DEFAULT_VIEW.longitude };
     const map = new MapLibreMap({
@@ -149,36 +212,54 @@ function PickerBody({
     // Expanded, not compact: mapCanvas.css hides the compact toggle button, and
     // the OpenFreeMap/OSM credit has to stay reachable. See MapCanvas.
     map.addControl(new AttributionControl({ compact: false }), 'bottom-right');
+    // The whole canvas is a target — say so.
+    map.getCanvas().style.cursor = 'crosshair';
 
-    let reverseTimer: ReturnType<typeof setTimeout> | undefined;
-    let reverseAbort: AbortController | undefined;
+    const marker = new Marker({ element: createPinElement(), anchor: 'bottom', draggable: true });
+    markerRef.current = marker;
+    markerAddedRef.current = false;
+
+    /** Everything a person does by hand lands here: point first, label after. */
+    const placeByHand = (lngLat: { lng: number; lat: number }) => {
+      const next = { lat: lngLat.lat, lng: lngLat.lng };
+      setPoint(next);
+      // Flipped here rather than in the effect below: an effect body that calls
+      // setState synchronously is a cascading render, and the gesture is the
+      // moment the label genuinely became stale.
+      setResolving(true);
+      setPendingReverse(next);
+    };
+
+    marker.on('dragstart', () => setDragging(true));
+    marker.on('dragend', () => {
+      setDragging(false);
+      placeByHand(marker.getLngLat());
+    });
+
+    let loaded = false;
+    const loadTimeout = setTimeout(() => {
+      if (!loaded) setStatus('failed');
+    }, STYLE_TIMEOUT_MS);
 
     const subscriptions = [
-      map.on('movestart', () => setMoving(true)),
-      map.on('moveend', (event) => {
-        setMoving(false);
-        const center = map.getCenter();
-        const next = { lat: center.lat, lng: center.lng };
-        setPoint(next);
-
-        // `originalEvent` is present only when a human moved the map. Without
-        // this guard the `flyTo` that ANSWERS a search would immediately
-        // reverse-geocode its own destination and overwrite the label the
-        // operator just picked with a rounder, less specific one.
-        if (!event.originalEvent) return;
-
-        clearTimeout(reverseTimer);
-        reverseAbort?.abort();
-        setResolving(true);
-        reverseTimer = setTimeout(() => {
-          reverseAbort = new AbortController();
-          void reverseGeocode(next, reverseAbort.signal).then((found) => {
-            setResolving(false);
-            if (found) setAddress(found);
-          });
-        }, REVERSE_DEBOUNCE_MS);
-      }),
+      map.on('click', (event) => placeByHand(event.lngLat)),
+      // MapLibre emits `error` for entirely routine startup noise — a raster
+      // tile 404 outside Natural Earth's coverage, an aborted request as the
+      // camera settles. A genuinely unreachable style simply never reaches
+      // `load`, which the timeout above is what catches. Same stance as
+      // MapCanvas, where treating any error as fatal once put a permanent
+      // failure screen over a tile host that was answering 200 throughout.
+      map.on('error', (event) => console.warn('[picker] MapLibre error', event.error ?? event)),
     ];
+
+    map.once('load', () => {
+      loaded = true;
+      clearTimeout(loadTimeout);
+      setStatus('ready');
+      // The dialog animates in, so the box MapLibre measured at construction
+      // may not be the box it ends up in.
+      map.resize();
+    });
 
     // MapLibre measures the container once, at construction. This one is inside
     // a portalled dialog that animates in, so measure again whenever the box
@@ -188,16 +269,59 @@ function PickerBody({
     resizeObserver.observe(container);
 
     return () => {
-      clearTimeout(reverseTimer);
-      reverseAbort?.abort();
+      clearTimeout(loadTimeout);
       resizeObserver.disconnect();
       for (const subscription of subscriptions) subscription.unsubscribe();
+      marker.remove();
+      markerRef.current = null;
+      markerAddedRef.current = false;
       map.remove();
       mapRef.current = null;
     };
     // Mount-only: `initialPoint` is the seed for the camera, not a live input.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // ── The pin follows `point`, whoever set it ──────────────────────────────
+  useEffect(() => {
+    const map = mapRef.current;
+    const marker = markerRef.current;
+    if (!map || !marker) return;
+
+    if (!point) {
+      if (markerAddedRef.current) {
+        marker.remove();
+        markerAddedRef.current = false;
+      }
+      return;
+    }
+
+    marker.setLngLat([point.lng, point.lat]);
+    if (!markerAddedRef.current) {
+      marker.addTo(map);
+      markerAddedRef.current = true;
+    }
+  }, [point]);
+
+  // ── A hand-placed pin gets its label from reverse geocoding, debounced ────
+  useEffect(() => {
+    if (!pendingReverse) return;
+    let cancelled = false;
+    const abort = new AbortController();
+    const timer = setTimeout(() => {
+      void reverseGeocode(pendingReverse, abort.signal).then((found) => {
+        if (cancelled) return;
+        setResolving(false);
+        if (found) setAddress(found);
+      });
+    }, REVERSE_DEBOUNCE_MS);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+      abort.abort();
+    };
+  }, [pendingReverse]);
 
   // ── Known places as markers ──────────────────────────────────────────────
   useEffect(() => {
@@ -216,12 +340,15 @@ function PickerBody({
       );
       element.textContent = String(place.count);
       element.addEventListener('click', (browserEvent) => {
+        // Without this the click also reaches the map and drops the pin at
+        // whatever pixel the badge happened to sit on, which is close to the
+        // stored point but not equal to it.
         browserEvent.stopPropagation();
-        // Snapping is a camera move, so `moveend` writes the point; the address
-        // is set here because the stored one beats anything reverse geocoding
-        // would invent for the same spot.
-        map.flyTo({ center: [place.point.lng, place.point.lat], zoom: PICK_ZOOM, duration: 500 });
+        setPoint(place.point);
+        // The stored address beats anything reverse geocoding would invent for
+        // the same spot, so no `pendingReverse` here.
         setAddress(place.address);
+        map.easeTo({ center: [place.point.lng, place.point.lat], zoom: PICK_ZOOM, duration: 500 });
       });
       return new Marker({ element, anchor: 'center' })
         .setLngLat([place.point.lng, place.point.lat])
@@ -240,6 +367,10 @@ function PickerBody({
     void searchAddresses(value.address, abort.signal).then((found) => {
       const first = found[0];
       if (!first || !mapRef.current) return;
+      // The pin lands on the geocoder's answer rather than waiting for a click:
+      // the operator opened the picker to ADJUST an address they already typed,
+      // and a pin on the right street is a better starting point than none.
+      setPoint(first.point);
       mapRef.current.flyTo({
         center: [first.point.lng, first.point.lat],
         zoom: PICK_ZOOM,
@@ -279,6 +410,7 @@ function PickerBody({
 
   const acceptResult = (result: GeocodeResult) => {
     setAddress(result.label);
+    setPoint(result.point);
     setQuery('');
     setResults([]);
     setHighlighted(-1);
@@ -325,7 +457,7 @@ function PickerBody({
           label="Caută adresa"
           value={query}
           placeholder="Str. Exemplu 12, București"
-          hint="Caută o adresă, apoi trage harta pentru a fixa punctul exact."
+          hint="Caută o adresă, apoi apasă pe hartă pentru a fixa punctul exact."
           autoFocus
           autoComplete="off"
           role="combobox"
@@ -381,26 +513,45 @@ function PickerBody({
         )}
       </div>
 
-      <div className="relative h-[clamp(14rem,42vh,24rem)] overflow-hidden rounded-lg border border-border">
-        <div ref={containerRef} className="absolute inset-0" />
-        {/* Anchored at the tip, lifted while dragging so the pin reads as
-            hovering over the map rather than stuck to it. */}
-        <div
-          className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-full"
-          aria-hidden
-        >
-          <svg
-            viewBox="0 0 24 24"
-            className={cx(
-              'size-9 drop-shadow-md transition-transform duration-150',
-              moving && '-translate-y-1.5',
+      <div className="relative h-[clamp(14rem,42vh,24rem)] overflow-hidden rounded-lg border border-border bg-surface-sunken">
+        {/*
+          Inline positioning, not Tailwind's `absolute inset-0`.
+
+          MapLibre stamps its own `.maplibregl-map` class onto whatever element
+          you hand it, and maplibre-gl.css declares `position: relative` on that
+          class. Loaded after Tailwind's utilities, it wins — so the container
+          silently becomes `position: relative`, `inset-0` stops applying, the
+          div collapses to height 0, and MapLibre initialises a zero-height
+          viewport. It then needs no tiles, never finishes loading, and shows a
+          blank white box with no error anywhere, while the camera keeps
+          reporting perfectly good coordinates. That is exactly what this picker
+          did until now. Inline styles outrank both stylesheets, so it cannot be
+          undone by class ordering. Same fix, same reason, as MapCanvas.
+        */}
+        <div ref={containerRef} style={{ position: 'absolute', inset: 0 }} />
+
+        {status !== 'ready' && (
+          <div className="pointer-events-none absolute inset-0 grid place-items-center bg-surface-sunken/80 p-4 text-center">
+            {status === 'loading' ? (
+              <span className="flex items-center gap-2 text-sm text-ink-muted">
+                <Spinner /> Se încarcă harta…
+              </span>
+            ) : (
+              <span className="text-sm text-ink-muted">
+                Harta nu s-a putut încărca. Verifică conexiunea — căutarea adresei funcționează în
+                continuare.
+              </span>
             )}
-            fill="var(--color-danger-600, #dc2626)"
-          >
-            <path d="M12 1.5a7.5 7.5 0 0 0-7.5 7.5c0 5.4 6.6 12.9 6.9 13.2a.8.8 0 0 0 1.2 0c.3-.3 6.9-7.8 6.9-13.2A7.5 7.5 0 0 0 12 1.5Z" />
-            <circle cx="12" cy="9" r="2.8" fill="white" />
-          </svg>
-        </div>
+          </div>
+        )}
+
+        {status === 'ready' && !point && (
+          <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center p-2">
+            <span className="rounded-full bg-ink/75 px-3 py-1 text-xs text-white">
+              Apasă pe hartă pentru a pune pinul
+            </span>
+          </div>
+        )}
       </div>
 
       <div className="flex flex-wrap items-center justify-between gap-2">
@@ -411,8 +562,8 @@ function PickerBody({
           </p>
           <p className="text-xs tabular-nums text-ink-muted">
             {point
-              ? formatPickedCoordinates(point)
-              : 'Trage harta pentru a fixa punctul.'}
+              ? `${formatPickedCoordinates(point)}${dragging ? ' — se mută pinul…' : ''}`
+              : 'Apasă pe hartă pentru a fixa punctul.'}
           </p>
         </div>
         <div className="flex shrink-0 items-center gap-2">

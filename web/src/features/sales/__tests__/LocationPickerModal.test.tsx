@@ -5,27 +5,46 @@
  * everything that matters here is the plumbing AROUND it, and that is exactly
  * where the bugs live:
  *
- *  - the value the operator confirms must be the point under the PIN, i.e. the
- *    map centre, never the coordinates the geocoder returned. Search puts you
- *    on the street; the drag puts you on the gate.
- *  - a search result's label must survive the `flyTo` that answers it. The map
- *    fires `moveend` for programmatic moves too, and reverse-geocoding that
- *    would quietly replace "Strada Lungă 3" with "Brașov".
- *  - a human drag must do the opposite and refresh the label, so the text and
- *    the point never disagree.
+ *  - the value the operator confirms must be the point under the PIN, and the
+ *    pin is now a marker on the ground: a click drops it, a drag moves it, and
+ *    panning the map does neither. Panning used to move the point, which meant
+ *    looking around silently rewrote the answer.
+ *  - a search result's label must survive the `flyTo` that answers it —
+ *    reverse-geocoding that would quietly replace "Strada Lungă 3" with
+ *    "Brașov".
+ *  - a click or a drag must do the opposite and refresh the label, so the text
+ *    and the point never disagree.
  */
 
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 
-/** Centre the fake map reports, mutated by `flyTo` and by the test itself. */
-let centre = { lat: 45.9, lng: 25.0 };
-/** Listeners registered by the component, so a test can fire a "human" drag. */
-let listeners: Record<string, ((event: unknown) => void)[]> = {};
+/**
+ * `vi.mock` factories are hoisted above every module-level binding, so the
+ * fakes have to be declared inside one — and the handle the tests reach them
+ * through has to come from `vi.hoisted`, which runs earlier still.
+ */
+const fake = vi.hoisted(() => ({
+  /** Listeners registered on the map, so a test can fire a "human" click. */
+  mapListeners: {} as Record<string, ((event: unknown) => void)[]>,
+  /** The draggable pin, once the component has built it. */
+  pin: null as null | { setLngLat(lngLat: [number, number]): unknown; fire(type: string): void },
+}));
 
 function emit(type: string, event: unknown = {}) {
-  for (const listener of listeners[type] ?? []) listener(event);
+  for (const listener of fake.mapListeners[type] ?? []) listener(event);
+}
+
+/** A click on the canvas, at the coordinates MapLibre would have resolved. */
+function clickMap(lat: number, lng: number) {
+  emit('click', { lngLat: { lat, lng } });
+}
+
+/** A finished pin drag: MapLibre has already moved the marker by `dragend`. */
+function dragPin(lat: number, lng: number) {
+  fake.pin?.setLngLat([lng, lat]);
+  fake.pin?.fire('dragend');
 }
 
 vi.mock('maplibre-gl', () => {
@@ -36,28 +55,56 @@ vi.mock('maplibre-gl', () => {
     addControl = vi.fn();
     resize = vi.fn();
     remove = vi.fn();
-    getCenter = () => centre;
+    getCanvas = () => ({ style: {} }) as HTMLCanvasElement;
+    flyTo = vi.fn();
+    easeTo = vi.fn();
     on(type: string, listener: (event: unknown) => void) {
-      (listeners[type] ??= []).push(listener);
+      (fake.mapListeners[type] ??= []).push(listener);
       return { unsubscribe: vi.fn() };
     }
-    /** Real MapLibre fires move events for programmatic moves, WITHOUT an
-     *  `originalEvent`. That distinction is the thing under test. */
-    flyTo({ center }: { center: [number, number] }) {
-      centre = { lat: center[1], lng: center[0] };
-      emit('movestart', {});
-      emit('moveend', {});
+    /** `load` fires immediately: nothing under test waits on tiles. */
+    once(type: string, listener: () => void) {
+      if (type === 'load') listener();
+      return this;
     }
   }
+
   class FakeMarker {
-    setLngLat() {
+    private lngLat = { lng: 0, lat: 0 };
+    private listeners: Record<string, (() => void)[]> = {};
+    private element: HTMLElement | null;
+    constructor(options?: { draggable?: boolean; element?: HTMLElement }) {
+      this.element = options?.element ?? null;
+      // The one draggable marker is the pin; the rest are known places.
+      if (options?.draggable) fake.pin = this;
+    }
+    setLngLat(lngLat: [number, number]) {
+      this.lngLat = { lng: lngLat[0], lat: lngLat[1] };
       return this;
     }
+    getLngLat() {
+      return this.lngLat;
+    }
+    // Real MapLibre appends the element into the map container. Here it goes
+    // to the body — close enough for the known-place badges, which the tests
+    // click as ordinary buttons.
     addTo() {
+      if (this.element) document.body.append(this.element);
       return this;
     }
-    remove = vi.fn();
+    remove() {
+      this.element?.remove();
+      return this;
+    }
+    on(type: string, listener: () => void) {
+      (this.listeners[type] ??= []).push(listener);
+      return this;
+    }
+    fire(type: string) {
+      for (const listener of this.listeners[type] ?? []) listener();
+    }
   }
+
   return { Map: FakeMap, Marker: FakeMarker, AttributionControl: class {} };
 });
 
@@ -82,8 +129,8 @@ const BRASOV = {
 };
 
 beforeEach(() => {
-  centre = { lat: 45.9, lng: 25.0 };
-  listeners = {};
+  fake.mapListeners = {};
+  fake.pin = null;
   vi.mocked(searchAddresses).mockResolvedValue([]);
   vi.mocked(reverseGeocode).mockResolvedValue(null);
 });
@@ -121,7 +168,21 @@ describe('LocationPickerModal', () => {
     });
   });
 
-  it('takes a search result label but the MAP CENTRE as the point', async () => {
+  it('drops the pin where the map was clicked', async () => {
+    const { onConfirm } = open();
+
+    clickMap(46.7712, 23.6236);
+
+    const confirm = screen.getByRole('button', { name: 'Confirmă locația' });
+    await waitFor(() => expect(confirm).toBeEnabled());
+    await userEvent.click(confirm);
+    expect(onConfirm).toHaveBeenCalledWith({
+      address: '',
+      coordinates: '46.7712,23.6236',
+    });
+  });
+
+  it('takes both the label and the point from a search result', async () => {
     vi.mocked(searchAddresses).mockResolvedValue([BRASOV]);
     const { onConfirm } = open();
 
@@ -129,8 +190,6 @@ describe('LocationPickerModal', () => {
     const option = await screen.findByRole('option', { name: /Strada Lungă 3/ });
     await userEvent.click(option);
 
-    // The fake map's flyTo moved the centre exactly onto the result, so the two
-    // agree here — what matters is that the value came from getCenter().
     await userEvent.click(screen.getByRole('button', { name: 'Confirmă locația' }));
     expect(onConfirm).toHaveBeenCalledWith({
       address: 'Strada Lungă 3, Brașov',
@@ -138,7 +197,7 @@ describe('LocationPickerModal', () => {
     });
   });
 
-  it('does not reverse geocode the flyTo that answers a search', async () => {
+  it('does not reverse geocode the search result it just placed', async () => {
     vi.mocked(searchAddresses).mockResolvedValue([BRASOV]);
     open();
 
@@ -150,12 +209,11 @@ describe('LocationPickerModal', () => {
 
   it('re-labels the point after a human drag', async () => {
     vi.mocked(reverseGeocode).mockResolvedValue('Bulevardul Nou 7, Cluj-Napoca');
-    const { onConfirm } = open({ value: { address: 'Str. Veche 1', coordinates: '44.4268,26.1025' } });
+    const { onConfirm } = open({
+      value: { address: 'Str. Veche 1', coordinates: '44.4268,26.1025' },
+    });
 
-    centre = { lat: 46.7712, lng: 23.6236 };
-    // `originalEvent` present = a real gesture, which is what unlocks the
-    // reverse lookup.
-    emit('moveend', { originalEvent: new MouseEvent('mouseup') });
+    dragPin(46.7712, 23.6236);
 
     await waitFor(() =>
       expect(screen.getByText('Bulevardul Nou 7, Cluj-Napoca')).toBeInTheDocument(),
@@ -169,10 +227,11 @@ describe('LocationPickerModal', () => {
 
   it('keeps the old label when reverse geocoding finds nothing', async () => {
     vi.mocked(reverseGeocode).mockResolvedValue(null);
-    const { onConfirm } = open({ value: { address: 'Str. Veche 1', coordinates: '44.4268,26.1025' } });
+    const { onConfirm } = open({
+      value: { address: 'Str. Veche 1', coordinates: '44.4268,26.1025' },
+    });
 
-    centre = { lat: 46.7712, lng: 23.6236 };
-    emit('moveend', { originalEvent: new MouseEvent('mouseup') });
+    clickMap(46.7712, 23.6236);
 
     await waitFor(() => expect(reverseGeocode).toHaveBeenCalled());
     await userEvent.click(screen.getByRole('button', { name: 'Confirmă locația' }));
@@ -181,6 +240,28 @@ describe('LocationPickerModal', () => {
     expect(onConfirm).toHaveBeenCalledWith({
       address: 'Str. Veche 1',
       coordinates: '46.7712,23.6236',
+    });
+  });
+
+  it('picks up a known place with its stored address, not a reverse lookup', async () => {
+    const { onConfirm } = open({
+      knownPlaces: [
+        {
+          address: 'Depozit Nord, Ploiești',
+          point: { lat: 44.9469, lng: 26.0201 },
+          count: 3,
+          scope: 'client',
+        },
+      ],
+    });
+
+    await userEvent.click(screen.getByRole('button', { name: /Depozit Nord/ }));
+
+    await userEvent.click(screen.getByRole('button', { name: 'Confirmă locația' }));
+    expect(reverseGeocode).not.toHaveBeenCalled();
+    expect(onConfirm).toHaveBeenCalledWith({
+      address: 'Depozit Nord, Ploiești',
+      coordinates: '44.9469,26.0201',
     });
   });
 

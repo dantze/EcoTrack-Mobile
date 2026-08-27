@@ -20,6 +20,7 @@ import {
   fuzzyMatch,
   fuzzyMatchFields,
   includesFolded,
+  matchesQuery,
   rankBy,
   splitHighlight,
 } from '../search';
@@ -57,6 +58,25 @@ describe('includesFolded', () => {
   it('is true for an empty needle and false for a genuine miss', () => {
     expect(includesFolded('Ana', '   ')).toBe(true);
     expect(includesFolded('Ana', 'zzz')).toBe(false);
+  });
+});
+
+describe('matchesQuery', () => {
+  it('is true when ANY field matches, folding both sides', () => {
+    expect(matchesQuery('stefan', 'Ana Ionescu', 'Ștefan Popescu')).toBe(true);
+    expect(matchesQuery('zzz', 'Ana Ionescu', 'Ștefan Popescu')).toBe(false);
+  });
+
+  it('tolerates null and undefined fields — a row with a blank column still matches', () => {
+    // Every caller passes optional columns straight through (a client with no
+    // phone, a route with no county); a nullish field is a miss, not a throw.
+    expect(matchesQuery('ana', null, undefined, 'Ana')).toBe(true);
+    expect(matchesQuery('ana', null, undefined)).toBe(false);
+  });
+
+  it('lets everything through when the box is empty or all spaces', () => {
+    expect(matchesQuery('', 'Ana')).toBe(true);
+    expect(matchesQuery('   ', 'Ana')).toBe(true);
   });
 });
 

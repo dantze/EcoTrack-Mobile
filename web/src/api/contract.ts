@@ -99,22 +99,15 @@ export interface AuthTokens {
   expiresIn: number;
 }
 
-/** User + a fresh token pair — what a successful login/Google handshake yields. */
+/**
+ * User + a fresh token pair. The only thing that mints one is
+ * `EnrollmentApi.claim` — there is no login and no Google handshake left in the
+ * backend, so there is no other way a first session comes into existence (see
+ * `AuthApi` below).
+ */
 export interface AuthSession {
   user: AuthUser;
   tokens: AuthTokens;
-}
-
-/**
- * POST /auth/login and /auth/google share this response shape: `success`
- * decides which fields are present. A failed attempt is not an exception —
- * `message` is the server's Romanian copy, meant to be rendered on the form
- * as-is ("Utilizator inexistent", "Parolă incorectă", …).
- */
-export interface LoginOutcome {
-  success: boolean;
-  message: string | null;
-  session?: AuthSession;
 }
 
 // ---------------------------------------------------------------------------

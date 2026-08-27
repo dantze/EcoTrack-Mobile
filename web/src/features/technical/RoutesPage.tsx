@@ -55,6 +55,7 @@ import { useDeepLink } from '@/lib/deepLink';
 import { useShortcuts } from '@/lib/hotkeys';
 import { useUndo } from '@/lib/undo';
 import { recordUse } from '@/lib/recents';
+import { matchesQuery } from '@/lib/search';
 import {
   useAssignDriver,
   useAssignTasksToRoute,
@@ -73,7 +74,6 @@ import {
   driverLabel,
   errorMessage,
   isUnassigned,
-  matchesQuery,
   routeLabel,
   sortByOrderIndex,
   taskProgress,

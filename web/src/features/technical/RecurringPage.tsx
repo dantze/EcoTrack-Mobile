@@ -25,6 +25,7 @@ import { ClientCell, formatDate, weekdayLabel } from '@/components/domain';
 import { useDeepLink } from '@/lib/deepLink';
 import { useShortcuts } from '@/lib/hotkeys';
 import { recordUse } from '@/lib/recents';
+import { matchesQuery } from '@/lib/search';
 import { clientName } from '@/types/domain';
 import type { RecurringIgienizare } from '@/types/domain';
 import {
@@ -39,7 +40,6 @@ import {
   errorMessage,
   frequencyDetail,
   frequencyLabel,
-  matchesQuery,
   routeLabel,
 } from './utils';
 import {

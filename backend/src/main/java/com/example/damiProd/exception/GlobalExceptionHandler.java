@@ -25,6 +25,25 @@ public class GlobalExceptionHandler {
 
     private static final Logger log = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
+    /**
+     * Every handler below answers with the same four keys. Clients parse that
+     * shape, so a handler that drifts from it - a missing timestamp, a status in
+     * the body that disagrees with the HTTP status - is a client-visible bug.
+     * Building it in one place is what keeps them from drifting.
+     */
+    private static ResponseEntity<Map<String, Object>> body(HttpStatus status, String error, String message) {
+        return ResponseEntity.status(status).body(payload(status.value(), error, message));
+    }
+
+    private static Map<String, Object> payload(int status, String error, String message) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("timestamp", Instant.now().toString());
+        body.put("status", status);
+        body.put("error", error);
+        body.put("message", message);
+        return body;
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<Map<String, Object>> handleValidationExceptions(MethodArgumentNotValidException ex) {
         Map<String, String> fieldErrors = new HashMap<>();
@@ -32,11 +51,8 @@ public class GlobalExceptionHandler {
             fieldErrors.put(error.getField(), error.getDefaultMessage());
         }
 
-        Map<String, Object> body = new HashMap<>();
-        body.put("timestamp", Instant.now().toString());
-        body.put("status", HttpStatus.BAD_REQUEST.value());
-        body.put("error", "Validation Failed");
-        body.put("message", "Request validation failed. Check field details.");
+        Map<String, Object> body = payload(HttpStatus.BAD_REQUEST.value(), "Validation Failed",
+                "Request validation failed. Check field details.");
         body.put("details", fieldErrors);
 
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
@@ -44,79 +60,40 @@ public class GlobalExceptionHandler {
 
     @ExceptionHandler(InsufficientQuantityException.class)
     public ResponseEntity<Map<String, Object>> handleInsufficientQuantity(InsufficientQuantityException ex) {
-        Map<String, Object> body = new HashMap<>();
-        body.put("timestamp", Instant.now().toString());
-        body.put("status", HttpStatus.CONFLICT.value());
-        body.put("error", "Insufficient Quantity");
-        body.put("message", ex.getMessage());
-
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+        return body(HttpStatus.CONFLICT, "Insufficient Quantity", ex.getMessage());
     }
 
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<Map<String, Object>> handleResourceNotFound(ResourceNotFoundException ex) {
-        Map<String, Object> body = new HashMap<>();
-        body.put("timestamp", Instant.now().toString());
-        body.put("status", HttpStatus.NOT_FOUND.value());
-        body.put("error", "Not Found");
-        body.put("message", ex.getMessage());
-
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
+        return body(HttpStatus.NOT_FOUND, "Not Found", ex.getMessage());
     }
 
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<Map<String, Object>> handleIllegalArgument(IllegalArgumentException ex) {
-        Map<String, Object> body = new HashMap<>();
-        body.put("timestamp", Instant.now().toString());
-        body.put("status", HttpStatus.BAD_REQUEST.value());
-        body.put("error", "Bad Request");
-        body.put("message", ex.getMessage());
-
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
+        return body(HttpStatus.BAD_REQUEST, "Bad Request", ex.getMessage());
     }
 
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<Map<String, Object>> handleIllegalState(IllegalStateException ex) {
-        Map<String, Object> body = new HashMap<>();
-        body.put("timestamp", Instant.now().toString());
-        body.put("status", HttpStatus.CONFLICT.value());
-        body.put("error", "Conflict");
-        body.put("message", ex.getMessage());
-
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+        return body(HttpStatus.CONFLICT, "Conflict", ex.getMessage());
     }
 
     @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<Map<String, Object>> handleMaxUploadSizeExceeded(MaxUploadSizeExceededException ex) {
-        Map<String, Object> body = new HashMap<>();
-        body.put("timestamp", Instant.now().toString());
-        body.put("status", HttpStatus.PAYLOAD_TOO_LARGE.value());
-        body.put("error", "Payload Too Large");
-        body.put("message", "File upload exceeds the maximum allowed size limit.");
-
-        return ResponseEntity.status(HttpStatus.PAYLOAD_TOO_LARGE).body(body);
+        return body(HttpStatus.PAYLOAD_TOO_LARGE, "Payload Too Large",
+                "File upload exceeds the maximum allowed size limit.");
     }
 
+    // The exception's own message is deliberately not echoed for the two below:
+    // it would tell an unauthorized caller which rule stopped them.
     @ExceptionHandler(AccessDeniedException.class)
     public ResponseEntity<Map<String, Object>> handleAccessDenied(AccessDeniedException ex) {
-        Map<String, Object> body = new HashMap<>();
-        body.put("timestamp", Instant.now().toString());
-        body.put("status", HttpStatus.FORBIDDEN.value());
-        body.put("error", "Forbidden");
-        body.put("message", "Access denied: insufficient permissions.");
-
-        return ResponseEntity.status(HttpStatus.FORBIDDEN).body(body);
+        return body(HttpStatus.FORBIDDEN, "Forbidden", "Access denied: insufficient permissions.");
     }
 
     @ExceptionHandler(AuthenticationException.class)
     public ResponseEntity<Map<String, Object>> handleAuthentication(AuthenticationException ex) {
-        Map<String, Object> body = new HashMap<>();
-        body.put("timestamp", Instant.now().toString());
-        body.put("status", HttpStatus.UNAUTHORIZED.value());
-        body.put("error", "Unauthorized");
-        body.put("message", "Authentication required or invalid credentials.");
-
-        return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(body);
+        return body(HttpStatus.UNAUTHORIZED, "Unauthorized", "Authentication required or invalid credentials.");
     }
 
     /**
@@ -128,12 +105,7 @@ public class GlobalExceptionHandler {
      */
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<Map<String, Object>> handleUnreadableBody(HttpMessageNotReadableException ex) {
-        Map<String, Object> body = new HashMap<>();
-        body.put("timestamp", Instant.now().toString());
-        body.put("status", HttpStatus.BAD_REQUEST.value());
-        body.put("error", "Bad Request");
-        body.put("message", "Malformed request body.");
-        return ResponseEntity.badRequest().body(body);
+        return body(HttpStatus.BAD_REQUEST, "Bad Request", "Malformed request body.");
     }
 
     /**
@@ -150,24 +122,15 @@ public class GlobalExceptionHandler {
     public ResponseEntity<Map<String, Object>> handleGeneralException(Exception ex) {
         if (ex instanceof ErrorResponse errorResponse) {
             HttpStatusCode status = errorResponse.getStatusCode();
-            Map<String, Object> body = new HashMap<>();
-            body.put("timestamp", Instant.now().toString());
-            body.put("status", status.value());
-            body.put("error", HttpStatus.resolve(status.value()) != null
-                    ? HttpStatus.resolve(status.value()).getReasonPhrase()
-                    : "Error");
-            body.put("message", "Request could not be processed.");
-            return ResponseEntity.status(status).body(body);
+            HttpStatus resolved = HttpStatus.resolve(status.value());
+            return ResponseEntity.status(status).body(payload(status.value(),
+                    resolved != null ? resolved.getReasonPhrase() : "Error",
+                    "Request could not be processed."));
         }
 
         log.error("Unhandled exception caught in GlobalExceptionHandler", ex);
 
-        Map<String, Object> body = new HashMap<>();
-        body.put("timestamp", Instant.now().toString());
-        body.put("status", HttpStatus.INTERNAL_SERVER_ERROR.value());
-        body.put("error", "Internal Server Error");
-        body.put("message", "An unexpected error occurred. Please try again later.");
-
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(body);
+        return body(HttpStatus.INTERNAL_SERVER_ERROR, "Internal Server Error",
+                "An unexpected error occurred. Please try again later.");
     }
 }

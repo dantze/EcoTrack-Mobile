@@ -15,11 +15,11 @@ import java.util.List;
  * DELETE /api/employees/{id}, both binding the raw {@link Employee} JPA entity
  * straight from the request body. That was a privilege-escalation hole: the
  * body carried its own `roles` list, so any caller who could reach the endpoint
- * could mint themselves an ADMIN, and `password` was persisted exactly as sent
- * - in plaintext, bypassing the encoder. Neither endpoint had a caller: the web
- * app and the mobile app both write through /api/admin/employees, which takes a
- * CreateEmployeeRequest DTO, bcrypts the password and resolves role names
- * against the role table.
+ * could mint themselves an ADMIN, and back when credentials existed `password`
+ * was persisted exactly as sent, in plaintext. Neither endpoint had a caller:
+ * the web app and the mobile app both write through /api/admin/employees, which
+ * takes a CreateEmployeeRequest DTO and resolves role names against the role
+ * table.
  *
  * If you need a write here, add it to AdminController - do not re-add an
  * entity-bound one.

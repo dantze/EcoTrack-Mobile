@@ -43,14 +43,10 @@ public class OrderService {
 
         // ─── Link product for Amplasare & Ridicare ───
         if (order instanceof AmplasareOrder amp && amp.getProduct() != null && amp.getProduct().getId() != null) {
-            Product product = productRepository.findById(amp.getProduct().getId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + amp.getProduct().getId()));
-            amp.setProduct(product);
+            amp.setProduct(requireProduct(amp.getProduct().getId()));
         }
         if (order instanceof RidicareOrder rid && rid.getProduct() != null && rid.getProduct().getId() != null) {
-            Product product = productRepository.findById(rid.getProduct().getId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + rid.getProduct().getId()));
-            rid.setProduct(product);
+            rid.setProduct(requireProduct(rid.getProduct().getId()));
         }
 
         // ─── Ridicare: validate available quantity before saving ─────────────
@@ -75,10 +71,7 @@ public class OrderService {
         // ─── Link subscription for Igienizare ───
         if (order instanceof IgienizareOrder igi && igi.getSubscription() != null
                 && igi.getSubscription().getId() != null) {
-            Subscription sub = subscriptionRepository.findById(igi.getSubscription().getId())
-                    .orElseThrow(() -> new ResourceNotFoundException(
-                            "Subscription not found with id: " + igi.getSubscription().getId()));
-            igi.setSubscription(sub);
+            igi.setSubscription(requireSubscription(igi.getSubscription().getId()));
         }
 
         return orderRepository.save(order);
@@ -132,10 +125,7 @@ public class OrderService {
         // ─── Amplasare-specific fields ───
         if (existingOrder instanceof AmplasareOrder existing && orderDetails instanceof AmplasareOrder updates) {
             if (updates.getProduct() != null && updates.getProduct().getId() != null) {
-                Product product = productRepository.findById(updates.getProduct().getId())
-                        .orElseThrow(() -> new ResourceNotFoundException(
-                                "Product not found with id: " + updates.getProduct().getId()));
-                existing.setProduct(product);
+                existing.setProduct(requireProduct(updates.getProduct().getId()));
             }
             if (updates.getQuantity() != null)
                 existing.setQuantity(updates.getQuantity());
@@ -158,10 +148,7 @@ public class OrderService {
         // ─── Ridicare-specific fields ───
         if (existingOrder instanceof RidicareOrder existing && orderDetails instanceof RidicareOrder updates) {
             if (updates.getProduct() != null && updates.getProduct().getId() != null) {
-                Product product = productRepository.findById(updates.getProduct().getId())
-                        .orElseThrow(() -> new ResourceNotFoundException(
-                                "Product not found with id: " + updates.getProduct().getId()));
-                existing.setProduct(product);
+                existing.setProduct(requireProduct(updates.getProduct().getId()));
             }
             if (updates.getPickupDate() != null)
                 existing.setPickupDate(updates.getPickupDate());
@@ -178,10 +165,7 @@ public class OrderService {
         // ─── Igienizare-specific fields ───
         if (existingOrder instanceof IgienizareOrder existing && orderDetails instanceof IgienizareOrder updates) {
             if (updates.getSubscription() != null && updates.getSubscription().getId() != null) {
-                Subscription sub = subscriptionRepository.findById(updates.getSubscription().getId())
-                        .orElseThrow(() -> new ResourceNotFoundException(
-                                "Subscription not found with id: " + updates.getSubscription().getId()));
-                existing.setSubscription(sub);
+                existing.setSubscription(requireSubscription(updates.getSubscription().getId()));
             }
             if (updates.getSanitationDate() != null)
                 existing.setSanitationDate(updates.getSanitationDate());
@@ -192,5 +176,20 @@ public class OrderService {
         }
 
         return orderRepository.save(existingOrder);
+    }
+
+    /**
+     * A client sends products and subscriptions as {"id": n} stubs; both create
+     * and update have to swap the stub for the managed entity before saving, or
+     * Hibernate persists a detached copy.
+     */
+    private Product requireProduct(Long id) {
+        return productRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + id));
+    }
+
+    private Subscription requireSubscription(Long id) {
+        return subscriptionRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Subscription not found with id: " + id));
     }
 }

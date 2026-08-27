@@ -13,7 +13,6 @@ import com.example.damiProd.repository.TaskRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.LocalDate;
 import java.util.List;
 
 @Service
@@ -45,9 +44,7 @@ public class RouteService {
 
         // Set employee if provided
         if (request.getEmployeeId() != null) {
-            Employee employee = employeeRepository.findById(request.getEmployeeId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Angajatul nu a fost găsit"));
-            route.setEmployee(employee);
+            route.setEmployee(requireEmployee(request.getEmployeeId()));
         }
 
         return routeRepository.save(route);
@@ -55,8 +52,7 @@ public class RouteService {
 
     @Transactional
     public void deleteRoute(Long id) {
-        Route route = routeRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Ruta nu a fost găsită"));
+        Route route = requireRoute(id);
 
         // Unassign all tasks from this route (set route = null so they become "neatribuite")
         List<Task> tasks = taskRepository.findByRoute_Id(id);
@@ -78,8 +74,7 @@ public class RouteService {
 
     @Transactional(readOnly = true)
     public Route getRouteById(Long id) {
-        Route route = routeRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Ruta nu a fost găsită"));
+        Route route = requireRoute(id);
         // Force loading of tasks (triggers lazy loading within transaction)
         route.getTasks().size();
         return route;
@@ -103,10 +98,8 @@ public class RouteService {
 
     @Transactional
     public Route assignDriverToRoute(Long routeId, Long employeeId) {
-        Route route = routeRepository.findById(routeId)
-                .orElseThrow(() -> new ResourceNotFoundException("Ruta nu a fost găsită"));
-        Employee employee = employeeRepository.findById(employeeId)
-                .orElseThrow(() -> new ResourceNotFoundException("Angajatul nu a fost găsit"));
+        Route route = requireRoute(routeId);
+        Employee employee = requireEmployee(employeeId);
 
         route.setEmployee(employee);
         return routeRepository.save(route);
@@ -114,8 +107,9 @@ public class RouteService {
 
     @Transactional
     public Route reorderTasks(Long routeId, List<Long> taskIds) {
-        Route route = routeRepository.findById(routeId)
-                .orElseThrow(() -> new ResourceNotFoundException("Ruta nu a fost găsită"));
+        // Existence check only; the route itself is re-read below, after the
+        // new indexes have been written.
+        requireRoute(routeId);
 
         List<Task> tasks = taskRepository.findByRoute_Id(routeId);
 
@@ -131,9 +125,18 @@ public class RouteService {
         taskRepository.saveAll(tasks);
 
         // Reload route with ordered tasks
-        Route reloaded = routeRepository.findById(routeId)
-                .orElseThrow(() -> new ResourceNotFoundException("Ruta nu a fost găsită"));
+        Route reloaded = requireRoute(routeId);
         reloaded.getTasks().size(); // force load
         return reloaded;
+    }
+
+    private Route requireRoute(Long id) {
+        return routeRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Ruta nu a fost găsită"));
+    }
+
+    private Employee requireEmployee(Long id) {
+        return employeeRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Angajatul nu a fost găsit"));
     }
 }

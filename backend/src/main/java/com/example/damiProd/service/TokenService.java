@@ -25,10 +25,11 @@ import java.util.Optional;
  * {@link com.example.damiProd.domain.Session}.
  *
  * Tokens are random bytes from {@link SecureRandom}, never JWTs. Only their
- * SHA-256 hash is ever persisted or compared, and hash lookups go through
- * the database's unique index rather than an in-memory equals() - there is
- * no code path that compares a raw secret byte-by-byte except the legacy
- * plaintext-password fallback in {@link AuthService}, which uses
+ * SHA-256 hash is ever persisted or compared, and hash lookups go through the
+ * database's unique index rather than an in-memory equals(), so no code path
+ * here compares a raw secret byte-by-byte. The one place in the app that has
+ * to compare secrets in memory is {@link EnrollmentService}, matching a claim
+ * secret and a setup code, and it uses
  * {@link MessageDigest#isEqual(byte[], byte[])} for that reason.
  */
 @Service
@@ -66,10 +67,6 @@ public class TokenService {
         this.refreshTokenTtl = Duration.ofDays(refreshTokenTtlDays);
         this.maxSessionsPerUser = maxSessionsPerUser;
         this.sessionRetention = Duration.ofDays(sessionRetentionDays);
-    }
-
-    public long getAccessTokenTtlSeconds() {
-        return accessTokenTtl.getSeconds();
     }
 
     /** Result of issuing or rotating a token pair. */
@@ -276,7 +273,9 @@ public class TokenService {
 
     /**
      * Revokes every session an employee has, including the one making the call.
-     * Meant for "this account is compromised" / password reset flows.
+     * Meant for "this account is compromised" and for an admin changing what an
+     * account is - see AdminService#updateEmployee, which calls this on a role
+     * change so no enrolled device keeps running under the old role.
      */
     @Transactional
     public int revokeAllSessions(Long employeeId, String reason) {

@@ -106,29 +106,21 @@ public class TaskService {
         String coordinates = null;
         Integer quantity = null;
 
+        // Each subtype keeps its location under a different pair of field names,
+        // but the rule is the same for all three: prefer the typed address, fall
+        // back to the raw coordinates so the driver still has something to
+        // navigate to.
         if (order instanceof AmplasareOrder amp) {
             coordinates = amp.getLocationCoordinates();
-            if (amp.getLocationAddress() != null && !amp.getLocationAddress().isEmpty()) {
-                address = amp.getLocationAddress();
-            } else if (coordinates != null && !coordinates.isEmpty()) {
-                address = coordinates;
-            }
+            address = firstNonEmpty(amp.getLocationAddress(), coordinates);
             quantity = amp.getQuantity();
         } else if (order instanceof RidicareOrder rid) {
             coordinates = rid.getPickupLocationCoordinates();
-            if (rid.getPickupLocationAddress() != null && !rid.getPickupLocationAddress().isEmpty()) {
-                address = rid.getPickupLocationAddress();
-            } else if (coordinates != null && !coordinates.isEmpty()) {
-                address = coordinates;
-            }
+            address = firstNonEmpty(rid.getPickupLocationAddress(), coordinates);
             quantity = rid.getPickupQuantity();
         } else if (order instanceof IgienizareOrder igi) {
             coordinates = igi.getSanitationLocationCoordinates();
-            if (igi.getSanitationLocationAddress() != null && !igi.getSanitationLocationAddress().isEmpty()) {
-                address = igi.getSanitationLocationAddress();
-            } else if (coordinates != null && !coordinates.isEmpty()) {
-                address = coordinates;
-            }
+            address = firstNonEmpty(igi.getSanitationLocationAddress(), coordinates);
         }
 
         // Final fallback: use client address if still null
@@ -229,6 +221,14 @@ public class TaskService {
         tasks.forEach(task -> task.setRoute(newRoute));
 
         return taskRepository.saveAll(tasks);
+    }
+
+    /** Null when neither candidate carries anything, matching "no address known". */
+    private static String firstNonEmpty(String preferred, String fallback) {
+        if (preferred != null && !preferred.isEmpty()) {
+            return preferred;
+        }
+        return fallback != null && !fallback.isEmpty() ? fallback : null;
     }
 
     private TaskType mapOrderTypeToTaskType(String orderType) {

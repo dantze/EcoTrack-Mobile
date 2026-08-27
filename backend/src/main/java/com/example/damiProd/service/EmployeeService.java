@@ -51,8 +51,9 @@ public class EmployeeService {
 
     // No save/delete here on purpose. Both used to exist as bare repository
     // passthroughs behind POST/DELETE /api/employees, which bound the raw
-    // Employee entity - so the request body chose its own roles and its
-    // password was persisted unencoded. Employee writes go through AdminService
-    // (/api/admin/employees), which bcrypts the password and resolves role
-    // names against the role table. See EmployeeController.
+    // Employee entity - so the request body chose its own roles, and back when
+    // credentials existed its password was persisted unencoded. Employee writes
+    // go through AdminService (/api/admin/employees), which takes a
+    // CreateEmployeeRequest DTO and resolves role names against the role table.
+    // See EmployeeController.
 }

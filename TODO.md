@@ -203,20 +203,58 @@ coordinates.
 *Note:* mobile does this in `LocationPicker`; that one deliberately does NOT go
 through `apiFetch` (it would leak the bearer token to Google).
 
-**Done.** `Alege pe hartă` sits under the address/coordinates pair in
-`LocationFields`, so it covers all three order types at once. The dialog is
-`sales/components/LocationPickerModal.tsx`: search an address, fly there, then
-drag the map under a fixed centre pin. **The confirmed point is always the map
-centre, never the geocoder's coordinates** — search lands you on the street,
-the drag puts you on the gate. A human drag re-labels the address by reverse
-geocoding; the programmatic `flyTo` that answers a search deliberately does
-not, or it would overwrite the label the operator just chose with a rounder one.
+**Done, then reworked after testing.** `Alege pe hartă` sits under the
+address/coordinates pair in `LocationFields`, so it covers all three order types
+at once. The dialog is `sales/components/LocationPickerModal.tsx`.
 
-The client's existing sites are drawn as numbered markers (their own in brand
-colour, everyone else's in grey) — the desktop equivalent of the mobile
-picker's `existingPlacements`, fed from the same `buildAddressSuggestions`
-history that already backs the address typeahead. Clicking one snaps to its
-exact coordinates.
+#### What was wrong on the first pass (reported: blank map, pin stuck in the middle)
+
+**1. The map was a blank white box.** The map container was positioned with
+Tailwind's `absolute inset-0`. MapLibre stamps its own `.maplibregl-map` class
+onto whatever element it is given, and `maplibre-gl.css` declares
+`position: relative` on that class. Same specificity, loaded later, so it wins:
+the container silently went back to `relative`, `inset-0` stopped applying, the
+div collapsed to height 0, and MapLibre initialised a zero-height viewport. A
+zero-height viewport needs no tiles, so nothing was ever requested and no error
+was raised anywhere — while the camera kept reporting perfectly correct
+coordinates, which is exactly why search "worked" on a map that showed nothing.
+
+`MapCanvas` had already hit this and fixed it with inline
+`style={{ position: 'absolute', inset: 0 }}` (inline styles outrank both
+stylesheets), and carries a comment explaining why. The picker was written
+afterwards and did not carry the fix across. It does now, with the same comment.
+
+The picker also had no failure state, which is what let a broken map look like
+an empty one. It now shows *"Se încarcă harta…"* until MapLibre fires `load`,
+and *"Harta nu s-a putut încărca"* if that has not happened in 20 s — same
+timeout and same "never fail on an `error` event" stance as `MapCanvas`, where
+routine startup errors had previously produced a permanent failure screen over a
+tile host that was answering fine.
+
+**2. The pin is no longer fixed to the centre of the viewport.** The first
+version copied the mobile crosshair model: the pin was an overlay at the middle
+of the map and the confirmed point was always `map.getCenter()`. That means
+panning to look around rewrites the answer. It is now a real MapLibre `Marker`
+on the ground: **click anywhere to drop it, drag it to fine-tune, pan freely
+without touching the point.** The marker is built as DOM (`createPinElement`,
+node by node rather than `innerHTML`) because MapLibre owns its positioning.
+
+Because the pin is explicit now, a search result also *places* it, at the
+geocoder's own coordinates, instead of only flying the camera; and the initial
+"opened on an address with no coordinates" lookup drops the pin on the first
+result rather than leaving the operator with nothing to adjust.
+
+#### Behaviour as it stands
+
+Three things fill the value: a **known place** (this client's sites in brand
+colour, everyone else's in grey, numbered — clicking one snaps to its exact
+stored coordinates and its stored address), an **address search**, or a
+**click/drag on the map**. Only the hand-placed pin triggers reverse geocoding;
+a search result and a known place come with a better label than a reverse lookup
+would invent, and re-labelling them would overwrite the operator's choice with
+something rounder. Every geocoder failure degrades to "keep the old label"
+rather than an error: the coordinates under the pin are the real output, and
+they keep working offline.
 
 **Geocoder: Photon (`lib/geocoding.ts`), not Google.** No API key, no billing,
 built for as-you-type autocomplete — which Nominatim's usage policy forbids —
@@ -227,12 +265,16 @@ billed key into a public SPA bundle to match would be a step backwards. Like
 mobile's, the call does NOT go through the app's fetch wrapper — that would
 attach our bearer token to a third party's host.
 
-Every geocoder failure degrades to "no label" rather than an error: the
-coordinates under the pin are the real output, and they keep working offline.
-
 The picker is behind `React.lazy` so MapLibre (~250 kB gzip) stays out of the
 Comenzi chunk for the operators who never open it;
 `__tests__/mapPickerIsLazy.test.ts` fails if a static import creeps back in.
+`__tests__/LocationPickerModal.test.tsx` covers the new model (click drops the
+pin, drag re-labels it, a search sets both halves, a known place is never
+reverse-geocoded) against a faked MapLibre, since jsdom has no WebGL.
+
+**Lesson worth keeping:** a map that renders nothing but whose coordinates are
+right is almost always a zero-sized container, not a network problem — and any
+CSS a third-party stylesheet also sets on the container has to be inline.
 
 ### TODO-11 `[DONE]` Remove Activ/Inactiv from Abonamente
 Drop the active/inactive concept and its UI for subscriptions. It is

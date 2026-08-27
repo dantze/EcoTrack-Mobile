@@ -205,6 +205,14 @@ bearer token to someone else's host. Same rule and same reason as
 imports it must stay behind a dynamic import — `/harta` via the route table,
 the order location picker via `React.lazy` in `sales/components/fields.tsx`.
 
+**A MapLibre container must be positioned with INLINE styles.** MapLibre stamps
+`.maplibregl-map` onto the element it is given, and `maplibre-gl.css` sets
+`position: relative` on that class — loaded after Tailwind's utilities, so it
+beats `absolute inset-0`, the container collapses to height 0, and the map
+renders a blank white box while still reporting correct coordinates. Both
+`MapCanvas` and `LocationPickerModal` use `style={{ position: 'absolute',
+inset: 0 }}` for exactly this reason; the picker shipped without it once (TODO-10).
+
 **Server state is TanStack Query.** Query keys and the mutations that invalidate
 them live together in each feature's `queries.ts`, namespaced by module
 (`'technical'`, `'sales'`) so invalidating a parent key cascades. Screens supply

@@ -40,6 +40,14 @@ NO_CI_REQUIRED = {
     "CLAUDE.md",
     "README.md",
     "TODO.md",          # the backlog; prose, ships in no build
+    "DEPLOYMENT.md",    # the runbook; prose, ships in no build
+    ".env.example",     # a template of NAMES only; read by nothing at build time
+    # The compose files ARE load-bearing - deploy.yml watches docker-compose.yml
+    # and rebuilds the stack from it - but no ci-*.yml validates them, so a typo
+    # is only caught on the VPS. Exempted to unblock, not because it is fine:
+    # TODO-29 is the `docker compose config -q` gate that would really cover them.
+    "docker-compose.yml",
+    "docker-compose.dev-hosted.yml",
 }
 NO_CI_REQUIRED_GLOBS = ("HANDOFF-*.md",)
 

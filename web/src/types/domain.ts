@@ -239,7 +239,7 @@ export interface AuthUser {
   fullName: string;
   phone: string | null;
   county: string | null;
-  /** Used to match a Google account to an employee record on /auth/google. */
+  /** Optional contact detail only — nothing authenticates with it. */
   email: string | null;
   roles: Role[];
 }

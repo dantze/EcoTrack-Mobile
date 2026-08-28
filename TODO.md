@@ -664,7 +664,7 @@ Needs deciding:
 - A `SecurityTests` case is the point of the change; the web guard stays as the
   friendly half.
 
-### TODO-23 `[ ]` Dead Google sign-in plumbing outside the backend
+### TODO-23 `[DONE]` Dead Google sign-in plumbing outside the backend
 Google sign-in and password login are gone from the backend, and the orphaned
 `ecotrack.google.*` properties went with the refactor. The **deployment and
 build plumbing still passes the values**: `GOOGLE_CLIENT_ID` and
@@ -680,6 +680,43 @@ Harmless but misleading — it reads as if the app still supports Google auth.
 half leaves build args feeding a variable nobody reads, which is worse than
 either end alone. Confirm no deployment secret is still expected before removing
 the workflow entries.
+
+**Done as one sweep, all three layers.**
+
+- **Deploy/build:** `GOOGLE_CLIENT_ID` / `GOOGLE_ALLOWED_DOMAIN` gone from
+  `deploy.yml` (both the `env:` block and the `envs:` passlist),
+  `docker-compose.yml`, `docker-compose.dev-hosted.yml` and `.env.example`;
+  `VITE_GOOGLE_CLIENT_ID` gone from `web/Dockerfile` (ARG **and** ENV),
+  `docker-compose.yml`, `.env.example` and `web/.env.example`.
+- **Web:** `GOOGLE_CLIENT_ID` deleted from `src/lib/config.ts`,
+  `VITE_GOOGLE_CLIENT_ID` from `src/vite-env.d.ts`, `MOCK_GOOGLE_DEMO_USERNAME`
+  from `src/mocks/seed.ts` — all three had **no consumer left anywhere in
+  `src/`**, so nothing changed behaviour.
+- **Comments:** the stale `/auth/google` lines on `email` in `types/domain.ts`
+  and on `CredentialRow` in `mocks/store.ts` now say what the field actually is
+  (an optional contact detail nothing authenticates with).
+
+**The precondition checked before touching the workflow:** `grep -rn "google"
+backend/src/main/resources/` returns **nothing** — no `ecotrack.google.*`
+property survives, so those env vars were reaching a Spring container that
+ignored them. No deployment secret is still expected. The GitHub secrets
+themselves (`GOOGLE_CLIENT_ID`, `GOOGLE_ALLOWED_DOMAIN`) are now unreferenced
+and can be deleted in **Settings → Secrets** — that is a click in the GitHub UI,
+not a repo change, so it is left to you.
+
+**Deliberately NOT touched:** the backend comments in `AuthController`,
+`AuthService`, `SecurityConfig`, `Employee` and `EnrollmentFlowTest` that
+mention Google. They are accurate — they document that the endpoint was removed,
+and `EnrollmentFlowTest.loginEndpointsAreGone` actively asserts `POST
+/api/auth/google` no longer answers. That test is the regression guard for this
+whole item. Also untouched: `google.com/maps` deep links in
+`mobile/app/Driver/TaskDetails.tsx` and `sales/OrderDetailDrawer.tsx`, and the
+Google Places key in mobile — those are Maps, not sign-in.
+
+**Verified (web + hygiene; backend and mobile untouched so their CI does not
+run):** 372 tests green in 26 files, typecheck clean, lint 0 errors / 105
+warnings (unchanged — that is the TODO-26 backlog), build clean, bundle
+**139.4 kB / 160 kB** (down from 139.7). Hygiene green after TODO-29.
 
 ### TODO-24 `[ ]` Rotate the Google Maps key that is still in git history
 A Maps key was committed in `807aec2`. The file that quoted it
@@ -731,6 +768,51 @@ Decide which number is intended, then make the property, the fallback and the
 prose agree. A 365-day refresh token is a year-long credential on a lost device;
 if that is deliberate it deserves a sentence saying so next to the session cap
 and the nightly prune.
+
+### TODO-28 `[ ]` Dead password-login plumbing in the web mock
+Found while doing TODO-23, and left alone because it is the **password** half,
+not the Google half — a different question with a different answer.
+
+`MOCK_CREDENTIALS_HINT` ("Exposed so the login screen can tell a demo user what
+to type") and `MOCK_AUTO_LOGIN` are both defined in `web/src/mocks/seed.ts` and
+re-exported twice — from `src/mocks/index.ts` and again from `src/api/index.ts`
+— and **neither has a single consumer in `src/`**, tests included. There is no
+login screen any more: mock mode boots by driving the real request→claim
+enrollment path against `DEV_DEVICE_ID` (TODO-01), which is the export beside
+them that *is* used.
+
+Behind them sits the bigger question: `CredentialRow` still carries a
+`password`, and `MOCK_PASSWORD = 'demo'` is stamped onto all ~8 seeded
+employees, for a system that has no password anywhere.
+
+Needs deciding: delete the two dead exports only, or drop `password` from
+`CredentialRow` entirely and keep the row for `email`? The second is the honest
+one but touches `toAuthUser`, `currentEmployee`, `issueSession` and
+`findApprovableEmployee` in `mocks/index.ts`, so it wants its own reading rather
+than being smuggled into a comment sweep.
+
+### TODO-29 `[ ]` Nothing validates the docker-compose files
+Found while doing TODO-23: `repo-hygiene.yml` **fails any PR that touches
+`docker-compose.yml`**, and always has — the file matches no `ci-*.yml` `paths:`
+filter, which is exactly the "no workflow watches this" error that check exists
+to raise. It went unnoticed because the file had not been edited since `bc47aec`.
+
+Unblocked the cheap way, deliberately: `docker-compose.yml`,
+`docker-compose.dev-hosted.yml`, `DEPLOYMENT.md` and `.env.example` were added
+to `NO_CI_REQUIRED` in `.github/scripts/repo_hygiene.py`. For the two docs that
+is simply correct — they are prose and a template of names, the same category as
+`CLAUDE.md`/`README.md`/`TODO.md` already in that set.
+
+**For the compose files it is an exemption, not a verdict.** They are
+load-bearing — `deploy.yml` watches `docker-compose.yml` and rebuilds the whole
+stack from it — so a typo there is currently caught on the VPS, mid-deploy, and
+nowhere earlier. The real fix is a small `ci-compose.yml` running
+`docker compose config -q` on both files (pinned action SHA, or hygiene's own
+unpinned-action check will flag it), and then removing the two exemptions again.
+
+Needs deciding: is a validation-only workflow worth a fourth `ci-*.yml`, or
+should the check be folded into `repo-hygiene.yml`, which already runs on every
+PR and would need no new `paths:` filter?
 
 ---
 

@@ -645,7 +645,7 @@ the security config, JPA setup and the enrollment code — close it.
 refactoring that followed) and deliberately not fixed there: none is a
 behaviour-preserving cleanup, and each wants a decision of its own.*
 
-### TODO-22 `[ ]` No backend guard against demoting the last admin
+### TODO-22 `[DONE]` No backend guard against demoting the last admin
 The last-admin lockout guard exists **only in `web/src/features/admin/EmployeesPage.tsx`**.
 `AdminService` has no equivalent check, so anything that is not that screen — a
 direct API call, a future mobile admin view, a script — can demote or delete the
@@ -663,6 +663,47 @@ Needs deciding:
   only device is the same lockout by another route.
 - A `SecurityTests` case is the point of the change; the web guard stays as the
   friendly half.
+
+**Done (backend only — the web guard is untouched and stays the friendly half).**
+`AdminService` now refuses both routes with a **409** and a Romanian message:
+`updateEmployee` when a `roleNames` payload would drop ADMIN from the last
+admin, and `deleteEmployee` when the target is the last admin. Both throw
+`IllegalStateException`, which `GlobalExceptionHandler` already maps to 409 —
+the same shape TODO-20 used, and no new handler.
+
+**The three questions, decided:**
+
+**1. Refuse the operation, with 409 — not "refuse only the last one and let the
+UI explain".** The refusal *is* only for the last one; what changed is that it
+no longer depends on the UI. The message names the fix
+(*"Promovează întâi pe altcineva"*) rather than only the problem.
+
+**2. NO to session revocation — deliberately, and this is the half that stays
+open.** It is a real lockout route: `claim` is single-use (`CLAIMED → EXPIRED`)
+and `isAwaitingBootstrap()` is `employeeRepository.count() == 0`, so the last
+admin logging out cannot get back in — nobody is left to approve a new device.
+But refusing it is the wrong instrument: a sole admin who may never log out, and
+who cannot revoke a stolen device, is a worse bug than the one being prevented.
+The honest fix is a **recovery path**, not a refusal — see TODO-30.
+`DELETE /api/auth/sessions` needs nothing either way: it is `revokeOtherSessions`
+and always keeps the caller's own session.
+
+**3. The count asks the database** (`EmployeeRepository.countByRoleName`,
+`COUNT(DISTINCT e)` because `roles` is a ManyToMany and a plain count over the
+join would see one admin as two). Not airtight — there is no `@Version` anywhere
+in this app, so two admins demoting each other concurrently can still both read
+"2" — but the window is the transaction rather than the request.
+
+**Verified: `./gradlew build` on JDK 21 — BUILD SUCCESSFUL, 241 tests, 0
+failures**, and the suite was then run three times over to be sure (see TODO-31:
+it was NOT reliably green before this change, for unrelated reasons).
+
+New `SecurityTests/LastAdminGuardTest` (9 tests) runs the real filter chain: the
+two refusals, that a refused demotion writes nothing, that the message is
+Romanian, and — the half that matters as much — four allowances, so the guard
+cannot quietly become "admins may not be edited": demoting/deleting one of two
+admins, deleting a non-admin, editing the last admin's NAME, and widening their
+roles while keeping ADMIN.
 
 ### TODO-23 `[DONE]` Dead Google sign-in plumbing outside the backend
 Google sign-in and password login are gone from the backend, and the orphaned
@@ -813,6 +854,70 @@ unpinned-action check will flag it), and then removing the two exemptions again.
 Needs deciding: is a validation-only workflow worth a fourth `ci-*.yml`, or
 should the check be folded into `repo-hygiene.yml`, which already runs on every
 PR and would need no new `paths:` filter?
+
+### TODO-30 `[ ]` There is no recovery path when the last admin loses their session
+Split out of TODO-22, which fixed the *demote/delete* route and deliberately did
+not touch this one.
+
+The last admin can still lock everyone out permanently by ordinary means:
+`POST /api/auth/logout`, or `DELETE /api/auth/sessions/{id}` on their own only
+device. Nothing about that is exotic — it is what "log out" does. It is
+unrecoverable because two things line up: `EnrollmentService.claim` is
+single-use (`CLAIMED → EXPIRED`, so the device cannot re-claim its old approval)
+and `isAwaitingBootstrap()` is `employeeRepository.count() == 0`, so the
+first-user-becomes-ADMIN path only reopens on an **empty employee table**. The
+only recovery is destroying all employee data.
+
+TODO-22 decided NOT to fix this by refusing the operation: an admin who may
+never log out, and who cannot revoke a device they just had stolen, is worse
+than the lockout. So the fix has to be a way back IN. Options, none chosen:
+
+- **Re-announce the setup code** when the admin count drops to zero — reuses the
+  bootstrap machinery already in `EnrollmentService`
+  (`announceSetupCodeIfUnclaimed`), but it currently keys on an empty table, and
+  "zero admins" is a different and much more reachable condition.
+- **Let a previously-approved device re-enroll without approval**, keyed on its
+  device id. Weakens the single-use property that exists to stop a leaked claim
+  secret minting a second session.
+- **An out-of-band break-glass code** in config, which is a password by another
+  name and would undo part of why credentials were removed.
+
+Needs deciding before building. Whichever is picked, it wants a `SecurityTests`
+case in the shape of `LastAdminGuardTest`.
+
+### TODO-31 `[ ]` The backend test suite shares one database across classes
+Found while doing TODO-22: **the backend suite was not reliably green before
+this change**, and the reason is test isolation, not product code.
+
+Two distinct problems, one fixed and one only worked around:
+
+**1. Clock-granularity races — FIXED.** Three `TokenServiceTest` cases built a
+`TokenService` with 0-day retention, making the prune cutoff `Instant.now()`,
+then compared it against timestamps stamped microseconds earlier with a STRICT
+`<`. Two `Instant.now()` calls can return the same value — the clock is coarser
+than the code is fast, ~15 ms on Windows against ~µs on Linux — so `revokedAt <
+cutoff` was false and nothing was pruned. The LRU cap test had the same tie
+problem in `ORDER BY lastUsedAt`. All three now stamp an explicit age
+(`backdateRevokedAt` / `backdateLastUsedAt`) instead of racing the clock. This
+is why the suite passed on CI (Linux) and failed on the developer's Windows
+machine — a class of failure that will keep recurring while tests use
+`Instant.now()` as both the data and the cutoff.
+
+**2. Cross-class committed state — NOT fixed, only accommodated.**
+`EnrollmentFlowTest`, `EnrollmentBootstrapCodeTest` and `AuthEnforcementOffTest`
+are deliberately not `@Transactional` — they exercise the first-user bootstrap,
+which needs committed state — and each leaves a committed ADMIN employee behind
+in the shared in-memory database. Any later test that asserts something about
+the WHOLE table therefore reads other classes' leftovers.
+`LastAdminGuardTest` works around it by demoting every pre-existing admin in its
+own `@BeforeEach` (rolled back, so it leaks nothing), and asserts its
+precondition so a future drift fails loudly instead of looking like a guard bug.
+
+That workaround is per-test and does not generalise. Needs deciding: give the
+non-transactional classes `@DirtiesContext` (slow — a fresh context each time),
+have them clean up after themselves explicitly, or move bootstrap tests onto
+their own isolated datasource. Until then, **any new assertion about a global
+count is unsafe by default.**
 
 ---
 

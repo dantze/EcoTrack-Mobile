@@ -919,6 +919,50 @@ have them clean up after themselves explicitly, or move bootstrap tests onto
 their own isolated datasource. Until then, **any new assertion about a global
 count is unsafe by default.**
 
+### TODO-32 `[ ]` Deploy fails at the SSH step — the VPS is unreachable
+Found on the push of TODO-22 (`a95825b`). **Not a test failure**, though it reads
+like one: both gates (`verify-backend`, `verify-web`) went green — the `deploy`
+job `needs:` them, so it only started because they passed — and then died on its
+first action with
+
+```
+2026/08/30 13:47:11 dial tcp ***:22: i/o timeout
+```
+
+Nothing in the deploy script ran; the `======CMD======` block in the log is just
+appleboy/ssh-action echoing the script before it connects.
+
+**What the error narrows it to:** `SERVER_IP` is *set* (GitHub prints `***` only
+for a secret that has a value), and an **i/o timeout** means the packets were
+dropped rather than refused — no host, a powered-off host, or a firewall DROP. A
+wrong-but-alive machine answers "connection refused" in milliseconds. So: the
+droplet is gone or off, a cloud firewall/ufw is blocking inbound 22 from GitHub
+runners, `SERVER_IP` is stale after a rebuild, or sshd is not on 22 (`deploy.yml`
+sets no `port:`, so it defaults to 22).
+
+This is consistent with the Appendix line that still says **"No users and no
+server exist yet"**, and with the dead `146.190.224.202` droplet that survives as
+a hardcoded fallback in `web/src/lib/config.ts` and `mobile/constants/ApiConfig.ts`.
+
+**Why it needs a decision rather than a fix:** `deploy.yml` triggers on every
+push to `main` touching `backend/**`, `web/**`, `docker-compose.yml` or
+`Caddyfile`. While no server answers, **every such push turns main red**, which
+trains everyone to ignore a red main — the expensive failure here, since the two
+CI gates that DO mean something are in the same workflow run.
+
+Options, none chosen:
+- **Gate the deploy job** on a repo variable (`if: vars.DEPLOY_ENABLED == 'true'`)
+  so the verify jobs still run and the deploy is skipped, not failed. Reversible,
+  one line, and honest about the state.
+- **Drop the `push:` trigger**, keeping `workflow_dispatch`, so deploying is a
+  deliberate button press until a server exists.
+- **Leave it red** on the argument that an unreachable production host SHOULD be
+  loud. Defensible only once a server actually exists.
+
+Decide after establishing whether a VPS is meant to exist right now. If one is
+provisioned, this closes by fixing the host/firewall/secret and nothing in the
+repo changes.
+
 ---
 
 ## Appendix — current state (context)

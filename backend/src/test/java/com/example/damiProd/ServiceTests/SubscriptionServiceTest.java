@@ -7,6 +7,7 @@ import com.example.damiProd.domain.Individual;
 import com.example.damiProd.domain.RecurringIgienizare;
 import com.example.damiProd.domain.Subscription;
 import com.example.damiProd.dto.SubscriptionUsageResponse;
+import com.example.damiProd.exception.ResourceNotFoundException;
 import com.example.damiProd.repository.OrderRepository;
 import com.example.damiProd.repository.RecurringIgienizareRepository;
 import com.example.damiProd.repository.SubscriptionRepository;
@@ -75,7 +76,7 @@ class SubscriptionServiceTest {
     @Test
     void deactivate_shouldRetireWhenNothingLiveUsesThePlan() {
         Subscription sub = plan();
-        when(subscriptionRepository.findById(1L)).thenReturn(Optional.of(sub));
+        when(subscriptionRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(sub));
         when(orderRepository.findLiveBySubscriptionId(1L)).thenReturn(List.of());
         when(recurringRepository.findBySubscription_IdAndActiveTrue(1L)).thenReturn(List.of());
 
@@ -94,7 +95,7 @@ class SubscriptionServiceTest {
     @Test
     void deactivate_shouldRetireWhenOnlyFinishedOrdersRemain() {
         Subscription sub = plan();
-        when(subscriptionRepository.findById(1L)).thenReturn(Optional.of(sub));
+        when(subscriptionRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(sub));
         when(orderRepository.findLiveBySubscriptionId(1L)).thenReturn(List.of());
         when(recurringRepository.findBySubscription_IdAndActiveTrue(1L)).thenReturn(List.of());
 
@@ -104,12 +105,67 @@ class SubscriptionServiceTest {
     }
 
     // -----------------------------------------------------------------------
+    // deactivate — the row lock that makes the check-then-act atomic (TODO-39)
+    // -----------------------------------------------------------------------
+
+    /**
+     * The read that starts the retirement must be the LOCKING one.
+     *
+     * A plain findById reads the plan and lets go, so a POST /api/orders can
+     * commit a live order between the blocker check and the isActive write —
+     * and because that transaction never touches the subscriptions row there is
+     * nothing to conflict on. findByIdForUpdate holds the row for the rest of
+     * the transaction, and the order paths take the same lock. Swapping it back
+     * for findById is a silent reopening of the hole, so pin it here.
+     */
+    @Test
+    void deactivate_takesTheRowLockRatherThanAPlainRead() {
+        Subscription sub = plan();
+        when(subscriptionRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(sub));
+        when(orderRepository.findLiveBySubscriptionId(1L)).thenReturn(List.of());
+        when(recurringRepository.findBySubscription_IdAndActiveTrue(1L)).thenReturn(List.of());
+
+        subscriptionService.deactivate(1L);
+
+        verify(subscriptionRepository).findByIdForUpdate(1L);
+        verify(subscriptionRepository, never()).findById(any());
+    }
+
+    /**
+     * The lock needs a transaction to live in: without @Transactional Spring
+     * gives each repository call its own, so the FOR UPDATE would be released
+     * the moment the SELECT returned — before the blocker check even runs.
+     */
+    @Test
+    void deactivate_isTransactional() throws NoSuchMethodException {
+        var method = SubscriptionService.class.getMethod("deactivate", Long.class);
+
+        boolean transactional =
+                method.isAnnotationPresent(org.springframework.transaction.annotation.Transactional.class)
+                        || SubscriptionService.class.isAnnotationPresent(
+                                org.springframework.transaction.annotation.Transactional.class);
+
+        assertThat(transactional)
+                .as("SubscriptionService.deactivate must stay @Transactional — the row lock "
+                        + "it takes is only held for the length of the transaction")
+                .isTrue();
+    }
+
+    @Test
+    void deactivate_shouldStill404ForAnUnknownPlan() {
+        when(subscriptionRepository.findByIdForUpdate(99L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> subscriptionService.deactivate(99L))
+                .isInstanceOf(ResourceNotFoundException.class);
+    }
+
+    // -----------------------------------------------------------------------
     // deactivate — refusals
     // -----------------------------------------------------------------------
     @Test
     void deactivate_shouldThrowWhenAnUnfinishedOrderUsesThePlan() {
         Subscription sub = plan();
-        when(subscriptionRepository.findById(1L)).thenReturn(Optional.of(sub));
+        when(subscriptionRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(sub));
         when(orderRepository.findLiveBySubscriptionId(1L))
                 .thenReturn(List.of(order(10L, 41L, person("Ana Pop"))));
         when(recurringRepository.findBySubscription_IdAndActiveTrue(1L)).thenReturn(List.of());
@@ -136,7 +192,7 @@ class SubscriptionServiceTest {
         recurring.setClient(person("Ana Pop"));
         recurring.setFrequencyDays(30);
 
-        when(subscriptionRepository.findById(1L)).thenReturn(Optional.of(sub));
+        when(subscriptionRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(sub));
         when(orderRepository.findLiveBySubscriptionId(1L)).thenReturn(List.of());
         when(recurringRepository.findBySubscription_IdAndActiveTrue(1L)).thenReturn(List.of(recurring));
 
@@ -154,7 +210,7 @@ class SubscriptionServiceTest {
         RecurringIgienizare recurring = new RecurringIgienizare();
         recurring.setId(5L);
 
-        when(subscriptionRepository.findById(1L)).thenReturn(Optional.of(sub));
+        when(subscriptionRepository.findByIdForUpdate(1L)).thenReturn(Optional.of(sub));
         when(orderRepository.findLiveBySubscriptionId(1L))
                 .thenReturn(List.of(order(10L, 41L, person("Ana Pop")), order(11L, 42L, person("Ana Pop"))));
         when(recurringRepository.findBySubscription_IdAndActiveTrue(1L)).thenReturn(List.of(recurring));

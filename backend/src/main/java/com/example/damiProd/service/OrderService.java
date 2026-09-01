@@ -68,9 +68,12 @@ public class OrderService {
         }
 
         // ─── Link subscription for Igienizare ───
+        // The lock and the re-check are one unit (TODO-39): see lockSubscription.
         if (order instanceof IgienizareOrder igi && igi.getSubscription() != null
                 && igi.getSubscription().getId() != null) {
-            igi.setSubscription(requireSubscription(igi.getSubscription().getId()));
+            Subscription plan = lockSubscription(igi.getSubscription().getId());
+            requireUsablePlan(plan);
+            igi.setSubscription(plan);
         }
 
         return orderRepository.save(order);
@@ -165,7 +168,16 @@ public class OrderService {
         // ─── Igienizare-specific fields ───
         if (existingOrder instanceof IgienizareOrder existing && orderDetails instanceof IgienizareOrder updates) {
             if (updates.getSubscription() != null && updates.getSubscription().getId() != null) {
-                existing.setSubscription(requireSubscription(updates.getSubscription().getId()));
+                Subscription plan = lockSubscription(updates.getSubscription().getId());
+                // Only a MOVE to a different plan has to be refused. Re-sending
+                // the plan an order already sits on must keep working: a finished
+                // order legitimately points at a retired plan (the delete is
+                // soft), and editing its address should not be blocked by that.
+                Long current = existing.getSubscription() != null ? existing.getSubscription().getId() : null;
+                if (!plan.getId().equals(current)) {
+                    requireUsablePlan(plan);
+                }
+                existing.setSubscription(plan);
             }
             if (updates.getSanitationDate() != null)
                 existing.setSanitationDate(updates.getSanitationDate());
@@ -188,8 +200,37 @@ public class OrderService {
                 .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + id));
     }
 
-    private Subscription requireSubscription(Long id) {
-        return subscriptionRepository.findById(id)
+    /**
+     * The plan, taken with SELECT … FOR UPDATE (TODO-39).
+     *
+     * Attaching an order to a plan and retiring that plan are a check-then-act
+     * against each other: SubscriptionService.deactivate reads "nothing live
+     * points at this plan" and then writes isActive = false, and this method's
+     * caller commits exactly the row that would have made that read say no.
+     * Neither transaction used to touch the other's rows, so nothing conflicted
+     * and both could win — leaving a live order on a retired plan.
+     *
+     * Both sides now take this lock on the same subscription row, which orders
+     * them. Ordering alone is not the fix: whoever comes second still has to
+     * LOOK. deactivate re-reads the blockers under the lock, and the caller here
+     * re-checks isActive through requireUsablePlan.
+     */
+    private Subscription lockSubscription(Long id) {
+        return subscriptionRepository.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Subscription not found with id: " + id));
+    }
+
+    /**
+     * Refuses a retired plan, read under the lock taken above.
+     *
+     * 409 rather than 404: the plan exists and the client is not confused about
+     * which one it means — it was retired while this order was being filled in.
+     */
+    private static void requireUsablePlan(Subscription plan) {
+        if (Boolean.FALSE.equals(plan.getIsActive())) {
+            throw new IllegalStateException(
+                    "Abonamentul „" + plan.getName() + "” a fost dezactivat și nu mai poate fi folosit"
+                            + " pentru comenzi noi. Alege alt abonament.");
+        }
     }
 }

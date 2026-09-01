@@ -157,8 +157,23 @@ public class TaskController {
     // the two disagree for any order carrying more than one task — the archive
     // would still show it as current while the guard had already let the
     // subscription go. TaskService.summariseOrderTasks holds the one rule.
+    //
+    // Office-only (TODO-42). The response names the task's id, route, schedule
+    // and status, and the order id is the only thing a caller needs to aim at
+    // it - so without a guard a driver-only account could walk the id space and
+    // read the schedule of work that is not theirs. The matrix cannot stop that:
+    // it lets any authenticated employee read /api/**, which is the same reason
+    // /api/tasks/employee/{id} needed a policy call rather than a matcher row.
+    //
+    // requireOfficeRole and not a driver-scoped rule, because no driver screen
+    // asks this question: every caller is an office screen - web's Comenzi
+    // (features/sales) and mobile's Sales/ and Technical/ sections. The driver
+    // app reads its day through /api/tasks/mine and writes exactly two things.
     @GetMapping("/order/{orderId}/exists")
-    public ResponseEntity<Map<String, Object>> checkOrderHasTask(@PathVariable Long orderId) {
+    public ResponseEntity<Map<String, Object>> checkOrderHasTask(
+            @AuthenticationPrincipal EmployeePrincipal principal,
+            @PathVariable Long orderId) {
+        accessPolicy.requireOfficeRole(principal);
         List<Task> tasks = taskService.getTasksByOrderId(orderId);
         Task task = TaskService.summariseOrderTasks(tasks).orElse(null);
         Map<String, Object> response = new HashMap<>();

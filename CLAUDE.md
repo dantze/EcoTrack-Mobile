@@ -177,6 +177,12 @@ The role matrix answers "which VERBS may this role use". It does not answer
 - `/api/tasks/employee/{id}` still exists for the office overview (and for
   `Technical/ChangeDriver`), and returns 403 when a driver asks for an id that
   is not their own.
+- `GET /api/tasks/order/{id}/exists` is **office-only** (TODO-42). It summarises
+  one order's task — id, route, schedule, status — and the order id is the only
+  thing needed to aim at it, so an unguarded read let a driver walk the id space.
+  It is `requireOfficeRole` rather than a row-scoped rule because no driver screen
+  asks the question: every caller is an office screen in `web/features/sales` or
+  `mobile/app/{Sales,Technical}`.
 
 `SecurityTests/TaskScopingTest` covers this against the real filter chain.
 **A new task endpoint needs a policy call, not just a matcher row.**
@@ -207,6 +213,18 @@ generation and inventory adjustment happen inside them.
 `recurring_plan_id`, each nullable and meaning something different. Tasks are
 generated from orders and from `RecurringIgienizare` plans; `RecurringTaskScheduler`
 tops up indefinite plans nightly at 02:00.
+
+**Retiring a subscription is serialised with a row lock.**
+`SubscriptionRepository.findByIdForUpdate` is a `SELECT … FOR UPDATE` on the one
+subscription row, and it is taken by `SubscriptionService.deactivate` *and* by
+every path that attaches work to a plan — `OrderService.createOrder`/`updateOrder`
+and `RecurringIgienizareService.create` (TODO-39). Retiring is a check-then-act
+("nothing live points at this plan" → `isActive = false`) and order creation is
+the write that invalidates it, while touching none of the same rows: with no
+`@Version` there was nothing to conflict on. **The lock only decides who goes
+second — each side must then re-read**: `deactivate` re-checks its blockers, and
+the creating side re-checks `isActive` and refuses a retired plan with a 409.
+Dropping either half reopens one of the two interleavings.
 
 **CORS lives in `SecurityConfig`, not `WebConfig`.** `WebConfig` is a
 deliberately empty marker documenting why — Spring Security must own CORS once
@@ -411,8 +429,11 @@ affects only task photos (TODO-46).
 
 Deliberate or unresolved; do not assume these are safe.
 
-- **The mobile app cannot authenticate.** It still posts to the deleted
-  `/api/auth/login` and has no enrollment screens (TODO-19). See "Auth" above.
+- **A role change on the web never reaches an enrolled phone.** Mobile stores
+  `user.roles` at claim time and never refetches, so an admin promoting or
+  demoting someone in Angajați changes what the backend authorizes but not what
+  the device renders — it keeps the old menus until it re-enrols, and the
+  mismatch surfaces as a dead button or a 403 (TODO-35).
 - **No optimistic locking anywhere.** There is no `@Version` on any entity.
   Concurrent edits to the same task/route/order are silent last-write-wins, and
   because Spring Data `save()` issues a full-row UPDATE, the loser's other field

@@ -129,15 +129,15 @@ export interface RecurringRow {
 }
 
 /**
- * Login credentials live beside the employee, never exposed through the API.
- * `email` is an optional contact detail that nothing authenticates with; it
- * sits here rather than on the employee only because the mock's `Employee`
- * mirrors the API shape, which does not carry it.
+ * The per-employee row that used to hold login credentials. It carries no
+ * secret any more: there is no password anywhere in this system, so the row
+ * survives only for `email` — an optional contact detail that nothing
+ * authenticates with, which sits here rather than on the employee because the
+ * mock's `Employee` mirrors the API shape, and that does not carry it.
  */
 export interface CredentialRow {
   employeeId: number;
   username: string;
-  password: string;
   email: string;
 }
 

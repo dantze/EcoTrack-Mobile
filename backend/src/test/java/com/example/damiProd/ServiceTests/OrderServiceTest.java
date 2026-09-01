@@ -94,13 +94,74 @@ class OrderServiceTest {
         order.setSubscription(subRef);
 
         when(clientRepository.findById(1L)).thenReturn(Optional.of(mockClient));
-        when(subscriptionRepository.findById(20L)).thenReturn(Optional.of(mockSubscription));
+        when(subscriptionRepository.findByIdForUpdate(20L)).thenReturn(Optional.of(mockSubscription));
         when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
 
         Order result = orderService.createOrder(1L, order);
 
         assertThat(((IgienizareOrder) result).getSubscription()).isEqualTo(mockSubscription);
         assertThat(((IgienizareOrder) result).getSubscription().getName()).isEqualTo("Plan Lunar");
+    }
+
+    // -----------------------------------------------------------------------
+    // TEST 2b — the plan is taken under a row lock, and a retired one is refused
+    //           (TODO-39)
+    // -----------------------------------------------------------------------
+
+    /**
+     * Attaching an order to a plan races SubscriptionService.deactivate, which
+     * reads "nothing live points at this plan" and then retires it. Neither
+     * transaction used to touch a row the other looked at, so both could win and
+     * the plan retired with a live order on it. Both sides now take the SAME
+     * FOR UPDATE lock on the subscription row; a plain findById here would put
+     * this side back outside the serialisation.
+     */
+    @Test
+    void createOrder_igienizare_takesTheRowLockOnThePlan() {
+        IgienizareOrder order = new IgienizareOrder();
+        order.setOrderType("Igienizari");
+        Subscription subRef = new Subscription();
+        subRef.setId(20L);
+        order.setSubscription(subRef);
+
+        when(clientRepository.findById(1L)).thenReturn(Optional.of(mockClient));
+        when(subscriptionRepository.findByIdForUpdate(20L)).thenReturn(Optional.of(mockSubscription));
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        orderService.createOrder(1L, order);
+
+        verify(subscriptionRepository).findByIdForUpdate(20L);
+        verify(subscriptionRepository, never()).findById(any());
+    }
+
+    /**
+     * The other half of the fix. The lock only ORDERS the two transactions —
+     * whoever arrives second still has to look at what the first one did. When
+     * the retirement got there first, this re-read sees isActive = false and
+     * refuses, instead of committing the live order the retirement had just
+     * confirmed did not exist.
+     */
+    @Test
+    void createOrder_igienizare_shouldRefuseARetiredPlan() {
+        IgienizareOrder order = new IgienizareOrder();
+        order.setOrderType("Igienizari");
+        Subscription subRef = new Subscription();
+        subRef.setId(20L);
+        order.setSubscription(subRef);
+
+        Subscription retired = new Subscription();
+        retired.setId(20L);
+        retired.setName("Plan Lunar");
+        retired.setIsActive(false);
+
+        when(clientRepository.findById(1L)).thenReturn(Optional.of(mockClient));
+        when(subscriptionRepository.findByIdForUpdate(20L)).thenReturn(Optional.of(retired));
+
+        assertThatThrownBy(() -> orderService.createOrder(1L, order))
+                .isInstanceOf(IllegalStateException.class)   // -> 409, the plan is not missing
+                .hasMessageContaining("dezactivat");
+
+        verify(orderRepository, never()).save(any(Order.class));
     }
 
     // -----------------------------------------------------------------------

@@ -70,11 +70,23 @@ public class RecurringIgienizareService {
                 .orElseThrow(() -> new ResourceNotFoundException("Client not found with id: " + clientId));
         plan.setClient(client);
 
-        // Link subscription
+        // Link subscription.
+        //
+        // The SAME row lock the retirement takes (TODO-39). This is the second
+        // path that can invalidate SubscriptionService.deactivate's read, and
+        // the stronger one: it commits an ACTIVE recurring plan AND an initial
+        // live order, either of which deactivate would have refused. Locking
+        // orders the two; the isActive re-check under the lock is what makes the
+        // loser refuse instead of proceeding against a plan that just retired.
         if (plan.getSubscription() != null && plan.getSubscription().getId() != null) {
-            Subscription sub = subscriptionRepository.findById(plan.getSubscription().getId())
+            Subscription sub = subscriptionRepository.findByIdForUpdate(plan.getSubscription().getId())
                     .orElseThrow(() -> new ResourceNotFoundException(
                             "Subscription not found with id: " + plan.getSubscription().getId()));
+            if (Boolean.FALSE.equals(sub.getIsActive())) {
+                throw new IllegalStateException(
+                        "Abonamentul „" + sub.getName() + "” a fost dezactivat și nu mai poate fi folosit"
+                                + " pentru planuri recurente noi. Alege alt abonament.");
+            }
             plan.setSubscription(sub);
         }
 

@@ -719,7 +719,6 @@ const employeesApi: EcoTrackApi['employees'] = {
       db.credentials.push({
         employeeId: employee.id,
         username: input.username,
-        password: '',
         email: `${input.username}@ecotrack.ro`,
       });
       return cloneEmployee(employee);
@@ -1433,5 +1432,4 @@ export const mockApi: EcoTrackApi = {
   recurring: recurringApi,
 };
 
-export { MOCK_CREDENTIALS_HINT, MOCK_AUTO_LOGIN } from './seed';
 export { MockApiError } from './store';

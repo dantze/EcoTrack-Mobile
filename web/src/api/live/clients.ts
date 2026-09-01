@@ -10,7 +10,7 @@
 import type { ClientInput, ClientsApi } from '../contract';
 import type { Client } from '@/types/domain';
 import { request } from '../http';
-import { extractUrl, normalizeClient, type RawClient } from './normalize';
+import { normalizeClient, type RawClient } from './normalize';
 
 export const clientsApi: ClientsApi = {
   async list(): Promise<Client[]> {
@@ -43,22 +43,5 @@ export const clientsApi: ClientsApi = {
     const raw = await request<{ hasOrders?: boolean } | boolean>(`/clients/${id}/has-orders`);
     if (typeof raw === 'boolean') return raw;
     return raw?.hasOrders === true;
-  },
-
-  async uploadIdPhoto(clientId: number, file: File): Promise<string> {
-    const form = new FormData();
-    form.append('file', file);
-
-    // Returns a plain sentence with the URL embedded, not JSON.
-    const message = await request<string>(`/${clientId}/idPhoto`, {
-      method: 'POST',
-      body: form,
-    });
-    return extractUrl(String(message ?? ''));
-  },
-
-  async deleteIdPhoto(clientId: number): Promise<string> {
-    const message = await request<string>(`/${clientId}/idPhoto`, { method: 'DELETE' });
-    return String(message ?? '');
   },
 };

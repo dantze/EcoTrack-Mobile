@@ -60,6 +60,33 @@ docker compose up -d --build
 ```
 → `https://localhost` (self-signed warning expected).
 
+## Draining the legacy ID photos (one time, per environment)
+
+EcoTrack no longer stores photographs of identity documents (TODO-14). The
+upload endpoints are deleted, but **objects uploaded by earlier builds are still
+in Spaces**, and `individual.id_photo_url` is the only record of their keys.
+They were written with a public-read ACL, so each one is a working
+unauthenticated URL to a scan of someone's identity card.
+
+This is an operator step on purpose — a deploy must not delete production data
+as a side effect of somebody merging. Run it as ADMIN after the release lands:
+
+```bash
+# how many are left, and whose (ids only, never the URLs)
+curl -H "Authorization: Bearer $ADMIN_TOKEN" https://<domain>/api/admin/id-photos
+
+# delete the objects and clear the column
+curl -X DELETE -H "Authorization: Bearer $ADMIN_TOKEN" https://<domain>/api/admin/id-photos
+```
+
+Repeat the DELETE until `failed` is 0 and the GET reports `remaining: 0`. A row
+whose object could not be deleted **keeps** its URL so the next run retries it —
+that is deliberate, because clearing it would destroy the last reference to an
+object still holding personal data.
+
+Once every environment reports zero, the column, `AdminIdPhotoController` and
+this section all go (TODO-45).
+
 ## Gotchas
 
 - `ECOTRACK_SECURITY_ENFORCE=true` logs out every device on a pre-token build.
@@ -68,3 +95,11 @@ docker compose up -d --build
 - `runtimeVersion` is `appVersion`: bumping `expo.version` fences OTAs off from
   older installs until they get a new binary. Intentional.
 - No DB migrations (`ddl-auto=update`). Destructive schema changes are manual.
+- The web image build downloads the ID scanner's language model once, from a
+  pinned `tessdata_fast` tag, verified against a SHA-256 in
+  `web/scripts/fetch-ocr-assets.mjs`. **A web build needs network for that**, and
+  fails loudly rather than shipping a scanner with no model.
+- **The mobile ID scanner is a native module and does NOT ship over the air.**
+  `eas update` cannot deliver `@react-native-ml-kit/text-recognition`; it needs
+  `eas build`. Installed builds without it simply do not show the button —
+  `isIdScanAvailable()` hides it — rather than failing on touch.

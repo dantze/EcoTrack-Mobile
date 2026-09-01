@@ -28,7 +28,6 @@ const CLIENT: Client = {
   phone: null,
   address: null,
   CNP: null,
-  idPhotoUrl: null,
 };
 
 function amplasare(id: number, startDate: string | null, endDate: string | null = null): Order {

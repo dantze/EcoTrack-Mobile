@@ -107,3 +107,10 @@ backend/data/
 # node_modules/, dist/ and *.tsbuildinfo are already covered above.
 web/.env
 *.log
+
+# Offline OCR assets for the ID scanner (TODO-13). Fetched by
+# web/scripts/fetch-ocr-assets.mjs from node_modules and from a pinned,
+# checksum-verified tessdata_fast tag, on every build. ~14 MB of engine and
+# language model that never changes - a build step, not a commit, because a
+# binary blob in git history is permanent (see TODO-24).
+web/public/tesseract/

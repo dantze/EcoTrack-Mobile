@@ -51,7 +51,6 @@ export interface Individual extends ClientBase {
   /** Romanian personal numeric code. */
   CNP: string | null;
   /** Public URL in DigitalOcean Spaces; null when no ID photo uploaded. */
-  idPhotoUrl: string | null;
 }
 
 export interface Company extends ClientBase {

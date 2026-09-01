@@ -1,11 +1,13 @@
 package com.example.damiProd.SecurityTests;
 
 import com.example.damiProd.domain.Employee;
+import com.example.damiProd.domain.IgienizareOrder;
 import com.example.damiProd.domain.EmployeeRole;
 import com.example.damiProd.domain.Route;
 import com.example.damiProd.domain.Task;
 import com.example.damiProd.domain.TaskType;
 import com.example.damiProd.repository.EmployeeRepository;
+import com.example.damiProd.repository.OrderRepository;
 import com.example.damiProd.service.TokenService;
 import com.example.damiProd.repository.EmployeeRoleRepository;
 import com.example.damiProd.repository.RouteRepository;
@@ -57,12 +59,14 @@ class TaskScopingTest {
     @Autowired private EmployeeRoleRepository employeeRoleRepository;
     @Autowired private RouteRepository routeRepository;
     @Autowired private TaskRepository taskRepository;
+    @Autowired private OrderRepository orderRepository;
     @Autowired private ObjectMapper objectMapper;
 
     private Employee driverA;
     private Employee driverB;
     private Task taskA;
     private Task taskB;
+    private IgienizareOrder orderOfDriverA;
     private String tokenA;
     private String tokenSales;
 
@@ -73,6 +77,7 @@ class TaskScopingTest {
         Employee sales = seed("scope_sales", "SALES");
 
         taskA = seedTaskFor(driverA, "Client A");
+        orderOfDriverA = seedOrderFor(taskA);
         taskB = seedTaskFor(driverB, "Client B");
 
         tokenA = mintToken(driverA);
@@ -152,6 +157,41 @@ class TaskScopingTest {
                 .andExpect(status().isForbidden());
     }
 
+    // ------------------------------------------- the order-shaped read (TODO-42)
+
+    // GET /api/tasks/order/{id}/exists names the task's id, route, schedule and
+    // status. The role matrix lets any authenticated employee read /api/**, so
+    // before the guard a driver could walk the order id space and read work that
+    // is not theirs - the same leak /api/tasks/employee/{id} had.
+
+    @Test
+    void driver_cannotProbeOrderTaskStatus_evenForOwnTask() throws Exception {
+        // The strongest case for OFFICE-ONLY rather than a row-scoped rule: this
+        // order carries driver A's own task and driver A still gets 403, because
+        // no driver screen asks this question in the first place.
+        mockMvc.perform(get("/api/tasks/order/" + orderOfDriverA.getId() + "/exists")
+                        .header("Authorization", "Bearer " + tokenA))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void driver_cannotProbeOrderTaskStatus_forAnUnknownOrderId() throws Exception {
+        // The guard runs BEFORE the lookup, so a refused probe cannot be told
+        // apart from a missing order - a driver learns nothing by scanning ids.
+        mockMvc.perform(get("/api/tasks/order/999999/exists")
+                        .header("Authorization", "Bearer " + tokenA))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void officeStaff_stillReadOrderTaskStatus() throws Exception {
+        mockMvc.perform(get("/api/tasks/order/" + orderOfDriverA.getId() + "/exists")
+                        .header("Authorization", "Bearer " + tokenSales))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.hasTask").value(true))
+                .andExpect(jsonPath("$.taskId").value(taskA.getId()));
+    }
+
     // --------------------------------------------------- office is unchanged
 
     @Test
@@ -185,6 +225,18 @@ class TaskScopingTest {
         task.setRoute(route);
         task.setScheduledDate(LocalDate.now());
         return taskRepository.save(task);
+    }
+
+    /** An order carrying {@code task}, so the order-shaped read has something to find. */
+    private IgienizareOrder seedOrderFor(Task task) {
+        IgienizareOrder order = new IgienizareOrder();
+        order.setOrderType("Igienizari");
+        order.setNumber(4242L);
+        order.setSanitationDate(LocalDate.now().toString());
+        IgienizareOrder saved = orderRepository.save(order);
+        task.setOrder(saved);
+        taskRepository.save(task);
+        return saved;
     }
 
     /**

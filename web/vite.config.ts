@@ -36,6 +36,18 @@ export default defineConfig({
           // map chunk. What it buys is a cache boundary: the library outlives
           // every deploy, while the map screen's own code does not.
           maplibre: ['maplibre-gl'],
+          // Same reasoning for the ID scanner's engine (TODO-13): a cache
+          // boundary for a library that outlives the screen using it.
+          //
+          // It once had a second reason — without a name here Rollup calls the
+          // chunk after the package's entry module and emits `index-<hash>.js`,
+          // which the old `.github/scripts/bundle_budget.py` read as the EAGER
+          // entry chunk and charged 6.7 kB of lazy weight to the initial
+          // download. That is fixed at the source now (TODO-47): the script
+          // walks the real static import graph out of `dist/index.html`, so the
+          // chunk's NAME no longer decides anything. Kept for the cache
+          // boundary alone.
+          tesseract: ['tesseract.js'],
         },
       },
     },

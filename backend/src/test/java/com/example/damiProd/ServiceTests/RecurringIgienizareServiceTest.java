@@ -325,7 +325,7 @@ class RecurringIgienizareServiceTest {
     @Test
     void create_alsoWritesTheVisibleIgienizareOrderAndBacklinksThePlan() {
         when(clientRepository.findById(1L)).thenReturn(Optional.of(acme));
-        when(subscriptionRepository.findById(20L)).thenReturn(Optional.of(monthly));
+        when(subscriptionRepository.findByIdForUpdate(20L)).thenReturn(Optional.of(monthly));
 
         RecurringIgienizare input = new RecurringIgienizare();
         input.setSubscription(monthly);

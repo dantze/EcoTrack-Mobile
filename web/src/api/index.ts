@@ -21,7 +21,8 @@ export * from './contract';
 export { ApiError } from './http';
 
 /**
- * Demo credentials for the seeded mock account, so LoginPage can hint them
- * without importing `@/mocks` directly. Only meaningful in mock mode.
+ * The device id mock mode enrolls with on boot, so `AuthProvider` can drive the
+ * real request -> claim handshake without importing `@/mocks` directly. Only
+ * meaningful in mock mode.
  */
-export { MOCK_CREDENTIALS_HINT, MOCK_AUTO_LOGIN, DEV_DEVICE_ID } from '@/mocks';
+export { DEV_DEVICE_ID } from '@/mocks';

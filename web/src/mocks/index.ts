@@ -294,7 +294,7 @@ const authApi: EcoTrackApi['auth'] = {
 // Clients
 // ---------------------------------------------------------------------------
 
-function clientFromInput(id: number, input: ClientInput, previous?: Client): Client {
+function clientFromInput(id: number, input: ClientInput): Client {
   const base = {
     id,
     email: input.email ?? null,
@@ -311,8 +311,6 @@ function clientFromInput(id: number, input: ClientInput, previous?: Client): Cli
     type: 'individual',
     fullName: input.fullName,
     CNP: input.CNP ?? null,
-    // The ID photo is owned by the upload endpoints, never by a client edit.
-    idPhotoUrl: previous && previous.type === 'individual' ? previous.idPhotoUrl : null,
   };
 }
 
@@ -339,7 +337,7 @@ const clientsApi: EcoTrackApi['clients'] = {
     respond(() => {
       const index = db.clients.findIndex((client) => client.id === id);
       if (index === -1) notFound('Client', id);
-      const updated = clientFromInput(id, input, db.clients[index]);
+      const updated = clientFromInput(id, input);
       db.clients[index] = updated;
       return { ...updated };
     }),
@@ -365,30 +363,6 @@ const clientsApi: EcoTrackApi['clients'] = {
 
   hasOrders: (id) => respond(() => clientHasOrders(id)),
 
-  uploadIdPhoto: (clientId, file) =>
-    respond(() => {
-      const client = findClient(clientId);
-      if (!client) notFound('Client', clientId);
-      if (client.type !== 'individual') {
-        // Same as PhotosController: companies have no ID photo slot.
-        throw new MockApiError('Clientul nu este persoană fizică.', 400);
-      }
-      const url = URL.createObjectURL(file);
-      client.idPhotoUrl = url;
-      return url;
-    }),
-
-  deleteIdPhoto: (clientId) =>
-    respond(() => {
-      const client = findClient(clientId);
-      if (!client) notFound('Client', clientId);
-      if (client.type !== 'individual') return 'Client is not an Individual';
-      if (!client.idPhotoUrl) return `No photo to delete for client ID ${clientId}`;
-
-      if (client.idPhotoUrl.startsWith('blob:')) URL.revokeObjectURL(client.idPhotoUrl);
-      client.idPhotoUrl = null;
-      return `Photo deleted successfully for client ID ${clientId}`;
-    }),
 };
 
 // ---------------------------------------------------------------------------
@@ -745,7 +719,6 @@ const employeesApi: EcoTrackApi['employees'] = {
       db.credentials.push({
         employeeId: employee.id,
         username: input.username,
-        password: '',
         email: `${input.username}@ecotrack.ro`,
       });
       return cloneEmployee(employee);
@@ -1459,5 +1432,4 @@ export const mockApi: EcoTrackApi = {
   recurring: recurringApi,
 };
 
-export { MOCK_CREDENTIALS_HINT, MOCK_AUTO_LOGIN } from './seed';
 export { MockApiError } from './store';

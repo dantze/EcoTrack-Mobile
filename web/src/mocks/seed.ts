@@ -323,9 +323,6 @@ const EMPLOYEE_SEED: readonly EmployeeSeed[] = [
   { fullName: 'Alina Grigore', username: 'alina.grigore', county: 'Cluj', roles: ['TECH'] },
 ];
 
-/** Every mock account shares this password — mock mode has no real auth. */
-const MOCK_PASSWORD = 'demo';
-
 // ---------------------------------------------------------------------------
 // Seed
 // ---------------------------------------------------------------------------
@@ -353,7 +350,6 @@ export function createSeedDb(): MockDb {
   const credentials: CredentialRow[] = employees.map((employee) => ({
     employeeId: employee.id,
     username: employee.username,
-    password: MOCK_PASSWORD,
     // The Employee entity has no email field; auth is the only consumer, so
     // it lives on the credential row instead. Deterministic from the seed.
     email: `${employee.username}@ecotrack.ro`,
@@ -392,7 +388,6 @@ export function createSeedDb(): MockDb {
         fullName,
         CNP: cnp(),
         // A minority have their ID scanned in; the rest exercise the empty state.
-        idPhotoUrl: chance(0.35) ? `https://picsum.photos/seed/ct-id-${id}/800/520` : null,
         email: `${slug(fullName)}@gmail.com`,
         phone: phone(),
         address: homeSite.address,
@@ -830,21 +825,3 @@ export function createSeedDb(): MockDb {
     },
   };
 }
-
-/** Exposed so the login screen can tell a demo user what to type. */
-export const MOCK_CREDENTIALS_HINT = {
-  username: EMPLOYEE_SEED[0]!.username,
-  password: MOCK_PASSWORD,
-};
-
-/**
- * The account mock mode signs in as on boot, with no login screen at all.
- *
- * Local development has no backend and no enrollment flow to run, and the real
- * app has no password to type any more - so a login form in mock mode would be
- * asking for a credential that no longer exists anywhere in the system.
- */
-export const MOCK_AUTO_LOGIN = {
-  username: EMPLOYEE_SEED[0]!.username,
-  password: MOCK_PASSWORD,
-};

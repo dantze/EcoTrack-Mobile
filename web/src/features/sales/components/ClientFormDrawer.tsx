@@ -3,20 +3,22 @@
  *
  * Validation is the mobile app's (CreateClient / EditClient): email, phone and
  * address are always required, company records additionally need name, CUI and
- * administrator. The ID photo is uploaded after the record exists, exactly like
- * the original — there is no create-with-photo endpoint.
+ * administrator.
+ *
+ * **The ID photo upload that used to live here is gone (TODO-14).** An identity
+ * document is now read on this machine by `IdScanField` and thrown away; the
+ * two fields it yields are ordinary form values from that point on. There is no
+ * longer anything to upload, which is the point — a photo that was never stored
+ * cannot be read out of a bucket later.
  */
 
 import { useState } from 'react';
 import type { ClientInput } from '@/api';
 import { Button, Drawer, TextInput } from '@/components/ui';
 import type { Client } from '@/types/domain';
-import {
-  useCreateClient,
-  useDeleteIdPhoto,
-  useUpdateClient,
-  useUploadIdPhoto,
-} from '../queries';
+import { IdScanField } from '../idScan/IdScanField';
+import type { MrzRead } from '../idScan/mrz';
+import { useCreateClient, useUpdateClient } from '../queries';
 import {
   focusFirstInvalidField,
   isValidEmail,
@@ -120,20 +122,29 @@ export function ClientFormDrawer({
   const editing = client !== null;
   const [state, setState] = useState<FormState>(() => initialState(client));
   const [errors, setErrors] = useState<Errors>({});
-  const [photoFile, setPhotoFile] = useState<File | null>(null);
 
   const createClient = useCreateClient();
   const updateClient = useUpdateClient();
-  const uploadPhoto = useUploadIdPhoto();
-  const deletePhoto = useDeleteIdPhoto();
-
-  const existingPhotoUrl =
-    client && client.type === 'individual' ? client.idPhotoUrl : null;
 
   const patch = (changes: Partial<FormState>) =>
     setState((current) => ({ ...current, ...changes }));
 
-  const saving = createClient.isPending || updateClient.isPending || uploadPhoto.isPending;
+  /**
+   * Fill the two fields a scan yields. Fills, never commits — the operator sees
+   * the values in the inputs and saves (or fixes) them like any other typing.
+   */
+  const applyScan = (read: MrzRead) => {
+    setState((current) => ({
+      ...current,
+      fullName: read.fullName,
+      // A document that carries no CNP must not wipe one already typed. Only a
+      // CNP the parser actually verified is allowed to overwrite anything.
+      cnp: read.cnp ?? current.cnp,
+    }));
+    setErrors((current) => ({ ...current, fullName: undefined, cnp: undefined }));
+  };
+
+  const saving = createClient.isPending || updateClient.isPending;
 
   const submit = async (chainOrder = false) => {
     const found = validate(state);
@@ -150,36 +161,11 @@ export function ClientFormDrawer({
         ? await updateClient.mutateAsync({ id: client.id, input })
         : await createClient.mutateAsync(input);
 
-      if (photoFile && saved.type === 'individual') {
-        try {
-          await uploadPhoto.mutateAsync({ clientId: saved.id, file: photoFile });
-        } catch (photoError) {
-          toast.error(
-            errorMessage(
-              photoError,
-              'Clientul a fost salvat, dar poza de buletin nu a putut fi încărcată',
-            ),
-          );
-          onClose();
-          return;
-        }
-      }
-
       toast.success(editing ? 'Clientul a fost actualizat.' : 'Clientul a fost creat.');
       if (!editing && chainOrder) onCreated?.(saved);
       onClose();
     } catch (error) {
       toast.error(errorMessage(error, 'Nu s-a putut salva clientul'));
-    }
-  };
-
-  const removePhoto = async () => {
-    if (!client) return;
-    try {
-      await deletePhoto.mutateAsync(client.id);
-      toast.success('Poza de buletin a fost ștearsă.');
-    } catch (error) {
-      toast.error(errorMessage(error, 'Nu s-a putut șterge poza'));
     }
   };
 
@@ -231,6 +217,11 @@ export function ClientFormDrawer({
       </FormSection>
 
       <FormSection title="Identificare">
+        {state.kind === 'individual' && (
+          <div className="mb-4">
+            <IdScanField onRead={applyScan} />
+          </div>
+        )}
         <FormGrid>
           {state.kind === 'individual' ? (
             <>
@@ -330,47 +321,6 @@ export function ClientFormDrawer({
         </FormGrid>
       </FormSection>
 
-      {state.kind === 'individual' && (
-        <FormSection
-          title="Buletin"
-          description="Fără cameră pe desktop — încărcați o fotografie sau un scan al actului."
-        >
-          <div className="flex items-start gap-4">
-            {existingPhotoUrl && (
-              <div className="flex flex-col items-start gap-1">
-                <img
-                  src={existingPhotoUrl}
-                  alt="Buletin"
-                  className="h-24 w-36 rounded border border-border object-cover"
-                />
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  loading={deletePhoto.isPending}
-                  onClick={() => void removePhoto()}
-                >
-                  Șterge imaginea
-                </Button>
-              </div>
-            )}
-            <div className="flex flex-col gap-1">
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(event) => setPhotoFile(event.target.files?.[0] ?? null)}
-                className="text-sm text-ink-muted file:mr-3 file:rounded-md file:border file:border-border file:bg-white file:px-2.5 file:py-1 file:text-sm file:text-ink hover:file:bg-surface-sunken"
-              />
-              <p className="text-xs text-ink-subtle">
-                {photoFile
-                  ? `Se va încărca: ${photoFile.name}`
-                  : editing
-                    ? 'Alegeți un fișier pentru a înlocui imaginea.'
-                    : 'Imaginea se încarcă după crearea clientului.'}
-              </p>
-            </div>
-          </div>
-        </FormSection>
-      )}
     </Drawer>
   );
 }

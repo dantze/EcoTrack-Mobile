@@ -14,9 +14,131 @@ unless its status says otherwise.
   as out of scope — gets an item at the next free ID rather than living in a
   chat reply that scrolls away. Write down what was found, why it was not done,
   and what deciding it needs. Reporting a finding is not recording it.
+- **Where a new item goes:** at the END of the topical section it belongs to
+  (A–J below), with the next free ID. IDs are a permanent NAME, not a position:
+  they are therefore **not contiguous within a section**, and that is expected —
+  TODO-27 sits between TODO-23 and TODO-28 under A because that is what it is
+  about, not because of when it was written. Never renumber to tidy this up.
+- **Adding an item or changing its status is two edits, not one:** the item
+  itself, and its row in the *Index* below (plus the *Still open* list if the
+  status crossed that line). The index is the only place that lists every item;
+  a drifted index is worse than none.
 
 **Status legend:** `[ ]` not started · `[~]` in progress · `[DONE]` done ·
 `[POSTPONED]` deliberately deferred · `[?]` needs a decision first
+
+**Next free ID: TODO-56.** (Highest used is TODO-55.)
+
+---
+
+## Still open — 22 of 55
+
+The whole of what is left, in one place. Everything not listed here is `[DONE]`.
+
+- **TODO-17** `[POSTPONED]` — All other AI ideas *(F)*
+- **TODO-24** `[ ]` — Rotate the Google Maps key that is still in git history *(G)*
+- **TODO-27** `[ ]` — The 60-day refresh-token arithmetic no longer describes production *(A)*
+- **TODO-29** `[ ]` — Nothing validates the docker-compose files *(G)*
+- **TODO-30** `[ ]` — There is no recovery path when the last admin loses their session *(A)*
+- **TODO-31** `[ ]` — The backend test suite shares one database across classes *(J)*
+- **TODO-32** `[ ]` — Deploy fails at the SSH step — the VPS is unreachable *(G)*
+- **TODO-33** `[ ]` — Make the web app responsive, and move Sales + Technical out of mobile *(H)*
+- **TODO-35** `[ ]` — Role changes on the web never reach the phone *(H)*
+- **TODO-36** `[ ]` — First-run setup code is only printed to the server log *(A)*
+- **TODO-37** `[ ]` — Bulk-move orders between subscriptions *(D)*
+- **TODO-38** `[ ]` — Produse deletion: hard delete, incomplete check, its own error format *(D)*
+- **TODO-43** `[ ]` — Comenzi asks for one order's task status per order *(C)*
+- **TODO-45** `[ ]` — Drop `individual.id_photo_url` once every environment is drained *(E)*
+- **TODO-46** `[ ]` — Task photos are still uploaded with a public-read ACL *(E)*
+- **TODO-48** `[ ]` — `bootNavigation.test.tsx` fails on Node 24 *(G)*
+- **TODO-50** `[ ]` — Nothing checks that the index at the top of TODO.md is true *(G)*
+- **TODO-51** `[ ]` — The web app throws away the server's Romanian refusal text *(J)*
+- **TODO-52** `[ ]` — The batch order-status endpoint in TODO-43 needs TODO-42's guard *(C)*
+- **TODO-53** `[ ]` — `CredentialRow.username` in the web mock is write-only *(A)*
+- **TODO-54** `[ ]` — The live production build still ships the mock seed database *(G)*
+- **TODO-55** `[ ]` — The bundle budget measures the mock build, not the deployed one *(G)*
+
+**Done, but flagged by whoever did it** — not open, but not finished-and-forgotten
+either:
+
+- **TODO-07** `[DONE — needs your eyes]` — BUG: drag-and-drop from "Neasignate" assigns on a nudge *(B)*
+- **TODO-16** `[DONE — one judgement call, see below]` — Remove recommended additions to routes *(F)*
+
+---
+
+## Index
+
+Every item, exactly once, in ID order. The section letter says where the item's
+full text lives further down.
+
+| ID | Status | Section | Title |
+|---|---|---|---|
+| TODO-01 | `[DONE]` | A | Admin section in the web sidebar |
+| TODO-02 | `[DONE]` | A | Fold Șoferi into Angajați |
+| TODO-03 | `[DONE]` | B | Routes are weekly, not dated |
+| TODO-04 | `[DONE]` | B | Rework the Rute screen layout |
+| TODO-05 | `[DONE]` | B | Change the driver on a route |
+| TODO-06 | `[DONE]` | B | Remove the "Asignează" button on unassigned tasks |
+| TODO-07 | `[DONE — needs your eyes]` | B | BUG: drag-and-drop from "Neasignate" assigns on a nudge |
+| TODO-08 | `[DONE]` | C | Task status is driver-owned |
+| TODO-09 | `[DONE]` | C | Better date filters on Sarcini |
+| TODO-10 | `[DONE]` | D | Map picker when choosing a location on an order |
+| TODO-11 | `[DONE]` | D | Remove Activ/Inactiv from Abonamente |
+| TODO-12 | `[DONE]` | D | Calendar view next to Comenzi |
+| TODO-13 | `[DONE]` | E | Scan an ID to autofill nume complet + CNP |
+| TODO-14 | `[DONE]` | E | ID photos must not be readable by the developer |
+| TODO-15 | `[DONE]` | F | Delete the Mistral-based AI work |
+| TODO-16 | `[DONE — one judgement call, see below]` | F | Remove recommended additions to routes |
+| TODO-17 | `[POSTPONED]` | F | All other AI ideas |
+| TODO-18 | `[DONE]` | G | Fix the Dependabot config |
+| TODO-19 | `[DONE]` | H | Mobile enrollment screens |
+| TODO-20 | `[DONE]` | D | Block deleting a subscription that live orders still use |
+| TODO-21 | `[DONE]` | D | Archive fulfilled orders out of Comenzi |
+| TODO-22 | `[DONE]` | A | No backend guard against demoting the last admin |
+| TODO-23 | `[DONE]` | A | Dead Google sign-in plumbing outside the backend |
+| TODO-24 | **`[ ]`** | G | Rotate the Google Maps key that is still in git history |
+| TODO-25 | `[DONE]` | J | Backend logging: `System.out`/`System.err`, and a swallowed failure |
+| TODO-26 | `[DONE]` | J | The web react-hooks lint backlog |
+| TODO-27 | **`[ ]`** | A | The 60-day refresh-token arithmetic no longer describes production |
+| TODO-28 | `[DONE]` | A | Dead password-login plumbing in the web mock |
+| TODO-29 | **`[ ]`** | G | Nothing validates the docker-compose files |
+| TODO-30 | **`[ ]`** | A | There is no recovery path when the last admin loses their session |
+| TODO-31 | **`[ ]`** | J | The backend test suite shares one database across classes |
+| TODO-32 | **`[ ]`** | G | Deploy fails at the SSH step — the VPS is unreachable |
+| TODO-33 | **`[ ]`** | H | Make the web app responsive, and move Sales + Technical out of mobile |
+| TODO-34 | `[DONE]` | C | `/tasks/order/{id}/exists` returns one task, but the guard rolls up all of them |
+| TODO-35 | **`[ ]`** | H | Role changes on the web never reach the phone |
+| TODO-36 | **`[ ]`** | A | First-run setup code is only printed to the server log |
+| TODO-37 | **`[ ]`** | D | Bulk-move orders between subscriptions |
+| TODO-38 | **`[ ]`** | D | Produse deletion: hard delete, incomplete check, its own error format |
+| TODO-39 | `[DONE]` | D | Check-then-act on subscription retirement is unserialized |
+| TODO-40 | `[DONE]` | G | Three cross-cutting guard scripts |
+| TODO-41 | `[DONE]` | G | Re-establish a golden-fixture guard for the fulfilment rule |
+| TODO-42 | `[DONE]` | C | `/tasks/order/{id}/exists` is not row-scoped |
+| TODO-43 | **`[ ]`** | C | Comenzi asks for one order's task status per order |
+| TODO-44 | `[DONE]` | G | `doc_claims.py` resolved paths with the OS separator |
+| TODO-45 | **`[ ]`** | E | Drop `individual.id_photo_url` once every environment is drained |
+| TODO-46 | **`[ ]`** | E | Task photos are still uploaded with a public-read ACL |
+| TODO-47 | `[DONE]` | G | `bundle_budget.py` counts lazy chunks named `index-*` as eager |
+| TODO-48 | **`[ ]`** | G | `bootNavigation.test.tsx` fails on Node 24 |
+| TODO-49 | `[DONE]` | G | CLAUDE.md's Known gaps still says mobile cannot authenticate |
+| TODO-50 | **`[ ]`** | G | Nothing checks that the index at the top of TODO.md is true |
+| TODO-51 | **`[ ]`** | J | The web app throws away the server's Romanian refusal text |
+| TODO-52 | **`[ ]`** | C | The batch order-status endpoint in TODO-43 needs TODO-42's guard |
+| TODO-53 | **`[ ]`** | A | `CredentialRow.username` in the web mock is write-only |
+| TODO-54 | **`[ ]`** | G | The live production build still ships the mock seed database |
+| TODO-55 | **`[ ]`** | G | The bundle budget measures the mock build, not the deployed one |
+
+---
+
+## Sections
+
+| | | |
+|---|---|---|
+| **A** Access & admin | **B** Rute | **C** Sarcini |
+| **D** Comenzi | **E** ID scanning & photo privacy | **F** AI |
+| **G** Repo & CI | **H** Mobile | **I** *(retired — see below)* |
+| **J** Code health & platform | | |
 
 ---
 
@@ -35,6 +157,8 @@ unless its status says otherwise.
 ---
 
 ## A. Access & admin (already designed, partly built)
+
+*Enrollment, roles, admin screens and the auth plumbing around them.*
 
 ### TODO-01 `[DONE]` Admin section in the web sidebar
 New `Admin` group in the left sidebar, visible to `ADMIN` only, containing:
@@ -65,9 +189,235 @@ ADMIN-only) replaces them. The command palette now points at `/angajati` and
 `/cereri`. The old page's route-assignment/daily-workload view was NOT carried
 over — it belongs on the Rute screen, and TODO-05 is where that lands.
 
+### TODO-22 `[DONE]` No backend guard against demoting the last admin
+The last-admin lockout guard exists **only in `web/src/features/admin/EmployeesPage.tsx`**.
+`AdminService` has no equivalent check, so anything that is not that screen — a
+direct API call, a future mobile admin view, a script — can demote or delete the
+last `ADMIN` and permanently lock everyone out of `/api/admin/**`.
+
+*Why it matters more than it looks:* with passwords gone there is no
+break-glass path back in. The only recovery is the first-user-becomes-admin
+bootstrap, which only fires when the employee table is empty — i.e. restoring
+access would mean destroying data.
+
+Needs deciding:
+- Refuse the demote/delete with a 409 and a Romanian message (the shape TODO-20
+  used for subscriptions), or refuse only the *last* one and let the UI explain?
+- Does the same rule belong on session revocation — revoking the last admin's
+  only device is the same lockout by another route.
+- A `SecurityTests` case is the point of the change; the web guard stays as the
+  friendly half.
+
+**Done (backend only — the web guard is untouched and stays the friendly half).**
+`AdminService` now refuses both routes with a **409** and a Romanian message:
+`updateEmployee` when a `roleNames` payload would drop ADMIN from the last
+admin, and `deleteEmployee` when the target is the last admin. Both throw
+`IllegalStateException`, which `GlobalExceptionHandler` already maps to 409 —
+the same shape TODO-20 used, and no new handler.
+
+**The three questions, decided:**
+
+**1. Refuse the operation, with 409 — not "refuse only the last one and let the
+UI explain".** The refusal *is* only for the last one; what changed is that it
+no longer depends on the UI. The message names the fix
+(*"Promovează întâi pe altcineva"*) rather than only the problem.
+
+**2. NO to session revocation — deliberately, and this is the half that stays
+open.** It is a real lockout route: `claim` is single-use (`CLAIMED → EXPIRED`)
+and `isAwaitingBootstrap()` is `employeeRepository.count() == 0`, so the last
+admin logging out cannot get back in — nobody is left to approve a new device.
+But refusing it is the wrong instrument: a sole admin who may never log out, and
+who cannot revoke a stolen device, is a worse bug than the one being prevented.
+The honest fix is a **recovery path**, not a refusal — see TODO-30.
+`DELETE /api/auth/sessions` needs nothing either way: it is `revokeOtherSessions`
+and always keeps the caller's own session.
+
+**3. The count asks the database** (`EmployeeRepository.countByRoleName`,
+`COUNT(DISTINCT e)` because `roles` is a ManyToMany and a plain count over the
+join would see one admin as two). Not airtight — there is no `@Version` anywhere
+in this app, so two admins demoting each other concurrently can still both read
+"2" — but the window is the transaction rather than the request.
+
+**Verified: `./gradlew build` on JDK 21 — BUILD SUCCESSFUL, 241 tests, 0
+failures**, and the suite was then run three times over to be sure (see TODO-31:
+it was NOT reliably green before this change, for unrelated reasons).
+
+New `SecurityTests/LastAdminGuardTest` (9 tests) runs the real filter chain: the
+two refusals, that a refused demotion writes nothing, that the message is
+Romanian, and — the half that matters as much — four allowances, so the guard
+cannot quietly become "admins may not be edited": demoting/deleting one of two
+admins, deleting a non-admin, editing the last admin's NAME, and widening their
+roles while keeping ADMIN.
+
+### TODO-23 `[DONE]` Dead Google sign-in plumbing outside the backend
+Google sign-in and password login are gone from the backend, and the orphaned
+`ecotrack.google.*` properties went with the refactor. The **deployment and
+build plumbing still passes the values**: `GOOGLE_CLIENT_ID` and
+`GOOGLE_ALLOWED_DOMAIN` in `.github/workflows/deploy.yml` and
+`docker-compose.yml`, `VITE_GOOGLE_CLIENT_ID` in `docker-compose.yml` and
+`web/Dockerfile`, and on the web side `GOOGLE_CLIENT_ID` in `src/lib/config.ts`,
+`VITE_GOOGLE_CLIENT_ID` in `src/vite-env.d.ts` and `MOCK_GOOGLE_DEMO_USERNAME`
+in `src/mocks/seed.ts`. Stale `/auth/google` comments sit on the `email` field
+in `types/domain.ts` and `mocks/store.ts`.
+
+Harmless but misleading — it reads as if the app still supports Google auth.
+**Do it as one sweep across all three layers**: deleting only the `web/src/`
+half leaves build args feeding a variable nobody reads, which is worse than
+either end alone. Confirm no deployment secret is still expected before removing
+the workflow entries.
+
+**Done as one sweep, all three layers.**
+
+- **Deploy/build:** `GOOGLE_CLIENT_ID` / `GOOGLE_ALLOWED_DOMAIN` gone from
+  `deploy.yml` (both the `env:` block and the `envs:` passlist),
+  `docker-compose.yml`, `docker-compose.dev-hosted.yml` and `.env.example`;
+  `VITE_GOOGLE_CLIENT_ID` gone from `web/Dockerfile` (ARG **and** ENV),
+  `docker-compose.yml`, `.env.example` and `web/.env.example`.
+- **Web:** `GOOGLE_CLIENT_ID` deleted from `src/lib/config.ts`,
+  `VITE_GOOGLE_CLIENT_ID` from `src/vite-env.d.ts`, `MOCK_GOOGLE_DEMO_USERNAME`
+  from `src/mocks/seed.ts` — all three had **no consumer left anywhere in
+  `src/`**, so nothing changed behaviour.
+- **Comments:** the stale `/auth/google` lines on `email` in `types/domain.ts`
+  and on `CredentialRow` in `mocks/store.ts` now say what the field actually is
+  (an optional contact detail nothing authenticates with).
+
+**The precondition checked before touching the workflow:** `grep -rn "google"
+backend/src/main/resources/` returns **nothing** — no `ecotrack.google.*`
+property survives, so those env vars were reaching a Spring container that
+ignored them. No deployment secret is still expected. The GitHub secrets
+themselves (`GOOGLE_CLIENT_ID`, `GOOGLE_ALLOWED_DOMAIN`) are now unreferenced
+and can be deleted in **Settings → Secrets** — that is a click in the GitHub UI,
+not a repo change, so it is left to you.
+
+**Deliberately NOT touched:** the backend comments in `AuthController`,
+`AuthService`, `SecurityConfig`, `Employee` and `EnrollmentFlowTest` that
+mention Google. They are accurate — they document that the endpoint was removed,
+and `EnrollmentFlowTest.loginEndpointsAreGone` actively asserts `POST
+/api/auth/google` no longer answers. That test is the regression guard for this
+whole item. Also untouched: `google.com/maps` deep links in
+`mobile/app/Driver/TaskDetails.tsx` and `sales/OrderDetailDrawer.tsx`, and the
+Google Places key in mobile — those are Maps, not sign-in.
+
+**Verified (web + hygiene; backend and mobile untouched so their CI does not
+run):** 372 tests green in 26 files, typecheck clean, lint 0 errors / 105
+warnings (unchanged — that is the TODO-26 backlog), build clean, bundle
+**139.4 kB / 160 kB** (down from 139.7). Hygiene green after TODO-29.
+
+### TODO-27 `[ ]` The 60-day refresh-token arithmetic no longer describes production
+`ecotrack.security.refresh-token-ttl-days=365`, but `TokenService`'s javadoc and
+its worked example still reason in terms of the 60-day code default
+(`@Value(":60")`). Neither is strictly wrong — the comments document the
+fallback — but the arithmetic ("a session that refreshes every 30 minutes for
+its 60-day life") describes a configuration production does not run.
+
+Decide which number is intended, then make the property, the fallback and the
+prose agree. A 365-day refresh token is a year-long credential on a lost device;
+if that is deliberate it deserves a sentence saying so next to the session cap
+and the nightly prune.
+
+### TODO-28 `[DONE]` Dead password-login plumbing in the web mock
+Found while doing TODO-23, and left alone because it is the **password** half,
+not the Google half — a different question with a different answer.
+
+`MOCK_CREDENTIALS_HINT` ("Exposed so the login screen can tell a demo user what
+to type") and `MOCK_AUTO_LOGIN` are both defined in `web/src/mocks/seed.ts` and
+re-exported twice — from `src/mocks/index.ts` and again from `src/api/index.ts`
+— and **neither has a single consumer in `src/`**, tests included. There is no
+login screen any more: mock mode boots by driving the real request→claim
+enrollment path against `DEV_DEVICE_ID` (TODO-01), which is the export beside
+them that *is* used.
+
+Behind them sits the bigger question: `CredentialRow` still carries a
+`password`, and `MOCK_PASSWORD = 'demo'` is stamped onto all ~8 seeded
+employees, for a system that has no password anywhere.
+
+Needs deciding: delete the two dead exports only, or drop `password` from
+`CredentialRow` entirely and keep the row for `email`? The second is the honest
+one but touches `toAuthUser`, `currentEmployee`, `issueSession` and
+`findApprovableEmployee` in `mocks/index.ts`, so it wants its own reading rather
+than being smuggled into a comment sweep.
+
+**Resolved — the second, honest option.** `password` is gone from
+`CredentialRow` entirely and the row survives for `email`, which is the one
+field on it that anything actually reads. Deleted: `MOCK_PASSWORD` and the two
+dead exports `MOCK_CREDENTIALS_HINT` / `MOCK_AUTO_LOGIN` in
+`web/src/mocks/seed.ts`, their re-export from `src/mocks/index.ts`, and their
+re-export from `src/api/index.ts` (whose doc comment still promised them to a
+`LoginPage` that has not existed for several items — it now documents
+`DEV_DEVICE_ID`, the one export beside them that is used). The `password: ''`
+that `employees.create` stamped on every new row went with them.
+
+`toAuthUser`, `currentEmployee`, `issueSession` and `findApprovableEmployee`
+needed no change after all: all four pass a `CredentialRow` around but only
+`toAuthUser` dereferences it, and only for `credential.email`. The mock's boot
+path is untouched — `enrollment.request` → `claim` against `DEV_DEVICE_ID` still
+short-circuits to an approved ADMIN ticket, and `auth/__tests__/mockAutoLogin.test.tsx`
+passes.
+
+Nothing crossed the contract: none of the deleted symbols was ever on
+`EcoTrackApi`, so `src/api/live/` had no counterpart to keep in step and mock and
+live stay substitutable.
+
+### TODO-30 `[ ]` There is no recovery path when the last admin loses their session
+Split out of TODO-22, which fixed the *demote/delete* route and deliberately did
+not touch this one.
+
+The last admin can still lock everyone out permanently by ordinary means:
+`POST /api/auth/logout`, or `DELETE /api/auth/sessions/{id}` on their own only
+device. Nothing about that is exotic — it is what "log out" does. It is
+unrecoverable because two things line up: `EnrollmentService.claim` is
+single-use (`CLAIMED → EXPIRED`, so the device cannot re-claim its old approval)
+and `isAwaitingBootstrap()` is `employeeRepository.count() == 0`, so the
+first-user-becomes-ADMIN path only reopens on an **empty employee table**. The
+only recovery is destroying all employee data.
+
+TODO-22 decided NOT to fix this by refusing the operation: an admin who may
+never log out, and who cannot revoke a device they just had stolen, is worse
+than the lockout. So the fix has to be a way back IN. Options, none chosen:
+
+- **Re-announce the setup code** when the admin count drops to zero — reuses the
+  bootstrap machinery already in `EnrollmentService`
+  (`announceSetupCodeIfUnclaimed`), but it currently keys on an empty table, and
+  "zero admins" is a different and much more reachable condition.
+- **Let a previously-approved device re-enroll without approval**, keyed on its
+  device id. Weakens the single-use property that exists to stop a leaked claim
+  secret minting a second session.
+- **An out-of-band break-glass code** in config, which is a password by another
+  name and would undo part of why credentials were removed.
+
+Needs deciding before building. Whichever is picked, it wants a `SecurityTests`
+case in the shape of `LastAdminGuardTest`.
+
+### TODO-36 `[ ]` First-run setup code is only printed to the server log
+Whoever performs the very first enrolment needs SSH access to read the setup
+code out of the backend log (`ecotrack.enrollment.require-setup-code=true`).
+Workable for the current operator, but the app cannot be bootstrapped by a
+non-technical user, and this will be forgotten by the time it matters.
+
+*Found while building TODO-19.*
+
+### TODO-53 `[ ]` `CredentialRow.username` in the web mock is write-only
+Found while doing TODO-28. With `password` gone, the row carries `employeeId`,
+`username` and `email` — and `username` is written in three places
+(`seed.ts`'s `createSeedDb`, `employees.create`, and `employees.update`, which
+keeps it in sync when an employee is renamed) while **nothing anywhere reads
+it**. Every lookup goes through `employeeId`; `toAuthUser` takes the username
+off the `Employee`, not off the credential row.
+
+Left alone deliberately: TODO-28 scoped the row down to "keep it for `email`"
+and stopping at `password` kept that change reviewable. It is the same shape of
+dead plumbing, one field smaller, and deleting it also removes the `if
+(credential && input.username)` line from `employees.update`.
+
+Needs deciding: drop `username` and let the row be `{ employeeId, email }` — at
+which point "CredentialRow" is a misnomer for what is really an employee-email
+side table and probably wants renaming — or keep it as a debugging affordance.
+
 ---
 
 ## B. Rute (routes)
+
+*The dispatch board and everything about assigning work to a route.*
 
 ### TODO-03 `[DONE]` Routes are weekly, not dated
 A route belongs to a **day of the week**, not a calendar date. Drop the date
@@ -158,6 +508,8 @@ See OQ-2.
 
 ## C. Sarcini (tasks)
 
+*Task status, the Sarcini screen, and the `/api/tasks/**` surface.*
+
 ### TODO-08 `[DONE]` Task status is driver-owned
 Statuses are **Nou**, **În curs**, **Finalizat**.
 - Only the **driver** changes them: they mark *În curs* when they start, and
@@ -197,9 +549,126 @@ datele` presets, plus a `w` shortcut for the current week. New `weekStartIso` /
 weeks start **Monday**, matching `Route.dayOfWeek` and dodging the JS
 `getDay()` Sunday-is-0 off-by-one.
 
+### TODO-34 `[DONE]` `/tasks/order/{id}/exists` returns one task, but the guard rolls up all of them
+`GET /api/tasks/order/{orderId}/exists` returns
+`taskService.getTaskByOrderId(orderId).orElse(null)` — a **single** task. The
+web's `isOrderFulfilled` reads exactly that one status to decide Curente vs
+Arhivă. But `OrderRepository.findLiveBySubscriptionId`, the backend guard that
+is supposed to be **the same rule**, is
+`NOT EXISTS (SELECT t ... AND t.status = 'COMPLETED')` — a roll-up over **every**
+task of the order.
+
+For an order with two tasks, one COMPLETED and one NEW, they disagree: the
+backend sees a COMPLETED task and stops blocking the subscription delete, while
+Comenzi may still show the order as current because `/exists` handed it the NEW
+one. Today orders appear to produce one task each so the answers coincide, and
+**nothing enforces that**.
+
+Fix by making `/exists` return the summarised status, or by adding a batch
+endpoint (`GET /api/tasks/order-status?ids=…`), which would also collapse the
+current one-request-per-order fan-out on Comenzi.
+
+*This is the concrete drift TODO-20 and TODO-21 warned about when they said the
+two definitions must stay identical.*
+
+**Done, by summarising server-side — not by adding the batch endpoint.** The two
+options in this item are not equivalent: the roll-up is the correctness half and
+the batch endpoint is the performance half, so only the first is done here. The
+fan-out is now TODO-43.
+
+`TaskService.summariseOrderTasks(List<Task>)` is the one rule, and
+`TaskController`'s `/exists` calls it: **a COMPLETED task wins whenever one
+exists**, whatever the others say — the same question `findLiveBySubscriptionId`'s
+`NOT EXISTS` answers. With none completed the order is unfinished either way, and
+the task reported is the earliest scheduled one (unscheduled last, ties by id) so
+the same order always summarises to the same task. The response shape did not
+change, so `normalize.ts` and every caller are untouched; `contract.ts` now
+documents `status` as a roll-up, and the mock summarises identically in
+`web/src/mocks/index.ts`.
+
+**The single-task assumption was in three places, not one**, all of them through
+`TaskRepository.findByOrder_Id`, which returned an `Optional`:
+
+- the endpoint — the drift this item is about;
+- `OrderService.deleteOrder` and `ClientService.deleteClientCascade`, which
+  deleted **one** task and then deleted the order, so the remaining tasks would
+  have failed that delete on their FK — and their photos would have been orphaned
+  in Spaces.
+
+The `Optional` was worse than ambiguous: Spring Data throws
+`IncorrectResultSizeDataAccessException` — a 500 — as soon as a second task
+exists. The finder is now `findAllByOrder_IdOrderByIdAsc` and the Optional one is
+gone, so the assumption cannot be re-made silently.
+
+**None of it was reachable today**, and that is the point: `createTaskFromOrder`
+is the only code that sets `Task.order` and it refuses a second task per order
+(*"Această comandă are deja un task asociat"*) — which is exactly the "nothing
+enforces that" this item flagged. The rule now holds without depending on it.
+
+**Verified:** `./gradlew test` — **253 tests, 0 failures** (was 241; +12 = ten
+golden cases from TODO-41 and two `TaskControllerTest` cases for an order with
+several tasks). Web: lint 0 errors, typecheck clean, build clean.
+
+### TODO-42 `[DONE]` `/tasks/order/{id}/exists` is not row-scoped
+Found while doing TODO-34, and left alone because it is an authorization decision
+rather than part of that fix.
+
+The endpoint made **no `TaskAccessPolicy` call**. `SecurityConfig`'s matrix lets
+any authenticated employee read `/api/**`, so a driver-only account could ask about
+**any** order id and learn its task's id, route, schedule and status — the same
+class of leak `TaskScopingTest` exists to prevent for `/api/tasks/employee/{id}`.
+It is a summary of one order rather than a list, so the exposure is small and
+needs an id to aim at.
+
+**Decided office-only** (`accessPolicy.requireOfficeRole`), not a driver-scoped
+policy method, on the evidence that **no driver screen asks this question**. Every
+caller is an office screen: web's `features/sales` (`useOrderTaskStatuses`, used by
+`OrdersPage`, `OrderDetailDrawer`, `DayOrdersDrawer`, `OrderFormDrawer`) and
+mobile's `app/Sales/` + `app/Technical/` (`TaskService.checkOrderHasTask`). Nothing
+under `mobile/app/Driver/` calls it — the driver app reads its day through
+`/api/tasks/mine` and makes exactly the two writes the matrix lists. A row-scoped
+rule would have been a guard with no caller to serve.
+
+The guard also runs **before** the lookup, so a refused probe cannot be told apart
+from a missing order — scanning ids teaches a driver nothing.
+
+Three cases in `SecurityTests/TaskScopingTest` against the real filter chain
+(driver refused even for an order carrying their OWN task, driver refused for an
+unknown id, office still reads it and sees the task id). Not in the controller
+slice: that runs `addFilters = false` with a mocked policy and proves nothing.
+
+### TODO-43 `[ ]` Comenzi asks for one order's task status per order
+Split out of TODO-34, which fixed the correctness half and deliberately did not
+touch this one.
+
+`useOrderTaskStatuses` fans out one `GET /tasks/order/{id}/exists` per order and
+`Promise.all`s them, so opening Comenzi with 200 orders is 200 requests. Mock mode
+hides it (in memory, one shared latency) and so does a small dataset.
+
+TODO-34's other option — `GET /api/tasks/order-status?ids=…` — is the fix, and it
+is now purely a performance change: the roll-up already lives in
+`TaskService.summariseOrderTasks`, so the endpoint is a loop over it plus a
+contract method, a mock and one query key. Needs deciding: a query-param id list
+(cheap, but URL length caps the page size) or a POST body (no cap, a POST that
+reads, and a new `SecurityConfig` row because writes need OFFICE).
+
+### TODO-52 `[ ]` The batch order-status endpoint in TODO-43 needs TODO-42's guard
+Recorded while closing TODO-42 so it is not re-learned later.
+
+TODO-43 replaces the per-order fan-out with one batch endpoint
+(`GET /api/tasks/order-status?ids=…` or a POST body). Whichever shape wins, it
+answers **the same question for many ids at once**, so it inherits TODO-42's
+answer and needs `accessPolicy.requireOfficeRole(principal)` in the controller —
+a batch version without it is strictly worse than the leak TODO-42 just closed,
+since one request would enumerate the whole order space instead of probing one id.
+The matcher row does not do this: reads are open to any authenticated employee by
+design. Add the `TaskScopingTest` case alongside it.
+
 ---
 
 ## D. Comenzi (orders)
+
+*Orders, the calendar, and the Abonamente / Produse catalogues behind them.*
 
 ### TODO-10 `[DONE]` Map picker when choosing a location on an order
 Choosing the location while creating an order should work like the mobile app:
@@ -526,15 +995,182 @@ API, 3 on the rule itself), typecheck clean, lint 0 errors, build clean.
 *Related:* OQ-1 — archiving depends on knowing when an order is finished, which
 depends on the order/task relationship being clear.
 
----
+### TODO-37 `[ ]` Bulk-move orders between subscriptions
+When TODO-20 refuses a delete, the only way forward is to finish or delete each
+blocking order one at a time. Offer *"Mută pe alt abonament"* in the refusal
+dialog: reassign the listed orders to a chosen plan, then retry.
+
+`SubscriptionService.deactivate`'s javadoc already records that this was
+deliberately left out — "that would be a write the operator did not ask for" —
+so this item is the considered follow-up, not a contradiction.
+
+Needs a backend endpoint and a decision on whether reassigning is allowed for
+orders whose tasks already carry the OLD plan name in `Task.productName`: the
+name is copied onto the task, so moving the order does not move history.
+
+### TODO-38 `[ ]` Produse deletion: hard delete, incomplete check, its own error format
+Investigated alongside TODO-20 and found **materially different from
+Abonamente**, so it deliberately did NOT get the same treatment — applying
+TODO-20's rule here would be a regression. Three problems in
+`ProductService.deleteProduct` / `ProductController.deleteProduct`:
+
+- **(a)** `existsByAmplasareOrderProductId` only checks `AmplasareOrder.product`.
+  **`RidicareOrder.product` is never checked**, so a product used only by
+  Ridicări can be destroyed, leaving a dangling FK. *Small fix, real bug.*
+- **(b)** It is a **hard** delete, not a soft one. That is why its strict "any
+  referencing order blocks" rule is *correct* and must not be relaxed to
+  TODO-20's "only unfulfilled orders block" — destroying a product that
+  fulfilled orders still reference is exactly the dangling reference the
+  subscription soft-delete exists to prevent. Adopting the friendlier rule needs
+  an `isActive` flag on Produse first. **This is the real decision.**
+- **(c)** `ProductController` catches `IllegalStateException` itself and returns
+  `409 {"error": …}`, bypassing `GlobalExceptionHandler` — the only place in the
+  app where the error body's message lives under `error` rather than `message`.
+
+### TODO-39 `[DONE]` Check-then-act on subscription retirement is unserialized
+Narrower than the repo-wide "no optimistic locking" gap in *Known gaps*, and
+with a cheap local fix, so it earned its own line.
+
+`SubscriptionService.deactivate` read the blockers and then wrote
+`isActive = false`. Under READ COMMITTED nothing made that atomic: `POST
+/api/orders` could commit a new unfulfilled `IgienizareOrder` for the plan between
+the read and the write. That transaction never touched the `subscriptions` row,
+so nothing conflicted — no `@Version`, no row lock, no constraint. **Outcome: a
+plan retired with a live order pointing at it.** Because the delete is soft the
+order still resolved, so the damage was "live order on a retired plan", not a
+dangling FK.
+
+Fixed with the pessimistic-lock option (not `@Version` — repo-wide optimistic
+locking stays a separate gap). `SubscriptionRepository.findByIdForUpdate` is a
+`@Lock(PESSIMISTIC_WRITE)` read of the one row, and **every writer that can
+invalidate another's decision takes it before deciding**: `deactivate()` (now
+`@Transactional`, which is what gives the lock a transaction to live in),
+`OrderService` (create and update), and `RecurringIgienizareService.create` —
+that third one was found during the fix and is the stronger writer, since it
+commits an ACTIVE recurring plan *and* an initial live order.
+
+**The lock alone was not enough, and that is the part worth remembering.**
+Serialising the two only decides who goes second; whoever does still has to
+LOOK. `deactivate` re-reads its blockers under the lock, and the creating side
+re-checks `isActive` and refuses a retired plan with a Romanian 409
+(`IllegalStateException`). Without that re-check, "retirement first, order
+second" produced exactly the bug the lock was meant to stop.
+`updateOrder` refuses only a **move** onto a retired plan: re-sending the plan an
+order already sits on stays legal, because the soft delete exists so finished
+orders keep resolving through the surviving row.
+
+Behavioural difference between the engines, since dev/test are H2 and prod is
+Postgres: the `for update` clause is emitted and valid on both (verified in the
+Hibernate SQL log), but a contended waiter **blocks indefinitely on Postgres and
+fails after H2's lock timeout**. So a contended retirement is a wait in prod and
+an error locally.
+
+Guarded by `RepositoryTests/ConcurrencyGapsTest` as "GAP 3 (CLOSED)" — real
+repositories on H2, both interleavings reproduced deterministically (no thread
+race, so nothing flaky), plus a test that the `FOR UPDATE` query actually runs on
+H2 — and by unit tests in `SubscriptionServiceTest` / `OrderServiceTest` pinning
+that the locking read is the one on the path (`findById` must never be called)
+and that `deactivate` stays `@Transactional`.
 
 ## E. ID scanning & photo privacy
 
-### TODO-13 `[ ]` Scan an ID to autofill nume complet + CNP
+*The MRZ scanner, and what is and is not stored in Spaces.*
+
+### TODO-13 `[DONE]` Scan an ID to autofill nume complet + CNP
 Upload a photo of an identity document and extract **full name** and **CNP**
 automatically, filling the form.
 
-### TODO-14 `[ ]` ID photos must not be readable by the developer
+**Done, in web and mobile, with no paid API and no network call at all.**
+
+**The decision that made this cheap: read the MRZ, not the card.** Autofilling
+these two fields looks like an OCR problem, and as an OCR problem it is a bad
+one — the printed fields are proportional type over a guilloche background, in a
+layout that changed with the 2021 electronic card, with diacritics. The MRZ is
+the same data in the one place designed to be read by a machine: three fixed
+30-character lines of OCR-B over a 37-symbol alphabet (`A-Z0-9<`), in the same
+position on every ICAO 9303 TD1 document ever issued. Romania puts the **CNP** in
+line 1's optional-data field and the **name** is line 3. Both fields we want,
+from the easiest tenth of the image.
+
+**Why a free, imperfect engine is good enough — and this is the whole argument.**
+Not because the engine is accurate. Because the MRZ checks itself, three
+independent ways:
+
+| Check | Catches |
+|---|---|
+| four ICAO check digits (document number, birth date, expiry, composite) | any misread character in those fields |
+| the CNP's own control digit (weights `279146358279`, mod 11, 10→1) | a misread CNP digit |
+| the CNP's embedded birth date and sex vs. MRZ line 2, stated independently | a misread that happens to pass both of the above |
+
+So the rule, stated once in `shared/id-mrz-cases.json` and implemented twice:
+**autofill ONLY on a fully self-consistent read; otherwise refuse.** A card whose
+document number smudged is rejected even though the document number is never
+used — a failed check digit means *something* was misread and the parser cannot
+say what. Refusing costs the operator two fields of typing, which is what they do
+today. A false accept writes a wrong CNP into a client record nobody re-reads, on
+a person, under GDPR. The costs are not comparable, so it fails safe.
+
+**Engines, both free and both on-device:**
+
+- **web** — `tesseract.js` (Apache-2.0, WASM). Self-hosted: `scripts/fetch-ocr-assets.mjs`
+  copies the LSTM cores and worker out of `node_modules` and downloads the
+  `tessdata_fast` English model from a **tagged** ref, verified against a
+  SHA-256 recorded in the script. The output is gitignored — a 2 MB binary blob
+  committed to a repo is permanent in a way a build step is not (TODO-24 is what
+  that lesson cost here).
+- **mobile** — `@react-native-ml-kit/text-recognition`, i.e. ML Kit on Android
+  and Vision on iOS. On-device, no key, no request, already in the OS.
+
+**Both defaults had to be overridden to keep it private.** tesseract.js defaults
+`workerPath`, `corePath` and `langPath` to **jsDelivr** — leaving any of them
+unset would put a third party in the request path of an identity-document scan,
+arriving through a default nobody wrote down. `ocrIsLazy.test.ts` asserts all
+three are set and that the file names no `http` host at all.
+
+**What was built:**
+
+| | web | mobile |
+|---|---|---|
+| parser | `features/sales/idScan/mrz.ts` | `utils/mrz.ts` |
+| engine | `features/sales/idScan/ocr.ts` | `services/IdScanService.ts` |
+| UI | `features/sales/idScan/IdScanField.tsx` | `app/Sales/CreateClient.tsx` |
+
+The two parsers are **byte-identical below their doc comments** and pinned
+against each other by `shared/id-mrz-cases.json`, which both suites read — the
+same arrangement as the fulfilment rule (TODO-41), and for the same reason: a
+rule written twice with no shared code drifts silently otherwise.
+
+**Refusals get four different messages, not one.** `format` and `check-digit`
+mean retake the photo; `cnp-invalid` and `cnp-mismatch` mean the card *was* read
+and disagrees with itself, so another photo of the same card fails identically —
+those say "type it instead". A single "scanarea a eșuat" would leave the operator
+re-photographing a card that will never read.
+
+**Two things it does not do, on purpose.** It fills, it does not commit — the
+fields stay editable and scanning saves nothing. And it cannot restore
+diacritics: MRZ text is transliterated, so `Ștefănescu` arrives as `Stefanescu`
+and both panels say so next to the result rather than in a tooltip nobody opens.
+
+**Deliberately not built:** live camera-stream scanning (a still photo is enough
+and avoids a preview surface that holds the image), reading the card's printed
+fields for diacritics, and NFC/eID chip reading.
+
+**Tests: 72 new, plus 5 backend.** Web 437 (was 393 — 29 parser, 7 panel,
+8 laziness/origin), mobile 111 (was 83 — 20 parser, 8 service). 15 golden cases cover both outcomes,
+including the OCR-B confusion set being repaired by position, a card that
+contradicts itself, and a truncated line that is **not** padded back to 30 —
+padding line 2 would invent the composite check digit that exists to catch
+exactly that.
+
+**One thing this change did to CI, worth knowing.** Without an explicit
+`manualChunks` entry, Rollup names tesseract.js's chunk after its entry module
+and emits `index-<hash>.js` — which is the very pattern
+`.github/scripts/bundle_budget.py` uses to find the **eager** entry chunk. The
+budget silently counted a lazy 6.7 kB chunk against the initial download.
+Naming the chunk `tesseract` moves it out of that pattern. A 444-byte interop
+shim still lands on it; see TODO-47.
+
+### TODO-14 `[DONE]` ID photos must not be readable by the developer
 The stored ID photo must not be viewable by the developer/operator (i.e. by
 whoever holds the DigitalOcean Spaces credentials).
 *Open problem:* plain Spaces access means the bucket owner can read every
@@ -543,9 +1179,144 @@ the key is not held alongside the data, plus a retention/deletion policy.
 Treat this as a **prerequisite** for TODO-13 going anywhere near production:
 CNP + ID photo is sensitive personal data (GDPR).
 
+**Done, by removing the thing rather than protecting it: EcoTrack no longer
+stores photographs of identity documents at all.**
+
+**The item understated the exposure.** It asks about the person holding the
+Spaces credentials. In fact `PhotoService.uploadPhoto` set
+`ObjectCannedACL.PUBLIC_READ` on every upload, so each ID photo was on a
+**working unauthenticated URL** — no credentials needed by anyone. The key was
+`persoane fizice/{clientId}_{FullName}.jpg`, which is guessable and leaks the
+client's name in the path. That URL was serialised as `idPhotoUrl` on every
+client the app lists. And `GET /api/photos` enumerated the **entire bucket** for
+any authenticated employee: while ID photos were stored, that was one call for a
+list of every scanned identity card in the company.
+
+**The design chosen, of three considered:**
+
+| Option | Verdict |
+|---|---|
+| don't store the photo at all | **chosen** |
+| store it encrypted client-side | rejected — see below |
+| private ACL + presigned URLs, photo kept | rejected: closes the public leak, leaves the item's actual question unanswered |
+
+Encryption was rejected on an honest reading of what it buys: AES-GCM in the
+browser defends against bucket access, backups and DO staff, but **not** against
+whoever deploys the app code, who can ship a build that leaks the key. It also
+needs a key-custody answer nobody has ("who reads a photo a year from now?").
+Once TODO-13 exists, the photo has no job left — it was only ever an input to
+the two fields — so the strongest control is also the cheapest one, and it is
+what GDPR data minimisation asks for anyway.
+
+**Removed:** `PhotosController` entirely (`POST`/`DELETE /{clientId}/idPhoto` and
+`GET /api/photos`); `PhotoService.getPhotos()`; `uploadIdPhoto`/`deleteIdPhoto`
+on both clients plus `getAllPhotos` in mobile; `extractUrl` in
+`web/src/api/live/normalize.ts`; `idPhotoUrl` from the web domain type, the
+contract, the mock and the seed; the upload UI in the web drawer and mobile
+`CreateClient`; the stored-photo viewer in mobile `EditClient`.
+
+**Kept, for one release only: the `individual.id_photo_url` column.** Dropping it
+in the same change that stops writing it would strand every already-uploaded
+object permanently — personal data in a bucket with nothing left that knows it is
+there. The order is forced: **purge first, drop the column second** (TODO-45).
+The field is `@JsonIgnore`d so the URL never crosses the wire again, and
+`ClientJsonSubTypesTest` asserts that, because removing the annotation would leak
+silently rather than fail.
+
+**New endpoint, temporary: `DELETE /api/admin/id-photos`** (with `GET` as its
+preflight count). Deletes every stored object and clears the column — **only for
+rows whose object actually went**, so a failed delete stays in the list and a
+re-run retries it. Clearing regardless would report success while leaving the
+object behind and destroying the last reference to it, which is the precise
+outcome this exists to avoid. Not `@Transactional`: one transaction round the
+loop would roll back every cleared column if the last row threw, while its
+objects are already gone. No new `SecurityConfig` row (it inherits ADMIN from
+`/api/admin/**`) and no `TaskAccessPolicy` call (neither task-shaped nor
+employee-scoped) — `AuthorizationMatrixTest` pins it anyway, because its
+protection is entirely inherited.
+
+**This is an operator step, not a deploy step.** Deleting production data as a
+side effect of somebody merging is not a thing that should happen. See
+DEPLOYMENT.md, "Draining the legacy ID photos".
+
+**Still public: task photos.** `uploadPhoto` is shared, and its `PUBLIC_READ` ACL
+now affects only `task_photos/`. Filed as TODO-46 rather than fixed here —
+making them private means presigned URLs in three screens, which is its own
+change and not what this item asked for.
+
+### Verification of TODO-13 + TODO-14 — uneven, and the backend half is the weak one
+
+- **Web — fully verified.** Lint 0 errors, typecheck clean, build clean,
+  bundle **139.9 / 160 kB** gzip (was 139.7 — the scanner is entirely lazy).
+  436 of 437 tests pass; the one failure is `bootNavigation.test.tsx`, which
+  **fails identically on a clean worktree at HEAD** and is filed as TODO-48.
+- **Mobile — verified as far as it can be here.** Lint 0 errors, typecheck
+  clean, 111/111 tests. **The native half has never run**: ML Kit needs an
+  `eas build` and an Android/iOS device, neither of which exists on this
+  machine. Everything below `TextRecognition.recognize` is proven; that call
+  itself is not.
+- **Backend — WRITTEN BUT NEVER COMPILED.** This machine has only a Java 8 JRE,
+  so Gradle cannot load the Spring Boot plugin — the same wall TODO-20 hit.
+  `cd backend && ./gradlew build` on JDK 21 is **owed**, and in particular it
+  is what would catch a malformed `@Query` in `IndividualRepository`, which
+  fails at context startup rather than at compile time.
+- **Hygiene scripts — one of four run.** No Python here either (the `python3`
+  on PATH is the Windows Store stub), so `doc_claims.py`'s two path checks were
+  ported to Node and run: **all paths resolve**. `repo_hygiene.py`,
+  `cross_project_invariants.py` and `dead_config.py` were **not** run.
+- **Snyk was NOT run.** `.github/instructions/snyk_rules.instructions.md`
+  requires a scan of new first-party code; no Snyk CLI or tool is available in
+  this environment. Reviewed by hand instead — the JPQL is static and
+  parameterless, the model download is HTTPS from a pinned tag with a SHA-256
+  check, the MRZ regexes are linear, and no user string reaches `innerHTML`.
+  **The scan is still owed.**
+
+### TODO-45 `[ ]` Drop `individual.id_photo_url` once every environment is drained
+TODO-14 stopped storing ID photos but deliberately kept the column, because it
+is the only remaining record of the keys of objects already in Spaces. Dropping
+it before deleting them would strand personal data in a bucket that nothing knows
+about.
+
+The sequence, in order:
+1. On each environment, `GET /api/admin/id-photos` to see the count, then
+   `DELETE /api/admin/id-photos` until it reports `remaining: 0`.
+2. Then delete `Individual.idPhotoUrl`, `IndividualRepository`,
+   `AdminIdPhotoController` and its test, and the matrix case
+   `onlyAdmin_mayPurgeLegacyIdPhotos`.
+3. Then drop the column by hand — `ddl-auto=update` never drops anything, so it
+   will otherwise sit in H2 and in prod Postgres exactly like the orphaned
+   `intake_message` / `order_draft` tables TODO-15 left behind.
+
+*Blocked on:* a deployed environment existing to run step 1 against. The
+appendix says there is no server yet, in which case there is nothing stored and
+step 1 is a formality — but it must still be **confirmed**, not assumed, because
+this is the step whose omission leaves personal data behind forever.
+
+### TODO-46 `[ ]` Task photos are still uploaded with a public-read ACL
+`PhotoService.uploadPhoto` sets `ObjectCannedACL.PUBLIC_READ`, so every object it
+writes is on a working unauthenticated URL. Found while doing TODO-14, which
+removed the ID photos from that path — what is left under it is
+`task_photos/`: job-site photos a driver attaches when completing a task.
+
+Lower stakes than an identity document, but the same shape of problem, and the
+URLs are handed to clients as plain strings by
+`GET /api/tasks/{id}/photos`.
+
+Needs deciding:
+- Private ACL plus short-lived presigned URLs, which means the three screens that
+  render task photos (`CloudPhotoViewer` in mobile `Driver/TaskDetails`, and the
+  web equivalents) stop being able to cache a URL and must ask for a fresh one.
+- Or accept it, on the grounds that a cabin on a street is not personal data —
+  in which case say so here, so the next person does not re-open it.
+
+*Context:* the ID-photo exposure was the urgent half and is fixed. This is the
+half that was deliberately left, so it is recorded rather than silently kept.
+
 ---
 
 ## F. AI
+
+*Deliberately near-empty. See TODO-17 before adding anything here.*
 
 ### TODO-15 `[DONE]` Delete the Mistral-based AI work
 Remove what was built with Mistral (intake/extraction: `IntakeConfig`,
@@ -594,47 +1365,9 @@ up AI-backed.
 
 ---
 
-## H. Mobile
-
-### TODO-19 `[DONE]` Mobile enrollment screens
-Replace the mobile password login with the same flow the web now has: one
-button + full name → six-digit code → waiting/polling → *"Sunteți înregistrat
-cu rol de X"*. The backend contract is settled and tested; `mobile/` is still
-untouched and still posts to the deleted `/api/auth/login`, so **the mobile app
-cannot log in at all until this is done**.
-
-**Done — the mobile app can authenticate again.** New `app/enrollment.tsx`
-(form → waiting → done), `services/EnrollmentService.ts`,
-`services/enrollmentStorage.ts`, `services/roleRouting.ts`. `app/login.tsx`,
-`AuthService.login` and its `LoginResponse` type are deleted — the only callers
-of the removed `POST /api/auth/login`.
-
-**The trap worth remembering:** `BearerTokenAuthenticationFilter` rejects *any*
-request carrying a token it cannot validate, and it runs BEFORE authorization —
-so it fires on the `permitAll` enrollment endpoints too. A device whose session
-was revoked still holds that dead token, so a plain `apiFetch` would have made
-the one screen able to recover the device the one screen it cannot reach.
-`apiFetch` gained `{ anonymous: true }`; all three enrollment calls use it and a
-test asserts it. **No backend change was needed.**
-
-`app/index.tsx` was an unconditional redirect to `/login` and had to become a
-real boot gate — under enrollment, "go to the login screen on every launch"
-means filing a fresh access request, needing a human admin, every time the app
-restarts. Device id is minted once and persisted (`@ecotrack_device_id`,
-single-flight); it is a self-asserted label, not a credential. Polling stops on
-approval, rejection, expiry, countdown zero, *Anulează* and unmount.
-
-Picked up on the way: the Sales and Technical menus' "logout" only changed
-screens and never revoked the session — they now call `AuthService.logout()`.
-
-Mobile: lint 0 errors, typecheck clean, **83 tests** (was 59).
-
-**Unverified, and not claimed otherwise:** no end-to-end request→approve→claim
-round trip against a running backend, and no render check on a device.
-
----
-
 ## G. Repo & CI
+
+*Workflows, guard scripts, deploy, secrets and the documentation they check.*
 
 ### TODO-18 `[DONE]` Fix the Dependabot config
 `.github/dependabot.yml` is already grouped and monthly, but it still produced
@@ -665,128 +1398,6 @@ batches are green and low risk (`web-minor-patch` #159, `mobile-minor-patch`
 majors — Vite 6→8 (#164), Vitest 3→4 (#168, #161), async-storage 2→3 (#166).
 **Spring Boot 3.5 → 4.1.1 (#158) is a whole major generation** and would touch
 the security config, JPA setup and the enrollment code — close it.
-
----
-
-## I. Found while doing something else
-
-*Each of these was noticed during other work (the TODO-15/16/21 pass and the
-refactoring that followed) and deliberately not fixed there: none is a
-behaviour-preserving cleanup, and each wants a decision of its own.*
-
-### TODO-22 `[DONE]` No backend guard against demoting the last admin
-The last-admin lockout guard exists **only in `web/src/features/admin/EmployeesPage.tsx`**.
-`AdminService` has no equivalent check, so anything that is not that screen — a
-direct API call, a future mobile admin view, a script — can demote or delete the
-last `ADMIN` and permanently lock everyone out of `/api/admin/**`.
-
-*Why it matters more than it looks:* with passwords gone there is no
-break-glass path back in. The only recovery is the first-user-becomes-admin
-bootstrap, which only fires when the employee table is empty — i.e. restoring
-access would mean destroying data.
-
-Needs deciding:
-- Refuse the demote/delete with a 409 and a Romanian message (the shape TODO-20
-  used for subscriptions), or refuse only the *last* one and let the UI explain?
-- Does the same rule belong on session revocation — revoking the last admin's
-  only device is the same lockout by another route.
-- A `SecurityTests` case is the point of the change; the web guard stays as the
-  friendly half.
-
-**Done (backend only — the web guard is untouched and stays the friendly half).**
-`AdminService` now refuses both routes with a **409** and a Romanian message:
-`updateEmployee` when a `roleNames` payload would drop ADMIN from the last
-admin, and `deleteEmployee` when the target is the last admin. Both throw
-`IllegalStateException`, which `GlobalExceptionHandler` already maps to 409 —
-the same shape TODO-20 used, and no new handler.
-
-**The three questions, decided:**
-
-**1. Refuse the operation, with 409 — not "refuse only the last one and let the
-UI explain".** The refusal *is* only for the last one; what changed is that it
-no longer depends on the UI. The message names the fix
-(*"Promovează întâi pe altcineva"*) rather than only the problem.
-
-**2. NO to session revocation — deliberately, and this is the half that stays
-open.** It is a real lockout route: `claim` is single-use (`CLAIMED → EXPIRED`)
-and `isAwaitingBootstrap()` is `employeeRepository.count() == 0`, so the last
-admin logging out cannot get back in — nobody is left to approve a new device.
-But refusing it is the wrong instrument: a sole admin who may never log out, and
-who cannot revoke a stolen device, is a worse bug than the one being prevented.
-The honest fix is a **recovery path**, not a refusal — see TODO-30.
-`DELETE /api/auth/sessions` needs nothing either way: it is `revokeOtherSessions`
-and always keeps the caller's own session.
-
-**3. The count asks the database** (`EmployeeRepository.countByRoleName`,
-`COUNT(DISTINCT e)` because `roles` is a ManyToMany and a plain count over the
-join would see one admin as two). Not airtight — there is no `@Version` anywhere
-in this app, so two admins demoting each other concurrently can still both read
-"2" — but the window is the transaction rather than the request.
-
-**Verified: `./gradlew build` on JDK 21 — BUILD SUCCESSFUL, 241 tests, 0
-failures**, and the suite was then run three times over to be sure (see TODO-31:
-it was NOT reliably green before this change, for unrelated reasons).
-
-New `SecurityTests/LastAdminGuardTest` (9 tests) runs the real filter chain: the
-two refusals, that a refused demotion writes nothing, that the message is
-Romanian, and — the half that matters as much — four allowances, so the guard
-cannot quietly become "admins may not be edited": demoting/deleting one of two
-admins, deleting a non-admin, editing the last admin's NAME, and widening their
-roles while keeping ADMIN.
-
-### TODO-23 `[DONE]` Dead Google sign-in plumbing outside the backend
-Google sign-in and password login are gone from the backend, and the orphaned
-`ecotrack.google.*` properties went with the refactor. The **deployment and
-build plumbing still passes the values**: `GOOGLE_CLIENT_ID` and
-`GOOGLE_ALLOWED_DOMAIN` in `.github/workflows/deploy.yml` and
-`docker-compose.yml`, `VITE_GOOGLE_CLIENT_ID` in `docker-compose.yml` and
-`web/Dockerfile`, and on the web side `GOOGLE_CLIENT_ID` in `src/lib/config.ts`,
-`VITE_GOOGLE_CLIENT_ID` in `src/vite-env.d.ts` and `MOCK_GOOGLE_DEMO_USERNAME`
-in `src/mocks/seed.ts`. Stale `/auth/google` comments sit on the `email` field
-in `types/domain.ts` and `mocks/store.ts`.
-
-Harmless but misleading — it reads as if the app still supports Google auth.
-**Do it as one sweep across all three layers**: deleting only the `web/src/`
-half leaves build args feeding a variable nobody reads, which is worse than
-either end alone. Confirm no deployment secret is still expected before removing
-the workflow entries.
-
-**Done as one sweep, all three layers.**
-
-- **Deploy/build:** `GOOGLE_CLIENT_ID` / `GOOGLE_ALLOWED_DOMAIN` gone from
-  `deploy.yml` (both the `env:` block and the `envs:` passlist),
-  `docker-compose.yml`, `docker-compose.dev-hosted.yml` and `.env.example`;
-  `VITE_GOOGLE_CLIENT_ID` gone from `web/Dockerfile` (ARG **and** ENV),
-  `docker-compose.yml`, `.env.example` and `web/.env.example`.
-- **Web:** `GOOGLE_CLIENT_ID` deleted from `src/lib/config.ts`,
-  `VITE_GOOGLE_CLIENT_ID` from `src/vite-env.d.ts`, `MOCK_GOOGLE_DEMO_USERNAME`
-  from `src/mocks/seed.ts` — all three had **no consumer left anywhere in
-  `src/`**, so nothing changed behaviour.
-- **Comments:** the stale `/auth/google` lines on `email` in `types/domain.ts`
-  and on `CredentialRow` in `mocks/store.ts` now say what the field actually is
-  (an optional contact detail nothing authenticates with).
-
-**The precondition checked before touching the workflow:** `grep -rn "google"
-backend/src/main/resources/` returns **nothing** — no `ecotrack.google.*`
-property survives, so those env vars were reaching a Spring container that
-ignored them. No deployment secret is still expected. The GitHub secrets
-themselves (`GOOGLE_CLIENT_ID`, `GOOGLE_ALLOWED_DOMAIN`) are now unreferenced
-and can be deleted in **Settings → Secrets** — that is a click in the GitHub UI,
-not a repo change, so it is left to you.
-
-**Deliberately NOT touched:** the backend comments in `AuthController`,
-`AuthService`, `SecurityConfig`, `Employee` and `EnrollmentFlowTest` that
-mention Google. They are accurate — they document that the endpoint was removed,
-and `EnrollmentFlowTest.loginEndpointsAreGone` actively asserts `POST
-/api/auth/google` no longer answers. That test is the regression guard for this
-whole item. Also untouched: `google.com/maps` deep links in
-`mobile/app/Driver/TaskDetails.tsx` and `sales/OrderDetailDrawer.tsx`, and the
-Google Places key in mobile — those are Maps, not sign-in.
-
-**Verified (web + hygiene; backend and mobile untouched so their CI does not
-run):** 372 tests green in 26 files, typecheck clean, lint 0 errors / 105
-warnings (unchanged — that is the TODO-26 backlog), build clean, bundle
-**139.4 kB / 160 kB** (down from 139.7). Hygiene green after TODO-29.
 
 ### TODO-24 `[ ]` Rotate the Google Maps key that is still in git history
 A Maps key was committed in `807aec2`. The file that quoted it
@@ -851,6 +1462,470 @@ key** (not merely restrict it: it is public, and an unrestricted-but-unused key
 still bills) → verify `sha256:8477701a13` in `google-services.json` carries the
 same package + SHA-1 restriction → only then remove the reminder block from
 `.github/repo-hygiene-allow.txt` and close this item.
+
+### TODO-29 `[ ]` Nothing validates the docker-compose files
+Found while doing TODO-23: `repo-hygiene.yml` **fails any PR that touches
+`docker-compose.yml`**, and always has — the file matches no `ci-*.yml` `paths:`
+filter, which is exactly the "no workflow watches this" error that check exists
+to raise. It went unnoticed because the file had not been edited since `bc47aec`.
+
+Unblocked the cheap way, deliberately: `docker-compose.yml`,
+`docker-compose.dev-hosted.yml`, `DEPLOYMENT.md` and `.env.example` were added
+to `NO_CI_REQUIRED` in `.github/scripts/repo_hygiene.py`. For the two docs that
+is simply correct — they are prose and a template of names, the same category as
+`CLAUDE.md`/`README.md`/`TODO.md` already in that set.
+
+**Update — partially covered now.** `repo-hygiene.yml` parses
+`docker-compose*.yml` as YAML on every PR, so a syntax error is caught before
+the VPS sees it. That is **not** the whole of this item: `docker compose config
+-q` additionally resolves `${VAR}` interpolation and validates the schema, and
+plain YAML parsing does neither. The `NO_CI_REQUIRED` comment says so, so the
+exemption stays honest.
+
+**For the compose files it is an exemption, not a verdict.** They are
+load-bearing — `deploy.yml` watches `docker-compose.yml` and rebuilds the whole
+stack from it — so a typo there is currently caught on the VPS, mid-deploy, and
+nowhere earlier. The real fix is a small `ci-compose.yml` running
+`docker compose config -q` on both files (pinned action SHA, or hygiene's own
+unpinned-action check will flag it), and then removing the two exemptions again.
+
+Needs deciding: is a validation-only workflow worth a fourth `ci-*.yml`, or
+should the check be folded into `repo-hygiene.yml`, which already runs on every
+PR and would need no new `paths:` filter?
+
+### TODO-32 `[ ]` Deploy fails at the SSH step — the VPS is unreachable
+Found on the push of TODO-22 (`a95825b`). **Not a test failure**, though it reads
+like one: both gates (`verify-backend`, `verify-web`) went green — the `deploy`
+job `needs:` them, so it only started because they passed — and then died on its
+first action with
+
+```
+2026/08/30 13:47:11 dial tcp ***:22: i/o timeout
+```
+
+Nothing in the deploy script ran; the `======CMD======` block in the log is just
+appleboy/ssh-action echoing the script before it connects.
+
+**What the error narrows it to:** `SERVER_IP` is *set* (GitHub prints `***` only
+for a secret that has a value), and an **i/o timeout** means the packets were
+dropped rather than refused — no host, a powered-off host, or a firewall DROP. A
+wrong-but-alive machine answers "connection refused" in milliseconds. So: the
+droplet is gone or off, a cloud firewall/ufw is blocking inbound 22 from GitHub
+runners, `SERVER_IP` is stale after a rebuild, or sshd is not on 22 (`deploy.yml`
+sets no `port:`, so it defaults to 22).
+
+This is consistent with the Appendix line that still says **"No users and no
+server exist yet"**, and with the dead `146.190.224.202` droplet that survives as
+a hardcoded fallback in `web/src/lib/config.ts` and `mobile/constants/ApiConfig.ts`.
+
+**Why it needs a decision rather than a fix:** `deploy.yml` triggers on every
+push to `main` touching `backend/**`, `web/**`, `docker-compose.yml` or
+`Caddyfile`. While no server answers, **every such push turns main red**, which
+trains everyone to ignore a red main — the expensive failure here, since the two
+CI gates that DO mean something are in the same workflow run.
+
+Options, none chosen:
+- **Gate the deploy job** on a repo variable (`if: vars.DEPLOY_ENABLED == 'true'`)
+  so the verify jobs still run and the deploy is skipped, not failed. Reversible,
+  one line, and honest about the state.
+- **Drop the `push:` trigger**, keeping `workflow_dispatch`, so deploying is a
+  deliberate button press until a server exists.
+- **Leave it red** on the argument that an unreachable production host SHOULD be
+  loud. Defensible only once a server actually exists.
+
+Decide after establishing whether a VPS is meant to exist right now. If one is
+provisioned, this closes by fixing the host/firewall/secret and nothing in the
+repo changes.
+
+### TODO-40 `[DONE]` Three cross-cutting guard scripts
+Cross-project facts that no toolchain checks, because the values are duplicated
+across languages with no shared schema and nothing fails at build time when they
+drift. All three run from `repo-hygiene.yml`, which has **no `paths:` filter** —
+the whole point is comparing one project against another, so a filtered run
+would miss exactly the PR that breaks the pair. Each step is `if: always()` so
+one failure does not hide the others.
+
+- **`cross_project_invariants.py`** — order-type names must match across
+  `Order.java`, `web/types/domain.ts`, `mobile/types/OrderTypes.ts` and mobile's
+  two untyped local copies; web `TASK_STATUSES` must match the backend enum
+  except for a declared backend-only set (`CANCELLED`). Verified by temporarily
+  adding a fourth order type: it named all four files that must follow. Absent
+  mobile files are *skipped, not failed*, so TODO-33 can delete them.
+- **`doc_claims.py`** — every backticked path in `CLAUDE.md` and the skills, and
+  every path in a Java/TS comment, must resolve (understanding `@/` aliases,
+  `./` relatives and `/.../` elisions). Pinned claims must match
+  `application.properties`: **stating no number passes, stating a wrong one
+  fails**, which suits CLAUDE.md's own "read them there rather than hardcoding a
+  number" style. And named cross-references must still hold — `isOrderFulfilled`
+  must keep naming `findLiveBySubscriptionId`, and the JPQL must keep naming
+  `deriveLifecycle`, with the symbol checked and not merely the path. That last
+  part exists because a path check is not enough: a pointer to a file that still
+  exists but no longer defines the thing passes a path check and is still wrong.
+- **`dead_config.py`** — `ecotrack.*` keys no Java source reads, reporting the
+  env var's other homes so cleanup is one pass. It found TODO-23's Google
+  plumbing independently. Bails out loudly if a `@ConfigurationProperties` class
+  is ever added, since prefix binding would make key-by-key grepping report
+  false deaths.
+
+### TODO-41 `[DONE]` Re-establish a golden-fixture guard for the fulfilment rule
+`isOrderFulfilled` (`web/src/features/sales/orderModel.ts`) and
+`OrderRepository.findLiveBySubscriptionId` are one rule written twice, in two
+languages, with no reference between them. TODO-40's `doc_claims.py` pins that
+they keep *naming* each other; nothing checks that they still *agree*.
+
+A shared golden-case file read by both suites was built for an earlier shape of
+this pair and dropped when this branch merged, because that shape did not
+survive: the backend rule now lives in **JPQL**, not in a policy class, so
+driving it from a fixture needs a `@DataJpaTest` rather than a plain unit test.
+That is the open question — whether the guard is worth a database-backed test,
+or whether TODO-34 (making the two sides read the same roll-up) removes enough
+of the risk that pinning the names is sufficient.
+
+Cheap and worth doing either way: the web half of the rule is a pure function,
+so a table of `(taskStatus → fulfilled)` cases costs nothing to assert.
+
+**Done — and the open question is decided: the database-backed test IS worth it.**
+Not because TODO-34 left much risk, but because of what writing it exposed:
+`findLiveBySubscriptionId` had **never once been executed**. Its only coverage was
+`SubscriptionServiceTest`, which stubs the repository — so the JPQL string
+itself, the half no compiler checks, was verified by nothing at all. A
+`@DataJpaTest` is the only way to reach it.
+
+`shared/fulfilment-cases.json` holds ten cases of *(task statuses on an order) →
+(summarised status, fulfilled)*. Both suites read that one file:
+
+- `RepositoryTests/FulfilmentRuleTest.java` — a `@DataJpaTest` `@TestFactory`, one
+  dynamic test per case. Each builds a plan, an order and its tasks, then asserts
+  the roll-up, the JPQL, **and that the two agree with each other**.
+- `web/src/features/sales/__tests__/fulfilment.test.ts` — the same cases through
+  the mock's summariser and `isOrderFulfilled`.
+
+Every task in a case is unscheduled on purpose, so no expected answer can come
+from a date. `backendOnly: true` marks the two CANCELLED cases: that status exists
+only in the backend enum (as `cross_project_invariants.py` declares), so the web
+suite skips them and the backend runs all ten. Both suites assert the file is
+non-empty first — a fixture that fails to load must fail, not pass vacuously.
+
+**`shared/**` was added to the `paths:` of BOTH `ci-backend.yml` and
+`ci-web.yml`.** Editing the fixture has to run both suites, which is the whole
+point; it also keeps `repo-hygiene.yml` happy, since a path no `ci-*.yml` watches
+is exactly what that check fails a PR for (TODO-29).
+
+**Checked that it bites:** with `summariseOrderTasks` reverted to "first task
+wins", three cases fail — the multi-task ones, and only those.
+
+*This replaces `shared/order-lifecycle-cases.json`, which the reconciliation merge
+dropped along with the `OrderFulfilmentPolicy` shape it was written for.*
+
+### TODO-44 `[DONE]` `doc_claims.py` resolved paths with the OS separator
+Found while verifying TODO-41: the script that checks every documented path
+**failed 25 claims on Windows and none on Linux**, including obviously-present
+files like `src/auth/RequireAuth.tsx`.
+
+`repo_files()` built its index with `str(path.relative_to(ROOT))`, which is
+`web\src\auth\...` on Windows, then compared it against tokens written with
+forward slashes — so every path-shaped claim in the repo failed to resolve. CI is
+Linux and stayed green, which is what let it sit: the script's own docstring says
+it "runs locally exactly as it runs in CI", and on this developer's machine it did
+not. Same shape as TODO-31's Windows-only test failures.
+
+Fixed by indexing with `.as_posix()` — identical to `str()` on Linux, so CI
+behaviour is unchanged — in all four places that built a path string. It now
+reports **0 problems** on Windows, which is what made it usable for checking the
+new claims in TODO-34 and TODO-41.
+
+*Not fixed, because they are display-only and cause no false failures:*
+`repo_hygiene.py`'s `check_action_pins` and `dead_config.py` still build an
+annotation path with `str()`, so a local Windows run prints backslashed paths in
+its messages. Both scripts pass.
+
+### TODO-47 `[DONE]` `bundle_budget.py` counts lazy chunks named `index-*` as eager
+The script identifies the eager entry chunk by the pattern `^index-[\w-]+\.js$`.
+That assumes only the app entry is ever named `index-*`, and Rollup breaks the
+assumption: a dependency reached only through a dynamic import gets a chunk named
+after **its** entry module, and a package whose entry is an `index` file
+therefore produces a second `index-<hash>.js` that the budget counts against the
+initial download.
+
+Found while adding tesseract.js in TODO-13, where it silently added 6.7 kB of a
+lazily-fetched chunk to the reported initial download. Worked around there by
+naming the chunk in `manualChunks` — but a 444-byte interop shim still lands on
+the pattern, and the next lazily-imported dependency will hit it again.
+
+The fix is to stop guessing from filenames: `dist/index.html` names the real
+entry, and its static import graph is the eager set. That is a rewrite of
+`main()` in the script, not a pattern tweak.
+
+*Note:* it fails in the safe direction — it over-counts, so it can fail a build
+that should pass, never pass one that should fail.
+
+**Resolved — `main()` rewritten to derive the eager set instead of guessing it.**
+`EAGER_CHUNK_PATTERNS` is deleted. The script now reads `dist/index.html`, takes
+the `<script type="module">` it names as the entry root, and walks that file's
+static `import` / `export … from` specifiers transitively; `import(...)` is a
+code-split boundary and is not followed. `<link rel="modulepreload">` hrefs join
+the root set, since the browser fetches those on first paint by definition.
+
+Measured on the same build: **139.7 kB → 139.3 kB**, the difference being the
+444-byte interop shim the item predicted. The stronger proof is with the
+`manualChunks` workaround removed — tesseract's chunk is then emitted as
+`index-<hash>.js` at 6.6 kB gzip, and the old script counted **145.9 kB** against
+the budget where the new one reports **139.3 kB**.
+
+The `tesseract: ['tesseract.js']` entry in `web/vite.config.ts` was **kept** —
+its cache-boundary reason still holds, the same as `maplibre` — but its comment
+was rewritten, because the budget-workaround half of it is now false and that
+comment is exactly the kind of stale pointer `doc_claims.py` exists to catch.
+
+*Correction to this item's own footnote:* the old approach did **not** only fail
+in the safe direction. Over-counting was the visible half; the other half is that
+only three name patterns counted as eager, so a genuinely eager chunk Rollup
+named anything else — a shared chunk split out of the entry, for instance — was
+silently filed as lazy and never budgeted. A synthetic `dist/` fixture reproduces
+both halves at once: the old script charged for a lazy `index-*` chunk while
+missing two real static dependencies of the entry. The graph walk has neither
+failure.
+
+Ambiguity still resolves toward failing: the specifier regex deliberately
+over-matches (a false positive over-counts, which can only fail a build that
+should pass), and a missing `index.html`, a missing `dist/assets`, or an
+`index.html` with no module entry are all `::error::` + exit 1. The CLI contract
+is unchanged — same argv, same `web/dist` default, same 0/1 exit codes, same
+`GITHUB_STEP_SUMMARY` markdown table — so `ci-web.yml` needs no edit.
+
+### TODO-48 `[ ]` `bootNavigation.test.tsx` fails on Node 24
+`stays on /comenzi when a dead refresh token is stored` throws
+`TypeError: RequestInit: Expected signal ("AbortSignal {}") to be an instance of
+AbortSignal` from inside react-router's `createBrowserRouter`, under undici.
+
+**Pre-existing, not caused by TODO-13/14** — verified by running the file from a
+clean worktree at HEAD, where it fails identically. Recorded because it means
+`npm run test:run` is not currently green on this machine, so "the suite passes"
+has an asterisk on it and the next person will otherwise re-diagnose it.
+
+The mismatch is jsdom's `AbortSignal` versus the one Node's built-in `fetch`
+checks against — the same class of Windows/runtime-specific breakage as TODO-31
+and TODO-44. Needs deciding whether to pin the Node version CI and developers
+use, or to give this test a jsdom-compatible fetch.
+
+### TODO-49 `[DONE]` CLAUDE.md's Known gaps still says mobile cannot authenticate
+``Known gaps`` opens with "**The mobile app cannot authenticate.** It still posts
+to the deleted `/api/auth/login` and has no enrollment screens (TODO-19)." The
+same file's Auth section says the opposite three screens earlier — "**All three
+projects can now get a session** (TODO-19)", naming `mobile/app/enrollment.tsx`
+and `mobile/services/EnrollmentService.ts` — and TODO-19 is `[DONE]`.
+
+Found while doing TODO-13/14. Not fixed there, because deleting a line from the
+section that exists to say what is unsafe is a call for whoever knows why it was
+left: TODO-19's entry may have shipped the screens without the bullet being
+revisited, or the bullet may be pointing at something narrower that is still
+true.
+
+`doc_claims.py` cannot catch this — both paths it names resolve. It is a claim
+about behaviour, and the file contradicts itself about it. **A wrong pointer is
+worse than no pointer because it is followed confidently**, which is that
+script's own docstring.
+
+**Done — the bullet was simply false, in all three of its claims, and is
+deleted.** Checked against the code rather than against the other paragraph:
+
+| The bullet said | The code says |
+|---|---|
+| "has no enrollment screens" | `mobile/app/enrollment.tsx` (form → waiting → done) exists, with `mobile/services/EnrollmentService.ts`, `enrollmentStorage.ts` and `roleRouting.ts` beside it |
+| "still posts to the deleted `/api/auth/login`" | `grep -rn "auth/login" mobile --include="*.ts" --include="*.tsx"` returns **three doc comments saying the endpoint was deleted** and nothing else. `mobile/app/login.tsx` does not exist; `AuthService` exports no `login` |
+| "the mobile app cannot authenticate" | it enrolls: `EnrollmentService` calls `/enrollment/status`, `/request` and `/claim`, all three with `{ anonymous: true }` (`http.ts:98,112`), and `services/__tests__/EnrollmentService.test.ts` asserts that third argument on two of them |
+
+So the Auth section's "**All three projects can now get a session**" is the
+accurate half, and TODO-19's `[DONE]` is honest.
+
+**Narrowing checked, not assumed.** The one part that could have survived is the
+transport, so `mobile/constants/ApiConfig.ts` was read: it still falls back to
+`http://146.190.224.202:8080/api` when `EXPO_PUBLIC_API_BASE_URL` is unset. That
+is a real remaining gap — but Known gaps **already carries it as its own
+bullet**, so it is not what this one was about and repeating it would not have
+made the deleted claim true.
+
+**Replaced rather than only deleted.** Dropping the bullet outright would have
+left Known gaps with nothing about mobile, and there is a real one: TODO-35 —
+mobile stores `user.roles` at claim time and never refetches, so a promotion or
+demotion in Angajați never reaches the device. That is now the bullet in its
+place. TODO-35 stays `[ ]`; this item only fixed the documentation.
+
+### TODO-54 `[ ]` The live production build still ships the mock seed database
+Found while measuring the bundle for TODO-47. `src/api/index.ts` does
+`import { mockApi } from '@/mocks'` unconditionally and re-exports
+`DEV_DEVICE_ID` from the same module, so `@/mocks` — and through it `seed.ts` —
+is in the module graph of **every** build, not just mock ones. Verified: a
+`VITE_DATA_MODE=live` build's entry chunk still contains the seeded employee
+names (`grep -l "Radu Nistor" dist/assets/*.js` hits). `IS_MOCK ? mockApi :
+liveApi` tree-shakes only about 2.2 kB gzip of it away.
+
+It is small and it is not a secret — the seed is invented demo data in a public
+repo — but it means the deployed app carries an in-memory database of fake
+clients, orders and employees it can never use, and the growth is unbounded:
+every row added to `seed.ts` for a nicer `npm run dev` lands in production.
+
+Needs deciding: whether to split the two off (`DEV_DEVICE_ID` is a constant and
+does not need to come from `@/mocks`; the `mockApi` import could go behind a
+dynamic `import()` guarded by `IS_MOCK`), or to accept it and say so in a
+comment, since the alternative loses the single synchronous `api` binding that
+`src/api/index.ts` currently gives every feature.
+
+### TODO-55 `[ ]` The bundle budget measures the mock build, not the deployed one
+Same investigation. `ci-web.yml` runs `npm run build` with no `VITE_DATA_MODE`,
+which `src/lib/config.ts` defaults to `'mock'` — so the number the budget gates
+on is mock mode's. `web/Dockerfile` builds `VITE_DATA_MODE=live`, which is the
+artefact users actually download. The two currently differ by 2.1 kB gzip
+(139.3 vs 137.2), so nothing is wrong today and the gate errs high, which is the
+safe side.
+
+Recorded because the gap is not visible from either file and could silently
+invert: a future mock-only dependency would inflate the gated number, and a
+live-only one would escape it entirely. Cheapest fix is a `VITE_DATA_MODE=live`
+on the CI build step so the gate measures the shipped bundle; that also makes
+the number comparable to what the Dockerfile produces.
+
+---
+
+### TODO-50 `[ ]` Nothing checks that the index at the top of TODO.md is true
+Found while reorganising this file (the pass that also closed TODO-49). The
+*Index* and *Still open* lists near the top are now the only way to see the
+backlog without reading 1900 lines — which makes them a new thing that can be
+wrong. They are maintained by hand: *How to use this file* says adding an item
+or changing its status is two edits, and nothing enforces the second one. An
+index that has silently drifted is worse than no index, for the same reason
+`doc_claims.py`'s docstring gives about a stale pointer: it is followed
+confidently.
+
+The check is cheap and mechanical, which is the argument for writing it rather
+than trusting the rule. Parse every `### TODO-NN \`status\` title` heading, then
+assert: every ID appears exactly once as a heading and exactly once as an index
+row; the row's status and title match the heading verbatim; the row's section
+letter matches the `## X.` heading the item actually sits under; the *Still
+open* list is exactly the non-`[DONE]` set; and the *Next free ID* line is
+highest + 1. That is roughly the script already used to verify this
+reorganisation.
+
+Needs deciding: a fourth guard script called from `repo-hygiene.yml` beside
+`doc_claims.py` (which deliberately does **not** path-check TODO.md — this is a
+different question about the same file, so it is a sibling, not an extension),
+or a step folded into `repo_hygiene.py`. Either way it must run on every PR with
+no `paths:` filter, since a stale index is exactly what a project-filtered run
+would miss.
+
+*Related:* TODO-40, which made the same argument for the three cross-cutting
+guards that already run there.
+
+---
+
+## H. Mobile
+
+*The Expo app: what it can do, and what it should stop doing.*
+
+### TODO-19 `[DONE]` Mobile enrollment screens
+Replace the mobile password login with the same flow the web now has: one
+button + full name → six-digit code → waiting/polling → *"Sunteți înregistrat
+cu rol de X"*. The backend contract is settled and tested; `mobile/` is still
+untouched and still posts to the deleted `/api/auth/login`, so **the mobile app
+cannot log in at all until this is done**.
+
+**Done — the mobile app can authenticate again.** New `app/enrollment.tsx`
+(form → waiting → done), `services/EnrollmentService.ts`,
+`services/enrollmentStorage.ts`, `services/roleRouting.ts`. `app/login.tsx`,
+`AuthService.login` and its `LoginResponse` type are deleted — the only callers
+of the removed `POST /api/auth/login`.
+
+**The trap worth remembering:** `BearerTokenAuthenticationFilter` rejects *any*
+request carrying a token it cannot validate, and it runs BEFORE authorization —
+so it fires on the `permitAll` enrollment endpoints too. A device whose session
+was revoked still holds that dead token, so a plain `apiFetch` would have made
+the one screen able to recover the device the one screen it cannot reach.
+`apiFetch` gained `{ anonymous: true }`; all three enrollment calls use it and a
+test asserts it. **No backend change was needed.**
+
+`app/index.tsx` was an unconditional redirect to `/login` and had to become a
+real boot gate — under enrollment, "go to the login screen on every launch"
+means filing a fresh access request, needing a human admin, every time the app
+restarts. Device id is minted once and persisted (`@ecotrack_device_id`,
+single-flight); it is a self-asserted label, not a credential. Polling stops on
+approval, rejection, expiry, countdown zero, *Anulează* and unmount.
+
+Picked up on the way: the Sales and Technical menus' "logout" only changed
+screens and never revoked the session — they now call `AuthService.logout()`.
+
+Mobile: lint 0 errors, typecheck clean, **83 tests** (was 59).
+
+**Unverified, and not claimed otherwise:** no end-to-end request→approve→claim
+round trip against a running backend, and no render check on a device.
+
+### TODO-33 `[ ]` Make the web app responsive, and move Sales + Technical out of mobile
+Two halves of one decision: **the phone stops being a second full app and
+becomes a browser**, except for the driver flow.
+
+**1. Responsive web.** Every web screen must work on a phone-sized viewport.
+Today the layouts assume width — the sidebar, the `DataTable` screens, the
+drawers and the map — and there is no breakpoint story. Target a real
+*web-mobile* experience: an off-canvas sidebar, tables that reflow into stacked
+cards below `md` (note `DataTable` is `overflow-x-hidden` from TODO-04, so a
+narrow screen currently *hides* columns rather than scrolling to them), drawers
+that become full-screen sheets, touch-sized hit targets.
+
+**2. Delete the Sales and Technical sections from `mobile/`** — `app/Sales/**`,
+`app/Technical/**` and everything only they use. Mobile keeps **only the driver
+experience**: my routes, my tasks, status changes, photo upload. Office staff
+use the responsive web app on their phone.
+
+**Why:** every order-type change currently has to be written twice (see the
+`order-type` skill — the discriminator is duplicated with no shared source of
+truth). One implementation is simpler, and the web one is more complete.
+
+**Consequences to handle, not discover later:**
+- `SecurityConfig`'s note that `PATCH /api/tasks/*/status` and
+  `POST /api/tasks/*/photos` are "the only writes the driver app makes" becomes
+  literally true — a checkable invariant rather than a comment.
+- `mobile/types/OrderTypes.ts` and the order-type duplication mostly disappear.
+  Update the `order-type` skill and `cross_project_invariants.py` when they do
+  (the script already *skips* absent mobile files rather than failing).
+- Do the responsive work **before** deleting the mobile screens, so office staff
+  are never left without a usable phone surface.
+
+### TODO-35 `[ ]` Role changes on the web never reach the phone
+The mobile app stores `user.roles` at claim time and never refetches. An admin
+promoting or demoting someone in **Angajați** changes what the backend
+authorizes but not what the phone renders: the device keeps showing the old
+menus until it re-enrols. The mismatch is silent and lands on the user as
+"button does nothing", or a 403.
+
+Fix: refresh the stored user from `GET /api/auth/me` in the boot gate
+(`app/index.tsx`), and probably after a 401-refresh too.
+
+*Found while building TODO-19.*
+
+---
+
+## I. Found while doing something else
+
+*This section used to hold TODO-22 through TODO-49 — 28 items of every topic, in
+the order they were noticed. They are now filed under the section each belongs to
+(A–H, J); the index above says where each one went. The original preamble is kept
+here because it is still true of those items:*
+
+> *Each of these was noticed during other work (the TODO-15/16/21 pass and the
+> refactoring that followed) and deliberately not fixed there: none is a
+> behaviour-preserving cleanup, and each wants a decision of its own.*
+
+**Nothing new gets filed here.** "Found while doing something else" is where an
+item came from, not what it is about, and filing by provenance is what made this
+file unreadable. A loose end noticed while doing something else still gets
+written down — the standing rule is unchanged — it just goes into the section
+whose code it concerns, at the next free ID. Say in the item's own text what you
+were doing when you found it, the way TODO-42 and TODO-46 do.
+
+---
+
+## J. Code health & platform
+
+*Backlogs and infrastructure that belong to no one screen.*
 
 ### TODO-25 `[DONE]` Backend logging: `System.out`/`System.err`, and a swallowed failure
 `DataLoader`, `RecurringTaskScheduler` and `PhotoService.deletePhoto` print to
@@ -1001,100 +2076,6 @@ question, and untouched here.
 **Verified:** typecheck clean, **395 tests green**, build clean, bundle
 **139.6 kB / 160 kB**.
 
-### TODO-27 `[ ]` The 60-day refresh-token arithmetic no longer describes production
-`ecotrack.security.refresh-token-ttl-days=365`, but `TokenService`'s javadoc and
-its worked example still reason in terms of the 60-day code default
-(`@Value(":60")`). Neither is strictly wrong — the comments document the
-fallback — but the arithmetic ("a session that refreshes every 30 minutes for
-its 60-day life") describes a configuration production does not run.
-
-Decide which number is intended, then make the property, the fallback and the
-prose agree. A 365-day refresh token is a year-long credential on a lost device;
-if that is deliberate it deserves a sentence saying so next to the session cap
-and the nightly prune.
-
-### TODO-28 `[ ]` Dead password-login plumbing in the web mock
-Found while doing TODO-23, and left alone because it is the **password** half,
-not the Google half — a different question with a different answer.
-
-`MOCK_CREDENTIALS_HINT` ("Exposed so the login screen can tell a demo user what
-to type") and `MOCK_AUTO_LOGIN` are both defined in `web/src/mocks/seed.ts` and
-re-exported twice — from `src/mocks/index.ts` and again from `src/api/index.ts`
-— and **neither has a single consumer in `src/`**, tests included. There is no
-login screen any more: mock mode boots by driving the real request→claim
-enrollment path against `DEV_DEVICE_ID` (TODO-01), which is the export beside
-them that *is* used.
-
-Behind them sits the bigger question: `CredentialRow` still carries a
-`password`, and `MOCK_PASSWORD = 'demo'` is stamped onto all ~8 seeded
-employees, for a system that has no password anywhere.
-
-Needs deciding: delete the two dead exports only, or drop `password` from
-`CredentialRow` entirely and keep the row for `email`? The second is the honest
-one but touches `toAuthUser`, `currentEmployee`, `issueSession` and
-`findApprovableEmployee` in `mocks/index.ts`, so it wants its own reading rather
-than being smuggled into a comment sweep.
-
-### TODO-29 `[ ]` Nothing validates the docker-compose files
-Found while doing TODO-23: `repo-hygiene.yml` **fails any PR that touches
-`docker-compose.yml`**, and always has — the file matches no `ci-*.yml` `paths:`
-filter, which is exactly the "no workflow watches this" error that check exists
-to raise. It went unnoticed because the file had not been edited since `bc47aec`.
-
-Unblocked the cheap way, deliberately: `docker-compose.yml`,
-`docker-compose.dev-hosted.yml`, `DEPLOYMENT.md` and `.env.example` were added
-to `NO_CI_REQUIRED` in `.github/scripts/repo_hygiene.py`. For the two docs that
-is simply correct — they are prose and a template of names, the same category as
-`CLAUDE.md`/`README.md`/`TODO.md` already in that set.
-
-**Update — partially covered now.** `repo-hygiene.yml` parses
-`docker-compose*.yml` as YAML on every PR, so a syntax error is caught before
-the VPS sees it. That is **not** the whole of this item: `docker compose config
--q` additionally resolves `${VAR}` interpolation and validates the schema, and
-plain YAML parsing does neither. The `NO_CI_REQUIRED` comment says so, so the
-exemption stays honest.
-
-**For the compose files it is an exemption, not a verdict.** They are
-load-bearing — `deploy.yml` watches `docker-compose.yml` and rebuilds the whole
-stack from it — so a typo there is currently caught on the VPS, mid-deploy, and
-nowhere earlier. The real fix is a small `ci-compose.yml` running
-`docker compose config -q` on both files (pinned action SHA, or hygiene's own
-unpinned-action check will flag it), and then removing the two exemptions again.
-
-Needs deciding: is a validation-only workflow worth a fourth `ci-*.yml`, or
-should the check be folded into `repo-hygiene.yml`, which already runs on every
-PR and would need no new `paths:` filter?
-
-### TODO-30 `[ ]` There is no recovery path when the last admin loses their session
-Split out of TODO-22, which fixed the *demote/delete* route and deliberately did
-not touch this one.
-
-The last admin can still lock everyone out permanently by ordinary means:
-`POST /api/auth/logout`, or `DELETE /api/auth/sessions/{id}` on their own only
-device. Nothing about that is exotic — it is what "log out" does. It is
-unrecoverable because two things line up: `EnrollmentService.claim` is
-single-use (`CLAIMED → EXPIRED`, so the device cannot re-claim its old approval)
-and `isAwaitingBootstrap()` is `employeeRepository.count() == 0`, so the
-first-user-becomes-ADMIN path only reopens on an **empty employee table**. The
-only recovery is destroying all employee data.
-
-TODO-22 decided NOT to fix this by refusing the operation: an admin who may
-never log out, and who cannot revoke a device they just had stolen, is worse
-than the lockout. So the fix has to be a way back IN. Options, none chosen:
-
-- **Re-announce the setup code** when the admin count drops to zero — reuses the
-  bootstrap machinery already in `EnrollmentService`
-  (`announceSetupCodeIfUnclaimed`), but it currently keys on an empty table, and
-  "zero admins" is a different and much more reachable condition.
-- **Let a previously-approved device re-enroll without approval**, keyed on its
-  device id. Weakens the single-use property that exists to stop a leaked claim
-  secret minting a second session.
-- **An out-of-band break-glass code** in config, which is a password by another
-  name and would undo part of why credentials were removed.
-
-Needs deciding before building. Whichever is picked, it wants a `SecurityTests`
-case in the shape of `LastAdminGuardTest`.
-
 ### TODO-31 `[ ]` The backend test suite shares one database across classes
 Found while doing TODO-22: **the backend suite was not reliably green before
 this change**, and the reason is test isolation, not product code.
@@ -1129,342 +2110,32 @@ have them clean up after themselves explicitly, or move bootstrap tests onto
 their own isolated datasource. Until then, **any new assertion about a global
 count is unsafe by default.**
 
-### TODO-32 `[ ]` Deploy fails at the SSH step — the VPS is unreachable
-Found on the push of TODO-22 (`a95825b`). **Not a test failure**, though it reads
-like one: both gates (`verify-backend`, `verify-web`) went green — the `deploy`
-job `needs:` them, so it only started because they passed — and then died on its
-first action with
+### TODO-51 `[ ]` The web app throws away the server's Romanian refusal text
+Found while doing TODO-39, which adds a third backend 409 whose whole value is
+its message.
 
-```
-2026/08/30 13:47:11 dial tcp ***:22: i/o timeout
-```
+`errorMessage()` in `web/src/features/technical/utils.ts` maps any `ApiError`
+that is not 404 or 5xx to `"Cererea a eșuat (cod ${status})."` — it never reads
+`ApiError.body`, which is where the backend's user-facing Romanian text arrives.
+So the operator is told "the request failed (code 409)" instead of *why*, for at
+least three refusals that were each written to be readable:
 
-Nothing in the deploy script ran; the `======CMD======` block in the log is just
-appleboy/ssh-action echoing the script before it connects.
+- `InsufficientQuantityException` — "Cantitate insuficientă la locație.
+  Disponibil: N, solicitat: M." (`live/orders.ts` documents it as reachable via
+  `ApiError.body`)
+- the retired-plan refusal added by TODO-39 — "Abonamentul „X" a fost dezactivat…"
+- `SubscriptionService.blockedMessage`, which goes to the trouble of agreeing in
+  Romanian ("1 comandă" vs "24 de comenzi") — and is only ever seen because
+  `SubscriptionsPage` special-cases 409 **on that one screen**.
 
-**What the error narrows it to:** `SERVER_IP` is *set* (GitHub prints `***` only
-for a secret that has a value), and an **i/o timeout** means the packets were
-dropped rather than refused — no host, a powered-off host, or a firewall DROP. A
-wrong-but-alive machine answers "connection refused" in milliseconds. So: the
-droplet is gone or off, a cloud firewall/ufw is blocking inbound 22 from GitHub
-runners, `SERVER_IP` is stale after a rebuild, or sshd is not on 22 (`deploy.yml`
-sets no `port:`, so it defaults to 22).
-
-This is consistent with the Appendix line that still says **"No users and no
-server exist yet"**, and with the dead `146.190.224.202` droplet that survives as
-a hardcoded fallback in `web/src/lib/config.ts` and `mobile/constants/ApiConfig.ts`.
-
-**Why it needs a decision rather than a fix:** `deploy.yml` triggers on every
-push to `main` touching `backend/**`, `web/**`, `docker-compose.yml` or
-`Caddyfile`. While no server answers, **every such push turns main red**, which
-trains everyone to ignore a red main — the expensive failure here, since the two
-CI gates that DO mean something are in the same workflow run.
-
-Options, none chosen:
-- **Gate the deploy job** on a repo variable (`if: vars.DEPLOY_ENABLED == 'true'`)
-  so the verify jobs still run and the deploy is skipped, not failed. Reversible,
-  one line, and honest about the state.
-- **Drop the `push:` trigger**, keeping `workflow_dispatch`, so deploying is a
-  deliberate button press until a server exists.
-- **Leave it red** on the argument that an unreachable production host SHOULD be
-  loud. Defensible only once a server actually exists.
-
-Decide after establishing whether a VPS is meant to exist right now. If one is
-provisioned, this closes by fixing the host/firewall/secret and nothing in the
-repo changes.
-
-### TODO-33 `[ ]` Make the web app responsive, and move Sales + Technical out of mobile
-Two halves of one decision: **the phone stops being a second full app and
-becomes a browser**, except for the driver flow.
-
-**1. Responsive web.** Every web screen must work on a phone-sized viewport.
-Today the layouts assume width — the sidebar, the `DataTable` screens, the
-drawers and the map — and there is no breakpoint story. Target a real
-*web-mobile* experience: an off-canvas sidebar, tables that reflow into stacked
-cards below `md` (note `DataTable` is `overflow-x-hidden` from TODO-04, so a
-narrow screen currently *hides* columns rather than scrolling to them), drawers
-that become full-screen sheets, touch-sized hit targets.
-
-**2. Delete the Sales and Technical sections from `mobile/`** — `app/Sales/**`,
-`app/Technical/**` and everything only they use. Mobile keeps **only the driver
-experience**: my routes, my tasks, status changes, photo upload. Office staff
-use the responsive web app on their phone.
-
-**Why:** every order-type change currently has to be written twice (see the
-`order-type` skill — the discriminator is duplicated with no shared source of
-truth). One implementation is simpler, and the web one is more complete.
-
-**Consequences to handle, not discover later:**
-- `SecurityConfig`'s note that `PATCH /api/tasks/*/status` and
-  `POST /api/tasks/*/photos` are "the only writes the driver app makes" becomes
-  literally true — a checkable invariant rather than a comment.
-- `mobile/types/OrderTypes.ts` and the order-type duplication mostly disappear.
-  Update the `order-type` skill and `cross_project_invariants.py` when they do
-  (the script already *skips* absent mobile files rather than failing).
-- Do the responsive work **before** deleting the mobile screens, so office staff
-  are never left without a usable phone surface.
-
-### TODO-34 `[DONE]` `/tasks/order/{id}/exists` returns one task, but the guard rolls up all of them
-`GET /api/tasks/order/{orderId}/exists` returns
-`taskService.getTaskByOrderId(orderId).orElse(null)` — a **single** task. The
-web's `isOrderFulfilled` reads exactly that one status to decide Curente vs
-Arhivă. But `OrderRepository.findLiveBySubscriptionId`, the backend guard that
-is supposed to be **the same rule**, is
-`NOT EXISTS (SELECT t ... AND t.status = 'COMPLETED')` — a roll-up over **every**
-task of the order.
-
-For an order with two tasks, one COMPLETED and one NEW, they disagree: the
-backend sees a COMPLETED task and stops blocking the subscription delete, while
-Comenzi may still show the order as current because `/exists` handed it the NEW
-one. Today orders appear to produce one task each so the answers coincide, and
-**nothing enforces that**.
-
-Fix by making `/exists` return the summarised status, or by adding a batch
-endpoint (`GET /api/tasks/order-status?ids=…`), which would also collapse the
-current one-request-per-order fan-out on Comenzi.
-
-*This is the concrete drift TODO-20 and TODO-21 warned about when they said the
-two definitions must stay identical.*
-
-**Done, by summarising server-side — not by adding the batch endpoint.** The two
-options in this item are not equivalent: the roll-up is the correctness half and
-the batch endpoint is the performance half, so only the first is done here. The
-fan-out is now TODO-43.
-
-`TaskService.summariseOrderTasks(List<Task>)` is the one rule, and
-`TaskController`'s `/exists` calls it: **a COMPLETED task wins whenever one
-exists**, whatever the others say — the same question `findLiveBySubscriptionId`'s
-`NOT EXISTS` answers. With none completed the order is unfinished either way, and
-the task reported is the earliest scheduled one (unscheduled last, ties by id) so
-the same order always summarises to the same task. The response shape did not
-change, so `normalize.ts` and every caller are untouched; `contract.ts` now
-documents `status` as a roll-up, and the mock summarises identically in
-`web/src/mocks/index.ts`.
-
-**The single-task assumption was in three places, not one**, all of them through
-`TaskRepository.findByOrder_Id`, which returned an `Optional`:
-
-- the endpoint — the drift this item is about;
-- `OrderService.deleteOrder` and `ClientService.deleteClientCascade`, which
-  deleted **one** task and then deleted the order, so the remaining tasks would
-  have failed that delete on their FK — and their photos would have been orphaned
-  in Spaces.
-
-The `Optional` was worse than ambiguous: Spring Data throws
-`IncorrectResultSizeDataAccessException` — a 500 — as soon as a second task
-exists. The finder is now `findAllByOrder_IdOrderByIdAsc` and the Optional one is
-gone, so the assumption cannot be re-made silently.
-
-**None of it was reachable today**, and that is the point: `createTaskFromOrder`
-is the only code that sets `Task.order` and it refuses a second task per order
-(*"Această comandă are deja un task asociat"*) — which is exactly the "nothing
-enforces that" this item flagged. The rule now holds without depending on it.
-
-**Verified:** `./gradlew test` — **253 tests, 0 failures** (was 241; +12 = ten
-golden cases from TODO-41 and two `TaskControllerTest` cases for an order with
-several tasks). Web: lint 0 errors, typecheck clean, build clean.
-
-### TODO-35 `[ ]` Role changes on the web never reach the phone
-The mobile app stores `user.roles` at claim time and never refetches. An admin
-promoting or demoting someone in **Angajați** changes what the backend
-authorizes but not what the phone renders: the device keeps showing the old
-menus until it re-enrols. The mismatch is silent and lands on the user as
-"button does nothing", or a 403.
-
-Fix: refresh the stored user from `GET /api/auth/me` in the boot gate
-(`app/index.tsx`), and probably after a 401-refresh too.
-
-*Found while building TODO-19.*
-
-### TODO-36 `[ ]` First-run setup code is only printed to the server log
-Whoever performs the very first enrolment needs SSH access to read the setup
-code out of the backend log (`ecotrack.enrollment.require-setup-code=true`).
-Workable for the current operator, but the app cannot be bootstrapped by a
-non-technical user, and this will be forgotten by the time it matters.
-
-*Found while building TODO-19.*
-
-### TODO-37 `[ ]` Bulk-move orders between subscriptions
-When TODO-20 refuses a delete, the only way forward is to finish or delete each
-blocking order one at a time. Offer *"Mută pe alt abonament"* in the refusal
-dialog: reassign the listed orders to a chosen plan, then retry.
-
-`SubscriptionService.deactivate`'s javadoc already records that this was
-deliberately left out — "that would be a write the operator did not ask for" —
-so this item is the considered follow-up, not a contradiction.
-
-Needs a backend endpoint and a decision on whether reassigning is allowed for
-orders whose tasks already carry the OLD plan name in `Task.productName`: the
-name is copied onto the task, so moving the order does not move history.
-
-### TODO-38 `[ ]` Produse deletion: hard delete, incomplete check, its own error format
-Investigated alongside TODO-20 and found **materially different from
-Abonamente**, so it deliberately did NOT get the same treatment — applying
-TODO-20's rule here would be a regression. Three problems in
-`ProductService.deleteProduct` / `ProductController.deleteProduct`:
-
-- **(a)** `existsByAmplasareOrderProductId` only checks `AmplasareOrder.product`.
-  **`RidicareOrder.product` is never checked**, so a product used only by
-  Ridicări can be destroyed, leaving a dangling FK. *Small fix, real bug.*
-- **(b)** It is a **hard** delete, not a soft one. That is why its strict "any
-  referencing order blocks" rule is *correct* and must not be relaxed to
-  TODO-20's "only unfulfilled orders block" — destroying a product that
-  fulfilled orders still reference is exactly the dangling reference the
-  subscription soft-delete exists to prevent. Adopting the friendlier rule needs
-  an `isActive` flag on Produse first. **This is the real decision.**
-- **(c)** `ProductController` catches `IllegalStateException` itself and returns
-  `409 {"error": …}`, bypassing `GlobalExceptionHandler` — the only place in the
-  app where the error body's message lives under `error` rather than `message`.
-
-### TODO-39 `[ ]` Check-then-act on subscription retirement is unserialized
-Narrower than the repo-wide "no optimistic locking" gap in *Known gaps*, and
-with a cheap local fix, so it earns its own line.
-
-`SubscriptionService.deactivate` reads the blockers and then writes
-`isActive = false`. Under READ COMMITTED nothing makes that atomic: `POST
-/api/orders` can commit a new unfulfilled `IgienizareOrder` for the plan between
-the read and the write. That transaction never touches the `subscriptions` row,
-so nothing conflicts — no `@Version`, no row lock, no constraint. **Outcome: a
-plan retired with a live order pointing at it.** Because the delete is soft the
-order still resolves, so the damage is "live order on a retired plan", not a
-dangling FK.
-
-Fix: `SELECT … FOR UPDATE` on the subscription row from **both** `deactivate()`
-and order creation, or `@Version` on `Subscription` plus a touching write in
-`OrderService`. Either means editing `OrderService`.
-
-### TODO-40 `[DONE]` Three cross-cutting guard scripts
-Cross-project facts that no toolchain checks, because the values are duplicated
-across languages with no shared schema and nothing fails at build time when they
-drift. All three run from `repo-hygiene.yml`, which has **no `paths:` filter** —
-the whole point is comparing one project against another, so a filtered run
-would miss exactly the PR that breaks the pair. Each step is `if: always()` so
-one failure does not hide the others.
-
-- **`cross_project_invariants.py`** — order-type names must match across
-  `Order.java`, `web/types/domain.ts`, `mobile/types/OrderTypes.ts` and mobile's
-  two untyped local copies; web `TASK_STATUSES` must match the backend enum
-  except for a declared backend-only set (`CANCELLED`). Verified by temporarily
-  adding a fourth order type: it named all four files that must follow. Absent
-  mobile files are *skipped, not failed*, so TODO-33 can delete them.
-- **`doc_claims.py`** — every backticked path in `CLAUDE.md` and the skills, and
-  every path in a Java/TS comment, must resolve (understanding `@/` aliases,
-  `./` relatives and `/.../` elisions). Pinned claims must match
-  `application.properties`: **stating no number passes, stating a wrong one
-  fails**, which suits CLAUDE.md's own "read them there rather than hardcoding a
-  number" style. And named cross-references must still hold — `isOrderFulfilled`
-  must keep naming `findLiveBySubscriptionId`, and the JPQL must keep naming
-  `deriveLifecycle`, with the symbol checked and not merely the path. That last
-  part exists because a path check is not enough: a pointer to a file that still
-  exists but no longer defines the thing passes a path check and is still wrong.
-- **`dead_config.py`** — `ecotrack.*` keys no Java source reads, reporting the
-  env var's other homes so cleanup is one pass. It found TODO-23's Google
-  plumbing independently. Bails out loudly if a `@ConfigurationProperties` class
-  is ever added, since prefix binding would make key-by-key grepping report
-  false deaths.
-
-### TODO-41 `[DONE]` Re-establish a golden-fixture guard for the fulfilment rule
-`isOrderFulfilled` (`web/src/features/sales/orderModel.ts`) and
-`OrderRepository.findLiveBySubscriptionId` are one rule written twice, in two
-languages, with no reference between them. TODO-40's `doc_claims.py` pins that
-they keep *naming* each other; nothing checks that they still *agree*.
-
-A shared golden-case file read by both suites was built for an earlier shape of
-this pair and dropped when this branch merged, because that shape did not
-survive: the backend rule now lives in **JPQL**, not in a policy class, so
-driving it from a fixture needs a `@DataJpaTest` rather than a plain unit test.
-That is the open question — whether the guard is worth a database-backed test,
-or whether TODO-34 (making the two sides read the same roll-up) removes enough
-of the risk that pinning the names is sufficient.
-
-Cheap and worth doing either way: the web half of the rule is a pure function,
-so a table of `(taskStatus → fulfilled)` cases costs nothing to assert.
-
-**Done — and the open question is decided: the database-backed test IS worth it.**
-Not because TODO-34 left much risk, but because of what writing it exposed:
-`findLiveBySubscriptionId` had **never once been executed**. Its only coverage was
-`SubscriptionServiceTest`, which stubs the repository — so the JPQL string
-itself, the half no compiler checks, was verified by nothing at all. A
-`@DataJpaTest` is the only way to reach it.
-
-`shared/fulfilment-cases.json` holds ten cases of *(task statuses on an order) →
-(summarised status, fulfilled)*. Both suites read that one file:
-
-- `RepositoryTests/FulfilmentRuleTest.java` — a `@DataJpaTest` `@TestFactory`, one
-  dynamic test per case. Each builds a plan, an order and its tasks, then asserts
-  the roll-up, the JPQL, **and that the two agree with each other**.
-- `web/src/features/sales/__tests__/fulfilment.test.ts` — the same cases through
-  the mock's summariser and `isOrderFulfilled`.
-
-Every task in a case is unscheduled on purpose, so no expected answer can come
-from a date. `backendOnly: true` marks the two CANCELLED cases: that status exists
-only in the backend enum (as `cross_project_invariants.py` declares), so the web
-suite skips them and the backend runs all ten. Both suites assert the file is
-non-empty first — a fixture that fails to load must fail, not pass vacuously.
-
-**`shared/**` was added to the `paths:` of BOTH `ci-backend.yml` and
-`ci-web.yml`.** Editing the fixture has to run both suites, which is the whole
-point; it also keeps `repo-hygiene.yml` happy, since a path no `ci-*.yml` watches
-is exactly what that check fails a PR for (TODO-29).
-
-**Checked that it bites:** with `summariseOrderTasks` reverted to "first task
-wins", three cases fail — the multi-task ones, and only those.
-
-*This replaces `shared/order-lifecycle-cases.json`, which the reconciliation merge
-dropped along with the `OrderFulfilmentPolicy` shape it was written for.*
-
-### TODO-42 `[ ]` `/tasks/order/{id}/exists` is not row-scoped
-Found while doing TODO-34, and left alone because it is an authorization decision
-rather than part of that fix.
-
-The endpoint makes **no `TaskAccessPolicy` call**. `SecurityConfig`'s matrix lets
-any authenticated employee read `/api/**`, so a driver-only account can ask about
-**any** order id and learn its task's id, route, schedule and status — the same
-class of leak `TaskScopingTest` exists to prevent for `/api/tasks/employee/{id}`.
-It is a summary of one order rather than a list, so the exposure is small and
-needs an id to aim at.
-
-Needs deciding: is order-task status office-only (`requireOfficeRole`), or should
-a driver see it for orders on their own routes (a new policy method — there is no
-order-shaped guard today)? Whichever is picked, the case belongs in
-`SecurityTests/TaskScopingTest`, never in the controller slice.
-
-### TODO-43 `[ ]` Comenzi asks for one order's task status per order
-Split out of TODO-34, which fixed the correctness half and deliberately did not
-touch this one.
-
-`useOrderTaskStatuses` fans out one `GET /tasks/order/{id}/exists` per order and
-`Promise.all`s them, so opening Comenzi with 200 orders is 200 requests. Mock mode
-hides it (in memory, one shared latency) and so does a small dataset.
-
-TODO-34's other option — `GET /api/tasks/order-status?ids=…` — is the fix, and it
-is now purely a performance change: the roll-up already lives in
-`TaskService.summariseOrderTasks`, so the endpoint is a loop over it plus a
-contract method, a mock and one query key. Needs deciding: a query-param id list
-(cheap, but URL length caps the page size) or a POST body (no cap, a POST that
-reads, and a new `SecurityConfig` row because writes need OFFICE).
-
-### TODO-44 `[DONE]` `doc_claims.py` resolved paths with the OS separator
-Found while verifying TODO-41: the script that checks every documented path
-**failed 25 claims on Windows and none on Linux**, including obviously-present
-files like `src/auth/RequireAuth.tsx`.
-
-`repo_files()` built its index with `str(path.relative_to(ROOT))`, which is
-`web\src\auth\...` on Windows, then compared it against tokens written with
-forward slashes — so every path-shaped claim in the repo failed to resolve. CI is
-Linux and stayed green, which is what let it sit: the script's own docstring says
-it "runs locally exactly as it runs in CI", and on this developer's machine it did
-not. Same shape as TODO-31's Windows-only test failures.
-
-Fixed by indexing with `.as_posix()` — identical to `str()` on Linux, so CI
-behaviour is unchanged — in all four places that built a path string. It now
-reports **0 problems** on Windows, which is what made it usable for checking the
-new claims in TODO-34 and TODO-41.
-
-*Not fixed, because they are display-only and cause no false failures:*
-`repo_hygiene.py`'s `check_action_pins` and `dead_config.py` still build an
-annotation path with `str()`, so a local Windows run prints backslashed paths in
-its messages. Both scripts pass.
+That per-screen special case is the tell: the fix belongs in `errorMessage`, not
+in a fourth copy of it. Needs deciding: surface `ApiError.body` verbatim whenever
+it is non-empty and plain text (simple, but the backend sometimes returns a JSON
+error envelope — `GlobalExceptionHandler.body()` builds `{status, error,
+message}`, so it would have to prefer `.message` and fall back to the raw text),
+or add an explicit allowlist of statuses whose body is known to be user-facing.
+Mobile has the same gap in its `Eșec la …` throw sites and should follow whichever
+is picked.
 
 ---
 

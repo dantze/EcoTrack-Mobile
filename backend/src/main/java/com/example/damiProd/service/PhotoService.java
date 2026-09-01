@@ -15,8 +15,6 @@ import software.amazon.awssdk.services.s3.model.*;
 
 import java.io.IOException;
 import java.net.URI;
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -26,10 +24,14 @@ public class PhotoService {
     private static final Logger log = LoggerFactory.getLogger(PhotoService.class);
 
     /**
-     * What callers are allowed to upload. Lives here rather than on each
-     * controller because both upload endpoints (task photos, client ID photos)
-     * must accept the same set - when this list was duplicated, adding a format
-     * to one endpoint silently left the other rejecting it.
+     * What callers are allowed to upload.
+     *
+     * <p>There is one upload endpoint left - task photos. It used to be two:
+     * the client ID photo upload was removed with the rest of ID storage
+     * (TODO-14), and this set stays here rather than moving onto
+     * {@code TaskController} because the reason it was centralised still holds.
+     * When the list was duplicated across the two endpoints, adding a format to
+     * one silently left the other rejecting it.
      */
     public static final Set<String> ALLOWED_IMAGE_TYPES = Set.of(
             "image/jpeg",
@@ -165,26 +167,12 @@ public class PhotoService {
         }
     }
 
-    /**
-     * Lists all photo URLs in the configured bucket.
-     *
-     * @return A list of public URLs for all objects in the bucket.
-     */
-    public List<String> getPhotos() {
-        List<String> photoUrls = new ArrayList<>();
-
-        ListObjectsV2Request listRequest = ListObjectsV2Request.builder()
-                .bucket(bucketName)
-                .build();
-
-        ListObjectsV2Response response = getS3Client().listObjectsV2(listRequest);
-        for (S3Object obj : response.contents()) {
-            photoUrls.add(String.format("https://%s.%s.digitaloceanspaces.com/%s",
-                    bucketName, region, obj.key()));
-        }
-
-        return photoUrls;
-    }
+    // getPhotos() used to live here, behind GET /api/photos: it enumerated the
+    // WHOLE bucket and returned every object's public URL to any authenticated
+    // employee. While ID photos were stored, that was a one-call listing of
+    // every scanned identity document in the company. Both it and its endpoint
+    // are gone (TODO-14). Nothing needs to enumerate the bucket; the rows that
+    // own an object already know its key.
 
     /**
      * Extracts the object name from a full Spaces URL or returns the input as-is.

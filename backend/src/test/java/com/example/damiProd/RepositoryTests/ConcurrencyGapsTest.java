@@ -2,9 +2,11 @@ package com.example.damiProd.RepositoryTests;
 
 import com.example.damiProd.domain.AmplasareOrder;
 import com.example.damiProd.domain.Company;
+import com.example.damiProd.domain.IgienizareOrder;
 import com.example.damiProd.domain.Order;
 import com.example.damiProd.domain.Product;
 import com.example.damiProd.domain.RidicareOrder;
+import com.example.damiProd.domain.Subscription;
 import com.example.damiProd.domain.Task;
 import com.example.damiProd.domain.TaskStatus;
 import com.example.damiProd.domain.TaskType;
@@ -16,6 +18,7 @@ import com.example.damiProd.repository.SubscriptionRepository;
 import com.example.damiProd.repository.TaskRepository;
 import com.example.damiProd.service.InsufficientQuantityException;
 import com.example.damiProd.service.OrderService;
+import com.example.damiProd.service.SubscriptionService;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Version;
 import org.junit.jupiter.api.BeforeEach;
@@ -49,6 +52,9 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  *           UPDATE).
  *   GAP 2 — {@code OrderService.createOrder} is not {@code @Transactional} and
  *           its Ridicare availability check is a read-then-write race.
+ *   GAP 3 — CLOSED (TODO-39). Subscription retirement was a check-then-act with
+ *           nothing serialising it against order creation. The tests at the
+ *           bottom now guard the fix rather than pinning the gap.
  *
  * Caveat that is itself part of the gap: this runs on H2 while production runs
  * Postgres ({@code ddl-auto=update}, no migration tool), so a *timing* test
@@ -68,6 +74,7 @@ class ConcurrencyGapsTest {
     @Autowired private TestEntityManager em;
 
     private OrderService orderService;
+    private SubscriptionService subscriptionService;
     private Company acme;
     private Product cabin;
 
@@ -80,6 +87,8 @@ class ConcurrencyGapsTest {
         // the real repositories so the test exercises production code paths.
         orderService = new OrderService(orderRepository, clientRepository, productRepository,
                 subscriptionRepository, taskRepository, recurringIgienizareRepository);
+        subscriptionService = new SubscriptionService(subscriptionRepository, orderRepository,
+                recurringIgienizareRepository);
 
         acme = em.persist(new Company("office@acme.ro", "0311", "Bd. 20", "Acme SRL", "RO1", "Maria"));
         cabin = em.persist(new Product(CABIN, "Standard cabin", 500.0));
@@ -284,5 +293,120 @@ class ConcurrencyGapsTest {
                 .as("OrderService.createOrder must stay @Transactional - multi-step "
                         + "creation and inventory adjustment have to roll back as one unit")
                 .isTrue();
+    }
+
+    // =======================================================================
+    // GAP 3 (CLOSED) - subscription retirement vs. order creation (TODO-39)
+    // =======================================================================
+    //
+    // deactivate() read its blockers and then wrote isActive = false. Nothing
+    // made that atomic: POST /api/orders could commit a live IgienizareOrder in
+    // between, and since that transaction touched no row the retirement had
+    // looked at, there was nothing to conflict on - no @Version, no lock, no
+    // constraint. Both sides now take SELECT ... FOR UPDATE on the same
+    // subscription row and re-read under it.
+    //
+    // These run against the real repositories on H2, which is the point: the
+    // locking query has to be valid on the engine dev and test actually use,
+    // not only on the Postgres that prod runs. They do NOT race threads - the
+    // interleavings below are reproduced deterministically, exactly like the
+    // GAP 2 tests above, so nothing here depends on scheduling.
+
+    private Subscription plan(boolean active) {
+        Subscription sub = new Subscription();
+        sub.setName("Igienizare lunară");
+        sub.setIsActive(active);
+        return em.persist(sub);
+    }
+
+    private IgienizareOrder sanitationOrderOn(Subscription plan) {
+        IgienizareOrder order = new IgienizareOrder();
+        order.setOrderType("Igienizari");
+        order.setDate(new Date());
+        order.setClient(acme);
+        order.setSubscription(plan);
+        order.setSanitationDate("2026-09-14");
+        return order;
+    }
+
+    @Test
+    @DisplayName("GAP 3: the FOR UPDATE read of a subscription is valid SQL on H2, not only on Postgres")
+    void subscriptionRowLock_executesOnH2() {
+        Subscription sub = plan(true);
+        em.flush();
+
+        // Dev and test run H2 while prod runs Postgres and there is no migration
+        // tool, so a locking query that only compiles on one engine would be a
+        // fix that never runs anywhere it is tested.
+        assertThat(subscriptionRepository.findByIdForUpdate(sub.getId()))
+                .as("SELECT ... FOR UPDATE on the subscriptions row")
+                .contains(sub);
+    }
+
+    @Test
+    @DisplayName("GAP 3: a plan cannot retire while an order created through OrderService is still live")
+    void retirement_seesAnOrderThatCommittedFirst() {
+        Subscription sub = plan(true);
+        em.flush();
+
+        // Interleaving A: the order wins the lock and commits first.
+        orderService.createOrder(acme.getId(), sanitationOrderOn(sub));
+        em.flush();
+
+        // The retirement then takes the lock, re-reads the blockers and refuses.
+        assertThatThrownBy(() -> subscriptionService.deactivate(sub.getId()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Nu se poate șterge abonamentul")
+                .hasMessageContaining("1 comandă nefinalizată");
+
+        assertThat(subscriptionRepository.findById(sub.getId()).orElseThrow().getIsActive())
+                .as("the plan stays open while live work points at it")
+                .isTrue();
+    }
+
+    @Test
+    @DisplayName("GAP 3: an order cannot be created on a plan that retired first")
+    void orderCreation_seesARetirementThatCommittedFirst() {
+        Subscription sub = plan(true);
+        em.flush();
+
+        // Interleaving B, the one the lock alone would not have fixed: the
+        // retirement wins. Serialising the two only decides who goes second -
+        // the re-read under the lock is what makes the loser refuse instead of
+        // committing a live order onto a plan that no longer accepts any.
+        subscriptionService.deactivate(sub.getId());
+        em.flush();
+
+        assertThatThrownBy(() -> orderService.createOrder(acme.getId(), sanitationOrderOn(sub)))
+                .isInstanceOf(IllegalStateException.class)  // -> 409; the plan exists, it is retired
+                .hasMessageContaining("dezactivat");
+
+        assertThat(orderRepository.findLiveBySubscriptionId(sub.getId()))
+                .as("no live order was left on the retired plan")
+                .isEmpty();
+    }
+
+    @Test
+    @DisplayName("GAP 3: a finished order on a retired plan can still be edited")
+    void updatingAnOrderAlreadyOnARetiredPlanIsNotBlocked() {
+        // The delete is soft precisely so orders already carried out keep
+        // resolving through the surviving row. Re-sending the plan an order is
+        // already on must therefore stay legal - only a MOVE onto a retired plan
+        // is refused.
+        Subscription sub = plan(false);
+        em.flush();
+
+        IgienizareOrder existing = em.persist(sanitationOrderOn(sub));
+        em.flush();
+
+        IgienizareOrder updates = new IgienizareOrder();
+        updates.setOrderType("Igienizari");
+        updates.setSubscription(sub);
+        updates.setSanitationLocationAddress("Str. Nouă 7");
+
+        Order updated = orderService.updateOrder(existing.getId(), updates);
+
+        assertThat(((IgienizareOrder) updated).getSanitationLocationAddress()).isEqualTo("Str. Nouă 7");
+        assertThat(((IgienizareOrder) updated).getSubscription().getId()).isEqualTo(sub.getId());
     }
 }

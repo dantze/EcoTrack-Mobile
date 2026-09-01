@@ -69,7 +69,6 @@ function client(overrides: Partial<Individual> = {}): Individual {
     type: 'individual',
     fullName: `Client ${id}`,
     CNP: null,
-    idPhotoUrl: null,
     ...overrides,
   };
 }

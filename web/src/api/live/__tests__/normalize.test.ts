@@ -21,7 +21,6 @@
 
 import { describe, expect, it } from 'vitest';
 import {
-  extractUrl,
   normalizeClient,
   normalizeEmployee,
   normalizeOrder,
@@ -197,14 +196,12 @@ describe('clients', () => {
       address: 'Str. Persoanei 4',
       fullName: 'Ion Popescu',
       CNP: '1900101123456',
-      idPhotoUrl: 'https://cdn.example/id.jpg',
     });
 
     expect(client).toMatchObject({
       type: 'individual',
       fullName: 'Ion Popescu',
       CNP: '1900101123456',
-      idPhotoUrl: 'https://cdn.example/id.jpg',
     });
   });
 
@@ -601,13 +598,4 @@ describe('photos', () => {
     expect(normalizePhotoUrls('nope')).toEqual([]);
   });
 
-  it('extractUrl() pulls the URL out of PhotosController plain-sentence response', () => {
-    expect(
-      extractUrl('Upload successful! Photo saved to client profile. URL: https://cdn/id.jpg'),
-    ).toBe('https://cdn/id.jpg');
-  });
-
-  it('extractUrl() returns the whole message when there is no URL to find', () => {
-    expect(extractUrl('Ceva nu a mers bine')).toBe('Ceva nu a mers bine');
-  });
 });

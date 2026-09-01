@@ -9,6 +9,7 @@ import com.example.damiProd.repository.OrderRepository;
 import com.example.damiProd.repository.RecurringIgienizareRepository;
 import com.example.damiProd.repository.SubscriptionRepository;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
@@ -85,8 +86,28 @@ public class SubscriptionService {
      * write the operator did not ask for. Refuse, name the blockers, and let
      * them be fulfilled, deleted or re-pointed one at a time.
      */
+    /*
+     * Serialised against order creation with a row lock (TODO-39).
+     *
+     * The read of the blockers and the write of isActive have to be one atomic
+     * decision. They were not: POST /api/orders could commit a live order for
+     * this plan between them, and because that transaction never touches the
+     * subscriptions row there was nothing to conflict on — no @Version, no lock,
+     * no constraint — so the plan retired with live work pointing at it. The
+     * damage is "live order on a retired plan" rather than a dangling FK, since
+     * the delete is soft and the order still resolves.
+     *
+     * findByIdForUpdate takes SELECT … FOR UPDATE on the plan, and the two order
+     * paths take the SAME lock before attaching an order to it, so the two can
+     * no longer interleave: one of them sees the other's committed state and
+     * refuses. @Transactional is what gives the lock a transaction to live in —
+     * without it the lock would be released at the end of the SELECT, which is
+     * before the check has even run.
+     */
+    @Transactional
     public void deactivate(Long id) {
-        Subscription sub = getById(id);
+        Subscription sub = subscriptionRepository.findByIdForUpdate(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Subscription not found with id: " + id));
 
         List<IgienizareOrder> liveOrders = orderRepository.findLiveBySubscriptionId(id);
         List<RecurringIgienizare> activePlans = recurringRepository.findBySubscription_IdAndActiveTrue(id);

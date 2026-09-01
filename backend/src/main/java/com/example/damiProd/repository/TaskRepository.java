@@ -9,7 +9,6 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Optional;
 
 @Repository
 public interface TaskRepository extends JpaRepository<Task, Long> {
@@ -30,8 +29,15 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
 
     List<Task> findByRoute_IdAndStatus(Long routeId, TaskStatus status);
 
-    // Find task by order ID
-    Optional<Task> findByOrder_Id(Long orderId);
+    // Find every task generated from an order (TODO-34).
+    //
+    // An order is NOT limited to one task, and the code that assumed it was
+    // disagreed with the rule in findLiveBySubscriptionId below, which rolls up
+    // ALL of them. The Optional-returning finder this replaces was worse than
+    // ambiguous: Spring Data throws IncorrectResultSizeDataAccessException — a
+    // 500 — the moment a second task exists. Ordered so a caller summarising
+    // the list gets the same answer twice.
+    List<Task> findAllByOrder_IdOrderByIdAsc(Long orderId);
 
     // Check if a task exists for an order
     boolean existsByOrder_Id(Long orderId);

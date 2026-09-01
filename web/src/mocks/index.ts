@@ -938,6 +938,34 @@ function taskRowFromOrder(order: OrderRow, routeId: number): TaskRow {
   };
 }
 
+/**
+ * The one task that answers "is this order's work finished?" (TODO-34).
+ *
+ * An order can carry more than one task, so the endpoint this mock stands in
+ * for reports a ROLL-UP rather than whichever row it happened to find first:
+ * **an order is finished iff ANY of its tasks is COMPLETED**. That is the rule
+ * `isOrderFulfilled` applies to the answer, and the rule the backend's
+ * `OrderRepository.findLiveBySubscriptionId` enforces in JPQL — one rule, and
+ * the mock has to hold it too or dev and production disagree about the archive.
+ *
+ * With nothing completed the order is unfinished either way and the task
+ * returned only describes the work outstanding: the earliest scheduled one,
+ * unscheduled tasks last, ties broken by the caller's ordering (id ascending).
+ *
+ * Mirrors `TaskService.summariseOrderTasks`; `shared/fulfilment-cases.json`
+ * holds both to the same answers.
+ */
+export function summariseOrderTasks(tasks: TaskRow[]): TaskRow | null {
+  const completed = tasks.find((task) => task.status === 'COMPLETED');
+  if (completed) return completed;
+  return tasks.reduce<TaskRow | null>((earliest, task) => {
+    if (!earliest) return task;
+    if (task.scheduledTime === null) return earliest;
+    if (earliest.scheduledTime === null) return task;
+    return task.scheduledTime < earliest.scheduledTime ? task : earliest;
+  }, null);
+}
+
 const tasksApi: EcoTrackApi['tasks'] = {
   list: () => respond(() => db.tasks.map(buildTask)),
 
@@ -1052,7 +1080,8 @@ const tasksApi: EcoTrackApi['tasks'] = {
 
   statusForOrder: (orderId) =>
     respond((): OrderTaskStatus => {
-      const task = db.tasks.find((entry) => entry.orderId === orderId);
+      const tasks = db.tasks.filter((entry) => entry.orderId === orderId).sort((a, b) => a.id - b.id);
+      const task = summariseOrderTasks(tasks);
       if (!task) {
         return { hasTask: false, taskId: null, routeId: null, scheduledTime: null, status: null };
       }

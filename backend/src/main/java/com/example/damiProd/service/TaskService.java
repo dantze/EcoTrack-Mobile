@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
 
@@ -183,17 +184,39 @@ public class TaskService {
     }
 
     /**
-     * Get task by order ID
+     * Every task generated from an order, oldest first.
      */
-    public Optional<Task> getTaskByOrderId(Long orderId) {
-        return taskRepository.findByOrder_Id(orderId);
+    public List<Task> getTasksByOrderId(Long orderId) {
+        return taskRepository.findAllByOrder_IdOrderByIdAsc(orderId);
     }
 
     /**
-     * Check if order has an associated task
+     * The one task that answers "is this order's work finished?" (TODO-34).
+     *
+     * <p>An order can carry more than one task, so "the order's status" has to
+     * be a roll-up rather than whichever row came back first. The rule is the
+     * one {@code OrderRepository.findLiveBySubscriptionId} enforces in JPQL and
+     * {@code isOrderFulfilled} enforces in the web app: <b>an order is finished
+     * iff ANY of its tasks is COMPLETED</b>. So a COMPLETED task wins whenever
+     * one exists, whatever the others say.
+     *
+     * <p>With none completed the answer is unfinished either way, and the task
+     * returned is only there to describe the work still outstanding — the
+     * earliest scheduled one, which is what an operator looks at next. Ties and
+     * unscheduled tasks fall back to the list's order (id ascending), so the
+     * same order always summarises to the same task.
+     *
+     * <p>Changing this rule means changing the JPQL and the web function too;
+     * {@code shared/fulfilment-cases.json} is the fixture that holds all three
+     * to the same answers.
      */
-    public boolean orderHasTask(Long orderId) {
-        return taskRepository.existsByOrder_Id(orderId);
+    public static Optional<Task> summariseOrderTasks(List<Task> tasks) {
+        return tasks.stream()
+                .filter(task -> task.getStatus() == TaskStatus.COMPLETED)
+                .findFirst()
+                .or(() -> tasks.stream()
+                        .min(Comparator.comparing(Task::getScheduledTime,
+                                Comparator.nullsLast(Comparator.naturalOrder()))));
     }
 
     /**

@@ -142,11 +142,11 @@ class OrderServiceTest {
     void deleteOrder_shouldDeleteTaskFirst() {
         Task mockTask = new Task();
         mockTask.setId(50L);
-        when(taskRepository.findByOrder_Id(100L)).thenReturn(Optional.of(mockTask));
+        when(taskRepository.findAllByOrder_IdOrderByIdAsc(100L)).thenReturn(List.of(mockTask));
 
         orderService.deleteOrder(100L);
 
-        verify(taskRepository).delete(mockTask);
+        verify(taskRepository).deleteAll(List.of(mockTask));
         verify(orderRepository).deleteById(100L);
     }
 
@@ -155,11 +155,11 @@ class OrderServiceTest {
     // -----------------------------------------------------------------------
     @Test
     void deleteOrder_noTask_shouldDeleteOrderOnly() {
-        when(taskRepository.findByOrder_Id(100L)).thenReturn(Optional.empty());
+        when(taskRepository.findAllByOrder_IdOrderByIdAsc(100L)).thenReturn(List.of());
 
         orderService.deleteOrder(100L);
 
-        verify(taskRepository, never()).delete(any());
+        verify(taskRepository).deleteAll(List.of());
         verify(orderRepository).deleteById(100L);
     }
 

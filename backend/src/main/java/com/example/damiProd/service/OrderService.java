@@ -12,7 +12,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Optional;
 
 @Service
 public class OrderService {
@@ -96,9 +95,10 @@ public class OrderService {
             recurringIgienizareRepository.deleteById(planId);
         }
 
-        // Delete any task directly linked to this order
-        Optional<Task> task = taskRepository.findByOrder_Id(orderId);
-        task.ifPresent(t -> taskRepository.delete(t));
+        // Delete EVERY task directly linked to this order (TODO-34). Deleting
+        // only the first one left the rest pointing at a row that is about to
+        // go, so the order delete failed on the FK instead.
+        taskRepository.deleteAll(taskRepository.findAllByOrder_IdOrderByIdAsc(orderId));
         orderRepository.deleteById(orderId);
     }
 

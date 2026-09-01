@@ -147,16 +147,22 @@ public class TaskController {
         return ResponseEntity.ok(task);
     }
 
-    // Check if an order has an associated task
+    // Whether an order's work is done, summarised over ALL of its tasks (TODO-34).
+    //
+    // `status` here is what the web app's Curente/Arhivă split reads, and it has
+    // to answer the same question as OrderRepository.findLiveBySubscriptionId,
+    // which refuses to retire a subscription while an order without a COMPLETED
+    // task points at it. That JPQL is a roll-up over every task of the order, so
+    // this must be one too: reporting whichever single row came back first made
+    // the two disagree for any order carrying more than one task — the archive
+    // would still show it as current while the guard had already let the
+    // subscription go. TaskService.summariseOrderTasks holds the one rule.
     @GetMapping("/order/{orderId}/exists")
     public ResponseEntity<Map<String, Object>> checkOrderHasTask(@PathVariable Long orderId) {
-        boolean hasTask = taskService.orderHasTask(orderId);
-        Task task = null;
-        if (hasTask) {
-            task = taskService.getTaskByOrderId(orderId).orElse(null);
-        }
+        List<Task> tasks = taskService.getTasksByOrderId(orderId);
+        Task task = TaskService.summariseOrderTasks(tasks).orElse(null);
         Map<String, Object> response = new HashMap<>();
-        response.put("hasTask", hasTask);
+        response.put("hasTask", !tasks.isEmpty());
         response.put("taskId", task != null ? task.getId() : null);
         response.put("routeId", task != null && task.getRouteId() != null ? task.getRouteId() : null);
         response.put("scheduledTime", task != null ? task.getScheduledTime() : null);

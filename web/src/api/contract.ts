@@ -82,7 +82,15 @@ export interface CreateEmployeeInput {
   roles: Role[];
 }
 
-/** Response of GET /tasks/order/{orderId}/exists — note: not a boolean. */
+/**
+ * Response of GET /tasks/order/{orderId}/exists — note: not a boolean.
+ *
+ * `status` is a ROLL-UP over every task the order carries, not one row's
+ * status (TODO-34): it is COMPLETED if ANY task is, which is what makes
+ * `isOrderFulfilled` agree with the backend guard
+ * `OrderRepository.findLiveBySubscriptionId`. With nothing completed, the
+ * other fields describe the earliest outstanding task.
+ */
 export interface OrderTaskStatus {
   hasTask: boolean;
   taskId: number | null;
@@ -378,7 +386,10 @@ export interface TasksApi {
   create(input: CreateTaskInput): Promise<Task>;
   /** POST /tasks/from-order */
   createFromOrder(orderId: number, routeId?: number | null): Promise<Task>;
-  /** GET /tasks/order/{orderId}/exists */
+  /**
+   * GET /tasks/order/{orderId}/exists — the order's SUMMARISED task status.
+   * See OrderTaskStatus: one call per order, rolled up server-side.
+   */
   statusForOrder(orderId: number): Promise<OrderTaskStatus>;
   /** PATCH /tasks/{id}/status — body { status }. */
   updateStatus(id: number, status: TaskStatus): Promise<Task>;

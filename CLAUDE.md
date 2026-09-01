@@ -232,6 +232,14 @@ subscription while live orders still point at it. Two implementations, one rule
 — **change one and you must change the other**, or the archive and the guard
 will disagree about the same order.
 
+Both are roll-ups over **all** of an order's tasks, because an order is not
+limited to one: `TaskService.summariseOrderTasks` is what
+`GET /api/tasks/order/{id}/exists` reports, and it answers COMPLETED whenever any
+task is (TODO-34). **`shared/fulfilment-cases.json` is what holds the three sides
+to the same answers** — the backend suite and the web suite both read that one
+file, so a case added there fails whichever side does not follow it. Change the
+rule by changing the fixture first.
+
 This strict rule drives the **Curente / Arhivă** split on Comenzi. Nothing
 archives or un-archives by hand: the state is derived, so an order leaves Arhivă
 exactly when its task stops being COMPLETED.

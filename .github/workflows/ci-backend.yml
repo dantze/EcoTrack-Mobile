@@ -8,6 +8,9 @@ on:
   pull_request:
     paths:
       - 'backend/**'
+      # The fulfilment golden fixture: FulfilmentRuleTest reads it, and the web
+      # suite reads the same file, so a change there must run BOTH (TODO-41).
+      - 'shared/**'
       - '.github/workflows/ci-backend.yml'
       - '.github/scripts/junit_summary.py'
       - '.github/scripts/jacoco_summary.py'
@@ -15,6 +18,9 @@ on:
     branches: [main]
     paths:
       - 'backend/**'
+      # The fulfilment golden fixture: FulfilmentRuleTest reads it, and the web
+      # suite reads the same file, so a change there must run BOTH (TODO-41).
+      - 'shared/**'
       - '.github/workflows/ci-backend.yml'
       - '.github/scripts/junit_summary.py'
       - '.github/scripts/jacoco_summary.py'

@@ -10,6 +10,11 @@
  *   - `status` starts at `'loading'` and stays there until the boot restore
  *     (below) resolves one way or the other. Routes gate on this so the app
  *     never flashes the login screen for a user who is actually signed in.
+ *     Boot must therefore reach `'anonymous'` at most ONCE, at its very end:
+ *     `RequireAuth` redirects to /login the moment it sees that status, and a
+ *     redirect cannot be taken back — the URL is rewritten and the user is on
+ *     the enrollment screen for good. `bootingRef` below is what holds the
+ *     intermediate failures back.
  *   - The access token lives in memory only, via `tokenBridge` — never in
  *     `state` here, so a re-render can't accidentally serialise it anywhere.
  *     The refresh token is the only thing persisted (`storage.ts`).
@@ -76,6 +81,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // The refresh token this tab most recently wrote — lets the storage
   // listener tell "another tab changed it" apart from "I just changed it".
   const lastWrittenToken = useRef<string | null>(null);
+  // True until the boot sequence below has settled. See localLogout.
+  const bootingRef = useRef(true);
 
   const clearTimer = useCallback(() => {
     if (refreshTimer.current) {
@@ -102,7 +109,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     clearRefreshToken();
     lastWrittenToken.current = null;
     setUser(null);
-    setStatus('anonymous');
+    // Tokens go regardless; only the ANSWER waits. A failed refresh during
+    // boot is not "you are logged out" yet — in mock mode the very next step
+    // enrolls this device and succeeds. Announcing anonymous there is what
+    // bounced /comenzi to /login half a second before the session arrived.
+    if (!bootingRef.current) setStatus('anonymous');
   }, [clearTimer]);
 
   const applySession = useCallback(
@@ -176,11 +187,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // MOCK MODE ENROLLS ITSELF. There is no password anywhere in this system
   // any more, and local development has no admin sitting there to approve a
   // request — so the mock auto-approves one well-known device id as ADMIN and
-  // `npm run dev` drops straight into the app. This branch is dead in live
+  // `npm run dev` drops straight into the app. This enrolment is dead in live
   // builds, where the same two calls are driven by EnrollmentPage instead.
+  //
+  // Mock has to enrol again after a FAILED restore, not only when no token is
+  // stored: the mock db is rebuilt in memory on every page load, so the
+  // refresh token the previous load persisted is dead on arrival and
+  // `restoreSession` throws it away. Without this fallback the first reload —
+  // including typing /comenzi in the address bar — bounced to /login and
+  // stayed there, because the stored token kept the enrolment branch from
+  // ever running again.
   useEffect(() => {
     void (async () => {
-      if (IS_MOCK && !readRefreshToken()) {
+      try {
+        if (readRefreshToken()) {
+          await restoreSession();
+          // restoreSession clears the stored token on any failure, so a token
+          // still sitting there means the session was restored.
+          if (readRefreshToken() || !IS_MOCK) return;
+        } else if (!IS_MOCK) {
+          return;
+        }
+
         // Drives the REAL enrollment flow rather than a side door: the mock
         // auto-approves this one device id, so dev exercises the same
         // request -> claim path a real device takes.
@@ -190,12 +218,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           deviceLabel: 'Development',
         });
         const claimed = await api.enrollment.claim(ticket.requestId, ticket.claimSecret);
-        if (claimed.state === 'issued') {
-          applySession(claimed.session);
-          return;
-        }
+        if (claimed.state === 'issued') applySession(claimed.session);
+      } catch {
+        /* fall through to anonymous rather than hanging on the spinner */
+      } finally {
+        // The single place boot is allowed to answer. Anything that got a
+        // session (restore, enrollment, or — under StrictMode, which runs this
+        // effect twice — the other pass) has already set the status itself; an
+        // access token is the evidence of that, and the second pass must not
+        // tear down what the first one established.
+        bootingRef.current = false;
+        if (!getAccessToken()) localLogout();
       }
-      await restoreSession();
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

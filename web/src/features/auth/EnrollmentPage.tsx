@@ -12,6 +12,13 @@
  *   waiting  → the six-digit code, a countdown, polling
  *   done     → "Sunteți înregistrat cu rol de X", then into the app
  *
+ * It is a route, not a modal, so it can be reached with a live session
+ * already in hand: the address bar keeps /login after a bounce, and mock mode
+ * enrolls itself on boot whichever URL was loaded. An authenticated visitor is
+ * therefore redirected out rather than shown a form for access they already
+ * have — without that, `npm run dev` opened on /login sat on the enrollment
+ * screen forever while signed in as ADMIN.
+ *
  * The pending ticket is persisted (see auth/storage.ts), so reloading or
  * accidentally closing the tab does not force the user to start over and read
  * out a different code.
@@ -19,7 +26,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { api } from '@/api';
 import type { EnrollmentStatus } from '@/api/contract';
 import { useAuth } from '@/auth';
@@ -55,8 +62,14 @@ function useCountdown(expiresAt: string | null): string | null {
 }
 
 export function EnrollmentPage() {
-  const { adoptSession } = useAuth();
+  const { adoptSession, status } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Where RequireAuth was headed when it bounced the user here, so being let
+  // in lands on the screen they actually asked for.
+  const from = (location.state as { from?: { pathname?: string } } | null)?.from?.pathname;
+  const destination = from && from !== '/login' ? from : '/';
 
   const [phase, setPhase] = useState<Phase>(() => (readPendingTicket() ? 'waiting' : 'form'));
   const [fullName, setFullName] = useState('');
@@ -113,7 +126,7 @@ export function EnrollmentPage() {
         // the user actually reads which role they were given.
         setTimeout(() => {
           adoptSession(result.session);
-          navigate('/', { replace: true });
+          navigate(destination, { replace: true });
         }, 1800);
         return;
       }
@@ -124,7 +137,18 @@ export function EnrollmentPage() {
     } catch {
       // A transient network failure must not kill the wait; the next tick retries.
     }
-  }, [adoptSession, navigate, startOver, stopPolling]);
+  }, [adoptSession, destination, navigate, startOver, stopPolling]);
+
+  // A ticket that outlived its usefulness: the session came from somewhere else
+  // (another tab, the boot restore, mock enrolling itself), so the request this
+  // device is still holding will never be claimed. Dropping it here is what
+  // keeps a later logout from landing back on a dead waiting screen showing a
+  // code no admin will ever be asked about.
+  useEffect(() => {
+    if (status !== 'authenticated') return;
+    stopPolling();
+    clearPendingTicket();
+  }, [status, stopPolling]);
 
   useEffect(() => {
     if (phase !== 'waiting') return;
@@ -161,6 +185,25 @@ export function EnrollmentPage() {
     } finally {
       setSubmitting(false);
     }
+  }
+
+  // Both guards sit below every hook on purpose — an early return above them
+  // would change the hook order between renders.
+  //
+  // 'loading' is still undecided (the boot restore, or mock enrolling itself),
+  // and rendering the form during it would flash "cere acces" at someone who is
+  // about to be signed in. Same spinner as RequireAuth, same reason.
+  if (status === 'loading') {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-surface-sunken">
+        <Spinner className="size-6 text-brand-600" />
+      </div>
+    );
+  }
+  // 'done' is exempt: that branch has just been issued a session and is showing
+  // the role for a beat before navigating itself.
+  if (status === 'authenticated' && phase !== 'done') {
+    return <Navigate to={destination} replace />;
   }
 
   return (

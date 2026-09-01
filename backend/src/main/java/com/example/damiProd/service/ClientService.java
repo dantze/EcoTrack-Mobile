@@ -15,7 +15,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Optional;
 
 @Service
 public class ClientService {
@@ -88,8 +87,10 @@ public class ClientService {
     public void deleteClientCascade(Long id) {
         List<Order> orders = orderRepository.findByClientId(id);
         for (Order order : orders) {
-            Optional<Task> taskOpt = taskRepository.findByOrder_Id(order.getId());
-            taskOpt.ifPresent(task -> {
+            // EVERY task of the order, not just the first (TODO-34): the orders
+            // are deleted below, so a task left behind fails the delete on its
+            // FK — and its photos would be orphaned in Spaces either way.
+            for (Task task : taskRepository.findAllByOrder_IdOrderByIdAsc(order.getId())) {
                 // Delete task photos from Digital Ocean Spaces before removing task
                 List<TaskPhoto> photos = taskPhotoRepository.findByTaskId(task.getId());
                 for (TaskPhoto photo : photos) {
@@ -97,7 +98,7 @@ public class ClientService {
                 }
                 taskPhotoRepository.deleteAll(photos);
                 taskRepository.delete(task);
-            });
+            }
         }
         taskRepository.flush();
         for (Order order : orders) {

@@ -1030,7 +1030,7 @@ truth). One implementation is simpler, and the web one is more complete.
 - Do the responsive work **before** deleting the mobile screens, so office staff
   are never left without a usable phone surface.
 
-### TODO-34 `[ ]` `/tasks/order/{id}/exists` returns one task, but the guard rolls up all of them
+### TODO-34 `[DONE]` `/tasks/order/{id}/exists` returns one task, but the guard rolls up all of them
 `GET /api/tasks/order/{orderId}/exists` returns
 `taskService.getTaskByOrderId(orderId).orElse(null)` — a **single** task. The
 web's `isOrderFulfilled` reads exactly that one status to decide Curente vs
@@ -1051,6 +1051,44 @@ current one-request-per-order fan-out on Comenzi.
 
 *This is the concrete drift TODO-20 and TODO-21 warned about when they said the
 two definitions must stay identical.*
+
+**Done, by summarising server-side — not by adding the batch endpoint.** The two
+options in this item are not equivalent: the roll-up is the correctness half and
+the batch endpoint is the performance half, so only the first is done here. The
+fan-out is now TODO-43.
+
+`TaskService.summariseOrderTasks(List<Task>)` is the one rule, and
+`TaskController`'s `/exists` calls it: **a COMPLETED task wins whenever one
+exists**, whatever the others say — the same question `findLiveBySubscriptionId`'s
+`NOT EXISTS` answers. With none completed the order is unfinished either way, and
+the task reported is the earliest scheduled one (unscheduled last, ties by id) so
+the same order always summarises to the same task. The response shape did not
+change, so `normalize.ts` and every caller are untouched; `contract.ts` now
+documents `status` as a roll-up, and the mock summarises identically in
+`web/src/mocks/index.ts`.
+
+**The single-task assumption was in three places, not one**, all of them through
+`TaskRepository.findByOrder_Id`, which returned an `Optional`:
+
+- the endpoint — the drift this item is about;
+- `OrderService.deleteOrder` and `ClientService.deleteClientCascade`, which
+  deleted **one** task and then deleted the order, so the remaining tasks would
+  have failed that delete on their FK — and their photos would have been orphaned
+  in Spaces.
+
+The `Optional` was worse than ambiguous: Spring Data throws
+`IncorrectResultSizeDataAccessException` — a 500 — as soon as a second task
+exists. The finder is now `findAllByOrder_IdOrderByIdAsc` and the Optional one is
+gone, so the assumption cannot be re-made silently.
+
+**None of it was reachable today**, and that is the point: `createTaskFromOrder`
+is the only code that sets `Task.order` and it refuses a second task per order
+(*"Această comandă are deja un task asociat"*) — which is exactly the "nothing
+enforces that" this item flagged. The rule now holds without depending on it.
+
+**Verified:** `./gradlew test` — **253 tests, 0 failures** (was 241; +12 = ten
+golden cases from TODO-41 and two `TaskControllerTest` cases for an order with
+several tasks). Web: lint 0 errors, typecheck clean, build clean.
 
 ### TODO-35 `[ ]` Role changes on the web never reach the phone
 The mobile app stores `user.roles` at claim time and never refetches. An admin
@@ -1151,7 +1189,7 @@ one failure does not hide the others.
   is ever added, since prefix binding would make key-by-key grepping report
   false deaths.
 
-### TODO-41 `[ ]` Re-establish a golden-fixture guard for the fulfilment rule
+### TODO-41 `[DONE]` Re-establish a golden-fixture guard for the fulfilment rule
 `isOrderFulfilled` (`web/src/features/sales/orderModel.ts`) and
 `OrderRepository.findLiveBySubscriptionId` are one rule written twice, in two
 languages, with no reference between them. TODO-40's `doc_claims.py` pins that
@@ -1167,6 +1205,92 @@ of the risk that pinning the names is sufficient.
 
 Cheap and worth doing either way: the web half of the rule is a pure function,
 so a table of `(taskStatus → fulfilled)` cases costs nothing to assert.
+
+**Done — and the open question is decided: the database-backed test IS worth it.**
+Not because TODO-34 left much risk, but because of what writing it exposed:
+`findLiveBySubscriptionId` had **never once been executed**. Its only coverage was
+`SubscriptionServiceTest`, which stubs the repository — so the JPQL string
+itself, the half no compiler checks, was verified by nothing at all. A
+`@DataJpaTest` is the only way to reach it.
+
+`shared/fulfilment-cases.json` holds ten cases of *(task statuses on an order) →
+(summarised status, fulfilled)*. Both suites read that one file:
+
+- `RepositoryTests/FulfilmentRuleTest.java` — a `@DataJpaTest` `@TestFactory`, one
+  dynamic test per case. Each builds a plan, an order and its tasks, then asserts
+  the roll-up, the JPQL, **and that the two agree with each other**.
+- `web/src/features/sales/__tests__/fulfilment.test.ts` — the same cases through
+  the mock's summariser and `isOrderFulfilled`.
+
+Every task in a case is unscheduled on purpose, so no expected answer can come
+from a date. `backendOnly: true` marks the two CANCELLED cases: that status exists
+only in the backend enum (as `cross_project_invariants.py` declares), so the web
+suite skips them and the backend runs all ten. Both suites assert the file is
+non-empty first — a fixture that fails to load must fail, not pass vacuously.
+
+**`shared/**` was added to the `paths:` of BOTH `ci-backend.yml` and
+`ci-web.yml`.** Editing the fixture has to run both suites, which is the whole
+point; it also keeps `repo-hygiene.yml` happy, since a path no `ci-*.yml` watches
+is exactly what that check fails a PR for (TODO-29).
+
+**Checked that it bites:** with `summariseOrderTasks` reverted to "first task
+wins", three cases fail — the multi-task ones, and only those.
+
+*This replaces `shared/order-lifecycle-cases.json`, which the reconciliation merge
+dropped along with the `OrderFulfilmentPolicy` shape it was written for.*
+
+### TODO-42 `[ ]` `/tasks/order/{id}/exists` is not row-scoped
+Found while doing TODO-34, and left alone because it is an authorization decision
+rather than part of that fix.
+
+The endpoint makes **no `TaskAccessPolicy` call**. `SecurityConfig`'s matrix lets
+any authenticated employee read `/api/**`, so a driver-only account can ask about
+**any** order id and learn its task's id, route, schedule and status — the same
+class of leak `TaskScopingTest` exists to prevent for `/api/tasks/employee/{id}`.
+It is a summary of one order rather than a list, so the exposure is small and
+needs an id to aim at.
+
+Needs deciding: is order-task status office-only (`requireOfficeRole`), or should
+a driver see it for orders on their own routes (a new policy method — there is no
+order-shaped guard today)? Whichever is picked, the case belongs in
+`SecurityTests/TaskScopingTest`, never in the controller slice.
+
+### TODO-43 `[ ]` Comenzi asks for one order's task status per order
+Split out of TODO-34, which fixed the correctness half and deliberately did not
+touch this one.
+
+`useOrderTaskStatuses` fans out one `GET /tasks/order/{id}/exists` per order and
+`Promise.all`s them, so opening Comenzi with 200 orders is 200 requests. Mock mode
+hides it (in memory, one shared latency) and so does a small dataset.
+
+TODO-34's other option — `GET /api/tasks/order-status?ids=…` — is the fix, and it
+is now purely a performance change: the roll-up already lives in
+`TaskService.summariseOrderTasks`, so the endpoint is a loop over it plus a
+contract method, a mock and one query key. Needs deciding: a query-param id list
+(cheap, but URL length caps the page size) or a POST body (no cap, a POST that
+reads, and a new `SecurityConfig` row because writes need OFFICE).
+
+### TODO-44 `[DONE]` `doc_claims.py` resolved paths with the OS separator
+Found while verifying TODO-41: the script that checks every documented path
+**failed 25 claims on Windows and none on Linux**, including obviously-present
+files like `src/auth/RequireAuth.tsx`.
+
+`repo_files()` built its index with `str(path.relative_to(ROOT))`, which is
+`web\src\auth\...` on Windows, then compared it against tokens written with
+forward slashes — so every path-shaped claim in the repo failed to resolve. CI is
+Linux and stayed green, which is what let it sit: the script's own docstring says
+it "runs locally exactly as it runs in CI", and on this developer's machine it did
+not. Same shape as TODO-31's Windows-only test failures.
+
+Fixed by indexing with `.as_posix()` — identical to `str()` on Linux, so CI
+behaviour is unchanged — in all four places that built a path string. It now
+reports **0 problems** on Windows, which is what made it usable for checking the
+new claims in TODO-34 and TODO-41.
+
+*Not fixed, because they are display-only and cause no false failures:*
+`repo_hygiene.py`'s `check_action_pins` and `dead_config.py` still build an
+annotation path with `str()`, so a local Windows run prints backslashed paths in
+its messages. Both scripts pass.
 
 ---
 

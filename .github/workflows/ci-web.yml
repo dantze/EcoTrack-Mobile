@@ -5,12 +5,18 @@ on:
   pull_request:
     paths:
       - 'web/**'
+      # The fulfilment golden fixture: fulfilment.test.ts reads it, and the
+      # backend suite reads the same file, so a change there must run BOTH.
+      - 'shared/**'
       - '.github/workflows/ci-web.yml'
       - '.github/scripts/bundle_budget.py'
   push:
     branches: [main]
     paths:
       - 'web/**'
+      # The fulfilment golden fixture: fulfilment.test.ts reads it, and the
+      # backend suite reads the same file, so a change there must run BOTH.
+      - 'shared/**'
       - '.github/workflows/ci-web.yml'
       - '.github/scripts/bundle_budget.py'
   # deploy.yml calls this workflow as its gate.

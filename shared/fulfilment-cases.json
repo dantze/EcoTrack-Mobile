@@ -1,0 +1,78 @@
+{
+  "_rule": "An order's work is finished IFF at least one of its tasks is COMPLETED. Nothing else finishes it: not a date, not a cancellation, not the absence of tasks.",
+  "_why": "TODO-41. This rule is written three times, in two languages, with no shared code: OrderRepository.findLiveBySubscriptionId (JPQL) refuses to retire a subscription while an unfinished order points at it; TaskService.summariseOrderTasks rolls an order's tasks up for GET /api/tasks/order/{id}/exists; isOrderFulfilled (web) splits Comenzi into Curente and Arhivă. TODO-40's doc_claims.py pins that they keep NAMING each other. This file is what pins that they still AGREE.",
+  "_readBy": [
+    "backend/src/test/java/com/example/damiProd/RepositoryTests/FulfilmentRuleTest.java",
+    "web/src/features/sales/__tests__/fulfilment.test.ts"
+  ],
+  "_fields": {
+    "taskStatuses": "The order's tasks, in the order the API returns them (id ascending). All unscheduled, so the summary cannot be decided by a date.",
+    "summarisedStatus": "What GET /tasks/order/{id}/exists must report for that order: COMPLETED if any task is, else the first task's status, else null for an order with no tasks.",
+    "fulfilled": "Whether the order is finished — i.e. it belongs in Arhivă, and no longer blocks retiring its subscription.",
+    "backendOnly": "Set when the case uses a status the web app has no name for. The web TaskStatus union is NEW/IN_PROGRESS/COMPLETED; CANCELLED is backend-only, as cross_project_invariants.py declares. The web suite skips these; the backend suite runs everything."
+  },
+  "cases": [
+    {
+      "name": "no task at all — never carried out, so never finished",
+      "taskStatuses": [],
+      "summarisedStatus": null,
+      "fulfilled": false
+    },
+    {
+      "name": "a single NEW task",
+      "taskStatuses": ["NEW"],
+      "summarisedStatus": "NEW",
+      "fulfilled": false
+    },
+    {
+      "name": "a single IN_PROGRESS task",
+      "taskStatuses": ["IN_PROGRESS"],
+      "summarisedStatus": "IN_PROGRESS",
+      "fulfilled": false
+    },
+    {
+      "name": "a single COMPLETED task",
+      "taskStatuses": ["COMPLETED"],
+      "summarisedStatus": "COMPLETED",
+      "fulfilled": true
+    },
+    {
+      "name": "two tasks, the LAST completed — the disagreement TODO-34 fixed",
+      "taskStatuses": ["NEW", "COMPLETED"],
+      "summarisedStatus": "COMPLETED",
+      "fulfilled": true
+    },
+    {
+      "name": "two tasks, the FIRST completed — position must not decide either",
+      "taskStatuses": ["COMPLETED", "NEW"],
+      "summarisedStatus": "COMPLETED",
+      "fulfilled": true
+    },
+    {
+      "name": "several tasks, none completed",
+      "taskStatuses": ["NEW", "IN_PROGRESS", "NEW"],
+      "summarisedStatus": "NEW",
+      "fulfilled": false
+    },
+    {
+      "name": "work started but not finished, then a second attempt completed it",
+      "taskStatuses": ["IN_PROGRESS", "COMPLETED"],
+      "summarisedStatus": "COMPLETED",
+      "fulfilled": true
+    },
+    {
+      "name": "a cancelled task finishes nothing",
+      "taskStatuses": ["CANCELLED"],
+      "summarisedStatus": "CANCELLED",
+      "fulfilled": false,
+      "backendOnly": true
+    },
+    {
+      "name": "cancelled and re-done — the completion still decides",
+      "taskStatuses": ["CANCELLED", "COMPLETED"],
+      "summarisedStatus": "COMPLETED",
+      "fulfilled": true,
+      "backendOnly": true
+    }
+  ]
+}

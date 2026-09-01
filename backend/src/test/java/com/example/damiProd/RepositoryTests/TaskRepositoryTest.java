@@ -120,7 +120,7 @@ class TaskRepositoryTest {
 
         // and every per-parent finder claims it
         assertThat(taskRepository.findByRoute_Id(routeA.getId())).extracting(Task::getId).contains(all.getId());
-        assertThat(taskRepository.findByOrder_Id(order.getId())).isPresent();
+        assertThat(taskRepository.findAllByOrder_IdOrderByIdAsc(order.getId())).hasSize(1);
         assertThat(taskRepository.findByRecurringPlan_Id(plan.getId())).hasSize(1);
     }
 
@@ -245,12 +245,11 @@ class TaskRepositoryTest {
         em.clear();
 
         assertThat(taskRepository.existsByOrder_Id(order.getId())).isTrue();
-        assertThat(taskRepository.findByOrder_Id(order.getId()))
-                .get()
+        assertThat(taskRepository.findAllByOrder_IdOrderByIdAsc(order.getId()))
                 .extracting(Task::getId)
-                .isEqualTo(linked.getId());
+                .containsExactly(linked.getId());
         assertThat(taskRepository.existsByOrder_Id(999_999L)).isFalse();
-        assertThat(taskRepository.findByOrder_Id(999_999L)).isEmpty();
+        assertThat(taskRepository.findAllByOrder_IdOrderByIdAsc(999_999L)).isEmpty();
     }
 
     // -----------------------------------------------------------------------

@@ -141,8 +141,7 @@ class TaskControllerTest {
     @Test
     void checkOrderHasTask_shouldReturnTrue() throws Exception {
         Task task = buildSampleTask();
-        when(taskService.orderHasTask(10L)).thenReturn(true);
-        when(taskService.getTaskByOrderId(10L)).thenReturn(Optional.of(task));
+        when(taskService.getTasksByOrderId(10L)).thenReturn(List.of(task));
 
         mockMvc.perform(get("/api/tasks/order/10/exists"))
                 .andExpect(status().isOk())
@@ -152,11 +151,59 @@ class TaskControllerTest {
     }
 
     // -----------------------------------------------------------------------
+    // TEST 6b — the same endpoint, for an order carrying MORE THAN ONE task
+    // -----------------------------------------------------------------------
+    // The drift TODO-34 was about. This response is what the web app's
+    // Curente/Arhivă split reads, and it has to agree with
+    // OrderRepository.findLiveBySubscriptionId, whose JPQL rolls up EVERY task
+    // of the order. Reporting whichever row came back first said "NEW" for an
+    // order the backend guard already considered finished.
+    //
+    // summariseOrderTasks is static, so the mocked TaskService does not stand in
+    // for it: the rule itself runs here.
+    @Test
+    void checkOrderHasTask_withSeveralTasks_shouldReportTheCompletedOne() throws Exception {
+        Task pending = buildSampleTask();
+        Task done = buildSampleTask();
+        done.setId(2L);
+        done.setStatus(TaskStatus.COMPLETED);
+        // Deliberately not first in the list, and scheduled later than the
+        // pending one — neither position nor date may decide the answer.
+        done.setScheduledTime(LocalDateTime.of(2025, 7, 9, 8, 0));
+        when(taskService.getTasksByOrderId(10L)).thenReturn(List.of(pending, done));
+
+        mockMvc.perform(get("/api/tasks/order/10/exists"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.hasTask").value(true))
+                .andExpect(jsonPath("$.taskId").value(2))
+                .andExpect(jsonPath("$.status").value("COMPLETED"));
+    }
+
+    // -----------------------------------------------------------------------
+    // TEST 6c — several tasks, none completed → the earliest describes the work
+    // -----------------------------------------------------------------------
+    @Test
+    void checkOrderHasTask_withNoCompletedTask_shouldReportTheEarliest() throws Exception {
+        Task later = buildSampleTask();
+        later.setScheduledTime(LocalDateTime.of(2025, 7, 9, 8, 0));
+        Task earlier = buildSampleTask();
+        earlier.setId(2L);
+        earlier.setStatus(TaskStatus.IN_PROGRESS);
+        earlier.setScheduledTime(LocalDateTime.of(2025, 7, 1, 8, 0));
+        when(taskService.getTasksByOrderId(10L)).thenReturn(List.of(later, earlier));
+
+        mockMvc.perform(get("/api/tasks/order/10/exists"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.taskId").value(2))
+                .andExpect(jsonPath("$.status").value("IN_PROGRESS"));
+    }
+
+    // -----------------------------------------------------------------------
     // TEST 7 — GET /api/tasks/order/{orderId}/exists → no task
     // -----------------------------------------------------------------------
     @Test
     void checkOrderHasTask_shouldReturnFalse() throws Exception {
-        when(taskService.orderHasTask(99L)).thenReturn(false);
+        when(taskService.getTasksByOrderId(99L)).thenReturn(List.of());
 
         mockMvc.perform(get("/api/tasks/order/99/exists"))
                 .andExpect(status().isOk())

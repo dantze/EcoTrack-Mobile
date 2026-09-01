@@ -45,12 +45,17 @@ def repo_files() -> set[str]:
         if any(part in SKIP_DIRS for part in path.parts):
             continue
         if path.is_file():
-            found.add(str(path.relative_to(ROOT)))
+            # as_posix(), not str(): on Windows str() yields backslashes and
+            # every "/"-shaped claim in the repo fails to resolve, which turns
+            # the documented local run into ~25 false failures while CI stays
+            # green. The paths this script compares against are written with
+            # forward slashes by definition.
+            found.add(path.relative_to(ROOT).as_posix())
     return found
 
 
 ALL_FILES = repo_files()
-ALL_DIRS = {str(Path(f).parent) for f in ALL_FILES}
+ALL_DIRS = {Path(f).parent.as_posix() for f in ALL_FILES}
 
 
 ALIASES = {
@@ -105,7 +110,7 @@ def resolves(token: str, from_file: str | None = None) -> bool:
             resolved = (ROOT / base / token).resolve().relative_to(ROOT)
         except (ValueError, OSError):
             return False
-        return str(resolved) in ALL_FILES
+        return resolved.as_posix() in ALL_FILES
 
     return _suffix_match(token)
 
@@ -122,7 +127,7 @@ BACKTICKED = re.compile(r"`([^`\n]+)`")
 PATHLIKE = re.compile(r"^[@\w./*-]+$")
 
 doc_files = ["CLAUDE.md"] + sorted(
-    str(p.relative_to(ROOT)) for p in (ROOT / ".claude" / "skills").rglob("*.md")
+    p.relative_to(ROOT).as_posix() for p in (ROOT / ".claude" / "skills").rglob("*.md")
 )
 
 for rel in doc_files:

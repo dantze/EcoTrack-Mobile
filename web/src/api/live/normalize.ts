@@ -113,7 +113,6 @@ export interface RawClient {
   address?: string | null;
   fullName?: string | null;
   CNP?: string | null;
-  idPhotoUrl?: string | null;
   name?: string | null;
   CUI?: string | null;
   adminName?: string | null;
@@ -288,7 +287,6 @@ export function normalizeClient(raw: RawClient): Client {
     type: 'individual',
     fullName: raw.fullName ?? '',
     CNP: optStr(raw.CNP),
-    idPhotoUrl: optStr(raw.idPhotoUrl),
   };
 }
 
@@ -498,12 +496,6 @@ export function normalizePhotoUrls(urls: unknown): TaskPhoto[] {
     .filter((photo): photo is TaskPhoto => photo !== null);
 }
 
-/**
- * PhotosController returns a human-readable sentence, not JSON:
- *   "Upload successful! Photo saved to client profile. URL: https://…"
- * Pull the URL back out; fall back to the whole message if there is none.
- */
-export function extractUrl(message: string): string {
-  const match = /https?:\/\/\S+/.exec(message);
-  return match ? match[0] : message;
-}
+// extractUrl() lived here: PhotosController answered an ID-photo upload with a
+// plain sentence carrying the URL, and this dug it back out. Both that endpoint
+// and the field it filled are gone (TODO-14).

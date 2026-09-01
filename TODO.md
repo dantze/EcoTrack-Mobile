@@ -530,11 +530,101 @@ depends on the order/task relationship being clear.
 
 ## E. ID scanning & photo privacy
 
-### TODO-13 `[ ]` Scan an ID to autofill nume complet + CNP
+### TODO-13 `[DONE]` Scan an ID to autofill nume complet + CNP
 Upload a photo of an identity document and extract **full name** and **CNP**
 automatically, filling the form.
 
-### TODO-14 `[ ]` ID photos must not be readable by the developer
+**Done, in web and mobile, with no paid API and no network call at all.**
+
+**The decision that made this cheap: read the MRZ, not the card.** Autofilling
+these two fields looks like an OCR problem, and as an OCR problem it is a bad
+one — the printed fields are proportional type over a guilloche background, in a
+layout that changed with the 2021 electronic card, with diacritics. The MRZ is
+the same data in the one place designed to be read by a machine: three fixed
+30-character lines of OCR-B over a 37-symbol alphabet (`A-Z0-9<`), in the same
+position on every ICAO 9303 TD1 document ever issued. Romania puts the **CNP** in
+line 1's optional-data field and the **name** is line 3. Both fields we want,
+from the easiest tenth of the image.
+
+**Why a free, imperfect engine is good enough — and this is the whole argument.**
+Not because the engine is accurate. Because the MRZ checks itself, three
+independent ways:
+
+| Check | Catches |
+|---|---|
+| four ICAO check digits (document number, birth date, expiry, composite) | any misread character in those fields |
+| the CNP's own control digit (weights `279146358279`, mod 11, 10→1) | a misread CNP digit |
+| the CNP's embedded birth date and sex vs. MRZ line 2, stated independently | a misread that happens to pass both of the above |
+
+So the rule, stated once in `shared/id-mrz-cases.json` and implemented twice:
+**autofill ONLY on a fully self-consistent read; otherwise refuse.** A card whose
+document number smudged is rejected even though the document number is never
+used — a failed check digit means *something* was misread and the parser cannot
+say what. Refusing costs the operator two fields of typing, which is what they do
+today. A false accept writes a wrong CNP into a client record nobody re-reads, on
+a person, under GDPR. The costs are not comparable, so it fails safe.
+
+**Engines, both free and both on-device:**
+
+- **web** — `tesseract.js` (Apache-2.0, WASM). Self-hosted: `scripts/fetch-ocr-assets.mjs`
+  copies the LSTM cores and worker out of `node_modules` and downloads the
+  `tessdata_fast` English model from a **tagged** ref, verified against a
+  SHA-256 recorded in the script. The output is gitignored — a 2 MB binary blob
+  committed to a repo is permanent in a way a build step is not (TODO-24 is what
+  that lesson cost here).
+- **mobile** — `@react-native-ml-kit/text-recognition`, i.e. ML Kit on Android
+  and Vision on iOS. On-device, no key, no request, already in the OS.
+
+**Both defaults had to be overridden to keep it private.** tesseract.js defaults
+`workerPath`, `corePath` and `langPath` to **jsDelivr** — leaving any of them
+unset would put a third party in the request path of an identity-document scan,
+arriving through a default nobody wrote down. `ocrIsLazy.test.ts` asserts all
+three are set and that the file names no `http` host at all.
+
+**What was built:**
+
+| | web | mobile |
+|---|---|---|
+| parser | `features/sales/idScan/mrz.ts` | `utils/mrz.ts` |
+| engine | `features/sales/idScan/ocr.ts` | `services/IdScanService.ts` |
+| UI | `features/sales/idScan/IdScanField.tsx` | `app/Sales/CreateClient.tsx` |
+
+The two parsers are **byte-identical below their doc comments** and pinned
+against each other by `shared/id-mrz-cases.json`, which both suites read — the
+same arrangement as the fulfilment rule (TODO-41), and for the same reason: a
+rule written twice with no shared code drifts silently otherwise.
+
+**Refusals get four different messages, not one.** `format` and `check-digit`
+mean retake the photo; `cnp-invalid` and `cnp-mismatch` mean the card *was* read
+and disagrees with itself, so another photo of the same card fails identically —
+those say "type it instead". A single "scanarea a eșuat" would leave the operator
+re-photographing a card that will never read.
+
+**Two things it does not do, on purpose.** It fills, it does not commit — the
+fields stay editable and scanning saves nothing. And it cannot restore
+diacritics: MRZ text is transliterated, so `Ștefănescu` arrives as `Stefanescu`
+and both panels say so next to the result rather than in a tooltip nobody opens.
+
+**Deliberately not built:** live camera-stream scanning (a still photo is enough
+and avoids a preview surface that holds the image), reading the card's printed
+fields for diacritics, and NFC/eID chip reading.
+
+**Tests: 72 new, plus 5 backend.** Web 437 (was 393 — 29 parser, 7 panel,
+8 laziness/origin), mobile 111 (was 83 — 20 parser, 8 service). 15 golden cases cover both outcomes,
+including the OCR-B confusion set being repaired by position, a card that
+contradicts itself, and a truncated line that is **not** padded back to 30 —
+padding line 2 would invent the composite check digit that exists to catch
+exactly that.
+
+**One thing this change did to CI, worth knowing.** Without an explicit
+`manualChunks` entry, Rollup names tesseract.js's chunk after its entry module
+and emits `index-<hash>.js` — which is the very pattern
+`.github/scripts/bundle_budget.py` uses to find the **eager** entry chunk. The
+budget silently counted a lazy 6.7 kB chunk against the initial download.
+Naming the chunk `tesseract` moves it out of that pattern. A 444-byte interop
+shim still lands on it; see TODO-47.
+
+### TODO-14 `[DONE]` ID photos must not be readable by the developer
 The stored ID photo must not be viewable by the developer/operator (i.e. by
 whoever holds the DigitalOcean Spaces credentials).
 *Open problem:* plain Spaces access means the bucket owner can read every
@@ -542,6 +632,98 @@ object. Needs a real design — likely client-side or app-layer encryption where
 the key is not held alongside the data, plus a retention/deletion policy.
 Treat this as a **prerequisite** for TODO-13 going anywhere near production:
 CNP + ID photo is sensitive personal data (GDPR).
+
+**Done, by removing the thing rather than protecting it: EcoTrack no longer
+stores photographs of identity documents at all.**
+
+**The item understated the exposure.** It asks about the person holding the
+Spaces credentials. In fact `PhotoService.uploadPhoto` set
+`ObjectCannedACL.PUBLIC_READ` on every upload, so each ID photo was on a
+**working unauthenticated URL** — no credentials needed by anyone. The key was
+`persoane fizice/{clientId}_{FullName}.jpg`, which is guessable and leaks the
+client's name in the path. That URL was serialised as `idPhotoUrl` on every
+client the app lists. And `GET /api/photos` enumerated the **entire bucket** for
+any authenticated employee: while ID photos were stored, that was one call for a
+list of every scanned identity card in the company.
+
+**The design chosen, of three considered:**
+
+| Option | Verdict |
+|---|---|
+| don't store the photo at all | **chosen** |
+| store it encrypted client-side | rejected — see below |
+| private ACL + presigned URLs, photo kept | rejected: closes the public leak, leaves the item's actual question unanswered |
+
+Encryption was rejected on an honest reading of what it buys: AES-GCM in the
+browser defends against bucket access, backups and DO staff, but **not** against
+whoever deploys the app code, who can ship a build that leaks the key. It also
+needs a key-custody answer nobody has ("who reads a photo a year from now?").
+Once TODO-13 exists, the photo has no job left — it was only ever an input to
+the two fields — so the strongest control is also the cheapest one, and it is
+what GDPR data minimisation asks for anyway.
+
+**Removed:** `PhotosController` entirely (`POST`/`DELETE /{clientId}/idPhoto` and
+`GET /api/photos`); `PhotoService.getPhotos()`; `uploadIdPhoto`/`deleteIdPhoto`
+on both clients plus `getAllPhotos` in mobile; `extractUrl` in
+`web/src/api/live/normalize.ts`; `idPhotoUrl` from the web domain type, the
+contract, the mock and the seed; the upload UI in the web drawer and mobile
+`CreateClient`; the stored-photo viewer in mobile `EditClient`.
+
+**Kept, for one release only: the `individual.id_photo_url` column.** Dropping it
+in the same change that stops writing it would strand every already-uploaded
+object permanently — personal data in a bucket with nothing left that knows it is
+there. The order is forced: **purge first, drop the column second** (TODO-45).
+The field is `@JsonIgnore`d so the URL never crosses the wire again, and
+`ClientJsonSubTypesTest` asserts that, because removing the annotation would leak
+silently rather than fail.
+
+**New endpoint, temporary: `DELETE /api/admin/id-photos`** (with `GET` as its
+preflight count). Deletes every stored object and clears the column — **only for
+rows whose object actually went**, so a failed delete stays in the list and a
+re-run retries it. Clearing regardless would report success while leaving the
+object behind and destroying the last reference to it, which is the precise
+outcome this exists to avoid. Not `@Transactional`: one transaction round the
+loop would roll back every cleared column if the last row threw, while its
+objects are already gone. No new `SecurityConfig` row (it inherits ADMIN from
+`/api/admin/**`) and no `TaskAccessPolicy` call (neither task-shaped nor
+employee-scoped) — `AuthorizationMatrixTest` pins it anyway, because its
+protection is entirely inherited.
+
+**This is an operator step, not a deploy step.** Deleting production data as a
+side effect of somebody merging is not a thing that should happen. See
+DEPLOYMENT.md, "Draining the legacy ID photos".
+
+**Still public: task photos.** `uploadPhoto` is shared, and its `PUBLIC_READ` ACL
+now affects only `task_photos/`. Filed as TODO-46 rather than fixed here —
+making them private means presigned URLs in three screens, which is its own
+change and not what this item asked for.
+
+### Verification of TODO-13 + TODO-14 — uneven, and the backend half is the weak one
+
+- **Web — fully verified.** Lint 0 errors, typecheck clean, build clean,
+  bundle **139.9 / 160 kB** gzip (was 139.7 — the scanner is entirely lazy).
+  436 of 437 tests pass; the one failure is `bootNavigation.test.tsx`, which
+  **fails identically on a clean worktree at HEAD** and is filed as TODO-48.
+- **Mobile — verified as far as it can be here.** Lint 0 errors, typecheck
+  clean, 111/111 tests. **The native half has never run**: ML Kit needs an
+  `eas build` and an Android/iOS device, neither of which exists on this
+  machine. Everything below `TextRecognition.recognize` is proven; that call
+  itself is not.
+- **Backend — WRITTEN BUT NEVER COMPILED.** This machine has only a Java 8 JRE,
+  so Gradle cannot load the Spring Boot plugin — the same wall TODO-20 hit.
+  `cd backend && ./gradlew build` on JDK 21 is **owed**, and in particular it
+  is what would catch a malformed `@Query` in `IndividualRepository`, which
+  fails at context startup rather than at compile time.
+- **Hygiene scripts — one of four run.** No Python here either (the `python3`
+  on PATH is the Windows Store stub), so `doc_claims.py`'s two path checks were
+  ported to Node and run: **all paths resolve**. `repo_hygiene.py`,
+  `cross_project_invariants.py` and `dead_config.py` were **not** run.
+- **Snyk was NOT run.** `.github/instructions/snyk_rules.instructions.md`
+  requires a scan of new first-party code; no Snyk CLI or tool is available in
+  this environment. Reviewed by hand instead — the JPQL is static and
+  parameterless, the model download is HTTPS from a pinned tag with a SHA-256
+  check, the MRZ regexes are linear, and no user string reaches `innerHTML`.
+  **The scan is still owed.**
 
 ---
 
@@ -1465,6 +1647,100 @@ new claims in TODO-34 and TODO-41.
 `repo_hygiene.py`'s `check_action_pins` and `dead_config.py` still build an
 annotation path with `str()`, so a local Windows run prints backslashed paths in
 its messages. Both scripts pass.
+
+### TODO-45 `[ ]` Drop `individual.id_photo_url` once every environment is drained
+TODO-14 stopped storing ID photos but deliberately kept the column, because it
+is the only remaining record of the keys of objects already in Spaces. Dropping
+it before deleting them would strand personal data in a bucket that nothing knows
+about.
+
+The sequence, in order:
+1. On each environment, `GET /api/admin/id-photos` to see the count, then
+   `DELETE /api/admin/id-photos` until it reports `remaining: 0`.
+2. Then delete `Individual.idPhotoUrl`, `IndividualRepository`,
+   `AdminIdPhotoController` and its test, and the matrix case
+   `onlyAdmin_mayPurgeLegacyIdPhotos`.
+3. Then drop the column by hand — `ddl-auto=update` never drops anything, so it
+   will otherwise sit in H2 and in prod Postgres exactly like the orphaned
+   `intake_message` / `order_draft` tables TODO-15 left behind.
+
+*Blocked on:* a deployed environment existing to run step 1 against. The
+appendix says there is no server yet, in which case there is nothing stored and
+step 1 is a formality — but it must still be **confirmed**, not assumed, because
+this is the step whose omission leaves personal data behind forever.
+
+### TODO-46 `[ ]` Task photos are still uploaded with a public-read ACL
+`PhotoService.uploadPhoto` sets `ObjectCannedACL.PUBLIC_READ`, so every object it
+writes is on a working unauthenticated URL. Found while doing TODO-14, which
+removed the ID photos from that path — what is left under it is
+`task_photos/`: job-site photos a driver attaches when completing a task.
+
+Lower stakes than an identity document, but the same shape of problem, and the
+URLs are handed to clients as plain strings by
+`GET /api/tasks/{id}/photos`.
+
+Needs deciding:
+- Private ACL plus short-lived presigned URLs, which means the three screens that
+  render task photos (`CloudPhotoViewer` in mobile `Driver/TaskDetails`, and the
+  web equivalents) stop being able to cache a URL and must ask for a fresh one.
+- Or accept it, on the grounds that a cabin on a street is not personal data —
+  in which case say so here, so the next person does not re-open it.
+
+*Context:* the ID-photo exposure was the urgent half and is fixed. This is the
+half that was deliberately left, so it is recorded rather than silently kept.
+
+### TODO-47 `[ ]` `bundle_budget.py` counts lazy chunks named `index-*` as eager
+The script identifies the eager entry chunk by the pattern `^index-[\w-]+\.js$`.
+That assumes only the app entry is ever named `index-*`, and Rollup breaks the
+assumption: a dependency reached only through a dynamic import gets a chunk named
+after **its** entry module, and a package whose entry is an `index` file
+therefore produces a second `index-<hash>.js` that the budget counts against the
+initial download.
+
+Found while adding tesseract.js in TODO-13, where it silently added 6.7 kB of a
+lazily-fetched chunk to the reported initial download. Worked around there by
+naming the chunk in `manualChunks` — but a 444-byte interop shim still lands on
+the pattern, and the next lazily-imported dependency will hit it again.
+
+The fix is to stop guessing from filenames: `dist/index.html` names the real
+entry, and its static import graph is the eager set. That is a rewrite of
+`main()` in the script, not a pattern tweak.
+
+*Note:* it fails in the safe direction — it over-counts, so it can fail a build
+that should pass, never pass one that should fail.
+
+### TODO-48 `[ ]` `bootNavigation.test.tsx` fails on Node 24
+`stays on /comenzi when a dead refresh token is stored` throws
+`TypeError: RequestInit: Expected signal ("AbortSignal {}") to be an instance of
+AbortSignal` from inside react-router's `createBrowserRouter`, under undici.
+
+**Pre-existing, not caused by TODO-13/14** — verified by running the file from a
+clean worktree at HEAD, where it fails identically. Recorded because it means
+`npm run test:run` is not currently green on this machine, so "the suite passes"
+has an asterisk on it and the next person will otherwise re-diagnose it.
+
+The mismatch is jsdom's `AbortSignal` versus the one Node's built-in `fetch`
+checks against — the same class of Windows/runtime-specific breakage as TODO-31
+and TODO-44. Needs deciding whether to pin the Node version CI and developers
+use, or to give this test a jsdom-compatible fetch.
+
+### TODO-49 `[ ]` CLAUDE.md's Known gaps still says mobile cannot authenticate
+``Known gaps`` opens with "**The mobile app cannot authenticate.** It still posts
+to the deleted `/api/auth/login` and has no enrollment screens (TODO-19)." The
+same file's Auth section says the opposite three screens earlier — "**All three
+projects can now get a session** (TODO-19)", naming `mobile/app/enrollment.tsx`
+and `mobile/services/EnrollmentService.ts` — and TODO-19 is `[DONE]`.
+
+Found while doing TODO-13/14. Not fixed there, because deleting a line from the
+section that exists to say what is unsafe is a call for whoever knows why it was
+left: TODO-19's entry may have shipped the screens without the bullet being
+revisited, or the bullet may be pointing at something narrower that is still
+true.
+
+`doc_claims.py` cannot catch this — both paths it names resolve. It is a claim
+about behaviour, and the file contradicts itself about it. **A wrong pointer is
+worse than no pointer because it is followed confidently**, which is that
+script's own docstring.
 
 ---
 

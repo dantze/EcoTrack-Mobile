@@ -256,32 +256,6 @@ export function useDeleteClient(): UseMutationResult<void, Error, number> {
   });
 }
 
-export interface UploadIdPhotoVars {
-  clientId: number;
-  file: File;
-}
-
-export function useUploadIdPhoto(): UseMutationResult<string, Error, UploadIdPhotoVars> {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ clientId, file }: UploadIdPhotoVars) =>
-      api.clients.uploadIdPhoto(clientId, file),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: salesKeys.clients });
-    },
-  });
-}
-
-export function useDeleteIdPhoto(): UseMutationResult<string, Error, number> {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: (clientId: number) => api.clients.deleteIdPhoto(clientId),
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: salesKeys.clients });
-    },
-  });
-}
-
 // ---------------------------------------------------------------------------
 // Products — writes
 // ---------------------------------------------------------------------------

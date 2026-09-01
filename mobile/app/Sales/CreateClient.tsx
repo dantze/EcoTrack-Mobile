@@ -1,9 +1,9 @@
-import { StyleSheet, Text, View, Pressable, ScrollView, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard, Alert, Image } from 'react-native'
+import { StyleSheet, Text, View, Pressable, ScrollView, KeyboardAvoidingView, Platform, TouchableWithoutFeedback, Keyboard, Alert } from 'react-native'
 import React, { useState } from 'react'
 import { useRouter } from 'expo-router'
 import { AntDesign, Feather } from '@expo/vector-icons';
 import { ClientService, ClientType } from '../../services/ClientService';
-import { PhotoService } from '../../services/PhotoService';
+import { ID_SCAN_REFUSALS, isIdScanAvailable, scanIdImage } from '../../services/IdScanService';
 import { isValidEmail, isValidPhoneDigits } from '../../utils/validation';
 import InputField from '../../components/forms/InputField';
 import PhoneInputField from '../../components/forms/PhoneInputField';
@@ -29,8 +29,12 @@ const CreateClient = () => {
     const [countryCode, setCountryCode] = useState('+40');
     const [address, setAddress] = useState('');
 
-    // ID Photo State
-    const [idPhoto, setIdPhoto] = useState<string | null>(null);
+    // ID scan state (TODO-13). There is no photo state any more: the image is
+    // read on this phone and dropped, so the only things that outlive a scan
+    // are the two form fields and a message about how it went.
+    const [scanning, setScanning] = useState(false);
+    const [scanMessage, setScanMessage] = useState<string | null>(null);
+    const scanAvailable = isIdScanAvailable();
 
     // Company specific fields
     const [companyName, setCompanyName] = useState('');
@@ -46,35 +50,64 @@ const CreateClient = () => {
         setIsDropdownOpen(false);
     };
 
-    const pickImage = async () => {
-        // No permissions request is necessary for launching the image library
-        const result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ['images'],
-            allowsEditing: true,
-            aspect: [4, 3],
-            quality: 1,
-        });
-
-        if (!result.canceled) {
-            setIdPhoto(result.assets[0].uri);
+    /**
+     * Read the card and fill the two fields (TODO-13).
+     *
+     * `allowsEditing` is deliberately OFF, unlike the upload it replaced. The
+     * crop UI defaults to a 4:3 box, and the MRZ is the strip along the bottom
+     * edge of the card — the first thing a careless crop removes, and then
+     * nothing reads and the operator has no idea why.
+     *
+     * The picked file is passed to the on-device recogniser and to nothing
+     * else. It is not uploaded and not kept (TODO-14).
+     */
+    const scanFrom = async (uri: string) => {
+        setScanning(true);
+        setScanMessage(null);
+        try {
+            const result = await scanIdImage(uri);
+            if (result.ok) {
+                setFullName(result.read.fullName);
+                // A document without a CNP must not wipe one already typed.
+                if (result.read.cnp) setCnp(result.read.cnp);
+                setScanMessage(
+                    result.read.cnp
+                        ? 'Datele au fost completate din act. Verificați-le și adăugați diacriticele.'
+                        : 'Am completat numele. Actul nu conține CNP — completați-l manual.',
+                );
+            } else {
+                setScanMessage(ID_SCAN_REFUSALS[result.reason]);
+            }
+        } catch (error) {
+            console.error('[CreateClient] ID scan failed:', error);
+            setScanMessage('Scanarea nu a putut porni pe acest telefon. Introduceți datele manual.');
+        } finally {
+            setScanning(false);
         }
     };
 
-    const takePhoto = async () => {
-        const { status } = await ImagePicker.requestCameraPermissionsAsync();
-        if (status !== 'granted') {
-            Alert.alert('Permisiune necesară', 'Avem nevoie de permisiunea camerei pentru a face poze.');
-            return;
-        }
-
-        const result = await ImagePicker.launchCameraAsync({
-            allowsEditing: true,
-            aspect: [4, 3],
+    const scanFromLibrary = async () => {
+        const result = await ImagePicker.launchImageLibraryAsync({
+            mediaTypes: ['images'],
             quality: 1,
         });
 
         if (!result.canceled) {
-            setIdPhoto(result.assets[0].uri);
+            await scanFrom(result.assets[0].uri);
+        }
+    };
+
+    const scanFromCamera = async () => {
+        const { status } = await ImagePicker.requestCameraPermissionsAsync();
+        if (status !== 'granted') {
+            Alert.alert('Permisiune necesară', 'Avem nevoie de permisiunea camerei pentru a scana actul.');
+            return;
+        }
+
+        const result = await ImagePicker.launchCameraAsync({ quality: 1 });
+
+        if (!result.canceled) {
+            await scanFrom(result.assets[0].uri);
         }
     };
 
@@ -122,21 +155,6 @@ const CreateClient = () => {
         try {
             const data = await ClientService.createClient(clientData);
             console.log('Client created successfully:', data);
-
-            // Upload photo to DigitalOcean Spaces via PhotoService
-            if (idPhoto && data?.id && selectedType === "Persoană fizică") {
-                try {
-                    console.log(`[CreateClient] Uploading photo for new client ID: ${data.id}`);
-                    const uploadResult = await PhotoService.uploadIdPhoto(data.id, idPhoto);
-                    console.log('[CreateClient] Photo uploaded to cloud:', uploadResult);
-                } catch (photoError) {
-                    console.error('[CreateClient] Cloud photo upload failed:', photoError);
-                    Alert.alert(
-                        "Eroare Buletin",
-                        "Clientul a fost creat, dar poza de buletin nu a putut fi încărcată în cloud."
-                    );
-                }
-            }
 
             if (shouldCreateOrder && data) {
                 router.push({
@@ -195,35 +213,60 @@ const CreateClient = () => {
                                 <InputField label="Nume Complet" value={fullName} onChangeText={setFullName} />
                                 <InputField label="CNP" value={cnp} onChangeText={setCnp} placeholder="Opțional" keyboardType="numeric" />
 
-                                {/* Photo Upload Section */}
-                                <Text style={styles.label}>Buletin</Text>
-                                <View style={styles.uploadContainer}>
-                                    <View style={styles.dashedBox}>
-                                        {idPhoto ? (
-                                            <View style={{ alignItems: 'center', width: '100%' }}>
-                                                <Image source={{ uri: idPhoto }} style={styles.previewImage} resizeMode="contain" />
-                                                <Pressable onPress={() => setIdPhoto(null)} style={{ marginTop: 10 }}>
-                                                    <Text style={{ color: '#FF4444', fontWeight: 'bold' }}>Șterge imaginea</Text>
+                                {/*
+                                  * Scan the card to fill the two fields above
+                                  * (TODO-13). This replaced the ID photo upload:
+                                  * the picture is read here and thrown away, so
+                                  * nothing about the client's document is
+                                  * stored (TODO-14).
+                                  *
+                                  * Hidden entirely on a build without the native
+                                  * recogniser — an over-the-air update cannot
+                                  * add it, and a button that always fails is
+                                  * worse than no button.
+                                  */}
+                                {scanAvailable && (
+                                    <>
+                                        <Text style={styles.label}>Buletin</Text>
+                                        <View style={styles.uploadContainer}>
+                                            <View style={styles.dashedBox}>
+                                                <Pressable
+                                                    onPress={scanFromCamera}
+                                                    disabled={scanning}
+                                                    style={styles.uploadTouchArea}
+                                                >
+                                                    <Feather name="camera" size={50} color="#5A8DAB" />
+                                                    <Text style={styles.uploadTitle}>
+                                                        {scanning ? 'Se citește actul…' : 'Scanează buletinul'}
+                                                    </Text>
+                                                </Pressable>
+
+                                                <View style={styles.orRow}>
+                                                    <View style={styles.line} />
+                                                    <Text style={styles.orText}>sau</Text>
+                                                    <View style={styles.line} />
+                                                </View>
+
+                                                <Pressable
+                                                    onPress={scanFromLibrary}
+                                                    disabled={scanning}
+                                                    style={styles.cameraButtonSmall}
+                                                >
+                                                    <Text style={styles.cameraButtonTextSmall}>
+                                                        Alege o poză existentă
+                                                    </Text>
                                                 </Pressable>
                                             </View>
-                                        ) : (
-                                            <Pressable onPress={pickImage} style={styles.uploadTouchArea}>
-                                                <Feather name="upload-cloud" size={50} color="#5A8DAB" />
-                                                <Text style={styles.uploadTitle}>Atingeți pentru a încărca ID-ul</Text>
-                                            </Pressable>
-                                        )}
-
-                                        <View style={styles.orRow}>
-                                            <View style={styles.line} />
-                                            <Text style={styles.orText}>sau</Text>
-                                            <View style={styles.line} />
                                         </View>
 
-                                        <Pressable onPress={takePhoto} style={styles.cameraButtonSmall}>
-                                            <Text style={styles.cameraButtonTextSmall}>Deschide Camera</Text>
-                                        </Pressable>
-                                    </View>
-                                </View>
+                                        {scanMessage && <Text style={styles.scanMessage}>{scanMessage}</Text>}
+
+                                        <Text style={styles.scanPrivacyNote}>
+                                            Fotografia este citită pe acest telefon și nu este trimisă sau salvată
+                                            nicăieri.
+                                        </Text>
+                                    </>
+                                )}
                             </>
                         )}
                         <InputField label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" />
@@ -353,10 +396,18 @@ const styles = StyleSheet.create({
         textAlign: 'center',
     },
 
-    previewImage: {
-        width: 200,
-        height: 120,
-        borderRadius: 10,
+    scanMessage: {
+        color: '#FFFFFF',
+        fontSize: 14,
+        marginTop: 10,
+        lineHeight: 20,
+    },
+    scanPrivacyNote: {
+        color: '#A0A0A0',
+        fontSize: 12,
+        marginTop: 6,
+        marginBottom: 4,
+        lineHeight: 16,
     },
     orRow: {
         flexDirection: 'row',

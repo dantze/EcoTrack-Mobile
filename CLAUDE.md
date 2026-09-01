@@ -63,6 +63,13 @@ npm run test:run
 
 `bootRun` auto-loads `backend/.env` via a custom task in `build.gradle`.
 
+`npm run dev` and `npm run build` in `web` run `scripts/fetch-ocr-assets.mjs`
+first (as `predev`/`prebuild`). It copies the ID scanner's WASM engine out of
+`node_modules` and, **once**, downloads a checksum-verified language model into
+the gitignored `web/public/tesseract/`. So a clean checkout's first web build
+needs network; every build after that finds the files and skips. `typecheck`,
+`lint` and `test:run` do not need them.
+
 **All three projects have tests** — backend JUnit through Gradle, `web` and
 `mobile` Vitest. `npm run test` is watch mode and never exits; CI (and you) want
 `npm run test:run`.
@@ -333,6 +340,55 @@ The badges and filters stay; the write controls were removed, and
 `src/features` outside a `queries.ts` calls a status-write hook. Do not
 reintroduce one (TODO-08).
 
+## Scanning an ID — and why no photo is stored
+
+Creating a *persoană fizică* offers **Scanează buletinul**, which fills `nume
+complet` and `CNP` from a photo of the card (TODO-13). Two rules govern it, and
+both are load-bearing.
+
+**1. It reads the MRZ, not the card.** The three 30-character OCR-B lines at the
+bottom of any ICAO 9303 TD1 document. Romania puts the CNP in line 1's
+optional-data field; the name is line 3. That choice is what makes a free
+recogniser sufficient — **the MRZ verifies itself**, via four ICAO check digits,
+the CNP's own control digit (weights `279146358279`, mod 11, 10→1), and the fact
+that the CNP restates the birth date and sex that line 2 states separately.
+
+So: **a read either passes every one of those checks or is refused.** A card
+whose document number smudged is rejected even though nothing uses the document
+number — a failed check digit means something was misread and the parser cannot
+say what. Refusing costs two fields of typing; a false accept writes a wrong CNP
+into a client record nobody re-reads. **Do not "improve" this by accepting
+partial reads.**
+
+The parser exists twice — `web/src/features/sales/idScan/mrz.ts` and
+`mobile/utils/mrz.ts`, byte-identical below their doc comments — because the two
+projects cannot import each other. `shared/id-mrz-cases.json` is what pins that
+they still agree; both suites read it. Same arrangement as the fulfilment rule.
+
+**2. The image never leaves the device and is never stored** (TODO-14). Web runs
+tesseract.js in the browser; mobile uses ML Kit / Vision on-device. Nothing about
+an identity document is uploaded, so `PhotosController`, both
+`/{clientId}/idPhoto` routes and `GET /api/photos` are gone, and `idPhotoUrl` is
+off the wire.
+
+Holding rule 2 requires one non-obvious thing: **tesseract.js defaults
+`workerPath`, `corePath` and `langPath` to jsDelivr.** Unset, they would put a
+third party in the request path of an ID scan. `web/scripts/fetch-ocr-assets.mjs`
+puts the engine in `web/public/tesseract/` (copied from `node_modules`, plus a
+checksum-verified language model) and `ocr.ts` points all three at our own
+origin. `ocrIsLazy.test.ts` fails if any of them is dropped, if the file names
+any `http` host, or if the ~6 MB engine stops being dynamically imported.
+
+Same rule as the map, in the other direction: `src/lib/geocoding.ts` keeps our
+bearer token off someone else's host; this keeps someone else's host out of our
+scanner.
+
+**Two follow-ups are still open.** The `individual.id_photo_url` column survives
+on purpose — it is the only record of the keys of objects already in Spaces, so
+`DELETE /api/admin/id-photos` must drain them before the column can go
+(TODO-45). And `PhotoService.uploadPhoto` still writes `PUBLIC_READ`, which now
+affects only task photos (TODO-46).
+
 ## Conventions
 
 - **User-facing strings are Romanian** across all three projects, including
@@ -372,6 +428,12 @@ Deliberate or unresolved; do not assume these are safe.
   (TODO-17) and the only sanctioned future use is autofill.
 - **`mobile/services/OrderLockService.ts` is a stub** that always reports a
   successful lock.
+- **`individual.id_photo_url` outlives the feature that filled it.** ID photos
+  are no longer stored (TODO-14), but the column is kept until
+  `DELETE /api/admin/id-photos` has drained the objects it points at on every
+  environment — it is the only record of their keys. It is `@JsonIgnore`d, so
+  nothing reads it but the purge. Drop it, and `AdminIdPhotoController` with
+  it, per TODO-45.
 - `mobile/constants/ApiConfig.ts` reads `EXPO_PUBLIC_API_BASE_URL` and falls
   back to the old hardcoded `http://146.190.224.202:8080/api`. The fallback is
   load-bearing for installed builds; compose still publishes 8080 for them.

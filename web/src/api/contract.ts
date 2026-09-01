@@ -247,10 +247,6 @@ export interface ClientsApi {
   remove(id: number): Promise<void>;
   /** GET /clients/{id}/has-orders — guards deletion in the UI. */
   hasOrders(id: number): Promise<boolean>;
-  /** POST /{clientId}/idPhoto (multipart, field "file"). Returns the public URL. */
-  uploadIdPhoto(clientId: number, file: File): Promise<string>;
-  /** DELETE /{clientId}/idPhoto */
-  deleteIdPhoto(clientId: number): Promise<string>;
 }
 
 export interface OrdersApi {

@@ -392,7 +392,6 @@ export function createSeedDb(): MockDb {
         fullName,
         CNP: cnp(),
         // A minority have their ID scanned in; the rest exercise the empty state.
-        idPhotoUrl: chance(0.35) ? `https://picsum.photos/seed/ct-id-${id}/800/520` : null,
         email: `${slug(fullName)}@gmail.com`,
         phone: phone(),
         address: homeSite.address,

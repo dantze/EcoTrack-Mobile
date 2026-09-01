@@ -156,8 +156,17 @@ class ClientJsonSubTypesTest {
 
         assertThat(node.get("type").asText()).isEqualTo("individual");
         assertThat(node.get("fullName").asText()).isEqualTo("Ion Popescu");
-        assertThat(node.get("idPhotoUrl").asText()).isEqualTo("https://cdn.example/id.jpg");
         assertThat(node.get("cnp").asText()).isEqualTo("1900101123456");
+
+        // The ID photo URL must not leave the server (TODO-14). Those objects
+        // were written with a PUBLIC_READ ACL, so the value is a working
+        // unauthenticated link to a scan of someone's identity card, and this
+        // field is on every client the app lists. @JsonIgnore on the field is
+        // what stops it; this asserts the annotation is still there, because
+        // removing it would leak silently rather than fail.
+        assertThat(node.has("idPhotoUrl"))
+                .as("legacy ID photo URL must never be serialised again")
+                .isFalse();
         assertThat(node.has("CNP"))
                 .as("no @JsonProperty(\"CNP\") on Individual, unlike Company's CUI")
                 .isFalse();

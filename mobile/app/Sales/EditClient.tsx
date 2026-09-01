@@ -13,7 +13,6 @@ import {
 import { useRouter, useLocalSearchParams } from 'expo-router';
 import { ClientService, ClientType } from '../../services/ClientService';
 import { isValidEmail, isValidPhoneDigits } from '../../utils/validation';
-import CloudPhotoViewer from '../../components/display/CloudPhotoViewer';
 import InputField from '../../components/forms/InputField';
 import PhoneInputField from '../../components/forms/PhoneInputField';
 import { EUROPEAN_COUNTRIES } from '../../components/forms/PhoneInputField';
@@ -139,15 +138,14 @@ export default function EditClient() {
                         </Text>
                     </View>
 
-                    {/* ID Photo for individual clients */}
-
-                    <View style={{ width: '100%', marginTop: 16 }}>
-                        <CloudPhotoViewer
-                            photos={[clientData.idPhotoUrl]}
-                            buttonLabel="Vezi Fotografia"
-                            bannerLabel="Fotografie buletin salvată"
-                        />
-                    </View>
+                    {/*
+                      * The stored ID photo used to be shown here (TODO-14).
+                      * EcoTrack no longer keeps photographs of identity
+                      * documents, so there is nothing left to view: the card is
+                      * read on the phone when a client is created and the image
+                      * is dropped. `CloudPhotoViewer` is still used by
+                      * Driver/TaskDetails for task photos.
+                      */}
 
                     {/* Form fields */}
                     <View style={{ width: '100%', marginTop: 20 }}>

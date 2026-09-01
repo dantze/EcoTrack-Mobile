@@ -92,7 +92,7 @@ export function Autocomplete({
   const listId = `${generatedId}-listbox`;
 
   const [open, setOpen] = useState(false);
-  const [highlight, setHighlight] = useState(-1);
+  const [storedHighlight, setHighlight] = useState(-1);
   const [rect, setRect] = useState<PopupRect | null>(null);
 
   const wrapperRef = useRef<HTMLDivElement>(null);
@@ -160,9 +160,13 @@ export function Autocomplete({
     };
   }, [visible]);
 
-  useEffect(() => {
-    if (highlight > matches.length - 1) setHighlight(matches.length - 1);
-  }, [matches.length, highlight]);
+  // Clamped on READ rather than corrected in an effect (TODO-26). Typing shrinks
+  // `matches` during render, so a stored index outlives the row it pointed at: an
+  // effect fixes it one render too late, and that render is a real one — the
+  // listbox draws a highlight on nothing and `matches[highlight]` is undefined,
+  // so Enter silently accepts nothing. -1 stays reachable and still means "no
+  // suggestion is highlighted", which is why there is no lower bound here.
+  const highlight = Math.min(storedHighlight, matches.length - 1);
 
   useEffect(() => {
     if (!visible) return;

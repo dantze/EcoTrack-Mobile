@@ -5,6 +5,8 @@ import com.example.damiProd.domain.Product;
 import com.example.damiProd.repository.EmployeeRepository;
 import com.example.damiProd.repository.EmployeeRoleRepository;
 import com.example.damiProd.repository.ProductRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,6 +23,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Component
 public class DataLoader implements CommandLineRunner {
 
+        private static final Logger log = LoggerFactory.getLogger(DataLoader.class);
+
         private final EmployeeRepository employeeRepository;
         private final EmployeeRoleRepository employeeRoleRepository;
         private final ProductRepository productRepository;
@@ -36,7 +40,7 @@ public class DataLoader implements CommandLineRunner {
         @Override
         @Transactional
         public void run(String... args) throws Exception {
-                System.out.println("Checking for seed data...");
+                log.debug("Checking for seed data");
 
                 if (employeeRoleRepository.count() == 0) {
                         loadRoles();
@@ -56,7 +60,7 @@ public class DataLoader implements CommandLineRunner {
          * since that triggers on an empty employees table.
          */
         private void loadRoles() {
-                System.out.println("Seeding roles...");
+                log.info("Seeding the four assignable roles into an empty database");
                 getOrCreateRole("DRIVER");
                 getOrCreateRole("SALES");
                 getOrCreateRole("TECH");
@@ -72,7 +76,7 @@ public class DataLoader implements CommandLineRunner {
         }
 
         private void loadProducts() {
-                System.out.println("Seeding products...");
+                log.info("Seeding the product catalogue into an empty database");
 
                 // Toaletă Armal
                 productRepository.save(new Product(
@@ -140,6 +144,6 @@ public class DataLoader implements CommandLineRunner {
                                 "Unitate care nu necesită acces la rețeaua de apă, dotată cu rezervoare pentru apă curată și apă uzată, dozator de săpun și dispenser de prosoape. Include 2 chiuvete și o capacitate mai mare (1000 utilizări).",
                                 780.00));
 
-                System.out.println("Seeded " + productRepository.count() + " products!");
+                log.info("Seeded {} products", productRepository.count());
         }
 }

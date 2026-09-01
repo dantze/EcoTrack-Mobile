@@ -9,7 +9,7 @@
  * would be asking a question the domain cannot answer.
  */
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Button, Modal, Select, TextInput } from '@/components/ui';
 import type { CreateRouteInput } from '@/api';
 import type { Employee } from '@/types/domain';
@@ -32,7 +32,21 @@ interface Errors {
 
 /** ISO "YYYY-MM-DD" → 1 = Monday … 7 = Sunday. */
 
-export function RouteFormModal({
+/**
+ * Fresh state per open, by REMOUNTING rather than by an effect (TODO-26).
+ *
+ * `Modal` already returns null while closed, so nothing of this dialog is on
+ * screen between opens — the only thing staying mounted was a half-typed route draft,
+ * which every open then had to clear. Not rendering the body at all is the
+ * same reset without the extra render, and it cannot be forgotten when a new
+ * piece of state is added here later.
+ */
+export function RouteFormModal(props: RouteFormModalProps) {
+  if (!props.open) return null;
+  return <RouteForm {...props} />;
+}
+
+function RouteForm({
   open,
   onClose,
   onSubmit,
@@ -44,16 +58,6 @@ export function RouteFormModal({
   const [county, setCounty] = useState<string | null>(null);
   const [employeeId, setEmployeeId] = useState<string | null>(null);
   const [errors, setErrors] = useState<Errors>({});
-
-  // Reset every time the dialog opens so a cancelled draft never leaks back.
-  useEffect(() => {
-    if (!open) return;
-    setName('');
-    setDayOfWeek(null);
-    setCounty(null);
-    setEmployeeId(null);
-    setErrors({});
-  }, [open]);
 
   const submit = () => {
     const next: Errors = {};

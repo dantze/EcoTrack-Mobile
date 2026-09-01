@@ -103,12 +103,14 @@ export function PickerRow({
  * scrolls into view, and commits on Enter.
  */
 export function useListKeyboard<T>(items: T[], onPick: (item: T) => void) {
-  const [highlight, setHighlight] = useState(0);
+  const [storedHighlight, setHighlight] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    if (highlight > items.length - 1) setHighlight(Math.max(0, items.length - 1));
-  }, [items.length, highlight]);
+  // Clamped on READ rather than corrected in an effect (TODO-26). The filter
+  // shrinks `items` during render, and an effect only notices afterwards — one
+  // render in which the highlight sits past the end of the list and `items[
+  // highlight]` is undefined, so Enter picks nothing.
+  const highlight = Math.max(0, Math.min(storedHighlight, items.length - 1));
 
   useEffect(() => {
     listRef.current
@@ -118,12 +120,14 @@ export function useListKeyboard<T>(items: T[], onPick: (item: T) => void) {
 
   const onKeyDown = (event: React.KeyboardEvent) => {
     if (items.length === 0) return;
+    // Stepping from the CLAMPED value, not the stored one: after the list
+    // shrinks, `stored + 1` can wrap from an index that no longer exists.
     if (event.key === 'ArrowDown') {
       event.preventDefault();
-      setHighlight((current) => (current + 1) % items.length);
+      setHighlight((highlight + 1) % items.length);
     } else if (event.key === 'ArrowUp') {
       event.preventDefault();
-      setHighlight((current) => (current - 1 + items.length) % items.length);
+      setHighlight((highlight - 1 + items.length) % items.length);
     } else if (event.key === 'Enter') {
       event.preventDefault();
       const item = items[highlight];
@@ -152,7 +156,21 @@ export interface RoutePickerModalProps {
   onSelect: (route: Route) => void;
 }
 
-export function RoutePickerModal({
+/**
+ * Fresh state per open, by REMOUNTING rather than by an effect (TODO-26).
+ *
+ * `Modal` already returns null while closed, so nothing of this dialog is on
+ * screen between opens — the only thing staying mounted was the filter string,
+ * which every open then had to clear. Not rendering the body at all is the
+ * same reset without the extra render, and it cannot be forgotten when a new
+ * piece of state is added here later.
+ */
+export function RoutePickerModal(props: RoutePickerModalProps) {
+  if (!props.open) return null;
+  return <RoutePicker {...props} />;
+}
+
+function RoutePicker({
   open,
   onClose,
   title,
@@ -187,10 +205,6 @@ export function RoutePickerModal({
   };
 
   const { highlight, setHighlight, listRef, onKeyDown } = useListKeyboard(filtered, pick);
-
-  useEffect(() => {
-    if (open) setQuery('');
-  }, [open]);
 
   return (
     <Modal
@@ -277,7 +291,21 @@ export interface DriverPickerModalProps {
   onSelect: (driver: Employee) => void;
 }
 
-export function DriverPickerModal({
+/**
+ * Fresh state per open, by REMOUNTING rather than by an effect (TODO-26).
+ *
+ * `Modal` already returns null while closed, so nothing of this dialog is on
+ * screen between opens — the only thing staying mounted was the filter string,
+ * which every open then had to clear. Not rendering the body at all is the
+ * same reset without the extra render, and it cannot be forgotten when a new
+ * piece of state is added here later.
+ */
+export function DriverPickerModal(props: DriverPickerModalProps) {
+  if (!props.open) return null;
+  return <DriverPicker {...props} />;
+}
+
+function DriverPicker({
   open,
   onClose,
   title = 'Alege șoferul',
@@ -306,10 +334,6 @@ export function DriverPickerModal({
   };
 
   const { highlight, setHighlight, listRef, onKeyDown } = useListKeyboard(filtered, pick);
-
-  useEffect(() => {
-    if (open) setQuery('');
-  }, [open]);
 
   return (
     <Modal

@@ -16,7 +16,7 @@
  * and the queries behind them stay disabled so no forbidden request is made.
  */
 
-import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { useMemo, useState, useSyncExternalStore } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Modal, SearchIcon, cx } from '@/components/ui';
 import { ORDER_TYPE_LABELS, TASK_TYPE_LABELS, formatDate, weekdayLabel } from '@/components/domain';
@@ -63,11 +63,27 @@ export interface CommandPaletteProps {
   onClose: () => void;
 }
 
-export function CommandPalette({ open, onClose }: CommandPaletteProps) {
+/**
+ * Fresh state per open, by REMOUNTING rather than by an effect (TODO-26).
+ *
+ * The palette used to stay mounted with a stale query and highlight, clearing
+ * them in an effect on close. It renders nothing while closed, so unmounting
+ * is the same reset with no extra render — and the shortcut that opens it
+ * lives in AppShell, not here, so nothing is lost by not being mounted.
+ *
+ * The queries below are unaffected: they were already gated on `enabled: open`
+ * and their data lives in the QueryClient cache, which outlives this mount.
+ */
+export function CommandPalette(props: CommandPaletteProps) {
+  if (!props.open) return null;
+  return <Palette {...props} />;
+}
+
+function Palette({ open, onClose }: CommandPaletteProps) {
   const navigate = useNavigate();
   const { hasRole } = useAuth();
   const [query, setQuery] = useState('');
-  const [highlight, setHighlight] = useState(0);
+  const [storedHighlight, setHighlight] = useState(0);
 
   // Re-rank as soon as a pick is recorded, so reopening the palette reflects it.
   useSyncExternalStore(subscribeRecents, recentsRevision, recentsRevision);
@@ -82,13 +98,6 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
   const routesQuery = useRoutes({ enabled: open && isTech });
   const recurringQuery = useRecurring('all', { enabled: open && isTech });
   const driversQuery = useDrivers({ enabled: open && isTech });
-
-  useEffect(() => {
-    if (!open) {
-      setQuery('');
-      setHighlight(0);
-    }
-  }, [open]);
 
   const entries = useMemo<Entry[]>(() => {
     const go = (path: string, recentKey: string) => () => {
@@ -339,13 +348,12 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
     }).map(({ item, ranges }) => ({ entry: item, ranges }));
   }, [entries, query]);
 
-  useEffect(() => {
-    setHighlight(0);
-  }, [query]);
-
-  useEffect(() => {
-    if (highlight > results.length - 1) setHighlight(Math.max(0, results.length - 1));
-  }, [results.length, highlight]);
+  // Clamped on READ rather than corrected in an effect (TODO-26). Every
+  // keystroke re-ranks `results` during render, so a stored index is stale
+  // constantly — and for that one render Enter would run `results[highlight]`,
+  // which is either undefined or, worse, a different command than the one the
+  // user can see highlighted.
+  const highlight = Math.max(0, Math.min(storedHighlight, results.length - 1));
 
   const loading =
     clientsQuery.isLoading || ordersQuery.isLoading || tasksQuery.isLoading || routesQuery.isLoading;
@@ -399,7 +407,14 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
           aria-label="Caută clienți, comenzi, sarcini, rute sau acțiuni"
           autoComplete="off"
           value={query}
-          onChange={(event) => setQuery(event.target.value)}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            // Back to the top on every keystroke: a new query means new
+            // results, and the old index pointed into a list that no longer
+            // exists. It belongs to the typing EVENT, not to an effect
+            // watching `query` (TODO-26).
+            setHighlight(0);
+          }}
           onKeyDown={onKeyDown}
           placeholder="Caută client, comandă, sarcină, rută sau acțiune…"
           className="h-10 w-full rounded-md border border-border bg-white pr-3 pl-8 text-sm text-ink outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/25"

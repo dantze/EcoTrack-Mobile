@@ -21,11 +21,11 @@
  * uses for its drawer, so a link pasted into chat opens the record either way.
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Badge, Button, DateInput, EmptyState, PageHeader, Select, TextInput, cx } from '@/components/ui';
 import { ORDER_TYPE_LABELS } from '@/components/domain';
-import { useDeepLink } from '@/lib/deepLink';
+import { useDeepLink, useDeepLinkOnce } from '@/lib/deepLink';
 import { useShortcuts } from '@/lib/hotkeys';
 import { recordUse } from '@/lib/recents';
 import { useAuth } from '@/auth';
@@ -97,15 +97,10 @@ export function MapPage() {
     [data.points, selectedPointId],
   );
 
-  const deepLink = useDeepLink();
-  const linkedOrderId = deepLink.number('comanda');
-
-  useEffect(() => {
-    if (linkedOrderId === null) return;
-    setSelectedPointId(`order:${linkedOrderId}`);
-    recordUse('order', linkedOrderId);
-    deepLink.clear('comanda');
-  }, [linkedOrderId, deepLink]);
+  useDeepLinkOnce('comanda', useDeepLink().number('comanda'), (orderId) => {
+    setSelectedPointId(`order:${orderId}`);
+    recordUse('order', orderId);
+  });
 
   useShortcuts([
     {
@@ -275,7 +270,15 @@ export function MapPage() {
  * Returns a bounds object whose identity changes only when its numbers do.
  * Writing through a ref during render is the standard idiom for deriving a
  * stable reference; there is no state to synchronise and no effect to schedule.
+ *
+ * The rule is disabled for this function alone rather than for the file
+ * (TODO-26): the argument above is why, and it holds here and nowhere else —
+ * the ref is read and written in the same render pass, never across one, so a
+ * render React discards takes its ref write with it. Twenty-six warnings from
+ * twelve lines was the whole of this rule’s noise in the feature layer, and
+ * leaving it as noise is what stops the next real one from being seen.
  */
+/* eslint-disable react-hooks/refs -- deliberate, and scoped to this hook only */
 function useStableBounds(next: MapBounds | null): MapBounds | null {
   const held = useRef<MapBounds | null>(null);
   const same =
@@ -289,6 +292,7 @@ function useStableBounds(next: MapBounds | null): MapBounds | null {
   if (!same) held.current = next;
   return held.current;
 }
+/* eslint-enable react-hooks/refs */
 
 // ---------------------------------------------------------------------------
 // Panels

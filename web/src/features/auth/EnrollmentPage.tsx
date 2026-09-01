@@ -150,8 +150,18 @@ export function EnrollmentPage() {
     clearPendingTicket();
   }, [status, stopPolling]);
 
+  // The one `react-hooks/set-state-in-effect` this file keeps, deliberately
+  // (TODO-26). The rule's two escapes do not apply: there is nothing to derive
+  // during render, because the answer lives on the server and arrives in its own
+  // time, and there is no event to move it into — waiting for an admin to
+  // approve a device IS the screen. Polling a remote resource and storing what
+  // comes back is what an effect is for. The lint sees `void poll()` running
+  // synchronously in the effect body; that first immediate tick is the point,
+  // since otherwise the screen sits idle for POLL_INTERVAL_MS before the first
+  // question, and an already-approved request takes three seconds to notice.
   useEffect(() => {
     if (phase !== 'waiting') return;
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- see above
     void poll();
     pollingRef.current = setInterval(() => void poll(), POLL_INTERVAL_MS);
     return () => stopPolling();

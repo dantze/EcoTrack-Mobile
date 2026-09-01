@@ -8,7 +8,7 @@
  * the entry points the command palette (⌘K) uses.
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
   Badge,
   Button,
@@ -19,7 +19,7 @@ import {
   type Column,
   type SelectOption,
 } from '@/components/ui';
-import { useDeepLink } from '@/lib/deepLink';
+import { useDeepLink, useDeepLinkOnce, useDeepLinkFlagOnce } from '@/lib/deepLink';
 import { useShortcuts } from '@/lib/hotkeys';
 import { recordUse } from '@/lib/recents';
 import { type Client, clientName } from '@/types/domain';
@@ -58,22 +58,12 @@ export function ClientsPage() {
 
   const clients = useMemo(() => clientsQuery.data ?? [], [clientsQuery.data]);
 
-  const deepLink = useDeepLink();
-  const linkedClientId = deepLink.number('client');
-  const wantsNew = deepLink.flag('nou');
+  useDeepLinkOnce('client', useDeepLink().number('client'), (clientId) => {
+    setDrawer({ kind: 'edit', clientId });
+    recordUse('client', clientId);
+  });
 
-  useEffect(() => {
-    if (linkedClientId === null) return;
-    setDrawer({ kind: 'edit', clientId: linkedClientId });
-    recordUse('client', linkedClientId);
-    deepLink.clear('client');
-  }, [linkedClientId, deepLink]);
-
-  useEffect(() => {
-    if (!wantsNew) return;
-    setDrawer({ kind: 'create' });
-    deepLink.clear('nou');
-  }, [wantsNew, deepLink]);
+  useDeepLinkFlagOnce('nou', () => setDrawer({ kind: 'create' }));
 
   useShortcuts([
     {

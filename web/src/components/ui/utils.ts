@@ -129,8 +129,17 @@ export function useFocusTrap(ref: React.RefObject<HTMLElement | null>, active: b
 
 /** ESC anywhere closes the topmost overlay. */
 export function useEscapeKey(active: boolean, onEscape: () => void) {
+  // Written in an effect, not during render (TODO-26), and declared BEFORE
+  // the subscribing effect so the newest handler is in place by the time the
+  // listener exists. Safe here because `handler.current` is only ever read
+  // from a document keydown listener, which cannot fire until that effect has
+  // run — unlike a ref mutated during render, which can describe a render
+  // React discarded without committing. Same idiom as `latest` in
+  // lib/hotkeys.tsx.
   const handler = useRef(onEscape);
-  handler.current = onEscape;
+  useEffect(() => {
+    handler.current = onEscape;
+  });
 
   useEffect(() => {
     if (!active) return;
@@ -167,10 +176,14 @@ export function useOutsideClick(
   active: boolean,
   onOutside: () => void,
 ) {
+  // Both written in an effect rather than during render — see useEscapeKey
+  // above. Neither is read outside the pointer listener installed below.
   const handler = useRef(onOutside);
-  handler.current = onOutside;
   const stableRefs = useRef(refs);
-  stableRefs.current = refs;
+  useEffect(() => {
+    handler.current = onOutside;
+    stableRefs.current = refs;
+  });
 
   useEffect(() => {
     if (!active) return;
@@ -189,9 +202,20 @@ export function useOutsideClick(
   }, [active]);
 }
 
-/** Latest-value callback ref, so effects do not re-subscribe on every render. */
+/**
+ * Latest-value callback ref, so effects do not re-subscribe on every render.
+ *
+ * The render-time ref write STAYS here, unlike the two hooks above (TODO-26).
+ * They only read their ref from a listener that an effect installed, so the
+ * write can wait for the commit. The callback this returns is handed to
+ * callers who may invoke it from a layout effect or straight out of a render
+ * path — before passive effects flush — and it would then call the PREVIOUS
+ * render's function. That is a behaviour change, not a cleanup, and these
+ * hooks sit under every modal in the app.
+ */
 export function useEvent<A extends unknown[], R>(fn: (...args: A) => R) {
   const ref = useRef(fn);
+  // eslint-disable-next-line react-hooks/refs -- deliberate; see the doc above
   ref.current = fn;
   return useCallback((...args: A) => ref.current(...args), []);
 }

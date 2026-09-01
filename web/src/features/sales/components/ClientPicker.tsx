@@ -61,7 +61,7 @@ export function ClientPicker({
   error?: string;
 }) {
   const [query, setQuery] = useState('');
-  const [highlight, setHighlight] = useState(0);
+  const [storedHighlight, setHighlight] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
   const listId = 'client-picker-list';
 
@@ -93,9 +93,10 @@ export function ClientPicker({
     ).map(({ item, ranges }) => ({ client: item, ranges }));
   }, [clients, query]);
 
-  useEffect(() => {
-    setHighlight(0);
-  }, [query]);
+  // Clamped on READ (TODO-26): the client list can arrive or shrink under a
+  // highlight that was valid when it was stored, and correcting that in an
+  // effect leaves one render pointing at a row that is not there.
+  const highlight = Math.max(0, Math.min(storedHighlight, matches.length - 1));
 
   useEffect(() => {
     listRef.current
@@ -112,10 +113,10 @@ export function ClientPicker({
     if (matches.length === 0) return;
     if (event.key === 'ArrowDown') {
       event.preventDefault();
-      setHighlight((current) => (current + 1) % matches.length);
+      setHighlight((highlight + 1) % matches.length);
     } else if (event.key === 'ArrowUp') {
       event.preventDefault();
-      setHighlight((current) => (current - 1 + matches.length) % matches.length);
+      setHighlight((highlight - 1 + matches.length) % matches.length);
     } else if (event.key === 'Enter') {
       event.preventDefault();
       const match = matches[highlight];
@@ -157,7 +158,12 @@ export function ClientPicker({
       <div onKeyDown={onKeyDown}>
         <SearchInput
           value={query}
-          onChange={setQuery}
+          onChange={(next) => {
+            setQuery(next);
+            // Back to the top as the results change: this belongs to the
+            // typing event, not to an effect watching `query` (TODO-26).
+            setHighlight(0);
+          }}
           placeholder="Caută client (nume, CUI, email, telefon) — ↑↓ și Enter"
           width="w-full"
           controls={listId}

@@ -14,12 +14,12 @@
  * the same trick `?comanda=` plays for a single order.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button, PageHeader, Select, Skeleton, type SelectOption } from '@/components/ui';
 import { ORDER_TYPE_LABELS, orderCountLabel } from '@/components/domain';
 import { ORDER_TYPES, type OrderTypeTag } from '@/types/domain';
-import { useDeepLink } from '@/lib/deepLink';
+import { useDeepLink, useDeepLinkOnce } from '@/lib/deepLink';
 import { useShortcuts } from '@/lib/hotkeys';
 import { recordUse } from '@/lib/recents';
 import { ErrorNotice, FilterBar, FilterField } from './components/FilterBar';
@@ -68,15 +68,14 @@ export function CalendarPage() {
   const total = useMemo(() => monthTotal(cells, buckets), [cells, buckets]);
 
   // ── Deep link: /calendar?zi=2026-08-14 opens that day ───────────────────
-  const deepLink = useDeepLink();
-  const linkedDay = deepLink.raw('zi');
+  const linkedDay = useDeepLink().raw('zi');
 
-  useEffect(() => {
-    if (linkedDay === null || !ISO_DATE.test(linkedDay)) return;
-    setMonthIso(monthStartIso(new Date(`${linkedDay}T00:00:00`)));
-    setSelectedIso(linkedDay);
-    deepLink.clear('zi');
-  }, [linkedDay, deepLink]);
+  // Validated here, not inside the hook: a `zi` this screen cannot read stays
+  // in the URL rather than being silently consumed.
+  useDeepLinkOnce('zi', linkedDay !== null && ISO_DATE.test(linkedDay) ? linkedDay : null, (day) => {
+    setMonthIso(monthStartIso(new Date(`${day}T00:00:00`)));
+    setSelectedIso(day);
+  });
 
   const goToday = () => {
     setMonthIso(monthStartIso());

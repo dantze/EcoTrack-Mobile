@@ -9,7 +9,7 @@
  * and a shareable link to one job.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Button,
   DataTable,
@@ -20,7 +20,7 @@ import {
   TextInput,
 } from '@/components/ui';
 import type { Column, RowKey } from '@/components/ui';
-import { useDeepLink } from '@/lib/deepLink';
+import { useDeepLink, useDeepLinkOnce } from '@/lib/deepLink';
 import { useShortcuts } from '@/lib/hotkeys';
 import { useUndo } from '@/lib/undo';
 import { recordUse } from '@/lib/recents';
@@ -92,15 +92,10 @@ function TasksScreen() {
 
   const tasks = useMemo(() => tasksQuery.data ?? [], [tasksQuery.data]);
 
-  const deepLink = useDeepLink();
-  const linkedTaskId = deepLink.number('sarcina');
-
-  useEffect(() => {
-    if (linkedTaskId === null) return;
-    setOpenTaskId(linkedTaskId);
-    recordUse('task', linkedTaskId);
-    deepLink.clear('sarcina');
-  }, [linkedTaskId, deepLink]);
+  useDeepLinkOnce('sarcina', useDeepLink().number('sarcina'), (taskId) => {
+    setOpenTaskId(taskId);
+    recordUse('task', taskId);
+  });
 
   useShortcuts([
     {

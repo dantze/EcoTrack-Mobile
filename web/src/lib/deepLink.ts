@@ -12,7 +12,7 @@
  * Back button does not walk the user through drawer re-openings.
  */
 
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 
 export interface DeepLink {
@@ -68,4 +68,69 @@ export function useDeepLink(): DeepLink {
   );
 
   return useMemo(() => ({ number, flag, raw, clear }), [number, flag, raw, clear]);
+}
+
+/**
+ * Consume a deep link exactly once: hand `value` to `apply`, then drop `name`
+ * from the URL so the intent cannot fire again on the next render or reload.
+ *
+ * Nine copies of this effect existed, one per screen that accepts an intent,
+ * each six lines of `if (value === null) return; …; deepLink.clear(name)`. They
+ * are here now for two reasons. The obvious one is that nine copies of a rule
+ * drift. The other is that every one of them tripped
+ * `react-hooks/set-state-in-effect` (TODO-26) and the suppression is a judgement
+ * call that deserved to be made once, in writing, rather than nine times by
+ * whoever was editing a screen that day:
+ *
+ * **An effect is right here, and the rule's usual fixes are not.** The URL is an
+ * external store owned by the router, not a prop this component derives from —
+ * so there is nothing to compute during render. There is no event handler to
+ * move the work into either: the navigation happened in the command palette, in
+ * another tab, or in a pasted link, and the arrival IS the event. Consuming it
+ * necessarily writes local state and rewrites the URL.
+ *
+ * The alternative that would delete the effect is to stop copying the intent
+ * into state at all and let the URL *be* the open drawer — `?comanda=42` means
+ * the detail drawer is open. That is a real design, and a bigger one: it changes
+ * what Back does on every screen, so it is not something to smuggle in under a
+ * lint fix. See TODO-26.
+ *
+ * `value` is passed in already parsed and validated so each screen keeps its own
+ * reading of its own param, and a value the screen rejects is left in the URL
+ * rather than silently swallowed.
+ */
+export function useDeepLinkOnce<T>(
+  name: string,
+  value: T | null,
+  apply: (value: T) => void,
+): void {
+  const { clear } = useDeepLink();
+  // `apply` is redeclared every render by every caller, so it must not be a
+  // dependency: the intent is keyed by its VALUE, and re-running because a
+  // closure changed identity would re-open a drawer the user just closed.
+  //
+  // Written in an effect rather than during render, and declared BEFORE the
+  // consuming effect so the newest closure is already in place when it runs —
+  // the same idiom, for the same reason, as `latest` in lib/hotkeys.tsx: React
+  // may render without committing, and a ref mutated during render can end up
+  // describing a render that never mounted.
+  const applyRef = useRef(apply);
+  useEffect(() => {
+    applyRef.current = apply;
+  });
+
+  useEffect(() => {
+    if (value === null) return;
+    applyRef.current(value);
+    clear(name);
+  }, [name, value, clear]);
+}
+
+/**
+ * The flag-shaped intent — `/clienti?nou=1` — where presence is the whole
+ * message. Same reasoning as {@link useDeepLinkOnce}.
+ */
+export function useDeepLinkFlagOnce(name: string, apply: () => void): void {
+  const flagged = useDeepLink().flag(name);
+  useDeepLinkOnce(name, flagged ? true : null, apply);
 }

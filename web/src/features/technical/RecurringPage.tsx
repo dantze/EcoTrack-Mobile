@@ -9,7 +9,7 @@
  * a shareable link to one plan.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Badge,
   Button,
@@ -22,7 +22,7 @@ import {
 } from '@/components/ui';
 import type { Column } from '@/components/ui';
 import { ClientCell, formatDate, weekdayLabel } from '@/components/domain';
-import { useDeepLink } from '@/lib/deepLink';
+import { useDeepLink, useDeepLinkOnce } from '@/lib/deepLink';
 import { useShortcuts } from '@/lib/hotkeys';
 import { recordUse } from '@/lib/recents';
 import { matchesQuery } from '@/lib/search';
@@ -92,25 +92,21 @@ function RecurringScreen() {
 
   const plans = useMemo(() => plansQuery.data ?? [], [plansQuery.data]);
 
-  const deepLink = useDeepLink();
-  const linkedPlanId = deepLink.number('plan');
+  const linkedPlanId = useDeepLink().number('plan');
   const allPlans = allPlansQuery.data;
 
-  useEffect(() => {
-    if (linkedPlanId === null) return;
-    // Wait for the full list before giving up on the id — clearing the param
-    // early would make the link a no-op on a cold cache.
-    if (!allPlans) return;
-    const plan = allPlans.find((candidate) => candidate.id === linkedPlanId);
-    if (plan) {
-      // Switch to the tab that can actually show it, so closing the drawer does
-      // not leave the operator staring at a list the plan is not in.
-      setScope('all');
-      setOpenPlan(plan);
-      recordUse('recurring', plan.id);
-    }
-    deepLink.clear('plan');
-  }, [linkedPlanId, allPlans, deepLink]);
+  // Gated on `allPlans` rather than fired on arrival: the id is only consumed
+  // (and only cleared from the URL) once the full list is there to look it up
+  // in, so the link is not a no-op on a cold cache.
+  useDeepLinkOnce('plan', allPlans ? linkedPlanId : null, (planId) => {
+    const plan = allPlans?.find((candidate) => candidate.id === planId);
+    if (!plan) return;
+    // Switch to the tab that can actually show it, so closing the drawer does
+    // not leave the operator staring at a list the plan is not in.
+    setScope('all');
+    setOpenPlan(plan);
+    recordUse('recurring', plan.id);
+  });
 
   useShortcuts([
     {

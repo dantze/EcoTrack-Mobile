@@ -1,5 +1,7 @@
 package com.example.damiProd.service;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -20,6 +22,8 @@ import java.util.UUID;
 
 @Service
 public class PhotoService {
+
+    private static final Logger log = LoggerFactory.getLogger(PhotoService.class);
 
     /**
      * What callers are allowed to upload. Lives here rather than on each
@@ -126,8 +130,22 @@ public class PhotoService {
     /**
      * Deletes a photo from DigitalOcean Spaces given its full URL or object name.
      *
+     * <p><b>A failure is reported, not thrown</b> (TODO-25). Every caller but one
+     * is a cascade whose actual job is removing a row — deleting a client, or a
+     * client's orders and their task photos. Throwing from here would abort such
+     * a delete halfway, after some objects are already gone, leaving a partially
+     * deleted client that the operator has no way to finish. The row going and
+     * the object staying is recoverable; a half-deleted cascade is not.
+     *
+     * <p>What was actually broken was the trace: the failure went to stderr with
+     * only {@code e.getMessage()}, so it missed the log format, the level and
+     * anything shipping logs off the VPS, and it did not even name the object.
+     * Once the owning row is deleted the object key exists nowhere else, so this
+     * ERROR line is the only remaining way to find what was left behind. It has
+     * to carry the key and the cause.
+     *
      * @param photoUrlOrName The full URL or just the object name.
-     * @return true if delete request was sent successfully.
+     * @return true if the object was deleted; false if it was left in storage.
      */
     public boolean deletePhoto(String photoUrlOrName) {
         String objectName = extractObjectName(photoUrlOrName);
@@ -141,7 +159,8 @@ public class PhotoService {
             getS3Client().deleteObject(deleteRequest);
             return true;
         } catch (Exception e) {
-            System.err.println("Failed to delete photo: " + e.getMessage());
+            log.error("Failed to delete object '{}' from bucket '{}'; it stays in storage "
+                    + "and this line is the only record of it", objectName, bucketName, e);
             return false;
         }
     }

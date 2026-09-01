@@ -79,7 +79,13 @@ export function Select<V extends string | number = string>({
 
   const [open, setOpen] = useState(defaultOpen);
   const [query, setQuery] = useState('');
-  const [highlight, setHighlight] = useState(0);
+  // `defaultOpen` opens on mount without anyone clicking, so it never reaches
+  // openList() below — EditableCell's one-click edit would otherwise land on row
+  // 0 rather than on the cell's current value. The filter is empty at mount, so
+  // `options` and `visible` are the same list here.
+  const [storedHighlight, setHighlight] = useState(() =>
+    defaultOpen ? Math.max(0, options.findIndex((option) => option.value === value)) : 0,
+  );
   const [rect, setRect] = useState<PopupRect | null>(null);
 
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -149,17 +155,27 @@ export function Select<V extends string | number = string>({
     };
   }, [open]);
 
-  // Open with the current value under the cursor; re-clamp as the filter narrows.
-  useEffect(() => {
-    if (!open) return;
+  // Open with the current value under the cursor.
+  //
+  // This belongs to the OPENING EVENT, not to an effect (TODO-26). There are
+  // exactly two ways to open the list — the trigger's click and its keydown —
+  // and doing it in both is what lets the first painted frame already show the
+  // right row, instead of drawing row 0 and then correcting it. It also drops
+  // the exhaustive-deps suppression the effect needed: it wanted to run on
+  // `open` alone while reading `visible` and `value`, which is precisely the
+  // dependency lie that rule exists to catch.
+  const openList = () => {
     const index = visible.findIndex((option) => option.value === value);
     setHighlight(index >= 0 ? index : 0);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [open]);
+    setOpen(true);
+  };
 
-  useEffect(() => {
-    if (highlight > visible.length - 1) setHighlight(Math.max(0, visible.length - 1));
-  }, [visible.length, highlight]);
+  // Clamped on READ rather than corrected in an effect (TODO-26): the filter
+  // narrows `visible` during render, and an effect would only pull the
+  // highlight back inside the list one render later — a render in which
+  // `visible[highlight]` is undefined, so aria-activedescendant points at
+  // nothing and Enter selects nothing.
+  const highlight = Math.max(0, Math.min(storedHighlight, visible.length - 1));
 
   // Without a filter row there is nothing else to hold focus, so the list takes it.
   useEffect(() => {
@@ -226,7 +242,7 @@ export function Select<V extends string | number = string>({
     if (open) return;
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp' || event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
-      setOpen(true);
+      openList();
     }
   };
 
@@ -251,7 +267,7 @@ export function Select<V extends string | number = string>({
         aria-invalid={error ? true : undefined}
         aria-describedby={describedBy(hintId, errorId, hint, error)}
         disabled={disabled}
-        onClick={() => (open ? close() : setOpen(true))}
+        onClick={() => (open ? close() : openList())}
         onKeyDown={onTriggerKeyDown}
         className={cx(
           controlClass(Boolean(error), size, 'flex items-center justify-between gap-2 text-left'),

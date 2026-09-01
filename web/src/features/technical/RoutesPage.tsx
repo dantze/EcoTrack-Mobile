@@ -20,7 +20,7 @@
  * the command palette (⌘K) lands here.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   DndContext,
   DragOverlay,
@@ -51,7 +51,7 @@ import {
 import type { Column } from '@/components/ui';
 import { weekdayLabel } from '@/components/domain';
 import type { Route, Task } from '@/types/domain';
-import { useDeepLink } from '@/lib/deepLink';
+import { useDeepLink, useDeepLinkOnce, useDeepLinkFlagOnce } from '@/lib/deepLink';
 import { useShortcuts } from '@/lib/hotkeys';
 import { useUndo } from '@/lib/undo';
 import { recordUse } from '@/lib/recents';
@@ -133,7 +133,7 @@ function RoutesScreen() {
   const [query, setQuery] = useState('');
 
   // --- selection & overlays ------------------------------------------------
-  const [selectedRouteId, setSelectedRouteId] = useState<number | null>(null);
+  const [storedRouteId, setSelectedRouteId] = useState<number | null>(null);
   const [openTaskId, setOpenTaskId] = useState<number | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [driverPickerOpen, setDriverPickerOpen] = useState(false);
@@ -164,17 +164,20 @@ function RoutesScreen() {
     [routes, county, driver, query],
   );
 
-  // Keep a route selected whenever the filtered list has one to show.
-  useEffect(() => {
-    const first = filteredRoutes[0];
-    if (!first) {
-      if (selectedRouteId !== null) setSelectedRouteId(null);
-      return;
-    }
-    if (selectedRouteId === null || !filteredRoutes.some((route) => route.id === selectedRouteId)) {
-      setSelectedRouteId(first.id);
-    }
-  }, [filteredRoutes, selectedRouteId]);
+  // Keep a route selected whenever the filtered list has one to show —
+  // DERIVED, not corrected in an effect (TODO-26).
+  //
+  // "Which route is selected" is a question about the filtered list, so it is
+  // answered from the filtered list: the stored id while that route is still
+  // visible, otherwise the first row, otherwise nothing. Typing in the filter
+  // used to leave one render in which `selectedRouteId` still pointed at a route
+  // that had just been filtered out — long enough for `useRouteTasks` to fetch
+  // that route's tasks and for the detail pane to render them beside a list the
+  // route is no longer in.
+  const selectedRouteId =
+    storedRouteId !== null && filteredRoutes.some((route) => route.id === storedRouteId)
+      ? storedRouteId
+      : (filteredRoutes[0]?.id ?? null);
 
   const selectedRoute = useMemo(
     () => routes.find((route) => route.id === selectedRouteId) ?? null,
@@ -208,22 +211,12 @@ function RoutesScreen() {
   const assignGroup = useAssignTasksToRoute(selectedRouteId ?? -1);
 
   // --- deep links & shortcuts ----------------------------------------------
-  const deepLink = useDeepLink();
-  const linkedRouteId = deepLink.number('ruta');
-  const wantsNew = deepLink.flag('nou');
+  useDeepLinkOnce('ruta', useDeepLink().number('ruta'), (routeId) => {
+    setSelectedRouteId(routeId);
+    recordUse('route', routeId);
+  });
 
-  useEffect(() => {
-    if (linkedRouteId === null) return;
-    setSelectedRouteId(linkedRouteId);
-    recordUse('route', linkedRouteId);
-    deepLink.clear('ruta');
-  }, [linkedRouteId, deepLink]);
-
-  useEffect(() => {
-    if (!wantsNew) return;
-    setCreateOpen(true);
-    deepLink.clear('nou');
-  }, [wantsNew, deepLink]);
+  useDeepLinkFlagOnce('nou', () => setCreateOpen(true));
 
   useShortcuts([
     {

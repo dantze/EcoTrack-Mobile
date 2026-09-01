@@ -801,7 +801,58 @@ the Firebase key). Only then remove the reminder comment left in
 `repo-hygiene-allow.txt`. History rewriting is *not* required and is not
 proposed here — rotation is what actually ends the exposure.
 
-### TODO-25 `[ ]` Backend logging: `System.out`/`System.err`, and a swallowed failure
+**Still open: the rotation itself is in Google Cloud and nobody in this repo can
+do it.** What *could* be done here is done, and the history was checked first —
+it is worse than this item said.
+
+**Two different keys are involved. Fingerprinted rather than quoted** (sha256 of
+the key string, first 10 hex chars) so they can be told apart in the Google Cloud
+console without ever being written down again:
+
+| Key | Where | Status |
+|---|---|---|
+| `sha256:5aa6a2ce91` | Maps/Places | **the leaked one — rotate it** |
+| `sha256:8477701a13` | Firebase Android, `google-services.json` | ships in the APK by design; only needs its restrictions verified |
+
+**`807aec2` is not where it leaked, and a handoff doc is not the only place it
+sat.** `git log --all -S` finds the Maps key in four blobs across the history:
+
+- `f548f87:frontend/app.json` — where it was **first committed**, in plain app
+  config (`frontend/` is what `mobile/` was called then);
+- `807aec2:frontend/.env` — "Added security for api key" moved it out of
+  `app.json` into a `.env` **that was itself committed**, which is why the next
+  commit is `13a7980` "env oopsies" deleting that file;
+- `d1f7af5` and `a0e6441` — the `HANDOFF-auth-security.md` copies, deleted in
+  `ada49c1`.
+
+So three separate deletions have already been tried and the key is still one
+`git show` away. That is the argument for rotating rather than tidying again.
+
+**Rotating needs no code change.** Both consumers read the same environment
+variable — `app.config.js` (`android.config.googleMaps.apiKey` and
+`extra.googleMapsApiKey`) and, through `extra`,
+`app/Sales/OrderTypes/OrderComponents/LocationPicker.tsx`. Set the new key in
+`mobile/.env` for local runs and in the EAS secret for builds, then rebuild.
+
+**Fixed here, because it would have broken the rotation:** `mobile/.env.example`
+named the variable `GOOGLE_MAPS_API_KEY`, **without the `EXPO_PUBLIC_` prefix
+that both consumers actually read**. Copying the template and pasting the new key
+in would have produced a build whose `extra.googleMapsApiKey` is `''` and whose
+every Places call answers `REQUEST_DENIED` — with the old key still live and the
+new one looking broken. The template now carries both real names
+(`EXPO_PUBLIC_GOOGLE_MAPS_API_KEY` and the missing `EXPO_PUBLIC_API_BASE_URL`,
+whose absence leaves a build pointed at the dead `146.190.224.202` droplet) and
+says what each is for.
+
+**What remains, in order:** create a new Maps/Places key restricted to package
+`com.damiprod.ecotrack` + the release signing SHA-1 → put it in `mobile/.env` and
+the EAS secret → rebuild and confirm the picker still geocodes → **delete the old
+key** (not merely restrict it: it is public, and an unrestricted-but-unused key
+still bills) → verify `sha256:8477701a13` in `google-services.json` carries the
+same package + SHA-1 restriction → only then remove the reminder block from
+`.github/repo-hygiene-allow.txt` and close this item.
+
+### TODO-25 `[DONE]` Backend logging: `System.out`/`System.err`, and a swallowed failure
 `DataLoader`, `RecurringTaskScheduler` and `PhotoService.deletePhoto` print to
 stdout/stderr while the rest of the backend uses slf4j — so those lines miss the
 log format, the levels and anything that ships logs off the VPS.
@@ -812,7 +863,50 @@ looks. Decide whether it should propagate, and at what level, before mechanicall
 swapping the print for a logger call — the logger swap alone would tidy the
 symptom and keep the bug.
 
-### TODO-26 `[ ]` The web react-hooks lint backlog
+**Done. The decision on `deletePhoto`: do NOT propagate — report.** Every caller
+that currently ignores the result is a cascade whose actual job is deleting a row
+(a client, or a client's orders and their task photos), and they delete objects
+*before* the rows. Throwing would abort such a cascade halfway, with some objects
+already gone and the client still there — a state the operator has no way to
+finish or retry cleanly. A row deleted with its object left behind is
+recoverable; a half-deleted client is not. The method already returned a
+`boolean`, so the contract was right; what was broken was that nothing usable was
+recorded.
+
+So the failure is now an **ERROR carrying the bucket, the object key and the
+exception** — the old line had none of them, only `e.getMessage()` on stderr.
+That matters because once the owning row is gone the key exists nowhere else:
+this log line is the only remaining way to find what was orphaned.
+
+**And the callers now say whose photo it was**, which the service cannot know:
+`ClientService` logs a WARN naming the task and client for an orphaned task
+photo, and an **ERROR** for an orphaned ID photo — personal data, deleted
+immediately afterwards along with the only row linking it to a person (TODO-14).
+
+The rest was the mechanical half:
+
+- `DataLoader` → slf4j. "Checking for seed data" is DEBUG (it says nothing when
+  nothing happens); the two seeding lines and the product count are INFO, because
+  they record a database that was actually written to.
+- `RecurringTaskScheduler` → slf4j. The per-plan failure is `log.error(msg, e)`
+  **with the exception**, not its message: one plan failing does not stop the
+  fleet (a test pins that), so this line is the only evidence it happened, at
+  02:00 with nobody watching. The closing line now reports `generated` out of
+  `activePlans.size()` rather than just the one number.
+- **`DamiProdApplication`'s `CommandLineRunner` is deleted, not converted.** Its
+  whole body was `System.out.println("Server started successfully")`; Boot
+  already logs `Started DamiProdApplication in Xs` through the same appender,
+  with a timing the print did not have. A comment in its place says so.
+
+`grep -rn "System.out|System.err" backend/src/main` is now empty. **Verified:
+`./gradlew test` — 253 tests, 0 failures.**
+
+*Left open deliberately:* nothing reaps the objects these ERROR lines name. The
+log makes an orphan findable by a human reading logs; it does not clean it up,
+and for ID photos "findable in a log" is not a retention policy. That belongs
+with TODO-14, which has to decide how long ID photos may exist at all.
+
+### TODO-26 `[DONE]` The web react-hooks lint backlog
 `npm run lint` is 0 errors / 105 warnings. Two clusters are real and deliberately
 deferred:
 - **`react-hooks/set-state-in-effect` (~25 sites)** — a derive-state-from-props
@@ -826,6 +920,86 @@ deferred:
 
 The 25 messages from `useStableBounds` in `MapPage.tsx` are **not** in scope: its
 comment argues that a render-time ref write is the correct idiom there, and it is.
+
+**Done. `npm run lint`: 105 warnings → 48, and `react-hooks` is 61 → 3.** Every
+one of the 25 `set-state-in-effect` sites was read on its own, because they were
+not one pattern — they were five, with five different right answers. What follows
+is the taxonomy, since the next person to add a screen will write one of these
+again:
+
+**1. The highlight clamp — a real bug, not a style violation (5 sites).**
+`Autocomplete`, `Select`, `CommandPalette`, `useListKeyboard` and `ClientPicker`
+all stored a highlighted index and corrected it in an effect when the list
+shrank. An effect corrects it **one render too late**, and that render is real:
+`items[highlight]` is `undefined`, so the listbox draws a highlight on nothing,
+`aria-activedescendant` points at a row that is not there, and **Enter commits
+nothing**. Now clamped on read — `Math.max(0, Math.min(stored, length - 1))` —
+which is not a workaround but the honest statement that the index only means
+anything relative to the current list. The arrow-key handlers step from the
+clamped value too, or they wrap from an index that no longer exists.
+
+**2. Nine deep links, one hook.** Every screen that accepts an intent
+(`?comanda=`, `?client=`, `?ruta=`, `?sarcina=`, `?zi=`, `?plan=`, `?nou=`)
+carried its own six-line copy of "if the param is there, apply it, then clear
+it". They are now `useDeepLinkOnce` / `useDeepLinkFlagOnce` in `lib/deepLink.ts`.
+
+**This one keeps its effect, and that is the considered answer, written down
+once instead of nine times.** A URL is an external store owned by the router, not
+a prop to derive from, so there is nothing to compute during render; and there is
+no handler to move it into, because the navigation happened in the command
+palette, in another tab, or in a link someone pasted — *the arrival is the
+event*. The refactor that would genuinely delete the effect is to stop copying
+the intent into state and let the URL **be** the open drawer. That is a real
+design and a bigger one — it changes what Back does on every screen — so it is
+not something to smuggle in under a lint fix. Recorded here rather than done.
+
+**3. Reset-on-open → remount (5 sites).** `RouteFormModal`, `AssignRecurringModal`,
+both pickers and `CommandPalette` kept a stale filter/draft while closed and
+cleared it in an effect. `Modal` already returns `null` when closed, so nothing
+of them was on screen anyway: each is now a two-line wrapper that returns `null`
+and a body that only mounts while open. State resets because it never survives —
+which also cannot be forgotten when someone adds a sixth `useState` later.
+
+**4. Two moved to the event that causes them.** `Select` put the cursor on the
+current value in an effect keyed on `open` (with an `exhaustive-deps`
+suppression to hide that it read `visible` and `value` too); it now happens in
+the two handlers that open the list, so the first painted frame is already
+right. `CommandPalette` reset its highlight in an effect on `query`; it now
+happens in the input's `onChange`.
+
+**5. Two derived instead of stored.** `RoutesPage`'s selected route is computed
+from the filtered list (stored id if still visible, else the first row) — the
+effect version left one render where the selection pointed at a route that had
+just been filtered out, long enough for `useRouteTasks` to fetch its tasks.
+`OrdersPage`'s Curente/Arhivă follow is now React's documented *adjust during
+render* pattern, keyed on the order **and** its archived-ness, because the task
+status arrives from a later query and that late answer has to move the tab too.
+
+**The one that stays, with a reason in the code:** `EnrollmentPage`'s poll.
+Nothing to derive (the answer is on a server), no event to move it into (waiting
+for an admin *is* the screen), and the first immediate tick is the point.
+
+**The `react-hooks/refs` cluster:** `useEscapeKey` and `useOutsideClick` now
+write their handler refs in an effect — safe precisely because each ref is only
+read from a listener that a later effect installs, so it cannot be read before
+the commit. **`useEvent` keeps its render-time write**, as this item predicted:
+its returned callback can run before passive effects flush and would then call
+the previous render's function, which is a behaviour change under every modal in
+the app. It carries a one-line suppression and the paragraph explaining it.
+`useStableBounds` in `MapPage.tsx` keeps its 26 warnings' worth of idiom, but the
+disable is now **scoped to that function** rather than left as noise — the rest
+of the file still reports, so the next real one is visible.
+
+**What is left, and why:** 3 `react-hooks` warnings, all in `AuthProvider.tsx`
+(one `exhaustive-deps` that already carried a suppression for the
+`scheduleRefresh`/`runRefresh` mutual recursion, plus `immutability` and
+`preserve-manual-memoization` on the same block) and 45
+`react-refresh/only-export-components`, which is a Fast-Refresh advisory about
+files exporting both a component and a constant — a different rule, a different
+question, and untouched here.
+
+**Verified:** typecheck clean, **395 tests green**, build clean, bundle
+**139.6 kB / 160 kB**.
 
 ### TODO-27 `[ ]` The 60-day refresh-token arithmetic no longer describes production
 `ecotrack.security.refresh-token-ttl-days=365`, but `TokenService`'s javadoc and

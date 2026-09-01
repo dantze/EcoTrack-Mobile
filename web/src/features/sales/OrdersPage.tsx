@@ -28,7 +28,7 @@
  * one the link named.
  */
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
   Badge,
   Button,
@@ -50,7 +50,7 @@ import {
   TaskStatusBadge,
 } from '@/components/domain';
 import { ORDER_TYPES, type Order, clientName } from '@/types/domain';
-import { useDeepLink } from '@/lib/deepLink';
+import { useDeepLink, useDeepLinkOnce, useDeepLinkFlagOnce } from '@/lib/deepLink';
 import { useShortcuts } from '@/lib/hotkeys';
 import { recordUse } from '@/lib/recents';
 import { ErrorNotice, FilterBar, FilterField, SearchInput } from './components/FilterBar';
@@ -111,22 +111,12 @@ export function OrdersPage() {
   const orders = useMemo(() => ordersQuery.data ?? [], [ordersQuery.data]);
 
   // ── Deep links from the command palette and from shared URLs ────────────
-  const deepLink = useDeepLink();
-  const linkedOrderId = deepLink.number('comanda');
-  const wantsNew = deepLink.flag('nou');
+  useDeepLinkOnce('comanda', useDeepLink().number('comanda'), (orderId) => {
+    setDrawer({ kind: 'detail', orderId });
+    recordUse('order', orderId);
+  });
 
-  useEffect(() => {
-    if (linkedOrderId === null) return;
-    setDrawer({ kind: 'detail', orderId: linkedOrderId });
-    recordUse('order', linkedOrderId);
-    deepLink.clear('comanda');
-  }, [linkedOrderId, deepLink]);
-
-  useEffect(() => {
-    if (!wantsNew) return;
-    setDrawer({ kind: 'create' });
-    deepLink.clear('nou');
-  }, [wantsNew, deepLink]);
+  useDeepLinkFlagOnce('nou', () => setDrawer({ kind: 'create' }));
 
   const openDetail = (orderId: number) => {
     recordUse('order', orderId);
@@ -215,10 +205,23 @@ export function OrdersPage() {
   // is on Curente. Follow the order rather than opening a drawer over a list
   // that does not contain its row.
   const openOrderIsArchived = openOrder !== null && isOrderFulfilled(taskStatuses?.[openOrder.id]);
-  useEffect(() => {
-    if (!openOrder) return;
+
+  // Adjusted DURING RENDER rather than in an effect (TODO-26), which is React's
+  // own answer for "one piece of state has to follow another"
+  // (react.dev/learn/you-might-not-need-an-effect). The tab lands correct on the
+  // first paint instead of showing the wrong list for a frame, and `view` stays
+  // ordinary state that the tabs themselves still write.
+  //
+  // The key is the ORDER PLUS its archived-ness, not the order alone: the task
+  // status arrives from its own query afterwards, so an order opens looking
+  // current and turns out to be archived a moment later — and that late answer
+  // has to move the tab too.
+  const followKey = openOrder ? `${openOrder.id}:${openOrderIsArchived}` : null;
+  const [followedKey, setFollowedKey] = useState<string | null>(null);
+  if (followKey !== null && followKey !== followedKey) {
+    setFollowedKey(followKey);
     setView(openOrderIsArchived ? 'archive' : 'current');
-  }, [openOrder, openOrderIsArchived]);
+  }
 
   const removeOrders = async (ids: number[], label: string) => {
     const confirmed = await confirm({

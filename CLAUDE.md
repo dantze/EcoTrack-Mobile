@@ -314,6 +314,19 @@ them live together in each feature's `queries.ts`, namespaced by module
 (`'admin'`, `'auth'`, `'sales'`, `'technical'`) so invalidating a parent key
 cascades. Screens supply only toasts.
 
+**Local state has three house rules, all from TODO-26.** They exist because the
+same three mistakes were made on nearly every screen:
+
+- **A highlighted index is clamped on READ**, never corrected in an effect — the
+  list shrinks during render, and an effect fixes it one render too late, in
+  which Enter commits nothing.
+- **A dialog resets by not being mounted.** `Modal` renders `null` when closed,
+  so a dialog with local state is a wrapper that returns `null` plus a body that
+  only mounts while open — not a `useEffect` clearing fields on `open`.
+- **A deep link is consumed by `useDeepLinkOnce` / `useDeepLinkFlagOnce`**
+  (`lib/deepLink.ts`), not by a hand-rolled effect per screen. That hook is also
+  where the one written argument for keeping such an effect lives.
+
 **Task status is read-only in the web app.** Only a driver sets it, from mobile.
 The badges and filters stay; the write controls were removed, and
 `features/technical/__tests__/statusIsReadOnly.test.ts` fails if any file under

@@ -3,8 +3,6 @@ package com.example.damiProd;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.boot.autoconfigure.security.servlet.UserDetailsServiceAutoConfiguration;
-import org.springframework.boot.CommandLineRunner;
-import org.springframework.context.annotation.Bean;
 import org.springframework.scheduling.annotation.EnableScheduling;
 
 // UserDetailsServiceAutoConfiguration is excluded because auth here is entirely
@@ -20,11 +18,9 @@ public class DamiProdApplication {
 		SpringApplication.run(DamiProdApplication.class, args);
 	}
 
-	@Bean
-	CommandLineRunner run() {
-		return args -> {
-			System.out.println("Server started successfully");
-		};
-	}
+	// There is deliberately no CommandLineRunner printing "Server started
+	// successfully" any more (TODO-25). Boot already logs "Started
+	// DamiProdApplication in Xs" through the same appender as everything else,
+	// with a timing the print did not have.
 
 }

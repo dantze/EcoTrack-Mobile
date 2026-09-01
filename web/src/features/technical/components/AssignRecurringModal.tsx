@@ -14,7 +14,7 @@
  * leaving the filter box.
  */
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Button, Modal, TextInput } from '@/components/ui';
 import { formatDate } from '@/components/domain';
 import { boost, recordUse } from '@/lib/recents';
@@ -44,16 +44,26 @@ function planMeta(plan: RecurringIgienizare): string {
   ].join(' · ');
 }
 
-export function AssignRecurringModal({ open, onClose, route }: AssignRecurringModalProps) {
+/**
+ * Fresh state per open, by REMOUNTING rather than by an effect (TODO-26).
+ *
+ * `Modal` already returns null while closed, so nothing of this dialog is on
+ * screen between opens — the only thing staying mounted was the filter string,
+ * which every open then had to clear. Not rendering the body at all is the
+ * same reset without the extra render, and it cannot be forgotten when a new
+ * piece of state is added here later.
+ */
+export function AssignRecurringModal(props: AssignRecurringModalProps) {
+  if (!props.open) return null;
+  return <AssignRecurring {...props} />;
+}
+
+function AssignRecurring({ open, onClose, route }: AssignRecurringModalProps) {
   const { toast } = useFeedback();
   const plansQuery = useRecurring('unassigned');
   const assign = useAssignRecurringRoute();
 
   const [query, setQuery] = useState('');
-
-  useEffect(() => {
-    if (open) setQuery('');
-  }, [open]);
 
   const filtered = useMemo(() => {
     const list = (plansQuery.data ?? []).filter((plan) =>

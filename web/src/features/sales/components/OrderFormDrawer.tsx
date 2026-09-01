@@ -147,8 +147,12 @@ export function OrderFormDrawer({ order = null, initialClient = null, onClose }:
     return buildPacketGroups(clientOrders, completed);
   }, [needsPackets, clientOrders, pickupStatusesQuery.data]);
 
-  const products = productsQuery.data ?? [];
-  const subscriptions = subscriptionsQuery.data ?? [];
+  // Memoised because the `?? []` is a fresh array on every render whenever the
+  // query has not resolved, and both feed the `suggestion` memo below — so
+  // without this that memo recomputes on every render while the catalogue loads,
+  // which is exactly the case it exists to avoid (TODO-26).
+  const products = useMemo(() => productsQuery.data ?? [], [productsQuery.data]);
+  const subscriptions = useMemo(() => subscriptionsQuery.data ?? [], [subscriptionsQuery.data]);
   // Fall back to the order's own product/subscription so an edit still works
   // while the catalogue is loading, or when the record points at a retired one.
   const orderProduct = order && order.orderType === 'Amplasari' ? order.product : null;

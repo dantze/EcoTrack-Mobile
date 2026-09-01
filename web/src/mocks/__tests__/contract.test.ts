@@ -22,6 +22,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { mockApi, DEV_DEVICE_ID } from '@/mocks';
 import { MockApiError } from '@/mocks/store';
+import { SubscriptionInUseError } from '@/api/errors';
 import type { EcoTrackApi } from '@/api/contract';
 import { setAccessToken } from '@/auth/tokenBridge';
 
@@ -389,6 +390,81 @@ describe('the failures the UI must render', () => {
   it('allows deleting an unreferenced product', async () => {
     const product = await api.products.create({ name: 'Nefolosit', description: null, price: 10 });
     await expect(api.products.remove(product.id)).resolves.toBeUndefined();
+  });
+
+  // -------------------------------------------------------------------------
+  // Retiring a subscription is refused while live orders still use it.
+  // Mirrors SubscriptionService.deactivate() — the UI branches on this class,
+  // so the mock has to throw it too or mock mode cannot exercise the dialog.
+  // -------------------------------------------------------------------------
+
+  const isoDaysFromToday = (days: number): string => {
+    const date = new Date();
+    date.setUTCHours(0, 0, 0, 0);
+    date.setUTCDate(date.getUTCDate() + days);
+    return date.toISOString().slice(0, 10);
+  };
+
+  const makePlan = () =>
+    api.subscriptions.create({
+      name: `Plan ${Math.random().toString(36).slice(2, 8)}`,
+      description: null,
+      type: 'ONE_TIME',
+      price: 150,
+      visitsPerMonth: null,
+      durationMonths: null,
+      isIndefinite: null,
+      isActive: true,
+    });
+
+  it('refuses to retire a subscription an UNFULFILLED order still uses, and names it', async () => {
+    const client = await api.clients.create({ type: 'company', name: 'Abonat Viu SRL' });
+    const plan = await makePlan();
+    const order = await api.orders.create(client.id, {
+      orderType: 'Igienizari',
+      subscription: { id: plan.id },
+      // Still ahead of us and no tasks yet: live work by any reading.
+      sanitationDate: isoDaysFromToday(30),
+    });
+
+    await expect(api.subscriptions.remove(plan.id)).rejects.toBeInstanceOf(SubscriptionInUseError);
+
+    // The refusal has to carry enough to LIST the blockers, not just count them.
+    const error = await api.subscriptions
+      .remove(plan.id)
+      .then(() => null)
+      .catch((thrown: unknown) => thrown as SubscriptionInUseError);
+    expect(error?.message).toContain('Abonamentul nu poate fi șters');
+    expect(error?.blockingOrders.map((blocker) => blocker.id)).toEqual([order.id]);
+    expect(error?.blockingOrders[0]?.clientName).toBe('Abonat Viu SRL');
+
+    // And nothing was retired.
+    const all = await api.subscriptions.listAll();
+    expect(all.find((entry) => entry.id === plan.id)?.isActive).toBe(true);
+  });
+
+  it('retires a subscription when only FULFILLED orders reference it', async () => {
+    const client = await api.clients.create({ type: 'company', name: 'Abonat Istoric SRL' });
+    const plan = await makePlan();
+    await api.orders.create(client.id, {
+      orderType: 'Igienizari',
+      subscription: { id: plan.id },
+      // A visit whose date is strictly behind us and that produced no tasks is
+      // history — blocking on it would make the plan undeletable forever.
+      sanitationDate: isoDaysFromToday(-30),
+    });
+
+    await expect(api.subscriptions.remove(plan.id)).resolves.toBeUndefined();
+    const all = await api.subscriptions.listAll();
+    expect(all.find((entry) => entry.id === plan.id)?.isActive).toBe(false);
+  });
+
+  it('retires a subscription nothing references at all', async () => {
+    const plan = await makePlan();
+
+    await expect(api.subscriptions.remove(plan.id)).resolves.toBeUndefined();
+    const active = await api.subscriptions.list();
+    expect(active.some((entry) => entry.id === plan.id)).toBe(false);
   });
 
   it('refuses a second task for the same order (409)', async () => {

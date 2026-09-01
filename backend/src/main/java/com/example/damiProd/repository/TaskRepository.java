@@ -36,6 +36,10 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
     // Check if a task exists for an order
     boolean existsByOrder_Id(Long orderId);
 
+    // All tasks belonging to any of the given orders, in one query — used to
+    // decide fulfilment for a batch of orders without an N+1 fan-out.
+    List<Task> findByOrder_IdIn(java.util.Collection<Long> orderIds);
+
     // Find tasks by the route's employee and scheduled time range
     @Query("SELECT t FROM Task t WHERE t.route.employee.id = :employeeId AND t.scheduledTime >= :startOfDay AND t.scheduledTime < :endOfDay ORDER BY t.orderIndex ASC")
     List<Task> findByEmployeeAndScheduledDate(

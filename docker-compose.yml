@@ -49,8 +49,6 @@ services:
       DO_SPACES_REGION: ${DO_SPACES_REGION:-fra1}
       ECOTRACK_SECURITY_ENFORCE: ${ECOTRACK_SECURITY_ENFORCE:-true}
       ECOTRACK_CORS_ALLOWED_ORIGINS: ${ECOTRACK_CORS_ALLOWED_ORIGINS:-http://localhost:5173,http://localhost:3000}
-      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
-      GOOGLE_ALLOWED_DOMAIN: ${GOOGLE_ALLOWED_DOMAIN:-}
     ports:
       - "8080:8080"
     healthcheck:
@@ -76,7 +74,6 @@ services:
         # backend, so the browser never makes a cross-origin call.
         VITE_DATA_MODE: ${VITE_DATA_MODE:-live}
         VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api}
-        VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID:-}
     container_name: ecotrack_web
     restart: unless-stopped
     networks:

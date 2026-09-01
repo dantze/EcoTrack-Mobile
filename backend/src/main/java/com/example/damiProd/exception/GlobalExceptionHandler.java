@@ -75,6 +75,27 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
     }
 
+    /**
+     * A delete refused because live records still point at the resource.
+     *
+     * Same status and same body shape as the IllegalStateException handler
+     * below (ResourceInUseException IS an IllegalStateException) — this one
+     * only adds `blockingOrders`, so the UI can name the orders standing in the
+     * way instead of showing a bare count. Spring picks the most specific
+     * handler, so this wins for the subclass and nothing else changes.
+     */
+    @ExceptionHandler(ResourceInUseException.class)
+    public ResponseEntity<Map<String, Object>> handleResourceInUse(ResourceInUseException ex) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("timestamp", Instant.now().toString());
+        body.put("status", HttpStatus.CONFLICT.value());
+        body.put("error", "Conflict");
+        body.put("message", ex.getMessage());
+        body.put("blockingOrders", ex.getBlockingOrders());
+
+        return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+    }
+
     @ExceptionHandler(IllegalStateException.class)
     public ResponseEntity<Map<String, Object>> handleIllegalState(IllegalStateException ex) {
         Map<String, Object> body = new HashMap<>();

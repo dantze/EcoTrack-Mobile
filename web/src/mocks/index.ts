@@ -14,8 +14,9 @@
  *     Igienizare order that owns a recurring plan takes the plan and its
  *     pending tasks with it.
  *   - The error cases the UI has to handle are reproduced: creating a second
- *     task for the same order, deleting a client that still has orders, and
- *     deleting a product that is still referenced all throw.
+ *     task for the same order, deleting a client that still has orders,
+ *     deleting a product that is still referenced, and retiring a subscription
+ *     that unfulfilled orders still use all throw.
  *
  * Where the mock deliberately differs from the backend, the comment says so.
  */
@@ -38,6 +39,8 @@ import type {
   OrderTaskStatus,
   SessionDevice,
 } from '@/api/contract';
+import { SubscriptionInUseError, type BlockingOrder } from '@/api/errors';
+import { isFulfilled, summarizeTaskStatus } from '@/lib/orderLifecycle';
 import { readRefreshToken } from '@/auth/storage';
 import { getAccessToken } from '@/auth/tokenBridge';
 import type {
@@ -53,6 +56,7 @@ import type {
   TaskType,
 } from '@/types/domain';
 import { clientName } from '@/types/domain';
+import type { IgienizareRow } from './store';
 import {
   MockApiError,
   buildOrder,
@@ -594,6 +598,39 @@ const productsApi: EcoTrackApi['products'] = {
 // Subscriptions
 // ---------------------------------------------------------------------------
 
+/**
+ * Which orders stand in the way of retiring this plan.
+ *
+ * "In use" means an Igienizare order referencing the plan that is NOT yet
+ * fulfilled — the same rule backend OrderFulfilmentPolicy.java applies. Both
+ * sides defer to `isFulfilled` in @/lib/orderLifecycle rather than re-deriving
+ * "done": a mock that judged fulfilment differently from the backend would
+ * refuse different deletes in mock mode than in production, which is exactly
+ * the substitutability this file exists to preserve.
+ */
+function unfulfilledOrdersUsingSubscription(subscriptionId: number): BlockingOrder[] {
+  const today = isoDate(todayUtc());
+  return db.orders
+    .filter(
+      (order): order is IgienizareRow =>
+        order.orderType === 'Igienizari' && order.subscriptionId === subscriptionId,
+    )
+    .filter((order) => {
+      const tasks = db.tasks.filter((task) => task.orderId === order.id).map(buildTask);
+      return !isFulfilled(buildOrder(order), summarizeTaskStatus(tasks), today);
+    })
+    .map((order) => {
+      const client = db.clients.find((entry) => entry.id === order.clientId);
+      return {
+        id: order.id,
+        number: order.number,
+        orderType: order.orderType,
+        clientName: client ? clientName(client) : null,
+        date: order.sanitationDate,
+      };
+    });
+}
+
 const subscriptionsApi: EcoTrackApi['subscriptions'] = {
   list: () => respond(() => db.subscriptions.filter((sub) => sub.isActive).map((sub) => ({ ...sub }))),
 
@@ -626,6 +663,22 @@ const subscriptionsApi: EcoTrackApi['subscriptions'] = {
     respond(() => {
       const sub = db.subscriptions.find((entry) => entry.id === id);
       if (!sub) notFound('Subscription', id);
+
+      // Refused while unfulfilled orders still reference the plan, exactly
+      // like SubscriptionService.deactivate() — same 409, same Romanian
+      // sentence, same blocker list.
+      const blockingOrders = unfulfilledOrdersUsingSubscription(id);
+      if (blockingOrders.length > 0) {
+        throw new SubscriptionInUseError(
+          `Abonamentul nu poate fi șters: este folosit de ${blockingOrders.length}` +
+            (blockingOrders.length === 1
+              ? ' comandă nefinalizată.'
+              : ' comenzi nefinalizate.') +
+            ' Finalizați sau ștergeți comenzile, apoi încercați din nou.',
+          blockingOrders,
+        );
+      }
+
       // Soft delete, exactly like SubscriptionService.deactivate().
       sub.isActive = false;
     }),

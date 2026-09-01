@@ -22,12 +22,17 @@ filters verbatim** — if a row matches, that workflow will run on your PR.
 
 | Changed | Workflow | Run |
 |---|---|---|
-| `backend/**`, `.github/workflows/ci-backend.yml`, `.github/scripts/junit_summary.py`, `.github/scripts/jacoco_summary.py` | `ci-backend.yml` | backend block below |
-| `web/**`, `.github/workflows/ci-web.yml`, `.github/scripts/bundle_budget.py` | `ci-web.yml` | web block below |
+| `backend/**`, `shared/**`, `.github/workflows/ci-backend.yml`, `.github/scripts/junit_summary.py`, `.github/scripts/jacoco_summary.py` | `ci-backend.yml` | backend block below |
+| `web/**`, `shared/**`, `.github/workflows/ci-web.yml`, `.github/scripts/bundle_budget.py` | `ci-web.yml` | web block below |
 | `mobile/**`, `.github/workflows/ci-mobile.yml` | `ci-mobile.yml` | mobile block below |
 | **anything at all** | `repo-hygiene.yml` | hygiene block below — always |
 
 Always run from the project subdirectory, never the repo root.
+
+**`shared/**` is in TWO rows on purpose.** `shared/order-lifecycle-cases.json`
+holds golden cases that the backend and web suites BOTH read, so a change to it
+must re-run both — a fixture only one side checks is not a contract. If you
+edit it, run the backend block and the web block, however small the diff looks.
 
 ### backend
 
@@ -84,13 +89,42 @@ python3 -m pip install --quiet pyyaml
 git diff --name-only origin/main... | python3 .github/scripts/repo_hygiene.py
 ```
 
-This exists precisely to cover changes that fall outside all three `paths:`
-filters and would otherwise get no CI at all. **Its exit code is the point** —
-unlike the summary scripts, it fails the job. It checks for secret filenames,
-secret contents, unpinned actions, and files with no workflow watching them.
+Plus three cross-cutting guards in the same workflow, which compare one project
+against another (or code against prose) and therefore cannot live behind a
+`paths:` filter:
+
+```bash
+python3 .github/scripts/cross_project_invariants.py   # order types + task statuses, all 3 projects
+python3 .github/scripts/doc_claims.py                 # doc/comment paths resolve; pinned claims hold
+python3 .github/scripts/dead_config.py                # ecotrack.* keys nothing reads
+```
+
+`repo_hygiene.py` exists precisely to cover changes that fall outside all three
+`paths:` filters and would otherwise get no CI at all. **Its exit code is the
+point** — unlike the summary scripts, it fails the job. It checks for secret
+filenames, secret contents, unpinned actions, and files with no workflow
+watching them.
 
 If it reports a path with no CI coverage, the fix is to add a workflow or add an
 entry to `.github/repo-hygiene-allow.txt` **with a reason** — not to silence it.
+
+**What each guard is protecting, so a failure is legible rather than annoying:**
+
+- *cross-project invariants* — the order-type discriminator and task statuses
+  are string literals duplicated across three languages with no shared schema.
+  A missing backend `@JsonSubTypes` entry throws at runtime; a missing web or
+  mobile literal is silent. See the `order-type` skill for every file involved.
+- *doc claims* — CLAUDE.md and the skills are followed literally by humans and
+  agents. A pointer to a file that moved is worse than no pointer. This also
+  pins symbols, not just paths: a comment naming a file that still exists but no
+  longer defines the thing is the exact bug that motivated it.
+- *dead config* — config outlives the feature it configured, and a stale key
+  reads as a supported feature to the next person.
+
+Failing one of these means a fact is now duplicated inconsistently. **Fix the
+disagreement, don't relax the check** — and if a difference is genuinely
+intended, encode it (there is a declared backend-only task-status set for
+exactly that) with a comment saying why.
 
 ## Step 3 — report honestly
 

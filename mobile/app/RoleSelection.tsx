@@ -26,6 +26,17 @@ const ROLE_CONFIG = {
         route: '/Technical/Menu',
         color: '#FF9800',
     },
+    // ADMIN has no screens of its own here — administration is a web job. What
+    // an admin holding the phone wants is to look at a driver's day, which is
+    // what DriverSelection does. Without this row an ADMIN+DRIVER account
+    // (the first person to enroll, most likely) would see a one-card picker.
+    ADMIN: {
+        title: 'Administrator',
+        subtitle: 'Rutele oricărui șofer',
+        icon: 'shield-checkmark-outline' as const,
+        route: '/Driver/DriverSelection',
+        color: '#9C27B0',
+    },
 };
 
 type RoleKey = keyof typeof ROLE_CONFIG;
@@ -37,7 +48,7 @@ const RoleSelection = () => {
     // away on its own left this device's refresh token valid for 60 more days.
     const handleLogout = async () => {
         await AuthService.logout();
-        router.replace('/login');
+        router.replace('/enrollment');
     };
     const params = useLocalSearchParams();
 

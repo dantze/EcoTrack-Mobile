@@ -359,12 +359,12 @@ export interface AssignGroupVars {
 }
 
 /**
- * Accepting a suggested group: move a batch of unassigned tasks onto one route
- * and immediately persist the driving order they were proposed in.
+ * The "held tray" pick-up gesture: move a batch of unassigned tasks onto one
+ * route and immediately persist the order they are dropped in.
  *
  * Two calls, same as `useMoveTaskToRoute`, because the contract has no
  * "assign at positions" endpoint. Not optimistic: this writes several rows at
- * once from a suggestion, and showing the real result is worth the round trip.
+ * once, and showing the real result is worth the round trip.
  */
 export function useAssignTasksToRoute(
   routeId: number,

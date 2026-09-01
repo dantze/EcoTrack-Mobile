@@ -23,14 +23,6 @@ export const DATA_MODE: DataMode =
 export const API_BASE_URL: string =
   import.meta.env.VITE_API_BASE_URL ?? 'http://146.190.224.202:8080/api';
 
-/**
- * OAuth client id for "Continuă cu Google" (Google Identity Services). Unset
- * in mock mode — mock signs the Google button in as a seeded demo user
- * without ever loading the Google script. Unset in live mode hides the
- * button entirely rather than rendering one that cannot work.
- */
-export const GOOGLE_CLIENT_ID: string | undefined = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-
 /** Artificial delay applied to mock responses, in ms, so loading states are real. */
 export const MOCK_LATENCY_MS = Number(import.meta.env.VITE_MOCK_LATENCY_MS ?? 220);
 

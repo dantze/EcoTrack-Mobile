@@ -22,7 +22,7 @@ const DriverRoutes = () => {
         try {
             const user = await AuthService.getCurrentUser();
             if (!user) {
-                router.replace('/login');
+                router.replace('/enrollment');
                 return;
             }
 
@@ -39,7 +39,7 @@ const DriverRoutes = () => {
             }
         } catch (error) {
             console.error('Error loading user:', error);
-            router.replace('/login');
+            router.replace('/enrollment');
         }
     };
 
@@ -88,7 +88,7 @@ const DriverRoutes = () => {
     // away on its own left this device's refresh token valid for 60 more days.
     const handleLogout = async () => {
         await AuthService.logout();
-        router.replace('/login');
+        router.replace('/enrollment');
     };
 
     if (loading) {

@@ -65,11 +65,36 @@ jobs:
       - name: Hygiene checks
         run: python3 .github/scripts/repo_hygiene.py --changed-files changed.txt
 
-      - name: Validate workflow YAML
+      # The three cross-cutting checks below all belong here rather than in a
+      # per-project CI file: each compares facts across projects, or between
+      # code and prose, so running them under a `paths:` filter would mean a
+      # PR touching one side never checks it against the other.
+      #
+      # `if: always()` so one failure does not hide the others — a PR that
+      # broke two of them should learn about both in one run.
+      - name: Cross-project invariants
+        if: always()
+        run: python3 .github/scripts/cross_project_invariants.py
+
+      - name: Documentation claims
+        if: always()
+        run: python3 .github/scripts/doc_claims.py
+
+      - name: Dead configuration
+        if: always()
+        run: python3 .github/scripts/dead_config.py
+
+      # Compose files are included because they are deploy surface that no
+      # ci-*.yml `paths:` filter covers — this step is the only thing standing
+      # between a typo in docker-compose.yml and a failed production deploy.
+      # That is also what justifies their NO_CI_REQUIRED entry in
+      # repo_hygiene.py: they ARE checked, here.
+      - name: Validate workflow and compose YAML
         if: always()
         run: |
-          for f in .github/workflows/*.yml; do
+          for f in .github/workflows/*.yml docker-compose*.yml; do
+            [ -e "$f" ] || continue
             python3 -c "import yaml,sys; yaml.safe_load(open(sys.argv[1]))" "$f" \
               || { echo "::error file=$f::not valid YAML"; exit 1; }
           done
-          echo "All workflow files parse."
+          echo "All workflow and compose files parse."

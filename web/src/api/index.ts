@@ -19,6 +19,7 @@ export const api: EcoTrackApi = IS_MOCK ? mockApi : liveApi;
 export { DATA_MODE };
 export * from './contract';
 export { ApiError } from './http';
+export { SubscriptionInUseError, type BlockingOrder } from './errors';
 
 /**
  * Demo credentials for the seeded mock account, so LoginPage can hint them

@@ -289,7 +289,13 @@ export interface SubscriptionsApi {
   create(input: Omit<Subscription, 'id'>): Promise<Subscription>;
   /** PUT /subscriptions/{id} */
   update(id: number, input: Omit<Subscription, 'id'>): Promise<Subscription>;
-  /** DELETE /subscriptions/{id} */
+  /**
+   * DELETE /subscriptions/{id} — a SOFT delete (isActive = false).
+   *
+   * Throws `SubscriptionInUseError` (`@/api/errors`) when unfulfilled orders
+   * still reference the plan: the backend answers 409 and both implementations
+   * surface it as that class, carrying the blocking orders.
+   */
   remove(id: number): Promise<void>;
 }
 

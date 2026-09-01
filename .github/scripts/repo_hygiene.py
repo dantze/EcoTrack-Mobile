@@ -40,6 +40,12 @@ NO_CI_REQUIRED = {
     "CLAUDE.md",
     "README.md",
     "TODO.md",          # the backlog; prose, ships in no build
+    # Deploy surface that no ci-*.yml `paths:` filter covers. Exempt only
+    # because repo-hygiene.yml parses them itself on every PR — if that step
+    # is ever removed, remove these too rather than leaving them unchecked.
+    "docker-compose.yml",
+    "docker-compose.dev-hosted.yml",
+    ".env.example",     # a template; documentation, ships in no build
 }
 NO_CI_REQUIRED_GLOBS = ("HANDOFF-*.md",)
 

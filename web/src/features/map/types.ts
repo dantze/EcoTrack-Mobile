@@ -15,6 +15,7 @@
  * third of the work looks complete and is worse than no map at all.
  */
 
+import type { Lifecycle } from '@/lib/orderLifecycle';
 import type { OrderTypeTag, TaskStatus, TaskType } from '@/types/domain';
 
 // ---------------------------------------------------------------------------
@@ -22,29 +23,16 @@ import type { OrderTypeTag, TaskStatus, TaskType } from '@/types/domain';
 // ---------------------------------------------------------------------------
 
 /**
- * Where an order sits in its life, derived in `data.ts` from the order's own
- * dates and the status of the tasks generated from it. This is the axis the
- * "incoming vs done" views are built on, not a field the backend stores.
+ * Where an order sits in its life. The type, the ordered list and the Romanian
+ * labels now live in `@/lib/orderLifecycle` — Comenzi's Arhivă is built on the
+ * same derivation, so it stopped being map-specific. Re-exported here because
+ * every map module reads its vocabulary from this file.
  */
-export type Lifecycle =
-  /** Scheduled, hasn't started. */
-  | 'upcoming'
-  /** Cabins are on site now / work is under way. */
-  | 'active'
-  /** Finished — picked up, or every task completed. */
-  | 'done'
-  /** Past its date with work still open. The queue that actually needs a human. */
-  | 'overdue'
-  /** Not enough dates to say. */
-  | 'unknown';
-
-export const LIFECYCLES: readonly Lifecycle[] = [
-  'upcoming',
-  'active',
-  'overdue',
-  'done',
-  'unknown',
-];
+export {
+  LIFECYCLES,
+  LIFECYCLE_LABEL,
+  type Lifecycle,
+} from '@/lib/orderLifecycle';
 
 /** One plottable order. `id` is stable across rebuilds so selection survives a refetch. */
 export interface MapPoint {
@@ -224,14 +212,6 @@ export const LIFECYCLE_COLOR: Record<Lifecycle, string> = {
   overdue: '#dc2626',
   done: '#64748b',
   unknown: '#94a3b8',
-};
-
-export const LIFECYCLE_LABEL: Record<Lifecycle, string> = {
-  upcoming: 'Programate',
-  active: 'În desfășurare',
-  overdue: 'Întârziate',
-  done: 'Finalizate',
-  unknown: 'Fără dată',
 };
 
 /** Cycled per route so adjacent routes stay distinguishable. */

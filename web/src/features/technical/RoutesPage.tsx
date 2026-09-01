@@ -11,11 +11,6 @@
  * a bare ordered array of ids — and is applied optimistically so the list never
  * snaps back while the request is in flight.
  *
- * Above the stop list sit the two local suggestions from `./grouping.ts`:
- * unassigned jobs that fall on this route's day and near its stops, and a
- * shorter stop order. Both are proposals with their numbers on show — nothing
- * is assigned or reordered until the dispatcher accepts.
- *
  * `?ruta=<id>` selects a route and `?nou=1` opens the create form, which is how
  * the command palette (⌘K) lands here.
  */
@@ -108,7 +103,6 @@ import {
   usePlacement,
 } from './components/placement';
 import { DriverPickerModal, RoutePickerModal } from './components/pickers';
-import { DispatchSuggestions } from './components/suggestions';
 
 export function RoutesPage() {
   return (
@@ -624,33 +618,6 @@ function RoutesScreen() {
                 )
               }
             />
-
-            {selectedRoute && !routeTasksQuery.isPending && (
-              <DispatchSuggestions
-                route={selectedRoute}
-                routeTasks={routeTasks}
-                pool={unassignedTasks}
-                busy={assignGroup.isPending || reorderTasks.isPending}
-                onApplyGroup={(taskIds, orderedIds) =>
-                  assignGroup.mutate(
-                    { taskIds, orderedIds },
-                    {
-                      onSuccess: () =>
-                        toast.success(
-                          `${taskIds.length} sarcini au fost adăugate pe ${routeLabel(selectedRoute)}.`,
-                        ),
-                      onError: (error) => toast.error(errorMessage(error)),
-                    },
-                  )
-                }
-                onApplyOrder={(orderedIds) =>
-                  reorderTasks.mutate(orderedIds, {
-                    onSuccess: () => toast.success('Ordinea opririlor a fost actualizată.'),
-                    onError: (error) => toast.error(errorMessage(error)),
-                  })
-                }
-              />
-            )}
 
             {selectedRoute && <HeldTray onCancel={placement.clear} />}
 

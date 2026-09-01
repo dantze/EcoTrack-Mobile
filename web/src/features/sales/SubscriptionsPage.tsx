@@ -8,7 +8,11 @@
  * the catalogue look like something with a lifecycle to manage, which it is
  * not — you either sell a plan or you retire it.
  *
- * The list therefore shows only live plans; deleting one retires it.
+ * The list therefore shows only live plans; deleting one retires it — unless
+ * UNFULFILLED orders still reference it, in which case the backend refuses with
+ * 409 and the refusal is shown as a dialog listing the blocking orders. A toast
+ * would have been the wrong shape: the user has to act on those orders, and a
+ * message that disappears after six seconds cannot be acted on.
  */
 
 import { useMemo, useState } from 'react';
@@ -25,8 +29,15 @@ import {
   type Column,
   type SelectOption,
 } from '@/components/ui';
-import { formatMoney } from '@/components/domain';
-import { SUBSCRIPTION_TYPES, type Subscription, type SubscriptionType } from '@/types/domain';
+import { ORDER_TYPE_LABELS, formatDate, formatMoney } from '@/components/domain';
+import { SubscriptionInUseError, type BlockingOrder } from '@/api';
+import {
+  ORDER_TYPES,
+  SUBSCRIPTION_TYPES,
+  type OrderTypeTag,
+  type Subscription,
+  type SubscriptionType,
+} from '@/types/domain';
 import { includesFolded } from '@/lib/search';
 import { ErrorNotice, FilterBar, FilterField, SearchInput } from './components/FilterBar';
 import { ToggleField } from './components/fields';
@@ -56,6 +67,20 @@ const TYPE_OPTIONS: SelectOption<string>[] = SUBSCRIPTION_TYPES.map((type) => ({
   value: type,
   label: SUBSCRIPTION_TYPE_LABELS[type],
 }));
+
+/** A refused delete, held open until the user dismisses it. */
+interface BlockedDelete {
+  planName: string;
+  message: string;
+  orders: readonly BlockingOrder[];
+}
+
+/** `orderType` arrives as a raw backend string; only label the ones we know. */
+function orderTypeLabel(orderType: string): string {
+  return ORDER_TYPES.includes(orderType as OrderTypeTag)
+    ? ORDER_TYPE_LABELS[orderType as OrderTypeTag]
+    : orderType;
+}
 
 interface Draft {
   name: string;
@@ -145,6 +170,7 @@ export function SubscriptionsPage() {
   const [editing, setEditing] = useState<Subscription | null>(null);
   const [draft, setDraft] = useState<Draft | null>(null);
   const [draftErrors, setDraftErrors] = useState<DraftErrors>({});
+  const [blocked, setBlocked] = useState<BlockedDelete | null>(null);
 
   const subscriptions = useMemo(
     () => subscriptionsQuery.data ?? [],
@@ -215,6 +241,15 @@ export function SubscriptionsPage() {
       await deleteSubscription.mutateAsync(subscription.id);
       toast.success('Abonamentul a fost șters.');
     } catch (error) {
+      // A refusal is not a failure — it is a list of work to finish first.
+      if (error instanceof SubscriptionInUseError) {
+        setBlocked({
+          planName: subscription.name,
+          message: error.message,
+          orders: error.blockingOrders,
+        });
+        return;
+      }
       toast.error(errorMessage(error, 'Nu s-a putut șterge abonamentul'));
     }
   };
@@ -494,6 +529,41 @@ export function SubscriptionsPage() {
                 </div>
               </>
             )}
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        open={blocked !== null}
+        onClose={() => setBlocked(null)}
+        width="md"
+        title="Abonamentul nu poate fi șters"
+        footer={
+          <Button variant="secondary" onClick={() => setBlocked(null)}>
+            Am înțeles
+          </Button>
+        }
+      >
+        {blocked && (
+          <div className="flex flex-col gap-3 text-sm">
+            <p className="text-ink">{blocked.message}</p>
+            {blocked.orders.length > 0 ? (
+              <>
+                <p className="text-ink-muted">
+                  Comenzi care folosesc „{blocked.planName}”:
+                </p>
+                <ul className="divide-y divide-border rounded-md border border-border">
+                  {blocked.orders.map((order) => (
+                    <li key={order.id} className="flex items-baseline gap-3 px-3 py-2">
+                      <span className="tabular font-medium">#{order.number}</span>
+                      <span className="text-ink-muted">{orderTypeLabel(order.orderType)}</span>
+                      <span className="flex-1 truncate">{order.clientName ?? '—'}</span>
+                      <span className="tabular text-ink-muted">{formatDate(order.date)}</span>
+                    </li>
+                  ))}
+                </ul>
+              </>
+            ) : null}
           </div>
         )}
       </Modal>

@@ -83,12 +83,36 @@ const refreshAccessToken = async (): Promise<string | null> => {
     return refreshInFlight;
 };
 
+export interface ApiFetchOptions {
+    /**
+     * Send the request with NO Authorization header, and never refresh-retry it.
+     *
+     * Required for `/enrollment/**`. Those endpoints are `permitAll`, but
+     * `BearerTokenAuthenticationFilter` runs before authorisation and answers
+     * 401 to ANY request carrying a bearer token it cannot validate
+     * (`ecotrack.security.reject-invalid-bearer`, default on). A device whose
+     * session was revoked still has that dead token in AsyncStorage, so
+     * attaching it would make the one screen that could recover the device the
+     * one screen it cannot reach.
+     */
+    anonymous?: boolean;
+}
+
 /**
  * @param path API path *relative to the /api root*, e.g. `/tasks/12` — not a
  *             full URL. Leading slash included.
  */
-export const apiFetch = async (path: string, init: RequestInit = {}): Promise<Response> => {
+export const apiFetch = async (
+    path: string,
+    init: RequestInit = {},
+    options: ApiFetchOptions = {},
+): Promise<Response> => {
     const url = `${API_BASE_URL}${path}`;
+
+    if (options.anonymous) {
+        return fetch(url, init);
+    }
+
     const accessToken = await getAccessToken();
     const response = await fetch(url, withAuthHeader(init, accessToken));
 

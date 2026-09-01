@@ -22,6 +22,7 @@ import {
   parseCoordinates,
 } from '@/types/domain';
 import { formatDate, formatMoney } from '@/components/domain';
+import { orderPrimaryDate } from '@/lib/orderLifecycle';
 import { DEFAULT_PHONE_CODE, joinPhone, splitPhone } from './validation';
 
 // ---------------------------------------------------------------------------
@@ -40,17 +41,14 @@ export function isIgienizare(order: Order): order is IgienizareOrder {
   return order.orderType === 'Igienizari';
 }
 
-/** The date the order is *about* — used for sorting, filtering and display. */
-export function orderPrimaryDate(order: Order): string | null {
-  switch (order.orderType) {
-    case 'Amplasari':
-      return order.startDate;
-    case 'Ridicari':
-      return order.pickupDate;
-    case 'Igienizari':
-      return order.sanitationDate;
-  }
-}
+/**
+ * The date the order is *about* — used for sorting, filtering and display.
+ *
+ * Defined in `@/lib/orderLifecycle` because the lifecycle derivation there
+ * reasons about the same anchor and must not fork it; re-exported here so the
+ * screens that already import it from the order model keep working.
+ */
+export { orderPrimaryDate } from '@/lib/orderLifecycle';
 
 /** "12 mar. 2026" or "12 mar. 2026 – 30 apr. 2026" for a placement window. */
 export function orderDateLabel(order: Order): string {

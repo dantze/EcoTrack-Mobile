@@ -31,8 +31,9 @@ cd backend
 ./gradlew test
 ./gradlew test --tests "*TokenServiceTest"                 # one class
 ./gradlew test --tests "*OrderServiceTest.createOrder_shouldThrowWhenClientNotFound"
-./gradlew bootRun                # H2 file DB, enforcement OFF (see below)
-./gradlew bootRun --args='--spring.profiles.active=dev'    # same H2 DB, enforcement ON
+./gradlew bootRun                # H2 file DB, enforcement ON by default (see below)
+./gradlew bootRun --args='--spring.profiles.active=dev'    # same H2 DB, same enforcement
+ECOTRACK_SECURITY_ENFORCE=false ./gradlew bootRun          # the way to turn it OFF now
 
 # docker (full stack: backend + postgres + caddy with auto HTTPS)
 docker compose up -d --build     # starts all 3 services in production mode
@@ -55,21 +56,32 @@ npm run typecheck
 ```
 
 `bootRun` auto-loads `backend/.env` via a custom task in `build.gradle`.
-Only the backend has tests; `web` and `mobile` have typecheck only.
+All three projects have tests: backend Gradle/JUnit (240), `web` Vitest
+(326), `mobile` Vitest (83). Mobile's `vitest.config.ts` covers
+`{utils,types,constants,services}`, and a services test must `vi.mock` every
+native dependency with a factory or the real module loads and the suite dies.
 
 ## The security enforcement flag
 
 `ecotrack.security.enforce` is the single most important thing to understand
 before touching auth. It gates whether `/api/**` rejects unauthenticated
-requests. It does **not** gate the auth machinery — login/refresh/logout and
+requests. It does **not** gate the auth machinery — enrollment/refresh/logout and
 bearer-token validation always work, and `BearerTokenAuthenticationFilter`
 always populates the SecurityContext for callers that do send a token.
 
 | Where | Value | Why |
 |---|---|---|
-| `application.properties` (base, inherited by prod) | `false` | installed app builds predating the mobile token contract still send no tokens |
+| `application.properties` (base, inherited by prod) | `${ECOTRACK_SECURITY_ENFORCE:true}` | **defaults to `true`** — overridable per environment |
 | `application-dev.properties` | `true` | opt-in local enforcement |
 | `application-test.properties` | `true` | `@SpringBootTest` exercises the real behaviour |
+
+**Two stale claims to ignore, in the repo and in this file's own history.** The
+base value was flipped to `true` in `bc47aec`, and the prose around it was not
+updated: the comment in `application-prod.properties` still says production
+"inherits the safe default of `false`" — it does not, it inherits `true`. This
+table said the same thing until it was corrected. If something reads as
+unenforced, check the `ECOTRACK_SECURITY_ENFORCE` env var actually set on the
+box, not the comments.
 
 Two companion knobs sit next to it, both **independent of `enforce`**:
 
@@ -114,21 +126,53 @@ The role matrix answers "which VERBS may this role use". It does not answer
 **A new task endpoint needs a policy call, not just a matcher row.**
 
 Note that `@WebMvcTest` slices are not profiled, so they see the base default
-(`false`) rather than the test profile's `true`.
+rather than the test profile's value. Both are `true` today, so the distinction
+no longer changes behaviour — but it will again the moment the base default
+moves, which is why it is still worth knowing.
 
-### What flipping it to `true` now depends on
+### The client side of the contract
 
-`mobile/` implements the token contract as of the auth hardening work:
-`services/tokenStore.ts` holds the pair, `services/http.ts` attaches
-`Authorization` and does a single-flight refresh-and-retry on one 401, and
-`AuthService.logout()` revokes server-side. Every EcoTrack call in `mobile/`
-goes through `apiFetch` — third-party calls (Google Places in `LocationPicker`)
-deliberately do not, since that would leak the bearer token to another host.
+`mobile/` implements the token contract: `services/tokenStore.ts` holds the
+pair, `services/http.ts` attaches `Authorization` and does a single-flight
+refresh-and-retry on one 401, and `AuthService.logout()` revokes server-side.
+Every EcoTrack call in `mobile/` goes through `apiFetch` — third-party calls
+(Google Places in `LocationPicker`) deliberately do not, since that would leak
+the bearer token to another host.
 
-What is left is an operational question, not a code one: **every installed copy
-of the app has to be a build that sends tokens.** Flipping the flag logs out
-every device still running an older build, mid-route. Ship the update, confirm
-rollout, then flip.
+**`apiFetch(path, init, { anonymous: true })` is the exception that matters.**
+`BearerTokenAuthenticationFilter` 401s any request carrying a token it cannot
+validate, and it runs BEFORE authorization — so it fires on the `permitAll`
+enrollment endpoints too. A device whose session was revoked still holds that
+dead token, which would make the one screen that can recover the device the one
+screen it cannot reach. All three enrollment calls are `anonymous`; a test
+asserts it. **A new unauthenticated endpoint needs the same treatment.**
+
+*Historical note:* this section used to explain what flipping `enforce` to
+`true` was waiting on — every installed build having to send tokens first. That
+rationale is spent (`/api/auth/login` is deleted, so older builds cannot
+authenticate at all) and the base default is already `true`. See TODO-25.
+
+### Enrollment is how anyone gets in — there is no login
+
+Passwords and Google sign-in are gone; `POST /api/auth/login` no longer exists.
+A device enrols and an admin approves it.
+
+| Endpoint | Returns |
+|---|---|
+| `GET /api/enrollment/status` | `{awaitingBootstrap, setupCodeRequired}` |
+| `POST /api/enrollment/request` | `{requestId, claimSecret, verificationCode, expiresAt, autoApproved}` · 403 bad setup code · 429 throttled |
+| `POST /api/enrollment/claim` | 200 `LoginResponse` · **202 still pending** · 403 rejected · 410 expired/spent · 404 unknown |
+
+The client shows `verificationCode` (six digits) and polls `claim` until it
+stops returning 202. **`autoApproved` is how first-user-becomes-admin works** —
+there is no separate bootstrap path, the first enrollee simply gets tokens on
+its first poll. Requests live 10 minutes and, once approved, must be claimed
+within 10 more (`ecotrack.enrollment.*`).
+
+`AccessRequest` + `EnrollmentService` own this on the backend; the web entry
+point is `EnrollmentPage`, the mobile one is `app/enrollment.tsx` plus
+`services/EnrollmentService.ts`. The device id is client-minted and persisted —
+it is a self-asserted label for revocation and polling, **not a credential**.
 
 ## Backend architecture
 
@@ -149,15 +193,18 @@ tops up indefinite plans nightly at 02:00.
 
 **Tokens are opaque, not JWTs.** `TokenService` mints 32 random bytes from
 `SecureRandom` and persists only the SHA-256 hash in `Session`. 30-minute
-access, 60-day rotating refresh, revocable per device. All TTLs and the login
-throttle are `ecotrack.security.*` properties.
+access, **365-day** rotating refresh, revocable per device. TTLs are
+`ecotrack.security.*`; the enrollment TTLs and throttle are a separate
+`ecotrack.enrollment.*` group (`request-ttl-minutes`, `claim-ttl-minutes`,
+`require-setup-code`, `max-requests-per-device-per-hour`).
 
 **CORS lives in `SecurityConfig`, not `WebConfig`.** `WebConfig` is a
 deliberately empty marker documenting why — Spring Security must own CORS once
 it is on the classpath, and a second registration would double-add headers.
 
 **Profiles.** Base and `dev` both use the H2 file DB at `backend/data/damiprod`;
-`dev` adds nothing but `enforce=true`. `prod` switches to Postgres, building its
+`dev` sets `enforce=true`, which the base default now also does — the profile
+is effectively redundant until the base changes. `prod` switches to Postgres, building its
 JDBC URL from `DB_HOST`/`DB_PORT`/`DB_NAME` env vars. `test` = in-memory H2,
 `create-drop`, `DataLoader` disabled.
 `DataLoader` seeds roles, employees, and products only when those tables are empty.
@@ -186,6 +233,22 @@ entities do not serialise cleanly into `@/types/domain`: associations are
 returns the JPA entity (roles as objects) while `/api/admin/employees` returns a
 DTO (roles as strings). **If you change an entity's JSON shape in the backend,
 `normalize.ts` is where the web app breaks.**
+
+**`src/lib/orderLifecycle.ts` is the single definition of "is this order
+finished?"** — used by the Comenzi archive split and by the map, and
+**mirrored on the backend by `service/OrderFulfilmentPolicy.java`**, which gates
+retiring a subscription that live orders still use. They are a deliberate pair:
+change one and you must change the other, or the archive and the delete-guard
+will disagree about the same order. The web mock imports the module directly
+rather than reimplementing it, so live and mock cannot drift either. A test
+asserts the two entry points (`deriveLifecycle` on a summarized status,
+`deriveLifecycleFromTasks` on a task list) agree on every combination.
+
+**`src/api/errors.ts` holds the errors the UI branches on**, as opposed to
+merely displays. Both implementations throw them: `ApiError` and `MockApiError`
+each pin a screen to one data mode, so anything a screen must *recognise* —
+`SubscriptionInUseError` and its blocking-order list, for instance — has to live
+here instead.
 
 **`src/auth/tokenBridge.ts` is an acyclic seam,** not incidental indirection.
 `http.ts` needs the current access token and a refresh-on-401 hook, but cannot

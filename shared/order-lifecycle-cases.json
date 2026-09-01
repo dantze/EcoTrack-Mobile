@@ -1,0 +1,200 @@
+{
+  "_comment": [
+    "GOLDEN CASES FOR THE ORDER-LIFECYCLE MIRROR PAIR. Read shared/README.md.",
+    "",
+    "Two implementations answer 'is this order finished?', in two languages,",
+    "with no reference between them:",
+    "  backend/src/main/java/com/example/damiProd/service/OrderFulfilmentPolicy.java",
+    "  web/src/lib/orderLifecycle.ts",
+    "The backend uses it to refuse retiring a subscription that live orders",
+    "still reference (TODO-20); the web app uses it to decide what belongs in",
+    "Comenzi vs Arhiva (TODO-21). If they disagree, one order is simultaneously",
+    "finished and not finished, and nothing in either toolchain notices.",
+    "",
+    "This file is the edge the code cannot express. Both test suites read it.",
+    "Add a case here when you change the rule -- in BOTH implementations."
+  ],
+
+  "today": "2026-09-01",
+
+  "cases": [
+    {
+      "name": "every task COMPLETED beats a date still in the future",
+      "order": { "orderType": "Igienizari", "sanitationDate": "2026-12-24" },
+      "tasks": ["COMPLETED", "COMPLETED"],
+      "lifecycle": "done",
+      "fulfilled": true
+    },
+    {
+      "name": "every task COMPLETED, date already past",
+      "order": { "orderType": "Igienizari", "sanitationDate": "2026-08-01" },
+      "tasks": ["COMPLETED"],
+      "lifecycle": "done",
+      "fulfilled": true
+    },
+    {
+      "name": "one task IN_PROGRESS outranks a past date",
+      "order": { "orderType": "Igienizari", "sanitationDate": "2026-08-01" },
+      "tasks": ["COMPLETED", "IN_PROGRESS"],
+      "lifecycle": "active",
+      "fulfilled": false
+    },
+    {
+      "name": "all tasks NEW with a past anchor is overdue, not done",
+      "order": { "orderType": "Igienizari", "sanitationDate": "2026-08-01" },
+      "tasks": ["NEW"],
+      "lifecycle": "overdue",
+      "fulfilled": false
+    },
+    {
+      "name": "all tasks NEW with a future anchor falls through to dates",
+      "order": { "orderType": "Igienizari", "sanitationDate": "2026-09-30" },
+      "tasks": ["NEW", "NEW"],
+      "lifecycle": "upcoming",
+      "fulfilled": false
+    },
+    {
+      "name": "all tasks NEW anchored exactly today is being worked",
+      "order": { "orderType": "Igienizari", "sanitationDate": "2026-09-01" },
+      "tasks": ["NEW"],
+      "lifecycle": "active",
+      "fulfilled": false
+    },
+    {
+      "name": "no tasks at all, visit date strictly past",
+      "order": { "orderType": "Igienizari", "sanitationDate": "2026-08-31" },
+      "tasks": [],
+      "lifecycle": "done",
+      "fulfilled": true
+    },
+    {
+      "name": "no tasks, visit dated today is being worked, not done",
+      "order": { "orderType": "Igienizari", "sanitationDate": "2026-09-01" },
+      "tasks": [],
+      "lifecycle": "active",
+      "fulfilled": false
+    },
+    {
+      "name": "no tasks, visit still upcoming",
+      "order": { "orderType": "Igienizari", "sanitationDate": "2026-09-02" },
+      "tasks": [],
+      "lifecycle": "upcoming",
+      "fulfilled": false
+    },
+    {
+      "name": "no tasks and no date is unknown, which is NOT fulfilled",
+      "order": { "orderType": "Igienizari", "sanitationDate": null },
+      "tasks": [],
+      "lifecycle": "unknown",
+      "fulfilled": false
+    },
+    {
+      "name": "an unparseable date is treated as absent, not as a verdict",
+      "order": { "orderType": "Igienizari", "sanitationDate": "nu se stie" },
+      "tasks": [],
+      "lifecycle": "unknown",
+      "fulfilled": false
+    },
+    {
+      "name": "Ridicare pickup strictly past, no tasks",
+      "order": { "orderType": "Ridicari", "pickupDate": "2026-08-31" },
+      "tasks": [],
+      "lifecycle": "done",
+      "fulfilled": true
+    },
+    {
+      "name": "Ridicare pickup dated today is being worked",
+      "order": { "orderType": "Ridicari", "pickupDate": "2026-09-01" },
+      "tasks": [],
+      "lifecycle": "active",
+      "fulfilled": false
+    },
+    {
+      "name": "Amplasare with no start date is unknown",
+      "order": { "orderType": "Amplasari", "startDate": null, "endDate": null },
+      "tasks": [],
+      "lifecycle": "unknown",
+      "fulfilled": false
+    },
+    {
+      "name": "Amplasare not started yet",
+      "order": { "orderType": "Amplasari", "startDate": "2026-10-01", "endDate": "2026-11-01" },
+      "tasks": [],
+      "lifecycle": "upcoming",
+      "fulfilled": false
+    },
+    {
+      "name": "Amplasare on site with the window still open",
+      "order": { "orderType": "Amplasari", "startDate": "2026-08-01", "endDate": "2026-10-01" },
+      "tasks": [],
+      "lifecycle": "active",
+      "fulfilled": false
+    },
+    {
+      "name": "Amplasare ending exactly today is still on site",
+      "order": { "orderType": "Amplasari", "startDate": "2026-08-01", "endDate": "2026-09-01" },
+      "tasks": [],
+      "lifecycle": "active",
+      "fulfilled": false
+    },
+    {
+      "name": "Amplasare whose window has closed",
+      "order": { "orderType": "Amplasari", "startDate": "2026-07-01", "endDate": "2026-08-31" },
+      "tasks": [],
+      "lifecycle": "done",
+      "fulfilled": true
+    },
+    {
+      "name": "an indefinite Amplasare is never done by dates alone",
+      "order": { "orderType": "Amplasari", "startDate": "2020-01-01", "endDate": null, "isIndefinite": true },
+      "tasks": [],
+      "lifecycle": "active",
+      "fulfilled": false
+    },
+    {
+      "name": "a started Amplasare with no end date is still active",
+      "order": { "orderType": "Amplasari", "startDate": "2026-08-01", "endDate": null },
+      "tasks": [],
+      "lifecycle": "active",
+      "fulfilled": false
+    },
+    {
+      "name": "task evidence can finish even an indefinite Amplasare",
+      "order": { "orderType": "Amplasari", "startDate": "2020-01-01", "endDate": null, "isIndefinite": true },
+      "tasks": ["COMPLETED"],
+      "lifecycle": "done",
+      "fulfilled": true
+    }
+  ],
+
+  "_backendOnlyComment": [
+    "CANCELLED exists in the backend TaskStatus enum and NOT in the web",
+    "TaskStatus union, so these cases cannot be constructed on the web side at",
+    "all -- the type forbids it. The web summarizer collapses anything that is",
+    "neither COMPLETED nor IN_PROGRESS to NEW, so the OUTCOME is identical;",
+    "these exist to pin that equivalence on the side that can express it.",
+    "cross_project_invariants.py is what enforces that CANCELLED stays the",
+    "only difference between the two status sets."
+  ],
+
+  "backendOnlyCases": [
+    {
+      "name": "a CANCELLED task behaves exactly like NEW: past anchor is overdue",
+      "order": { "orderType": "Igienizari", "sanitationDate": "2026-08-01" },
+      "tasks": ["CANCELLED"],
+      "fulfilled": false
+    },
+    {
+      "name": "a CANCELLED task behaves exactly like NEW: future anchor falls through to dates",
+      "order": { "orderType": "Igienizari", "sanitationDate": "2026-09-30" },
+      "tasks": ["CANCELLED"],
+      "fulfilled": false
+    },
+    {
+      "name": "CANCELLED alongside COMPLETED is not 'all completed'",
+      "order": { "orderType": "Igienizari", "sanitationDate": "2026-12-01" },
+      "tasks": ["COMPLETED", "CANCELLED"],
+      "fulfilled": false
+    }
+  ]
+}

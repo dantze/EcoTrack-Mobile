@@ -11,7 +11,10 @@ default for local development and needs no backend at all, while production
 builds live. A change that lands in one implementation and not the other breaks
 that quietly — usually discovered in a demo.
 
-## The four files, in order
+## The files, in order
+
+Four always; a fifth whenever the UI must **recognise** an error rather than
+just display it.
 
 ### 1. `src/api/contract.ts` — the contract
 
@@ -75,6 +78,25 @@ A new key **must** start with its module name and nest under the parent whose
 invalidation should also refresh it. Expose mutations as hooks that already
 invalidate what they dirty — **screens supply only toasts**, never
 `invalidateQueries` of their own.
+
+### 5. `src/api/errors.ts` — only when the UI branches on an error
+
+Skip this for an error the UI merely shows. Add it the moment a screen has to
+*act* on one — render a list of blockers, offer a specific recovery, choose a
+different view.
+
+The trap: `ApiError` (live) and `MockApiError` (mock) are **different classes**.
+A screen that does `catch (e) { if (e instanceof ApiError) … }` works in
+production and silently does nothing in mock mode, or the reverse — the two
+implementations stop being substitutable at exactly the point the user needs the
+error to be useful. So the class lives in `src/api/errors.ts` and **both**
+implementations throw the same one.
+
+Carry the data the UI needs on the error itself, not just a message.
+`SubscriptionInUseError` is the worked example: it holds `BlockingOrder[]`, so
+the refusal dialog can list the orders standing in the way instead of printing a
+sentence the operator cannot act on. Give it the same fields on both sides — the
+mock reproducing the refusal is what keeps the screen testable without a backend.
 
 ## The import rule
 

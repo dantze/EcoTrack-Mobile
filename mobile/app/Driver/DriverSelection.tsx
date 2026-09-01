@@ -43,7 +43,7 @@ const DriverSelection = () => {
                 },
             });
         } else {
-            router.replace('/login');
+            router.replace('/enrollment');
         }
     };
 

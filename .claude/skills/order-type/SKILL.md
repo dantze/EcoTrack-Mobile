@@ -58,15 +58,33 @@ type is a data change with no migration path; treat it as a separate decision.
    errors** — do it early and let `tsc` find the rest.
 2. **`features/sales/orderModel.ts`** — the big one. Type guard
    (`isAmplasare`-style) plus a branch in every `switch (order.orderType)`:
-   `orderPrimaryDate`, `orderDateLabel`, `orderAddress`, `orderCoordinates`,
-   `orderSummary`, `orderToForm`, `validateOrderForm`, and a
-   `build<Type>Payload`.
-3. **`components/domain`** — `ORDER_TYPE_LABELS` is a
+   `orderDateLabel`, `orderAddress`, `orderCoordinates`, `orderSummary`,
+   `orderToForm`, `validateOrderForm`, and a `build<Type>Payload`.
+   (`orderPrimaryDate` used to live here and is still re-exported from here for
+   its old importers, but it moved — see the next step.)
+3. **`lib/orderLifecycle.ts`** — the cross-feature one, easy to miss because it
+   is not under `features/`. It owns `orderPrimaryDate` and the lifecycle
+   derivation shared by Sales (the Comenzi archive split) and the map. Two
+   branches are needed:
+   - `orderPrimaryDate` — which date anchors this type.
+   - `deriveLifecycleFromDates` — **a real modelling decision, not a
+     copy-paste.** Does the new type occupy a *window* like `Amplasari`
+     (`startDate`/`endDate`, possibly `isIndefinite`, and therefore possibly
+     never fulfilled), or a single *instant* like `Ridicari`/`Igienizari`
+     (fulfilled once its date is strictly in the past)? Getting this wrong
+     means orders of the new type either never leave Comenzi or archive
+     themselves early.
+
+   The backend mirrors this rule in
+   `service/OrderFulfilmentPolicy.java` (it gates deleting a subscription that
+   live orders still use) — **change both or they drift**, and a test asserts
+   the two lifecycle entry points agree with each other.
+4. **`components/domain`** — `ORDER_TYPE_LABELS` is a
    `Record<OrderTypeTag, string>`, so a missing entry **is** a type error.
    Labels are Romanian.
-4. **`features/sales/suggestions.ts`** — history heuristics switch on type; a
+5. **`features/sales/suggestions.ts`** — history heuristics switch on type; a
    new type silently produces no suggestions until handled.
-5. **`api/live/normalize.ts`** and the mocks — see the `web-data-layer` skill.
+6. **`api/live/normalize.ts`** and the mocks — see the `web-data-layer` skill.
 
 ## Mobile
 

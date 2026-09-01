@@ -849,9 +849,3 @@ export const MOCK_AUTO_LOGIN = {
   password: MOCK_PASSWORD,
 };
 
-/**
- * The account "Continuă cu Google" signs in as, in mock mode. A different
- * employee than MOCK_CREDENTIALS_HINT (SALES + TECH instead of SALES-only) so
- * trying both buttons exercises different role gating.
- */
-export const MOCK_GOOGLE_DEMO_USERNAME = EMPLOYEE_SEED[3]!.username;

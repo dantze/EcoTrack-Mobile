@@ -328,7 +328,9 @@ const Enrollment = () => {
                 <Text style={styles.hint}>
                     {serverStatus?.awaitingBootstrap
                         ? 'Nicio persoană nu are încă acces. Prima cerere devine administrator.'
-                        : 'Trimite o cerere de acces. Un administrator o va aproba.'}
+                        : serverStatus?.adminLockout
+                          ? 'Niciun administrator nu mai este conectat, deci nimeni nu poate aproba cereri. Cu codul de recuperare din jurnalul serverului poți crea un administrator nou.'
+                          : 'Trimite o cerere de acces. Un administrator o va aproba.'}
                 </Text>
 
                 <View style={styles.inputFields}>
@@ -342,10 +344,16 @@ const Enrollment = () => {
                         autoCorrect={false}
                         editable={!submitting}
                     />
+                    {/* One field, two states - first run and admin lockout
+                        (TODO-30). Only the placeholder tells them apart. */}
                     {serverStatus?.setupCodeRequired ? (
                         <TextInput
                             style={styles.input}
-                            placeholder="Cod de configurare"
+                            placeholder={
+                                serverStatus.adminLockout
+                                    ? 'Cod de recuperare'
+                                    : 'Cod de configurare'
+                            }
                             placeholderTextColor={AppColors.placeholderText}
                             value={setupCode}
                             onChangeText={setSetupCode}

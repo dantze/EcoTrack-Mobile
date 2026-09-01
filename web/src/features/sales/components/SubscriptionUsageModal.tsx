@@ -1,17 +1,28 @@
 /**
- * Why a subscription cannot be retired yet, with the blockers named.
+ * Why a subscription cannot be retired yet, with the blockers named — and the
+ * one bulk action that clears them.
  *
  * A toast saying "3 orders still use this" is not actionable — the operator's
  * next question is always *which* three. Every order here links through to
  * Comenzi (`?comanda=<id>`), so the refusal comes with the way to resolve it.
  *
- * Read-only by design. Fulfilling, deleting or re-pointing an order happens in
- * the order's own form; this dialog does not offer a bulk "move them all to
- * another plan", because that would be a sweeping write the operator asked for
- * only obliquely by pressing Delete.
+ * It also offers *Mută pe alt abonament* (TODO-37). That is not a contradiction
+ * of the note this file used to carry: what was refused was a bulk write
+ * triggered by pressing DELETE, which the operator asked for only obliquely.
+ * This is the same write asked for explicitly, by its own button, on a list they
+ * have just read — and it moves exactly the orders shown, nothing else.
+ *
+ * Recurring plans deliberately have no such button. They are stopped from a
+ * Tehnic screen, and moving one would keep it generating orders against a plan
+ * the operator is trying to retire.
+ *
+ * Local state (the chosen target) lives here and resets by NOT BEING MOUNTED —
+ * the caller renders this only while a delete stands refused, per the house rule
+ * from TODO-26.
  */
 
-import { Badge, Button, Modal } from '@/components/ui';
+import { useState } from 'react';
+import { Badge, Button, Modal, Select } from '@/components/ui';
 import { formatDate } from '@/components/domain';
 import type { SubscriptionUsage } from '@/api';
 import type { Subscription } from '@/types/domain';
@@ -19,17 +30,25 @@ import type { Subscription } from '@/types/domain';
 export interface SubscriptionUsageModalProps {
   subscription: Subscription;
   usage: SubscriptionUsage;
+  /** Active plans this one's orders could move to — never includes itself. */
+  moveTargets: Subscription[];
   onClose: () => void;
   onOpenOrder: (orderId: number) => void;
+  onMoveOrders: (targetSubscriptionId: number, orderIds: number[]) => void;
+  moving: boolean;
 }
 
 export function SubscriptionUsageModal({
   subscription,
   usage,
+  moveTargets,
   onClose,
   onOpenOrder,
+  onMoveOrders,
+  moving,
 }: SubscriptionUsageModalProps) {
   const { orders, recurringPlans } = usage;
+  const [targetId, setTargetId] = useState<number | null>(null);
 
   return (
     <Modal
@@ -38,7 +57,7 @@ export function SubscriptionUsageModal({
       width="lg"
       title={`Abonamentul „${subscription.name}” nu poate fi șters`}
       footer={
-        <Button variant="secondary" onClick={onClose}>
+        <Button variant="secondary" onClick={onClose} disabled={moving}>
           Am înțeles
         </Button>
       }
@@ -72,6 +91,56 @@ export function SubscriptionUsageModal({
               </li>
             ))}
           </ul>
+        </section>
+      )}
+
+      {orders.length > 0 && (
+        <section className="mt-4 rounded-md border border-border bg-surface-sunken p-3">
+          <h3 className="mb-2 text-xs font-semibold tracking-wide text-ink-subtle uppercase">
+            Mută pe alt abonament
+          </h3>
+          {moveTargets.length === 0 ? (
+            <p className="text-xs text-ink-subtle">
+              Nu există alt abonament activ pe care să fie mutate. Creați unul întâi.
+            </p>
+          ) : (
+            <>
+              <div className="flex flex-wrap items-end gap-2">
+                <div className="min-w-56 flex-1">
+                  <Select<number>
+                    label="Abonamentul destinație"
+                    value={targetId}
+                    options={moveTargets.map((plan) => ({ value: plan.id, label: plan.name }))}
+                    onChange={setTargetId}
+                    placeholder="Alege abonamentul"
+                    searchable
+                    disabled={moving}
+                  />
+                </div>
+                <Button
+                  onClick={() =>
+                    targetId !== null &&
+                    onMoveOrders(
+                      targetId,
+                      orders.map((order) => order.id),
+                    )
+                  }
+                  disabled={targetId === null || moving}
+                >
+                  {moving
+                    ? 'Se mută…'
+                    : orders.length === 1
+                      ? 'Mută 1 comandă'
+                      : `Mută ${orders.length} comenzi`}
+                </Button>
+              </div>
+              <p className="mt-2 text-xs text-ink-subtle">
+                {recurringPlans.length > 0
+                  ? 'Comenzile de mai sus vor fi mutate, dar abonamentul tot nu va putea fi șters până când planurile recurente de mai jos nu sunt oprite.'
+                  : 'Comenzile de mai sus vor fi mutate, apoi abonamentul va fi șters.'}
+              </p>
+            </>
+          )}
         </section>
       )}
 

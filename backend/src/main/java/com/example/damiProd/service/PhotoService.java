@@ -12,9 +12,13 @@ import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.*;
+import software.amazon.awssdk.services.s3.presigner.S3Presigner;
+import software.amazon.awssdk.services.s3.presigner.model.GetObjectPresignRequest;
 
 import java.io.IOException;
 import java.net.URI;
+import java.time.Duration;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -54,6 +58,17 @@ public class PhotoService {
     private String region;
 
     private S3Client s3Client;
+    private S3Presigner presigner;
+
+    /**
+     * How long a presigned photo URL stays valid.
+     *
+     * <p>An hour: long enough to open a task, look through its photos and come
+     * back, short enough that a leaked link is stale before it is useful. It is
+     * not a security boundary on its own - the boundary is
+     * {@code requireCanAccessTask} on the endpoint that hands these out.
+     */
+    private static final Duration PRESIGNED_URL_TTL = Duration.ofHours(1);
 
     /**
      * Initialize S3 client lazily (after Spring injects properties).
@@ -120,13 +135,39 @@ public class PhotoService {
                 .bucket(bucketName)
                 .key(objectName)
                 .contentType(file.getContentType())
-                .acl(ObjectCannedACL.PUBLIC_READ) // Make file publicly readable
+                // PRIVATE, not PUBLIC_READ (TODO-46). A public-read object is on
+                // a working unauthenticated URL forever, and the key is not the
+                // secret people assume: it is
+                // "poze cabine/{taskId}_{clientName}/{n}" - a small integer, a
+                // customer's name, and a counter starting at 1. Anyone who ever
+                // sees one URL can walk that client's other photos by changing
+                // the last segment. Reads go through presignedUrl() below.
+                .acl(ObjectCannedACL.PRIVATE)
                 .build();
 
         getS3Client().putObject(putRequest, RequestBody.fromInputStream(file.getInputStream(), file.getSize()));
 
-        // Return the public CDN URL
+        // The canonical URL is still what gets stored: it is a stable identity
+        // for the object, and extractObjectName() turns it back into a key. It
+        // is no longer *usable* on its own - fetching now needs a presigned URL.
         return String.format("https://%s.%s.digitaloceanspaces.com/%s", bucketName, region, objectName);
+    }
+
+    /**
+     * The presigner, built lazily for the same reason as the client: the
+     * @Value fields are not populated until after construction.
+     */
+    private S3Presigner getPresigner() {
+        if (presigner == null) {
+            String endpoint = String.format("https://%s.digitaloceanspaces.com", region);
+            presigner = S3Presigner.builder()
+                    .endpointOverride(URI.create(endpoint))
+                    .region(Region.of(region))
+                    .credentialsProvider(StaticCredentialsProvider.create(
+                            AwsBasicCredentials.create(accessKey, secretKey)))
+                    .build();
+        }
+        return presigner;
     }
 
     /**
@@ -173,6 +214,52 @@ public class PhotoService {
     // every scanned identity document in the company. Both it and its endpoint
     // are gone (TODO-14). Nothing needs to enumerate the bucket; the rows that
     // own an object already know its key.
+
+    /**
+     * A time-limited URL that can actually fetch a private object (TODO-46).
+     *
+     * <p>Objects are written PRIVATE, so the stored URL no longer resolves for
+     * anyone. This signs a short-lived GET for it, and the signature is what
+     * carries the authorisation - which means <b>the caller must have already
+     * decided the requester is allowed to see it</b>. Every caller today is
+     * behind {@code TaskAccessPolicy.requireCanAccessTask}; a new one without an
+     * equivalent check would hand out access this method cannot withhold.
+     *
+     * <p>The window is deliberately short but not tiny. Long enough that a
+     * driver can open a task, scroll its photos and come back without the images
+     * dying mid-view; short enough that a URL copied out of a screenshot, a
+     * proxy log or browser history is worthless by the time anyone tries it.
+     * Both clients refetch the list whenever the screen opens - web's
+     * {@code useTaskPhotos} sets no staleTime, mobile's CloudPhotoViewer holds
+     * them in component state - so nothing needs to survive longer.
+     *
+     * @return a signed URL, or the input unchanged if signing fails - the caller
+     *         gets a link that 403s rather than an exception that blanks the
+     *         whole gallery.
+     */
+    public String presignedUrl(String photoUrlOrName) {
+        String objectName = extractObjectName(photoUrlOrName);
+        try {
+            GetObjectRequest getRequest = GetObjectRequest.builder()
+                    .bucket(bucketName)
+                    .key(objectName)
+                    .build();
+            GetObjectPresignRequest presignRequest = GetObjectPresignRequest.builder()
+                    .signatureDuration(PRESIGNED_URL_TTL)
+                    .getObjectRequest(getRequest)
+                    .build();
+            return getPresigner().presignGetObject(presignRequest).url().toString();
+        } catch (Exception e) {
+            log.error("Failed to presign object '{}' in bucket '{}'; returning the unsigned URL, "
+                    + "which will not resolve", objectName, bucketName, e);
+            return photoUrlOrName;
+        }
+    }
+
+    /** {@link #presignedUrl(String)} over a list, preserving order. */
+    public List<String> presignedUrls(List<String> photoUrlsOrNames) {
+        return photoUrlsOrNames.stream().map(this::presignedUrl).toList();
+    }
 
     /**
      * Extracts the object name from a full Spaces URL or returns the input as-is.

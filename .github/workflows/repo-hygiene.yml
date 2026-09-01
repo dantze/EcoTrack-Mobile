@@ -84,17 +84,50 @@ jobs:
         if: always()
         run: python3 .github/scripts/dead_config.py
 
-      # Compose files are included because they are deploy surface that no
-      # ci-*.yml `paths:` filter covers — this step is the only thing standing
-      # between a typo in docker-compose.yml and a failed production deploy.
-      # That is also what justifies their NO_CI_REQUIRED entry in
-      # repo_hygiene.py: they ARE checked, here.
-      - name: Validate workflow and compose YAML
+      - name: Validate workflow YAML
         if: always()
         run: |
-          for f in .github/workflows/*.yml docker-compose*.yml; do
+          for f in .github/workflows/*.yml; do
             [ -e "$f" ] || continue
             python3 -c "import yaml,sys; yaml.safe_load(open(sys.argv[1]))" "$f" \
               || { echo "::error file=$f::not valid YAML"; exit 1; }
           done
-          echo "All workflow and compose files parse."
+          echo "All workflow files parse."
+
+      # Compose files are deploy surface that no ci-*.yml `paths:` filter covers,
+      # so this step is the only thing standing between a typo in
+      # docker-compose.yml and a failed production deploy — deploy.yml rebuilds
+      # the whole stack from it on the VPS. It is also what justifies their
+      # NO_CI_REQUIRED entry in repo_hygiene.py: they ARE checked, here.
+      #
+      # `config -q` rather than a YAML parse (TODO-29). Parsing only proves the
+      # bytes are YAML. `config -q` additionally resolves ${VAR} interpolation
+      # and validates against the Compose schema, which is what catches the
+      # mistakes that actually reach the VPS: an unknown key
+      # (`containerr_name`), a `depends_on`/`volumes:`/`networks:` reference to
+      # something never declared, and a `${VAR?...}` required variable with no
+      # value. It does NOT check enum values — `restart: unless-stoppped` still
+      # passes — so this is a floor, not a proof.
+      #
+      # Two passes, and they check different things:
+      #   1. no env file — every ${VAR} falls back to its `:-default`, which is
+      #      how a developer runs the stack from a clean checkout;
+      #   2. --env-file .env.example — pins that the committed template is
+      #      actually sufficient to bring the stack up. A new required variable
+      #      that nobody added to the template fails here rather than on the VPS.
+      # docker and the compose plugin are preinstalled on ubuntu-latest.
+      - name: Validate compose files
+        if: always()
+        run: |
+          status=0
+          for f in docker-compose*.yml; do
+            [ -e "$f" ] || continue
+            docker compose -f "$f" config -q \
+              || { echo "::error file=$f::invalid compose file (defaults)"; status=1; }
+            docker compose --env-file .env.example -f "$f" config -q \
+              || { echo "::error file=$f::invalid compose file (with .env.example)"; status=1; }
+          done
+          if [ "$status" -eq 0 ]; then
+            echo "All compose files validate."
+          fi
+          exit "$status"

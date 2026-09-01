@@ -45,7 +45,9 @@ public class TokenService {
      * Reuse of any remembered hash revokes the session. A token older than this
      * many rotations is already dead - the cap only limits how far back a replay
      * stays *attributable* to theft, in exchange for a bounded row: a session
-     * that refreshes every 30 minutes for its 60-day life rotates ~2900 times.
+     * that refreshes every 30 minutes for its 365-day life rotates ~17,500 times
+     * (ecotrack.security.refresh-token-ttl-days, see application.properties for
+     * why the window is a year).
      */
     private static final int MAX_RETIRED_TOKEN_HASHES = 10;
 
@@ -59,7 +61,7 @@ public class TokenService {
 
     public TokenService(SessionRepository sessionRepository,
             @Value("${ecotrack.security.access-token-ttl-minutes:30}") long accessTokenTtlMinutes,
-            @Value("${ecotrack.security.refresh-token-ttl-days:60}") long refreshTokenTtlDays,
+            @Value("${ecotrack.security.refresh-token-ttl-days:365}") long refreshTokenTtlDays,
             @Value("${ecotrack.security.max-sessions-per-user:10}") int maxSessionsPerUser,
             @Value("${ecotrack.security.session-retention-days:30}") long sessionRetentionDays) {
         this.sessionRepository = sessionRepository;
@@ -103,9 +105,13 @@ public class TokenService {
 
     /**
      * Caps how many live sessions one employee can accumulate. Without this,
-     * every login adds a 60-day credential that nothing ever cleans up, so a
+     * every enrolment adds a 365-day credential that nothing ever cleans up, so a
      * years-old forgotten device stays a valid way into the account. The
      * least-recently-used sessions above the cap are revoked, oldest first.
+     *
+     * With a year-long refresh token this cap is not hygiene, it is the bound:
+     * it, {@link #revokeSession} and the nightly prune are the only things that
+     * shorten a lost device's window.
      */
     private void enforceSessionCap(Long employeeId, Long currentSessionId, Instant now) {
         if (maxSessionsPerUser <= 0) {

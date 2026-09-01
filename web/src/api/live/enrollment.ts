@@ -87,12 +87,15 @@ function normalizeRequest(raw: RawAccessRequest): AccessRequest {
 
 export const enrollmentApi: EnrollmentApi = {
   async status(): Promise<EnrollmentStatus> {
-    const raw = await request<{ awaitingBootstrap?: boolean; setupCodeRequired?: boolean }>(
-      '/enrollment/status',
-    );
+    const raw = await request<{
+      awaitingBootstrap?: boolean;
+      setupCodeRequired?: boolean;
+      adminLockout?: boolean;
+    }>('/enrollment/status');
     return {
       awaitingBootstrap: raw.awaitingBootstrap ?? false,
       setupCodeRequired: raw.setupCodeRequired ?? false,
+      adminLockout: raw.adminLockout ?? false,
     };
   },
 

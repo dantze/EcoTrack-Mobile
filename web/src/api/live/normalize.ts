@@ -123,6 +123,7 @@ export interface RawProduct {
   name?: string;
   description?: string | null;
   price?: number;
+  isActive?: boolean | null;
 }
 
 export interface RawSubscription {
@@ -296,6 +297,11 @@ export function normalizeProduct(raw: RawProduct): Product {
     name: raw.name ?? '',
     description: optStr(raw.description),
     price: num(raw.price),
+    // Missing means active, and so does an explicit null: rows that predate the
+    // is_active column read back null, because there is no migration tool and
+    // ddl-auto=update cannot add a NOT NULL column to a populated table. Same
+    // rule as Product.isRetired() on the backend.
+    isActive: raw.isActive ?? true,
   };
 }
 

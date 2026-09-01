@@ -20,6 +20,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -28,6 +29,17 @@ import java.util.Map;
 public class TaskController {
 
     private static final Logger log = LoggerFactory.getLogger(TaskController.class);
+
+    /**
+     * How many order ids one /order-status call may carry.
+     *
+     * A GET puts the list in the URL, and Tomcat's default max-http-header-size
+     * is 8 KB. 500 ids is comfortably inside that at any realistic id width and
+     * is far more than a page of Comenzi. Exceeding it is a 400, never a silent
+     * truncation: a short map reads as "these orders have no task", which is
+     * exactly what decides Curente vs Arhivă.
+     */
+    private static final int MAX_ORDER_STATUS_IDS = 500;
 
     private final TaskService taskService;
     private final PhotoService photoService;
@@ -185,6 +197,66 @@ public class TaskController {
         return ResponseEntity.ok(response);
     }
 
+    /**
+     * The same question as /order/{id}/exists, for many orders at once (TODO-43).
+     *
+     * Comenzi used to fan out one request per order to fill its status column,
+     * so opening a list of 200 orders was 200 requests. Mock mode hid it (one
+     * shared latency, in memory) and so did a small dataset. This is purely a
+     * performance change: {@link TaskService#summariseOrderTasks} still holds
+     * the one rule, and each entry is the identical roll-up.
+     *
+     * <p><b>GET with an id list, not a POST body.</b> A POST that reads is worse
+     * on both counts that mattered - it is the wrong verb for a read, and it
+     * would land under the OFFICE write matcher, hiding an authorisation
+     * decision inside a rule about writes. The cost of GET is that the URL caps
+     * how many ids fit, so the list is capped explicitly at
+     * {@link #MAX_ORDER_STATUS_IDS} and refused with a 400 beyond it rather than
+     * silently truncated - a truncated status map would quietly mark orders as
+     * having no task, which is what the Curente/Arhivă split reads. The web
+     * client chunks to stay under it.
+     *
+     * <p><b>Office-only, and this is the whole of TODO-52.</b> It inherits
+     * TODO-42's answer because it asks TODO-42's question: the matcher row
+     * cannot help, since reads are open to any authenticated employee by design.
+     * Without the guard this would be strictly worse than the leak TODO-42
+     * closed - one request would enumerate the order space instead of probing a
+     * single id. Do not remove it, and do not add a batch read anywhere near
+     * tasks without deciding the same question again.
+     */
+    @GetMapping("/order-status")
+    public ResponseEntity<?> orderTaskStatuses(
+            @AuthenticationPrincipal EmployeePrincipal principal,
+            @RequestParam("ids") List<Long> ids) {
+        accessPolicy.requireOfficeRole(principal);
+
+        // Distinct because a repeated id costs a map entry and buys nothing, and
+        // because the cap should count real orders rather than a padded list.
+        List<Long> distinct = ids.stream().filter(java.util.Objects::nonNull).distinct().toList();
+        if (distinct.size() > MAX_ORDER_STATUS_IDS) {
+            return ResponseEntity.badRequest().body(Map.of(
+                    "message", "Prea multe comenzi într-o singură cerere (maximum "
+                            + MAX_ORDER_STATUS_IDS + ")."));
+        }
+
+        Map<Long, List<Task>> byOrder = taskService.getTasksByOrderIds(distinct);
+        Map<String, Object> response = new LinkedHashMap<>();
+        for (Long orderId : distinct) {
+            List<Task> tasks = byOrder.getOrDefault(orderId, List.of());
+            Task task = TaskService.summariseOrderTasks(tasks).orElse(null);
+            Map<String, Object> entry = new HashMap<>();
+            entry.put("hasTask", !tasks.isEmpty());
+            entry.put("taskId", task != null ? task.getId() : null);
+            entry.put("routeId", task != null && task.getRouteId() != null ? task.getRouteId() : null);
+            entry.put("scheduledTime", task != null ? task.getScheduledTime() : null);
+            entry.put("status", task != null ? task.getStatus().name() : null);
+            // Keyed by id as a STRING: JSON object keys are strings anyway, and
+            // saying so here stops a client guessing whether to look up 7 or "7".
+            response.put(String.valueOf(orderId), entry);
+        }
+        return ResponseEntity.ok(response);
+    }
+
     // Update task status (for driver to mark task as IN_PROGRESS, COMPLETED, etc.)
     @PatchMapping("/{id}/status")
     public ResponseEntity<Task> updateTaskStatus(
@@ -304,6 +376,8 @@ public class TaskController {
                 TaskPhoto taskPhoto = new TaskPhoto(publicUrl, null, task);
                 taskPhotoRepository.save(taskPhoto);
                 uploadedUrls.add(publicUrl);
+                // NB: what is stored and what is returned differ from here on -
+                // see the presign at the end of this method.
             } catch (Exception e) {
                 log.error("Failed to upload task photo for task ID {}", id, e);
             }
@@ -311,18 +385,40 @@ public class TaskController {
 
         Map<String, Object> response = new HashMap<>();
         response.put("uploaded", uploadedUrls.size());
-        response.put("urls", uploadedUrls);
+        // Presigned, like the GET below: the stored URL is an identity, not a
+        // fetchable link, since these objects are PRIVATE (TODO-46). The
+        // uploader is exactly who is allowed to see them, and they were just
+        // authorised above.
+        response.put("urls", photoService.presignedUrls(uploadedUrls));
         return ResponseEntity.ok(response);
     }
 
-    // Get all photo URLs for a task
+    /**
+     * The task's photos, as URLs a browser can actually load.
+     *
+     * <p>Objects are PRIVATE in Spaces (TODO-46), so the URL held in
+     * {@code task_photos.image_url} identifies an object but cannot fetch one.
+     * What goes over the wire is a short-lived presigned link, minted per
+     * request.
+     *
+     * <p><b>The signature carries the access, so this guard is what decides
+     * it.</b> {@code requireCanAccessTask} runs first and is the same rule that
+     * governs the task itself - photos are evidence of a job and are exactly as
+     * visible as the job. Handing out a presigned URL without it would grant
+     * access nothing downstream can withhold, because a signed URL needs no
+     * token.
+     *
+     * <p>The links expire (see {@code PhotoService.PRESIGNED_URL_TTL}), so a
+     * client must not persist them. Neither does: web's {@code useTaskPhotos}
+     * sets no staleTime and mobile's {@code CloudPhotoViewer} keeps them in
+     * component state only.
+     */
     @GetMapping("/{id}/photos")
     public ResponseEntity<List<String>> getTaskPhotos(@AuthenticationPrincipal EmployeePrincipal principal,
             @PathVariable Long id) {
-        // Photos are evidence of a job: same visibility rule as the task itself.
         accessPolicy.requireCanAccessTask(principal, taskService.getTaskById(id));
         List<TaskPhoto> photos = taskPhotoRepository.findByTaskId(id);
-        List<String> urls = photos.stream().map(TaskPhoto::getImageUrl).toList();
-        return ResponseEntity.ok(urls);
+        List<String> stored = photos.stream().map(TaskPhoto::getImageUrl).toList();
+        return ResponseEntity.ok(photoService.presignedUrls(stored));
     }
 }

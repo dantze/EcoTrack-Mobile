@@ -17,9 +17,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Focused on the one thing admin edits get wrong by default: an admin changing
- * a password (the response to "this account is compromised" / "they left") does
- * not by itself stop the old credentials working. Every device that ever logged
- * in holds a refresh token good for another 60 days.
+ * an employee's roles (the response to "this account is compromised" / "they
+ * left") does not by itself stop the old credentials working. Every device that
+ * ever enrolled holds a refresh token good for another year, so the role change
+ * has to revoke the sessions as well - which is what these tests pin.
  */
 @DataJpaTest
 @Import({ AdminService.class, TokenService.class })

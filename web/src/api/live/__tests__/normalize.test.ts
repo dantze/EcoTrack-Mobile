@@ -243,7 +243,21 @@ describe('clients', () => {
 describe('products and subscriptions', () => {
   it('normalises a product', () => {
     expect(normalizeProduct({ id: 4, name: 'Toaletă Standard', description: null, price: 500 }))
-      .toEqual({ id: 4, name: 'Toaletă Standard', description: null, price: 500 });
+      .toEqual({ id: 4, name: 'Toaletă Standard', description: null, price: 500, isActive: true });
+  });
+
+  /**
+   * A row that predates the is_active column reads back null, because
+   * ddl-auto=update cannot add a NOT NULL column to a populated table. Null MUST
+   * mean active, or the deploy that introduces it empties every product picker
+   * in all three apps (TODO-38).
+   */
+  it('treats a missing or null isActive on a product as active', () => {
+    expect(normalizeProduct({ id: 4, name: 'Vechi', price: 1 }).isActive).toBe(true);
+    expect(normalizeProduct({ id: 4, name: 'Vechi', price: 1, isActive: null }).isActive).toBe(true);
+    expect(normalizeProduct({ id: 4, name: 'Retras', price: 1, isActive: false }).isActive).toBe(
+      false,
+    );
   });
 
   it('treats a missing isActive as active, because the column defaults to true server-side', () => {

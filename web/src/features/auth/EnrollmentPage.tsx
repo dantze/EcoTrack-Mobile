@@ -226,7 +226,9 @@ export function EnrollmentPage() {
             <p className="mt-1 text-sm text-content-muted">
               {serverStatus?.awaitingBootstrap
                 ? 'Nicio persoană nu are încă acces. Prima cerere devine administrator.'
-                : 'Trimite o cerere de acces. Un administrator o va aproba.'}
+                : serverStatus?.adminLockout
+                  ? 'Niciun administrator nu mai este conectat, deci nimeni nu poate aproba cereri. Cu codul de recuperare din jurnalul serverului poți crea un administrator nou.'
+                  : 'Trimite o cerere de acces. Un administrator o va aproba.'}
             </p>
 
             <form onSubmit={onSubmit} className="mt-6 flex flex-col gap-4" noValidate>
@@ -238,10 +240,18 @@ export function EnrollmentPage() {
                 autoComplete="name"
               />
 
+              {/* One field, two states — first run and admin lockout (TODO-30).
+                  `setupCodeRequired` is true for both; only the wording tells
+                  them apart, because the person reading it is looking for the
+                  code in a different place each time. */}
               {serverStatus?.setupCodeRequired && (
                 <TextInput
-                  label="Cod de configurare"
-                  hint="Afișat în log-ul serverului la prima pornire."
+                  label={serverStatus.adminLockout ? 'Cod de recuperare' : 'Cod de configurare'}
+                  hint={
+                    serverStatus.adminLockout
+                      ? 'Afișat în jurnalul serverului când ultimul administrator s-a deconectat.'
+                      : 'Afișat în log-ul serverului la prima pornire.'
+                  }
                   value={setupCode}
                   onChange={(event) => setSetupCode(event.target.value)}
                   autoComplete="off"

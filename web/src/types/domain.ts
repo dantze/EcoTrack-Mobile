@@ -77,6 +77,12 @@ export interface Product {
   name: string;
   description: string | null;
   price: number;
+  /**
+   * Retiring a product is a SOFT delete, like a subscription (TODO-38): the row
+   * survives so finished orders keep resolving their name and price through it.
+   * A retired product is gone from every picker but still appears on history.
+   */
+  isActive: boolean;
 }
 
 export interface Subscription {

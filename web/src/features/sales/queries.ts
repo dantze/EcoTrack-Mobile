@@ -81,9 +81,28 @@ export function useSubscriptions(includeInactive: boolean): UseQueryResult<Subsc
 export type OrderTaskStatusMap = Record<number, TaskStatus | null>;
 
 /**
- * Task status per order, for the status column. There is no batch endpoint —
- * the mobile app fans out one `GET /tasks/order/{id}/exists` per order and so
- * do we, in a single query so it happens once per order-list revision.
+ * How many order ids go in one `/tasks/order-status` request.
+ *
+ * The server caps the list at 500 and answers 400 beyond it, because a GET puts
+ * the ids in the URL. 200 leaves room to spare at any realistic id width, and a
+ * list long enough to need a second chunk is already rare.
+ */
+const ORDER_STATUS_CHUNK = 200;
+
+/**
+ * Task status per order, for the status column.
+ *
+ * One batched request per chunk (TODO-43), where this used to fan out one
+ * `GET /tasks/order/{id}/exists` per order — opening Comenzi with 200 orders was
+ * 200 requests. Mock mode hid it behind one shared latency and so did a small
+ * dataset. The roll-up is unchanged and still lives server-side in
+ * `TaskService.summariseOrderTasks`; only the number of round trips differs.
+ *
+ * Still `allSettled`, and still per chunk: one failed chunk must leave the other
+ * orders with a status rather than blanking the whole column. An order missing
+ * from the map renders as unknown, which `isOrderFulfilled` reads as UNFINISHED
+ * — the fail-safe direction, since an order only leaves the operator's list on
+ * positive evidence.
  */
 export function useOrderTaskStatuses(orderIds: number[]): UseQueryResult<OrderTaskStatusMap> {
   const sorted = [...orderIds].sort((a, b) => a - b);
@@ -93,14 +112,21 @@ export function useOrderTaskStatuses(orderIds: number[]): UseQueryResult<OrderTa
     enabled: sorted.length > 0,
     staleTime: 60_000,
     queryFn: async () => {
+      const chunks: number[][] = [];
+      for (let index = 0; index < sorted.length; index += ORDER_STATUS_CHUNK) {
+        chunks.push(sorted.slice(index, index + ORDER_STATUS_CHUNK));
+      }
+
       const settled = await Promise.allSettled(
-        sorted.map(async (id) => ({ id, status: await api.tasks.statusForOrder(id) })),
+        chunks.map((chunk) => api.tasks.statusForOrders(chunk)),
       );
+
       const map: OrderTaskStatusMap = {};
       for (const result of settled) {
         if (result.status !== 'fulfilled') continue;
-        const { id, status } = result.value;
-        map[id] = status.hasTask ? status.status : null;
+        for (const [id, status] of Object.entries(result.value)) {
+          map[Number(id)] = status.hasTask ? status.status : null;
+        }
       }
       return map;
     },
@@ -392,6 +418,38 @@ export function useCheckSubscriptionUsage(): (id: number) => Promise<Subscriptio
       queryFn: () => api.subscriptions.usage(id),
       staleTime: 0,
     });
+}
+
+export interface MoveSubscriptionOrdersInput {
+  subscriptionId: number;
+  targetSubscriptionId: number;
+  orderIds: number[];
+}
+
+/**
+ * Re-points blocking orders onto another plan so a refused delete can be
+ * retried (TODO-37).
+ *
+ * Invalidates `orders` and `tasks` as well as `subscriptions`: the orders now
+ * name a different plan, and every non-completed task of theirs had its
+ * `productName` rewritten server-side. Leaving those keys alone would show
+ * Sarcini the old plan name until something else happened to refetch it.
+ */
+export function useMoveSubscriptionOrders(): UseMutationResult<
+  number,
+  Error,
+  MoveSubscriptionOrdersInput
+> {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ subscriptionId, targetSubscriptionId, orderIds }: MoveSubscriptionOrdersInput) =>
+      api.subscriptions.moveOrders(subscriptionId, targetSubscriptionId, orderIds),
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: salesKeys.subscriptions });
+      void queryClient.invalidateQueries({ queryKey: salesKeys.orders });
+      void queryClient.invalidateQueries({ queryKey: ['tasks'] });
+    },
+  });
 }
 
 export function useDeleteSubscription(): UseMutationResult<void, Error, number> {

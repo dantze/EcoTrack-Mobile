@@ -41,6 +41,24 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     boolean existsByRidicareOrderProductId(@Param("productId") Long productId);
 
     /**
+     * Orders using this product whose work is NOT finished yet (TODO-38).
+     *
+     * The same STRICT rule as {@link #findLiveBySubscriptionId}: unfinished means
+     * "has no COMPLETED task", never a date comparison. Both order types that
+     * carry a product are counted - missing Ridicari here is the bug that let a
+     * pickup-only product be destroyed.
+     *
+     * This is what a SOFT product delete blocks on. A finished order does not
+     * block, because the row survives the delete and the order keeps resolving
+     * its product name and price through it.
+     */
+    @Query("SELECT COUNT(o) FROM Order o "
+            + "WHERE ((TYPE(o) = AmplasareOrder AND TREAT(o AS AmplasareOrder).product.id = :productId) "
+            + "   OR  (TYPE(o) = RidicareOrder  AND TREAT(o AS RidicareOrder).product.id  = :productId)) "
+            + "AND NOT EXISTS (SELECT t FROM Task t WHERE t.order.id = o.id AND t.status = 'COMPLETED')")
+    long countLiveByProductId(@Param("productId") Long productId);
+
+    /**
      * Igienizare orders on this plan whose work is NOT finished yet.
      *
      * "Finished" is deliberately strict: a COMPLETED task, and nothing else. An

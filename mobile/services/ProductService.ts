@@ -95,11 +95,17 @@ export const ProductService = {
         }
 
         if (response.status === 409) {
-            // Product is in use by orders
-            const data = await response.json();
+            // Refused: unfinished orders still use the product.
+            //
+            // `message`, NOT `error` (TODO-38c). This endpoint used to build its
+            // own body with the Romanian text under `error`; it now goes through
+            // GlobalExceptionHandler like everything else, which puts the HTTP
+            // status reason under `error` and the text under `message`. Reading
+            // `error` here would show the user the word "Conflict".
+            const data = await response.json().catch(() => null);
             return {
                 success: false,
-                error: data.error || 'Produsul este folosit în comenzi existente.'
+                error: data?.message || 'Produsul este folosit în comenzi nefinalizate.'
             };
         }
 

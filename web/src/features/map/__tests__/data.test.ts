@@ -46,7 +46,7 @@ function nextId(): number {
   return seq;
 }
 
-const PRODUCT: Product = { id: 1, name: 'Toaletă standard', description: null, price: 100 };
+const PRODUCT: Product = { id: 1, name: 'Toaletă standard', description: null, price: 100, isActive: true };
 const SUBSCRIPTION: Subscription = {
   id: 1,
   name: 'Igienizare lunară',

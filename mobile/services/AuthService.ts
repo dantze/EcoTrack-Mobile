@@ -84,8 +84,9 @@ export const AuthService = {
      * Logout the current user.
      *
      * Revokes the session server-side first. Clearing local storage alone would
-     * leave the refresh token this device was issued valid for another 60 days,
-     * so a phone handed on or lost after "Deconectare" would still be a way in.
+     * leave the refresh token this device was issued valid for the rest of its
+     * year (ecotrack.security.refresh-token-ttl-days), so a phone handed on or
+     * lost after "Deconectare" would still be a way in.
      * Best-effort: a failed call must never trap someone in a signed-in state,
      * so the local clear happens either way.
      */

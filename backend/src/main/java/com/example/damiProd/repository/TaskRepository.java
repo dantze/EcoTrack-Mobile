@@ -8,6 +8,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.List;
 
 @Repository
@@ -38,6 +39,18 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
     // 500 — the moment a second task exists. Ordered so a caller summarising
     // the list gets the same answer twice.
     List<Task> findAllByOrder_IdOrderByIdAsc(Long orderId);
+
+    /**
+     * Every task of every listed order, in one query (TODO-43).
+     *
+     * What makes the batch status endpoint one round trip instead of one per
+     * order. Ordered by order then id so the caller can group without sorting,
+     * and so the roll-up sees each order's tasks in the same sequence
+     * findAllByOrder_IdOrderByIdAsc would have given it - the two must agree,
+     * because TaskService.summariseOrderTasks picks a representative task and a
+     * different order of arrival would pick a different one.
+     */
+    List<Task> findAllByOrder_IdInOrderByOrder_IdAscIdAsc(Collection<Long> orderIds);
 
     // Check if a task exists for an order
     boolean existsByOrder_Id(Long orderId);

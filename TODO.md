@@ -27,36 +27,28 @@ unless its status says otherwise.
 **Status legend:** `[ ]` not started · `[~]` in progress · `[DONE]` done ·
 `[POSTPONED]` deliberately deferred · `[?]` needs a decision first
 
-**Next free ID: TODO-56.** (Highest used is TODO-55.)
+**Next free ID: TODO-58.** (Highest used is TODO-57.)
 
 ---
 
-## Still open — 22 of 55
+## Still open — 14 of 57
 
 The whole of what is left, in one place. Everything not listed here is `[DONE]`.
 
 - **TODO-17** `[POSTPONED]` — All other AI ideas *(F)*
-- **TODO-24** `[ ]` — Rotate the Google Maps key that is still in git history *(G)*
-- **TODO-27** `[ ]` — The 60-day refresh-token arithmetic no longer describes production *(A)*
-- **TODO-29** `[ ]` — Nothing validates the docker-compose files *(G)*
-- **TODO-30** `[ ]` — There is no recovery path when the last admin loses their session *(A)*
 - **TODO-31** `[ ]` — The backend test suite shares one database across classes *(J)*
 - **TODO-32** `[ ]` — Deploy fails at the SSH step — the VPS is unreachable *(G)*
 - **TODO-33** `[ ]` — Make the web app responsive, and move Sales + Technical out of mobile *(H)*
 - **TODO-35** `[ ]` — Role changes on the web never reach the phone *(H)*
-- **TODO-36** `[ ]` — First-run setup code is only printed to the server log *(A)*
-- **TODO-37** `[ ]` — Bulk-move orders between subscriptions *(D)*
-- **TODO-38** `[ ]` — Produse deletion: hard delete, incomplete check, its own error format *(D)*
-- **TODO-43** `[ ]` — Comenzi asks for one order's task status per order *(C)*
 - **TODO-45** `[ ]` — Drop `individual.id_photo_url` once every environment is drained *(E)*
-- **TODO-46** `[ ]` — Task photos are still uploaded with a public-read ACL *(E)*
 - **TODO-48** `[ ]` — `bootNavigation.test.tsx` fails on Node 24 *(G)*
 - **TODO-50** `[ ]` — Nothing checks that the index at the top of TODO.md is true *(G)*
 - **TODO-51** `[ ]` — The web app throws away the server's Romanian refusal text *(J)*
-- **TODO-52** `[ ]` — The batch order-status endpoint in TODO-43 needs TODO-42's guard *(C)*
 - **TODO-53** `[ ]` — `CredentialRow.username` in the web mock is write-only *(A)*
 - **TODO-54** `[ ]` — The live production build still ships the mock seed database *(G)*
 - **TODO-55** `[ ]` — The bundle budget measures the mock build, not the deployed one *(G)*
+- **TODO-56** `[ ]` — An admin cannot revoke another employee's session *(A)*
+- **TODO-57** `[ ]` — Produse has no "what is still using it" dialog *(D)*
 
 **Done, but flagged by whoever did it** — not open, but not finished-and-forgotten
 either:
@@ -96,38 +88,40 @@ full text lives further down.
 | TODO-21 | `[DONE]` | D | Archive fulfilled orders out of Comenzi |
 | TODO-22 | `[DONE]` | A | No backend guard against demoting the last admin |
 | TODO-23 | `[DONE]` | A | Dead Google sign-in plumbing outside the backend |
-| TODO-24 | **`[ ]`** | G | Rotate the Google Maps key that is still in git history |
+| TODO-24 | `[DONE]` | G | Rotate the Google Maps key that is still in git history |
 | TODO-25 | `[DONE]` | J | Backend logging: `System.out`/`System.err`, and a swallowed failure |
 | TODO-26 | `[DONE]` | J | The web react-hooks lint backlog |
-| TODO-27 | **`[ ]`** | A | The 60-day refresh-token arithmetic no longer describes production |
+| TODO-27 | `[DONE]` | A | The 60-day refresh-token arithmetic no longer describes production |
 | TODO-28 | `[DONE]` | A | Dead password-login plumbing in the web mock |
-| TODO-29 | **`[ ]`** | G | Nothing validates the docker-compose files |
-| TODO-30 | **`[ ]`** | A | There is no recovery path when the last admin loses their session |
+| TODO-29 | `[DONE]` | G | Nothing validates the docker-compose files |
+| TODO-30 | `[DONE]` | A | There is no recovery path when the last admin loses their session |
 | TODO-31 | **`[ ]`** | J | The backend test suite shares one database across classes |
 | TODO-32 | **`[ ]`** | G | Deploy fails at the SSH step — the VPS is unreachable |
 | TODO-33 | **`[ ]`** | H | Make the web app responsive, and move Sales + Technical out of mobile |
 | TODO-34 | `[DONE]` | C | `/tasks/order/{id}/exists` returns one task, but the guard rolls up all of them |
 | TODO-35 | **`[ ]`** | H | Role changes on the web never reach the phone |
-| TODO-36 | **`[ ]`** | A | First-run setup code is only printed to the server log |
-| TODO-37 | **`[ ]`** | D | Bulk-move orders between subscriptions |
-| TODO-38 | **`[ ]`** | D | Produse deletion: hard delete, incomplete check, its own error format |
+| TODO-36 | `[DONE]` | A | First-run setup code is only printed to the server log |
+| TODO-37 | `[DONE]` | D | Bulk-move orders between subscriptions |
+| TODO-38 | `[DONE]` | D | Produse deletion: hard delete, incomplete check, its own error format |
 | TODO-39 | `[DONE]` | D | Check-then-act on subscription retirement is unserialized |
 | TODO-40 | `[DONE]` | G | Three cross-cutting guard scripts |
 | TODO-41 | `[DONE]` | G | Re-establish a golden-fixture guard for the fulfilment rule |
 | TODO-42 | `[DONE]` | C | `/tasks/order/{id}/exists` is not row-scoped |
-| TODO-43 | **`[ ]`** | C | Comenzi asks for one order's task status per order |
+| TODO-43 | `[DONE]` | C | Comenzi asks for one order's task status per order |
 | TODO-44 | `[DONE]` | G | `doc_claims.py` resolved paths with the OS separator |
 | TODO-45 | **`[ ]`** | E | Drop `individual.id_photo_url` once every environment is drained |
-| TODO-46 | **`[ ]`** | E | Task photos are still uploaded with a public-read ACL |
+| TODO-46 | `[DONE]` | E | Task photos are still uploaded with a public-read ACL |
 | TODO-47 | `[DONE]` | G | `bundle_budget.py` counts lazy chunks named `index-*` as eager |
 | TODO-48 | **`[ ]`** | G | `bootNavigation.test.tsx` fails on Node 24 |
 | TODO-49 | `[DONE]` | G | CLAUDE.md's Known gaps still says mobile cannot authenticate |
 | TODO-50 | **`[ ]`** | G | Nothing checks that the index at the top of TODO.md is true |
 | TODO-51 | **`[ ]`** | J | The web app throws away the server's Romanian refusal text |
-| TODO-52 | **`[ ]`** | C | The batch order-status endpoint in TODO-43 needs TODO-42's guard |
+| TODO-52 | `[DONE]` | C | The batch order-status endpoint in TODO-43 needs TODO-42's guard |
 | TODO-53 | **`[ ]`** | A | `CredentialRow.username` in the web mock is write-only |
 | TODO-54 | **`[ ]`** | G | The live production build still ships the mock seed database |
 | TODO-55 | **`[ ]`** | G | The bundle budget measures the mock build, not the deployed one |
+| TODO-56 | **`[ ]`** | A | An admin cannot revoke another employee's session |
+| TODO-57 | **`[ ]`** | D | Produse has no "what is still using it" dialog |
 
 ---
 
@@ -303,7 +297,7 @@ run):** 372 tests green in 26 files, typecheck clean, lint 0 errors / 105
 warnings (unchanged — that is the TODO-26 backlog), build clean, bundle
 **139.4 kB / 160 kB** (down from 139.7). Hygiene green after TODO-29.
 
-### TODO-27 `[ ]` The 60-day refresh-token arithmetic no longer describes production
+### TODO-27 `[DONE]` The 60-day refresh-token arithmetic no longer describes production
 `ecotrack.security.refresh-token-ttl-days=365`, but `TokenService`'s javadoc and
 its worked example still reason in terms of the 60-day code default
 (`@Value(":60")`). Neither is strictly wrong — the comments document the
@@ -314,6 +308,34 @@ Decide which number is intended, then make the property, the fallback and the
 prose agree. A 365-day refresh token is a year-long credential on a lost device;
 if that is deliberate it deserves a sentence saying so next to the session cap
 and the nightly prune.
+
+**Decided: 365 is the intended number, and everything now says so.** The reason
+is that removing password login removed the cheap way back in — a driver whose
+refresh token dies mid-shift cannot sign in again, they file an enrolment request
+and wait for an admin. A year means that only happens to a device genuinely idle
+for a year. Changed: `TokenService`'s `@Value` fallback `:60` → `:365`, so an
+absent property can no longer give a lifetime the properties file does not state;
+the `MAX_RETIRED_TOKEN_HASHES` worked example (~2900 rotations → ~17,500) and the
+`enforceSessionCap` javadoc; `Session.retiredRefreshTokenHashes` and the
+`expires_at` comment, which now names the property instead of restating a number
+that can drift; `TokenServiceTest`, `AdminServiceTest`; and the two mobile
+`Menu.tsx` logout comments plus `AuthService.logout`.
+
+**The sentence TODO-27 asked for is in `application.properties`, and it states
+the cost rather than only the benefit:** a lost phone holds a working credential
+for up to a year, expiry is not what bounds that, and the things that do are the
+session cap, the nightly prune (which only removes what is already unusable), and
+a role change or employee deletion — each named there.
+
+**Found while writing it, and NOT true as first drafted:** the obvious mitigation
+— an admin revoking one employee's stolen device — does not exist.
+`DELETE /api/auth/sessions/{id}` is self-only (`AuthController` passes
+`principal.getEmployee().getId()`), and `/api/admin/**` has no session route at
+all. Recorded as **TODO-56**; the comment now says what is actually there.
+
+**Also fixed in passing:** `AdminServiceTest`'s class javadoc still framed itself
+around "an admin changing a password", which has not existed since password login
+was removed. Its tests are about role changes, and it now says so.
 
 ### TODO-28 `[DONE]` Dead password-login plumbing in the web mock
 Found while doing TODO-23, and left alone because it is the **password** half,
@@ -358,7 +380,7 @@ Nothing crossed the contract: none of the deleted symbols was ever on
 `EcoTrackApi`, so `src/api/live/` had no counterpart to keep in step and mock and
 live stay substitutable.
 
-### TODO-30 `[ ]` There is no recovery path when the last admin loses their session
+### TODO-30 `[DONE]` There is no recovery path when the last admin loses their session
 Split out of TODO-22, which fixed the *demote/delete* route and deliberately did
 not touch this one.
 
@@ -388,13 +410,151 @@ than the lockout. So the fix has to be a way back IN. Options, none chosen:
 Needs deciding before building. Whichever is picked, it wants a `SecurityTests`
 case in the shape of `LastAdminGuardTest`.
 
-### TODO-36 `[ ]` First-run setup code is only printed to the server log
+**Decided: option 1, re-announce a code — but keyed on SESSIONS, not on the
+admin count.** The owner's call was that logging out should be an ordinary thing
+to do, with a new session made afterwards; that only works if there is a way to
+make one.
+
+"Zero ADMIN employees" turned out to be the wrong trigger even though the item
+listed it: `AdminService`'s last-admin guard already makes it near-unreachable,
+and it was never the failure anyway. The lockout is an admin who **exists** and
+cannot sign in. So `EnrollmentService.isAdminLockedOut()` asks
+`SessionRepository.countUsableSessionsForRole("ADMIN", now) == 0`, measured on
+the **refresh** token — a 30-minute access token expiring is not a lockout, its
+owner refreshes — and excluding the empty-table case, which is first run and
+already handled.
+
+Option 2 (let an approved device re-enrol on its device id) was rejected for the
+reason the item gives: it weakens the single-use claim secret. Option 3 is a
+password by another name.
+
+**How it behaves:**
+
+- Entering the state logs a single-use recovery code, same shape and same place
+  as the first-run code. Reading it needs server access — which is the whole
+  security argument, since someone with it could edit the database anyway.
+- Presenting it on `/api/enrollment/request` mints a **new** ADMIN employee; the
+  device then claims it normally. New rather than a session grafted onto the old
+  employee: the name on the form is not proof of identity, so picking an existing
+  employee would be inventing an authorisation decision from a string. The stale
+  admin keeps their row and their zero sessions, and can be tidied up in Angajați.
+- Recomputed lazily on `GET /api/enrollment/status` and on `/request`. Nothing
+  else observes the transition — a logout is an `/api/auth` call that knows
+  nothing about enrollment, and an admin whose refresh token simply expires makes
+  no request at all. `refreshRecoveryCode()` is idempotent, so polling the status
+  endpoint cannot flood the log; it logs on the transition only.
+- **The code is required even when `require-setup-code=false`.** That flag
+  exempts the first-run land-grab, which needs an attacker to beat the owner to a
+  brand-new server. A lockout is one button on one phone away, so it never gets
+  the exemption. `ecotrack.enrollment.allow-admin-recovery=false` disables the
+  mechanism entirely and restores the old permanent lockout.
+- **No code at all during a lockout files an ordinary PENDING request, not a
+  403.** A driver who happens to ask in that window knows nothing about any of
+  this and must not be handed an error they cannot act on; their request simply
+  waits, exactly as before. A code presented when *neither* state is open IS a
+  403, because filing it silently would leave the sender waiting on a decision
+  they think they already made.
+
+**A bug the tests caught, in the first version of this:** `refreshRecoveryCode()`
+was called only in the non-bootstrap branch of `request()`, so a code minted for
+one lockout stayed live across the next one — silently accepted, never
+re-announced, leaving the operator with no code in the log and an old one still
+working. It is now called unconditionally at the top of `request()`, which is
+what actually expires a code when its lockout ends.
+
+`SecurityTests/AdminLockoutRecoveryTest` covers all nine paths against the real
+filter chain, including that a live DRIVER session does not hide the lockout.
+**It scrapes the code out of the log on purpose** — that is the code's only
+delivery channel, and a test that reached into the service for it would be
+testing something production does not have.
+
+Clients: `GET /api/enrollment/status` gained `adminLockout`, wired through
+`web/src/api/contract.ts` + `live/enrollment.ts` + the mock, and
+`mobile/services/EnrollmentService.ts` (absent key reads as `false`, so an older
+backend renders the pre-existing form). Both screens render the one existing code
+field with different Romanian wording — *Cod de recuperare* vs *Cod de
+configurare* — because the person reading it is looking in a different place.
+
+**Not done here, and split out as TODO-56:** the owner also wanted the admin
+panel to show a signed-out user's session. An admin cannot see or revoke another
+employee's sessions at all today, which is a bigger gap than this item.
+
+### TODO-36 `[DONE]` First-run setup code is only printed to the server log
 Whoever performs the very first enrolment needs SSH access to read the setup
 code out of the backend log (`ecotrack.enrollment.require-setup-code=true`).
 Workable for the current operator, but the app cannot be bootstrapped by a
 non-technical user, and this will be forgotten by the time it matters.
 
 *Found while building TODO-19.*
+
+**Fixed both halves: a code that can be chosen up front, and a runbook.**
+
+`ecotrack.enrollment.setup-code` (env `ECOTRACK_SETUP_CODE`, blank by default)
+lets whoever deploys pick the first-run code instead of reading a generated one
+out of the log. Set it and no SSH is needed at all; leave it blank and nothing
+changes. Threaded through `docker-compose.yml`, `docker-compose.dev-hosted.yml`,
+`deploy.yml` (both the `env:` block and the `envs:` allowlist — missing either
+silently drops it) and `.env.example`.
+
+**A configured code is NOT logged.** The operator already has it, and printing a
+chosen secret would copy it into every log aggregator for nothing. The generated
+one is still printed, because the log is its only delivery channel.
+
+**Under 12 characters it is IGNORED, with an error, and a generated one is used
+instead.** `/api/enrollment/request` is public and its rate limit is keyed on a
+client-supplied device id, so a guessable first-run code hands the instance to
+whoever guesses it — permanently, since there is no password path back in.
+Failing this way costs one SSH session; obeying it costs the system.
+`ShortConfiguredSetupCodeTest` pins the refusal, `ConfiguredSetupCodeTest` the
+accepted path, its case-insensitivity, and that it goes inert once an employee
+exists.
+
+**It is deliberately not accepted for TODO-30's lockout recovery.** A code that
+sits in config and always mints an ADMIN is the "out-of-band break-glass code"
+TODO-30 rejected as a password by another name. Recovery codes are always
+generated and always read from the log.
+
+**A bug found while writing the tests, in TODO-30's code:** between the bootstrap
+request and the claim that follows it, an ADMIN employee exists with no session —
+so `isAdminLockedOut()` reported a lockout and a normal first run announced a
+LOCKOUT banner seconds after starting. It now also asks whether an APPROVED,
+unexpired ADMIN grant is outstanding
+(`countByStatusAndAssignedRoleNameAndExpiresAtAfter`): nobody-can-get-in is not
+the same as somebody-is-halfway-in.
+
+**The "will be forgotten" half is DEPLOYMENT.md**, which now has a *First
+enrolment* section (both routes, with the `openssl rand` line and the
+`docker compose logs | grep` recipe) and a *Recovering when no admin can sign in*
+section for TODO-30. That is where someone will look at 2am, not this file.
+
+### TODO-56 `[ ]` An admin cannot revoke another employee's session
+Found while doing TODO-27, writing the sentence that item asked for about what
+bounds a year-long refresh token. The obvious answer — "an admin revokes the lost
+device" — is not implemented, so the draft comment claimed a capability the code
+does not have.
+
+`DELETE /api/auth/sessions/{id}` and `DELETE /api/auth/sessions` both scope to
+the caller: `AuthController` passes `principal.getEmployee().getId()` into
+`AuthService`, so an admin can only ever revoke their own devices. `GET
+/api/auth/sessions` is the same. `/api/admin/**` has no session route at all.
+
+So when a driver's phone is lost, an admin's only levers are blunt:
+- change that employee's roles, because `AdminService.updateEmployee` revokes
+  every session on a role change — a side effect, not an intent, and it changes
+  what they are allowed to do;
+- delete the employee;
+- wait out `ecotrack.security.refresh-token-ttl-days`, which is **365**.
+
+`TokenService.revokeAllSessions(employeeId, reason)` already exists and is what a
+fix would call. The shape is roughly `GET /api/admin/employees/{id}/sessions` and
+`DELETE /api/admin/employees/{id}/sessions[/{sessionId}]`, ADMIN-only, plus a
+matcher row above the `/api/admin/**` catch-all and an `AuthorizationMatrixTest`
+case. The one real design question is whether an admin should see another
+employee's device labels and IPs at all, or only be able to revoke blind.
+
+Overlaps **TODO-30** (recovery when the last admin loses their session) and the
+session list the owner asked for there — build them together, since both want an
+admin-facing view of somebody else's sessions.
 
 ### TODO-53 `[ ]` `CredentialRow.username` in the web mock is write-only
 Found while doing TODO-28. With `password` gone, the row carries `employeeId`,
@@ -637,7 +797,7 @@ Three cases in `SecurityTests/TaskScopingTest` against the real filter chain
 unknown id, office still reads it and sees the task id). Not in the controller
 slice: that runs `addFilters = false` with a mocked policy and proves nothing.
 
-### TODO-43 `[ ]` Comenzi asks for one order's task status per order
+### TODO-43 `[DONE]` Comenzi asks for one order's task status per order
 Split out of TODO-34, which fixed the correctness half and deliberately did not
 touch this one.
 
@@ -652,7 +812,37 @@ contract method, a mock and one query key. Needs deciding: a query-param id list
 (cheap, but URL length caps the page size) or a POST body (no cap, a POST that
 reads, and a new `SecurityConfig` row because writes need OFFICE).
 
-### TODO-52 `[ ]` The batch order-status endpoint in TODO-43 needs TODO-42's guard
+**Built, together with TODO-52 — they are one piece of work.** Shipping the
+endpoint without the guard would have been a security regression, not a
+half-finished feature, so both are closed here.
+
+**Decided: the query-param id list, with an explicit cap and a chunking client.**
+A POST that reads is worse on both counts that mattered. It is the wrong verb for
+a read, and — the part that actually decided it — it would land under the OFFICE
+write matcher, which means the authorisation would come from a rule about
+*writes*, hiding a decision this endpoint has to make on purpose. GET keeps that
+decision visible as the `requireOfficeRole` call TODO-52 asks for.
+
+The cost of GET is the URL cap, and it is handled rather than hoped away:
+`MAX_ORDER_STATUS_IDS = 500` (Tomcat's default header limit is 8 KB), **a 400
+beyond it, never a silent truncation** — a short map reads as "these orders have
+no task", which is exactly what the Curente/Arhivă split decides on. The web
+client chunks at 200 and `Promise.allSettled`s the chunks, so one failed chunk
+leaves the rest of the column populated instead of blanking it.
+
+**Every requested id gets an entry, including orders with no task.** An absent
+key would read as "no task" by accident; making it explicit means absence never
+stands in for an answer. Two tests pin it, one per side.
+
+`statusForOrder` is kept although no screen calls it now: it is still a live
+backend endpoint mobile uses, and `contract.test.ts` measures the batch form
+against it id by id — if those two ever disagree, Comenzi would mean different
+things depending on how it happened to fetch.
+
+Covered by four `TaskScopingTest` cases (a driver is refused even for their own
+order, and even for one id) and three `contract.test.ts` cases.
+
+### TODO-52 `[DONE]` The batch order-status endpoint in TODO-43 needs TODO-42's guard
 Recorded while closing TODO-42 so it is not re-learned later.
 
 TODO-43 replaces the per-order fan-out with one batch endpoint
@@ -663,6 +853,15 @@ a batch version without it is strictly worse than the leak TODO-42 just closed,
 since one request would enumerate the whole order space instead of probing one id.
 The matcher row does not do this: reads are open to any authenticated employee by
 design. Add the `TaskScopingTest` case alongside it.
+
+**Done with TODO-43, as one change.** `TaskController.orderTaskStatuses` opens
+with `accessPolicy.requireOfficeRole(principal)`, before it looks anything up, so
+a refused probe cannot be told apart from a missing order. Four
+`TaskScopingTest` cases cover it: a driver refused for two ids, refused for a
+single id, refused **even for the order carrying their own task** — the case that
+shows this is office-only rather than row-scoped — and office staff still reading
+it. The GET shape was chosen partly so this guard stays a visible line of code
+rather than a side effect of the OFFICE write matcher; see TODO-43.
 
 ---
 
@@ -995,7 +1194,7 @@ API, 3 on the rule itself), typecheck clean, lint 0 errors, build clean.
 *Related:* OQ-1 — archiving depends on knowing when an order is finished, which
 depends on the order/task relationship being clear.
 
-### TODO-37 `[ ]` Bulk-move orders between subscriptions
+### TODO-37 `[DONE]` Bulk-move orders between subscriptions
 When TODO-20 refuses a delete, the only way forward is to finish or delete each
 blocking order one at a time. Offer *"Mută pe alt abonament"* in the refusal
 dialog: reassign the listed orders to a chosen plan, then retry.
@@ -1008,7 +1207,58 @@ Needs a backend endpoint and a decision on whether reassigning is allowed for
 orders whose tasks already carry the OLD plan name in `Task.productName`: the
 name is copied onto the task, so moving the order does not move history.
 
-### TODO-38 `[ ]` Produse deletion: hard delete, incomplete check, its own error format
+**Built. `POST /api/subscriptions/{id}/orders/move`** with body
+`{targetSubscriptionId, orderIds}` → `SubscriptionService.moveOrders`, plus the
+*Mută pe alt abonament* section in `SubscriptionUsageModal`.
+
+**The `Task.productName` decision: the tasks move too, and no history is
+rewritten.** Those turn out not to be in tension. `productName` is a COPY of the
+plan name taken when the task was generated, so a move that ignored it would send
+a driver out with the old plan on their screen. But **only orders with no
+COMPLETED task can move at all** — the same strict `NOT EXISTS` as
+`findLiveBySubscriptionId`, deliberately, or this method and the guard it exists
+to unblock would disagree about the same order. A movable order therefore has no
+completed task, so "update every non-COMPLETED task" rewrites nothing that
+records work actually done. The COMPLETED check on the task loop is belts and
+braces, and says so.
+
+Finished orders are also simply not blockers, so moving them would buy nothing.
+
+**Other decisions made while building it:**
+
+- **`orderIds` is required — no "move everything on this plan".** Between the
+  dialog opening and the button being pressed, a new order can land on the source
+  plan, and sweeping it along is exactly the write-nobody-asked-for that kept
+  this out of `deactivate`. The server recomputes the live set and refuses the
+  **whole** call if any requested id has stopped being live since. All-or-nothing:
+  a half-move leaves the plan still un-retirable and the operator with no idea
+  which half went.
+- **It takes the TARGET plan's row lock and re-checks `isActive`** — this
+  attaches work to a plan, so it is one of the writes TODO-39 is about. The
+  source is not locked: emptying a plan can only help a concurrent retirement of
+  it, and locking both would invite a deadlock between two operators moving
+  orders in opposite directions.
+- **Recurring plans get no move button.** Moving one keeps it generating orders
+  against the plan being retired. When they also block, the dialog says the
+  delete will still fail rather than promising something it cannot deliver.
+- **The move retries the delete automatically**, with no second confirm — the
+  operator pressed Delete, not "reorganise my orders", and they confirmed once
+  already. `attemptDelete` was split out of `remove` so both paths share the
+  409-re-ask.
+
+**Refactor it forced, worth naming:** "a retired plan takes no new work" existed
+twice, in `OrderService` and `RecurringIgienizareService`, with per-context
+wording. Adding a third copy would have been the drift this repo keeps warning
+about, so it is now one `SubscriptionService.requireUsablePlan(plan, forWhat)`
+with all three delegating to it.
+
+Covered by 8 cases in `SubscriptionServiceTest` (including that it takes
+`findByIdForUpdate` and not a plain read) and 5 new ones in
+`SubscriptionUsageModal.test.tsx`. The web mock enforces every refusal the
+backend does, with the same Romanian text, so the UI's error path is not
+first exercised in production.
+
+### TODO-38 `[DONE]` Produse deletion: hard delete, incomplete check, its own error format
 Investigated alongside TODO-20 and found **materially different from
 Abonamente**, so it deliberately did NOT get the same treatment — applying
 TODO-20's rule here would be a regression. Three problems in
@@ -1026,6 +1276,69 @@ TODO-20's rule here would be a regression. Three problems in
 - **(c)** `ProductController` catches `IllegalStateException` itself and returns
   `409 {"error": …}`, bypassing `GlobalExceptionHandler` — the only place in the
   app where the error body's message lives under `error` rather than `message`.
+
+**All three done. The decision on (b): soft delete, matching Abonamente.**
+
+The complaint the item names is real and only a soft delete fixes it — under a
+hard delete, a product sold once years ago blocks its own removal forever, so the
+catalogue can only grow. `Product.isActive` now exists, `deleteProduct` sets it
+false, and the rule relaxes with it: **only UNFINISHED orders block**, the same
+strict `NOT EXISTS (task COMPLETED)` as `findLiveBySubscriptionId`, via a new
+`OrderRepository.countLiveByProductId` that counts BOTH order types. Produse and
+Abonamente are one rule now, where they were deliberately two.
+
+**The trap in doing it, and the thing to not undo:** `is_active` is **nullable,
+and null MEANS ACTIVE.** There is no migration tool — `ddl-auto=update` adds the
+column to a populated table and therefore cannot make it NOT NULL, so every row
+that already existed reads back null. A plain `findByIsActiveTrue()` would have
+returned NOTHING on the deploy that introduced the column, emptying every product
+picker in all three apps. The query is `IS NULL OR = true`, the Java side reads
+it through `Product.isRetired()` (`Boolean.FALSE.equals`, false for null), and
+`normalizeProduct` does `?? true`. Three tests pin it, one per layer.
+
+**(a) was already fixed** before this pass — `existsByRidicareOrderProductId` was
+being checked. The item's text was stale. `countLiveByProductId` covers both
+types anyway.
+
+**(c) is subtler than "rename the key".** The bespoke body put the Romanian text
+under `error`; `GlobalExceptionHandler` puts the HTTP status REASON under `error`
+("Conflict") and the text under `message`. So simply deleting the try/catch would
+have made every client that read `error` show the user the word **"Conflict"** —
+`mobile/services/ProductService.deleteProduct` did exactly that and is fixed to
+read `message`. `ProductControllerTest` now asserts both keys, so nobody
+re-introduces the confusion. The web client never read either key, which is
+TODO-51's separate problem.
+
+**Also added:** `GET /api/products/all` and `products.listAll()`, mirroring
+subscriptions, so a management view can still see what an old order points at.
+`GET /api/products` is now active-only, which is what makes a retired product
+vanish from the pickers in all three apps.
+
+The web mock enforces the new rule with the same Romanian text, and
+`contract.test.ts` gained a Produse block mirroring the Abonamente one — including
+that a COMPLETED task releases the product, and that a retired product leaves
+`list()` but stays in `listAll()`.
+
+### TODO-57 `[ ]` Produse has no "what is still using it" dialog
+Found while doing TODO-38. Retiring a product is now refused the same way
+retiring a subscription is, but the two refusals are not equally useful.
+
+Abonamente has `GET /api/subscriptions/{id}/usage` and
+`SubscriptionUsageModal`, which name every blocking order and link each one
+through to Comenzi. Produse has a counted message and nothing else: *"Nu se poate
+șterge produsul: 3 comenzi nefinalizate îl folosesc încă."* — the operator's next
+question is always *which* three, and there is no way to find out but to search
+Comenzi by hand.
+
+Not built here because TODO-38 asked for the delete rule, not a second dialog,
+and the parallel is worth building deliberately rather than by copy-paste. What
+it needs: a `ProductUsageResponse` alongside `SubscriptionUsageResponse`,
+`GET /api/products/{id}/usage`, and a modal — most likely one component
+parameterised over both, since the two would otherwise be the same JSX twice.
+
+The bulk move from TODO-37 has **no** product equivalent and probably should not:
+moving an order to a different product changes what is physically delivered,
+which is a real decision per order, not a bulk one. Say so if this is picked up.
 
 ### TODO-39 `[DONE]` Check-then-act on subscription retirement is unserialized
 Narrower than the repo-wide "no optimistic locking" gap in *Known gaps*, and
@@ -1292,7 +1605,32 @@ appendix says there is no server yet, in which case there is nothing stored and
 step 1 is a formality — but it must still be **confirmed**, not assumed, because
 this is the step whose omission leaves personal data behind forever.
 
-### TODO-46 `[ ]` Task photos are still uploaded with a public-read ACL
+**Still open, deliberately — and the blocker is now one command instead of a
+deploy.** Steps 2 and 3 were NOT done, because they are the irreversible half and
+step 1 is still unconfirmed. What was done is to make step 1 answerable.
+
+**The prefix is `persoane fizice/`, with the space.** Recovered from
+`PhotosController.clientIdsFolderName` in `e55eb41~1`, before that class was
+deleted — it was never written down anywhere that survives, and without it a
+bucket check cannot tell ID photos from task photos. `DEPLOYMENT.md` now carries
+an `aws s3 ls` recipe against the Spaces endpoint that needs **only the keys, not
+a running server**, which is what actually unblocked this.
+
+**What was checked here, and what it does and does not prove.** There is no
+`backend/data/` H2 database in the working tree, no `backend/.env`, so this
+machine has no Spaces credentials and no local rows. The deploy has never
+succeeded (TODO-32: i/o timeout on SSH). **None of that is sufficient.** Commit
+`2bc3614` shows `backend/data/damiprod.mv.db` was once committed and later
+removed, and the old `146.190.224.202` droplet was live at some point — so builds
+carrying the upload path did run somewhere. Whether they ran with Spaces
+credentials configured is not knowable from this repository, and assuming they
+did not is exactly the assumption this item exists to forbid.
+
+**So the remaining work is one decision by whoever holds the Spaces keys:** run
+the `aws s3 ls` above, note which bucket was checked, and either delete what it
+lists or confirm it is empty. Steps 2 and 3 are then mechanical and safe.
+
+### TODO-46 `[DONE]` Task photos are still uploaded with a public-read ACL
 `PhotoService.uploadPhoto` sets `ObjectCannedACL.PUBLIC_READ`, so every object it
 writes is on a working unauthenticated URL. Found while doing TODO-14, which
 removed the ID photos from that path — what is left under it is
@@ -1311,6 +1649,76 @@ Needs deciding:
 
 *Context:* the ID-photo exposure was the urgent half and is fixed. This is the
 half that was deliberately left, so it is recorded rather than silently kept.
+
+**Decided: private ACL plus presigned URLs — the first option.** The second
+option ("a cabin on a street is not personal data") does not survive looking at
+the actual object key, which this item did not have when it was written:
+
+    poze cabine/{taskId}_{sanitizedClientName}/{n}
+
+So a public URL **names the customer**, and its last segment is a counter
+starting at 1 — anyone who obtains one link can walk that client's other photos
+by changing one character. That is not "a cabin on a street"; it is an
+enumerable, customer-labelled set of photographs of a customer's premises, on
+permanent unauthenticated URLs. Recording the "accept it" reasoning as the item
+invited would have meant recording something untrue.
+
+**What changed.** `PhotoService.uploadPhoto` writes `ObjectCannedACL.PRIVATE`;
+`presignedUrl` / `presignedUrls` sign a 1-hour GET through an `S3Presigner`
+pointed at the Spaces endpoint; `GET /api/tasks/{id}/photos` and the POST's
+`urls` both return signed links. The stored `task_photos.image_url` is unchanged
+and stays the canonical identity — `extractObjectName` already turned a URL back
+into a key, which is what made this a small change.
+
+**The cost the item worried about did not materialise.** Neither client caches a
+URL: web's `useTaskPhotos` sets no `staleTime` (so TanStack refetches on mount)
+and mobile's `CloudPhotoViewer` holds them in component state until unmount. So
+no screen needed changing — only their doc comments, which now say the URLs
+expire, because that is now load-bearing rather than incidental.
+
+**Two things a reader must not undo:**
+- **The endpoint's guard is the whole authorisation.** A presigned URL needs no
+  token, so `requireCanAccessTask` running first is what decides access; handing
+  out a signed link anywhere without an equivalent check grants something nothing
+  downstream can take back. Said so on both the method and the service.
+- **A signing failure returns the unsigned URL, not an exception.** The caller
+  gets a link that 403s instead of a blank gallery, and the ERROR line names the
+  object. `TaskControllerTest` asserts the endpoint SIGNS rather than echoes —
+  echoing is exactly what a regression to `PUBLIC_READ` would look like from
+  outside.
+
+**Still to do operationally, and it is not code:** objects uploaded by earlier
+builds keep the public ACL they were created with. `DEPLOYMENT.md` has the
+one-time `put-object-acl` loop over `poze cabine/`, and a warning to run it
+*after* this release ships — doing it first would show drivers broken images
+while the app still hands out raw URLs. Same shape as TODO-45's leftover, and
+likely the same answer: per TODO-32 there may be no environment that ever
+uploaded one.
+
+**The owner's suggestion — a key on the device that decrypts the photo, applied
+to the ID photos put in from the web — was considered and not taken, for two
+different reasons depending on which photos it means.**
+
+*For ID photos:* there is nothing to encrypt. TODO-14 removed storage entirely —
+the card is OCR'd in the browser or on-device, `nume complet` and `CNP` are
+extracted, and the image is discarded. `PhotosController` and both `idPhoto`
+routes are gone. **Not uploading is strictly stronger than uploading encrypted:**
+encryption still puts the ciphertext, its lifetime and its key management in our
+hands, and a key that can decrypt is a key that can leak. The only thing left is
+draining what old builds already wrote (TODO-45).
+
+*For task photos:* a device-held key does not fit who has to see them. A driver
+uploads a photo and office staff review it later, from other devices — so the key
+would have to travel between devices, at which point it is a shared secret the
+server distributes, and the server can decrypt too. That is the same trust model
+as presigned URLs with more moving parts and a new way to lose photos forever if
+a key is lost. Client-side encryption pays off when the server must NOT be able
+to read the data; here the server is the thing deciding who may.
+
+If end-to-end encryption is wanted anyway, the honest version is per-employee
+keypairs with the object key wrapped per recipient, plus a recovery path for a
+lost device — a real feature, not a tweak to this one. Open a new item for it
+rather than reopening this.
 
 ---
 
@@ -1399,7 +1807,7 @@ majors — Vite 6→8 (#164), Vitest 3→4 (#168, #161), async-storage 2→3 (#1
 **Spring Boot 3.5 → 4.1.1 (#158) is a whole major generation** and would touch
 the security config, JPA setup and the enrollment code — close it.
 
-### TODO-24 `[ ]` Rotate the Google Maps key that is still in git history
+### TODO-24 `[DONE]` Rotate the Google Maps key that is still in git history
 A Maps key was committed in `807aec2`. The file that quoted it
 (`HANDOFF-auth-security.md`) was deleted in `ada49c1` and its
 `.github/repo-hygiene-allow.txt` entry has now been retired — **but deleting a
@@ -1463,7 +1871,16 @@ still bills) → verify `sha256:8477701a13` in `google-services.json` carries th
 same package + SHA-1 restriction → only then remove the reminder block from
 `.github/repo-hygiene-allow.txt` and close this item.
 
-### TODO-29 `[ ]` Nothing validates the docker-compose files
+**Closed.** The owner reports the rotation is done in Google Cloud: the leaked
+`sha256:5aa6a2ce91` key is deleted, its restricted replacement is in `mobile/.env`
+and the EAS secret, and `sha256:8477701a13` in `google-services.json` is package +
+SHA-1 restricted. The reminder block in `.github/repo-hygiene-allow.txt` is
+removed accordingly, per that file's own rule. **The old key string is still in
+git history and always will be** — that is now harmless because the key no longer
+exists, and it is the reason no history rewrite was needed. The two
+`google-services.json` allow-entries stay: that file is still committed by design.
+
+### TODO-29 `[DONE]` Nothing validates the docker-compose files
 Found while doing TODO-23: `repo-hygiene.yml` **fails any PR that touches
 `docker-compose.yml`**, and always has — the file matches no `ci-*.yml` `paths:`
 filter, which is exactly the "no workflow watches this" error that check exists
@@ -1492,6 +1909,47 @@ unpinned-action check will flag it), and then removing the two exemptions again.
 Needs deciding: is a validation-only workflow worth a fourth `ci-*.yml`, or
 should the check be folded into `repo-hygiene.yml`, which already runs on every
 PR and would need no new `paths:` filter?
+
+**Decided: folded into `repo-hygiene.yml`, no fourth `ci-*.yml`.** A new
+`ci-compose.yml` would need its own `paths:` filter, which is one more thing that
+can drift out of step with the files it claims to watch — and the whole reason
+compose was uncovered in the first place is a `paths:` filter that did not match
+it. `repo-hygiene.yml` has no filter by design, so a compose file cannot escape
+it however it is renamed. `docker` and the compose plugin are preinstalled on
+`ubuntu-latest`, so this costs no setup step.
+
+The old "Validate workflow and compose YAML" step is split in two: workflows are
+still YAML-parsed, and compose files now get `docker compose -f <f> config -q`.
+
+**It runs twice per file, and the two passes check different things:** once with
+no env file, so every `${VAR}` takes its `:-default` — the way a developer runs
+the stack from a clean checkout — and once with `--env-file .env.example`, which
+pins that the committed template is actually sufficient. A newly added
+`${VAR?required}` that nobody put in `.env.example` now fails in CI instead of
+on the VPS.
+
+**Verified against the real binary rather than assumed** (compose v5.2.0). Each
+of these was injected into a copy of `docker-compose.yml` and confirmed to exit
+non-zero, and none of them is a YAML syntax error, so the old step passed all of
+them:
+
+| Injected | Result |
+|---|---|
+| `containerr_name:` (unknown key) | `additional properties 'containerr_name' not allowed` |
+| `depends_on:` a service that does not exist | `depends on undefined service` |
+| `- caddy_dataa:/data` (undeclared volume) | `refers to undefined volume` |
+| `networks: [ecotrack_networkk]` (undeclared) | `refers to undefined network` |
+| `${VAR?must be set}` with no value | `required variable ... is missing a value` |
+
+**And one it does NOT catch, stated in the workflow comment so nobody trusts it
+too far:** `restart: unless-stoppped` passes cleanly — compose does not validate
+that field's enum. This is a floor, not a proof.
+
+`docker-compose.yml` and `docker-compose.dev-hosted.yml` **stay** in
+`NO_CI_REQUIRED`: that set is about the `ci-*.yml` `paths:` requirement, and
+these files are deliberately covered by the unfiltered workflow instead. The
+comment there no longer says "covered, partially" — it now says what actually
+runs.
 
 ### TODO-32 `[ ]` Deploy fails at the SSH step — the VPS is unreachable
 Found on the push of TODO-22 (`a95825b`). **Not a test failure**, though it reads
@@ -1900,6 +2358,32 @@ Fix: refresh the stored user from `GET /api/auth/me` in the boot gate
 (`app/index.tsx`), and probably after a 401-refresh too.
 
 *Found while building TODO-19.*
+
+**Corrected — this is smaller than the text above says, and it is NOT a
+data-sharing problem.** Both apps do talk to the same backend and the same
+database; nothing here disagrees about the data. What disagrees is one cached
+copy of `user.roles`, written into device storage at claim time and used only to
+decide which menu buttons to draw.
+
+And the window is short, because a role change already forces the device out:
+`AdminService.updateEmployee` calls `tokenService.revokeAllSessions(...,
+"CREDENTIALS_CHANGED_BY_ADMIN")` whenever the role set actually changes, and
+`mobile/services/http.ts` clears the tokens and fires its session-gone hook when
+the refresh that follows the 401 fails. So the real sequence is: admin changes
+the role → every session of that employee is revoked → the phone's next server
+call 401s, cannot refresh, and lands on the enrollment screen → the device
+re-enrols and stores fresh roles.
+
+So the exposure is the gap between the role change and the phone's next request:
+stale menus drawn from cache, and tapping one leads to a screen whose first API
+call boots the user to enrollment. Confusing, not a privilege leak — the backend
+authorizes from the `Employee` the token points at, never from the cached copy.
+
+**Still worth doing** for the confusion, and because the guarantee currently
+rests on "a role change always revokes sessions", which is a side effect of a
+different feature and could be relaxed without anyone noticing this depended on
+it. Deferred by the owner pending TODO-33, which may move Sales and Technical
+out of mobile entirely and change what the cached roles are even for.
 
 ---
 

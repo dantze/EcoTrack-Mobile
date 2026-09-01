@@ -67,6 +67,8 @@ class TaskScopingTest {
     private Task taskA;
     private Task taskB;
     private IgienizareOrder orderOfDriverA;
+    /** A second order, so the batch read (TODO-52) has more than one id to leak. */
+    private IgienizareOrder orderOfDriverB;
     private String tokenA;
     private String tokenSales;
 
@@ -79,6 +81,7 @@ class TaskScopingTest {
         taskA = seedTaskFor(driverA, "Client A");
         orderOfDriverA = seedOrderFor(taskA);
         taskB = seedTaskFor(driverB, "Client B");
+        orderOfDriverB = seedOrderFor(taskB);
 
         tokenA = mintToken(driverA);
         tokenSales = mintToken(sales);
@@ -190,6 +193,55 @@ class TaskScopingTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.hasTask").value(true))
                 .andExpect(jsonPath("$.taskId").value(taskA.getId()));
+    }
+
+    // ------------------------------------------- the BATCH order read (TODO-52)
+
+    // GET /api/tasks/order-status?ids=... answers the same question for many
+    // orders at once, so it inherits the same answer. Unguarded it would be
+    // strictly WORSE than the leak above: one request enumerates the order space
+    // instead of probing a single id.
+
+    @Test
+    void driver_cannotProbeBatchOrderTaskStatus() throws Exception {
+        mockMvc.perform(get("/api/tasks/order-status")
+                        .param("ids", orderOfDriverA.getId() + "," + orderOfDriverB.getId())
+                        .header("Authorization", "Bearer " + tokenA))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void driver_cannotProbeBatchOrderTaskStatus_evenForOwnOrderAlone() throws Exception {
+        // Same reasoning as the single-id case: office-only, not row-scoped,
+        // because no driver screen asks this question at all.
+        mockMvc.perform(get("/api/tasks/order-status")
+                        .param("ids", String.valueOf(orderOfDriverA.getId()))
+                        .header("Authorization", "Bearer " + tokenA))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void officeStaff_readBatchOrderTaskStatus() throws Exception {
+        mockMvc.perform(get("/api/tasks/order-status")
+                        .param("ids", orderOfDriverA.getId() + "," + orderOfDriverB.getId())
+                        .header("Authorization", "Bearer " + tokenSales))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.['" + orderOfDriverA.getId() + "'].hasTask").value(true))
+                .andExpect(jsonPath("$.['" + orderOfDriverA.getId() + "'].taskId").value(taskA.getId()))
+                .andExpect(jsonPath("$.['" + orderOfDriverB.getId() + "'].taskId").value(taskB.getId()));
+    }
+
+    @Test
+    void batchOrderTaskStatus_reportsAnOrderWithNoTaskRatherThanOmittingIt() throws Exception {
+        // A missing entry would read as "no task" anyway, but only by accident.
+        // Comenzi decides Curente vs Arhivă from this, so every requested id
+        // must come back with an explicit answer.
+        mockMvc.perform(get("/api/tasks/order-status")
+                        .param("ids", orderOfDriverA.getId() + ",999999")
+                        .header("Authorization", "Bearer " + tokenSales))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.['999999'].hasTask").value(false))
+                .andExpect(jsonPath("$.['999999'].status").doesNotExist());
     }
 
     // --------------------------------------------------- office is unchanged

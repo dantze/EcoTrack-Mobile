@@ -56,6 +56,14 @@ export const subscriptionsApi: SubscriptionsApi = {
     };
   },
 
+  async moveOrders(id: number, targetSubscriptionId: number, orderIds: number[]): Promise<number> {
+    const raw = await request<{ moved?: number }>(`/subscriptions/${id}/orders/move`, {
+      method: 'POST',
+      body: { targetSubscriptionId, orderIds },
+    });
+    return raw?.moved ?? 0;
+  },
+
   async remove(id: number): Promise<void> {
     await request<void>(`/subscriptions/${id}`, { method: 'DELETE' });
   },

@@ -37,6 +37,7 @@ import { useConfirm } from './components/useConfirm';
 import { SubscriptionUsageModal } from './components/SubscriptionUsageModal';
 import {
   useCheckSubscriptionUsage,
+  useMoveSubscriptionOrders,
   useCreateSubscription,
   useDeleteSubscription,
   useSubscriptions,
@@ -143,6 +144,7 @@ export function SubscriptionsPage() {
   const createSubscription = useCreateSubscription();
   const updateSubscription = useUpdateSubscription();
   const deleteSubscription = useDeleteSubscription();
+  const moveSubscriptionOrders = useMoveSubscriptionOrders();
   const { confirm, confirmDialog } = useConfirm();
 
   const checkUsage = useCheckSubscriptionUsage();
@@ -221,6 +223,68 @@ export function SubscriptionsPage() {
    * failed action. The preflight is advisory — `deleteSubscription` re-checks
    * server-side, and the catch below handles losing that race.
    */
+  /**
+   * The DELETE itself, minus the confirm. Shared by the ordinary delete and by
+   * the retry that follows a successful move (TODO-37) — the operator has
+   * already confirmed once, and asking again after they pressed "Mută N
+   * comenzi" would be a second prompt for the same decision.
+   *
+   * Returns whether the plan is now retired, so the caller can pick its toast.
+   */
+  const attemptDelete = async (subscription: Subscription): Promise<boolean> => {
+    try {
+      await deleteSubscription.mutateAsync(subscription.id);
+      return true;
+    } catch (error) {
+      // Lost the race, or something else still blocks: re-ask so the operator
+      // gets the current list rather than a stale one.
+      if (error instanceof ApiError && error.status === 409) {
+        try {
+          const fresh = await checkUsage(subscription.id);
+          if (fresh.blocked) {
+            setBlocked({ subscription, usage: fresh });
+            return false;
+          }
+        } catch {
+          /* fall through to the toast */
+        }
+      }
+      toast.error(errorMessage(error, 'Nu s-a putut șterge abonamentul'));
+      return false;
+    }
+  };
+
+  /**
+   * Move the blocking orders onto another plan, then retry the delete.
+   *
+   * The retry is the point — the operator pressed Delete, not "reorganise my
+   * orders". When active recurring plans also block, the move still succeeds and
+   * the delete still fails; that is said plainly rather than swallowed, and the
+   * dialog re-opens on the remaining blockers.
+   */
+  const moveOrdersAway = async (
+    subscription: Subscription,
+    targetSubscriptionId: number,
+    orderIds: number[],
+  ) => {
+    try {
+      const moved = await moveSubscriptionOrders.mutateAsync({
+        subscriptionId: subscription.id,
+        targetSubscriptionId,
+        orderIds,
+      });
+      setBlocked(null);
+      toast.success(
+        moved === 1 ? 'Comanda a fost mutată.' : `${moved} comenzi au fost mutate.`,
+      );
+      if (await attemptDelete(subscription)) {
+        toast.success('Abonamentul a fost șters.');
+      }
+    } catch (error) {
+      toast.error(errorMessage(error, 'Nu s-au putut muta comenzile'));
+    }
+  };
+
   const remove = async (subscription: Subscription) => {
     let usage: SubscriptionUsage | null = null;
     try {
@@ -242,24 +306,8 @@ export function SubscriptionsPage() {
       destructive: true,
     });
     if (!confirmed) return;
-    try {
-      await deleteSubscription.mutateAsync(subscription.id);
+    if (await attemptDelete(subscription)) {
       toast.success('Abonamentul a fost șters.');
-    } catch (error) {
-      // Lost the race: something started using the plan between the preflight
-      // and the delete. Re-ask, so the operator still gets the list.
-      if (error instanceof ApiError && error.status === 409) {
-        try {
-          const fresh = await checkUsage(subscription.id);
-          if (fresh.blocked) {
-            setBlocked({ subscription, usage: fresh });
-            return;
-          }
-        } catch {
-          /* fall through to the toast */
-        }
-      }
-      toast.error(errorMessage(error, 'Nu s-a putut șterge abonamentul'));
     }
   };
 
@@ -546,8 +594,17 @@ export function SubscriptionsPage() {
         <SubscriptionUsageModal
           subscription={blocked.subscription}
           usage={blocked.usage}
+          // Active plans only, and never the one being retired — moving an
+          // order onto a retired plan is refused server-side anyway.
+          moveTargets={subscriptions.filter(
+            (plan) => plan.isActive && plan.id !== blocked.subscription.id,
+          )}
           onClose={() => setBlocked(null)}
           onOpenOrder={(orderId) => navigate(`/comenzi?comanda=${orderId}`)}
+          onMoveOrders={(targetSubscriptionId, orderIds) =>
+            void moveOrdersAway(blocked.subscription, targetSubscriptionId, orderIds)
+          }
+          moving={moveSubscriptionOrders.isPending}
         />
       )}
 

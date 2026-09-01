@@ -88,7 +88,7 @@ class ConcurrencyGapsTest {
         orderService = new OrderService(orderRepository, clientRepository, productRepository,
                 subscriptionRepository, taskRepository, recurringIgienizareRepository);
         subscriptionService = new SubscriptionService(subscriptionRepository, orderRepository,
-                recurringIgienizareRepository);
+                recurringIgienizareRepository, taskRepository);
 
         acme = em.persist(new Company("office@acme.ro", "0311", "Bd. 20", "Acme SRL", "RO1", "Maria"));
         cabin = em.persist(new Product(CABIN, "Standard cabin", 500.0));

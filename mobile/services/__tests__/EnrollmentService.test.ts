@@ -50,19 +50,38 @@ beforeEach(() => {
 });
 
 describe('getStatus', () => {
-    it('reads the two booleans the form renders from', async () => {
-        apiFetch.mockResolvedValue(reply(200, { awaitingBootstrap: true, setupCodeRequired: true }));
+    it('reads the three booleans the form renders from', async () => {
+        apiFetch.mockResolvedValue(
+            reply(200, { awaitingBootstrap: true, setupCodeRequired: true, adminLockout: false }),
+        );
         await expect(EnrollmentService.getStatus()).resolves.toEqual({
             awaitingBootstrap: true,
             setupCodeRequired: true,
+            adminLockout: false,
         });
     });
 
-    it('defaults both to false rather than trusting a partial body', async () => {
+    it('reports an admin lockout, which is not the same as a fresh instance', async () => {
+        // Employees exist, so this is NOT first run - but no admin can sign in,
+        // so the screen asks for a recovery code instead (TODO-30).
+        apiFetch.mockResolvedValue(
+            reply(200, { awaitingBootstrap: false, setupCodeRequired: true, adminLockout: true }),
+        );
+        await expect(EnrollmentService.getStatus()).resolves.toEqual({
+            awaitingBootstrap: false,
+            setupCodeRequired: true,
+            adminLockout: true,
+        });
+    });
+
+    it('defaults all of them to false rather than trusting a partial body', async () => {
+        // Also what an older backend returns: no adminLockout key at all, which
+        // must render the same form the screen had before the field existed.
         apiFetch.mockResolvedValue(reply(200, {}));
         await expect(EnrollmentService.getStatus()).resolves.toEqual({
             awaitingBootstrap: false,
             setupCodeRequired: false,
+            adminLockout: false,
         });
     });
 });

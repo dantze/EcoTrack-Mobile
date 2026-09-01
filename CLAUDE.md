@@ -87,7 +87,30 @@ code logged at startup while `ecotrack.enrollment.require-setup-code=true` — s
 whoever opens a fresh server owns it permanently, with no password path back in.
 
 What survives under `/api/auth`: `refresh`, `logout`, `me`, `sessions`,
-`DELETE /sessions/{id}`, `DELETE /sessions`.
+`DELETE /sessions/{id}`, `DELETE /sessions`. All of them are **self-scoped** —
+an admin cannot list or revoke someone else's sessions from anywhere (TODO-56).
+
+**Losing every admin session is recoverable (TODO-30).** The last admin pressing
+Deconectare used to be permanent: nobody could approve a request, and the
+first-user-becomes-ADMIN path only reopens on an *empty employees table*, which
+a logout does not produce. `EnrollmentService.isAdminLockedOut()` now detects
+"zero usable ADMIN sessions" — measured on the **refresh** token, since an
+expired access token is not a lockout — and logs a single-use recovery code, in
+the same place and shape as the first-run code. Presenting it on
+`/api/enrollment/request` mints a new ADMIN, which the device then claims
+normally. The state is recomputed lazily on `GET /api/enrollment/status` and on
+`/request`, because nothing else observes the transition: a logout is an
+`/api/auth` call that knows nothing about enrollment.
+
+Two rules hold it up. **The recovery code is required even when
+`ecotrack.enrollment.require-setup-code=false`** — that flag exempts the
+first-run land-grab, which needs an attacker to beat the owner to a brand-new
+server, whereas a lockout is one button on one phone away. And **a request
+carrying no code at all during a lockout stays an ordinary PENDING request**,
+not a 403, so a driver who happens to ask in that window is not handed an error
+they cannot act on. `ecotrack.enrollment.allow-admin-recovery=false` turns the
+whole thing off. `SecurityTests/AdminLockoutRecoveryTest` covers it against the
+real filter chain, reading the code out of the log — the only channel it has.
 
 **Tokens are opaque, not JWTs.** `TokenService` mints 32 bytes from
 `SecureRandom` and persists only the SHA-256 hash, in `Session`. 30-minute
@@ -183,6 +206,13 @@ The role matrix answers "which VERBS may this role use". It does not answer
   It is `requireOfficeRole` rather than a row-scoped rule because no driver screen
   asks the question: every caller is an office screen in `web/features/sales` or
   `mobile/app/{Sales,Technical}`.
+- `GET /api/tasks/order-status?ids=…` is the **batch** form of that read
+  (TODO-43), and carries the **same** `requireOfficeRole` for the same reason
+  (TODO-52) — unguarded it would be strictly worse, since one request would
+  enumerate the order space rather than probe a single id. The id list is capped
+  at 500 and refused with a 400 beyond it, never truncated: a short map reads as
+  "these orders have no task", which is what decides Curente vs Arhivă. The web
+  client chunks at 200.
 
 `SecurityTests/TaskScopingTest` covers this against the real filter chain.
 **A new task endpoint needs a policy call, not just a matcher row.**
@@ -256,6 +286,15 @@ The backend enforces the **same** rule in
 subscription while live orders still point at it. Two implementations, one rule
 — **change one and you must change the other**, or the archive and the guard
 will disagree about the same order.
+
+`countLiveByProductId` in the same repository is the third, and it is the same
+`NOT EXISTS` for the same reason: **retiring a product is now a soft delete too**
+(TODO-38), so a finished order keeps resolving its name and price through the
+surviving row and no longer blocks. Produse and Abonamente are one rule now,
+where they used to be two — the product delete was hard, which forced it to block
+on *any* reference and meant a product sold once could never leave the catalogue.
+`SubscriptionService.moveOrders` (TODO-37) is the fourth caller of the same
+definition. All four move together.
 
 Both are roll-ups over **all** of an order's tasks, because an order is not
 limited to one: `TaskService.summariseOrderTasks` is what
@@ -401,11 +440,31 @@ Same rule as the map, in the other direction: `src/lib/geocoding.ts` keeps our
 bearer token off someone else's host; this keeps someone else's host out of our
 scanner.
 
-**Two follow-ups are still open.** The `individual.id_photo_url` column survives
+**One follow-up is still open.** The `individual.id_photo_url` column survives
 on purpose — it is the only record of the keys of objects already in Spaces, so
-`DELETE /api/admin/id-photos` must drain them before the column can go
-(TODO-45). And `PhotoService.uploadPhoto` still writes `PUBLIC_READ`, which now
-affects only task photos (TODO-46).
+they must be drained before the column can go (TODO-45). The objects sit under
+the prefix **`persoane fizice/`**; `DEPLOYMENT.md` has both the purge endpoint
+and a bucket check that needs no running server.
+
+**Task photos are private objects, served as presigned URLs** (TODO-46).
+`PhotoService.uploadPhoto` writes `ObjectCannedACL.PRIVATE`, and
+`GET /api/tasks/{id}/photos` signs a short-lived link per request rather than
+returning the stored URL. Two consequences that are easy to get wrong:
+
+- **The signature carries the access, so the guard on the endpoint is the whole
+  authorisation.** `requireCanAccessTask` runs first; a signed URL needs no token,
+  so anything that hands one out without an equivalent check grants access
+  nothing downstream can withhold.
+- **The URLs expire, so no client may persist one.** Web's `useTaskPhotos` sets
+  no `staleTime` and mobile's `CloudPhotoViewer` holds them in component state —
+  both correct today, and both load-bearing. The stored `task_photos.image_url`
+  stays the canonical, unsigned identity of the object.
+
+This was not a theoretical exposure: the object key is
+`poze cabine/{taskId}_{clientName}/{n}`, so a public URL named a customer and its
+last segment counted from 1 — one leaked link walked that client's other photos.
+Objects uploaded before this change keep their old public ACL; `DEPLOYMENT.md`
+has the one-time fix.
 
 ## Conventions
 
@@ -429,11 +488,15 @@ affects only task photos (TODO-46).
 
 Deliberate or unresolved; do not assume these are safe.
 
-- **A role change on the web never reaches an enrolled phone.** Mobile stores
-  `user.roles` at claim time and never refetches, so an admin promoting or
-  demoting someone in Angajați changes what the backend authorizes but not what
-  the device renders — it keeps the old menus until it re-enrols, and the
-  mismatch surfaces as a dead button or a 403 (TODO-35).
+- **A role change on the web reaches an enrolled phone only by kicking it out.**
+  Mobile stores `user.roles` at claim time and never refetches, so the menus are
+  drawn from a cached copy. A role change does revoke every session that employee
+  holds (`AdminService.updateEmployee`), and mobile clears its tokens when the
+  401's refresh fails — so the device is forced back to enrollment on its next
+  call rather than running indefinitely on stale roles. The gap is the stretch
+  before that call: stale menus, and a tap that boots the user to the enrollment
+  screen. Not a privilege leak — authorization always reads the `Employee` the
+  token points at, never the cached roles (TODO-35).
 - **No optimistic locking anywhere.** There is no `@Version` on any entity.
   Concurrent edits to the same task/route/order are silent last-write-wins, and
   because Spring Data `save()` issues a full-row UPDATE, the loser's other field

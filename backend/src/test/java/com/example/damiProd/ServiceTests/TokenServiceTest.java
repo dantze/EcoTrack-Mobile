@@ -197,7 +197,7 @@ class TokenServiceTest {
         TokenService.IssuedTokens newest = capped.issueNewSession(employee, "Device-C");
 
         // Three logins, cap of two: the least-recently-used one is revoked, and a
-        // 60-day refresh token on a forgotten device stops being a live key.
+        // year-long refresh token on a forgotten device stops being a live key.
         assertThat(capped.validateAccessToken(oldest.accessToken())).isEmpty();
         assertThat(capped.rotate(oldest.refreshToken(), "Device-A")).isEmpty();
         assertThat(capped.validateAccessToken(middle.accessToken())).isPresent();
@@ -318,7 +318,7 @@ class TokenServiceTest {
         Employee employee = newEmployee("token_svc_chain_bound");
         TokenService.IssuedTokens tokens = tokenService.issueNewSession(employee, "Device-A");
 
-        // A session refreshing every 30 minutes for 60 days rotates ~2900 times;
+        // A session refreshing every 30 minutes for 365 days rotates ~17,500 times;
         // the row must not grow with it.
         for (int i = 0; i < 25; i++) {
             tokens = tokenService.rotate(tokens.refreshToken(), "Device-A").orElseThrow();

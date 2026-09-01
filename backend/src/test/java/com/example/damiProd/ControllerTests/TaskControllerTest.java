@@ -265,18 +265,31 @@ class TaskControllerTest {
     // -----------------------------------------------------------------------
     // TEST 11 — GET /api/tasks/{id}/photos → get task photos
     // -----------------------------------------------------------------------
+    /**
+     * The stored URL is an identity, not a fetchable link: objects are PRIVATE
+     * in Spaces, so what goes over the wire is a presigned URL minted per
+     * request (TODO-46). This asserts the endpoint SIGNS rather than echoing —
+     * echoing would hand out links that 403, and, worse, would be what a
+     * regression back to PUBLIC_READ looks like from the outside.
+     */
     @Test
-    void getTaskPhotos_shouldReturn200() throws Exception {
+    void getTaskPhotos_shouldReturnPresignedUrls() throws Exception {
         Task task = buildSampleTask();
         TaskPhoto photo1 = new TaskPhoto("https://cdn.example.com/photo1.jpg", null, task);
         TaskPhoto photo2 = new TaskPhoto("https://cdn.example.com/photo2.jpg", null, task);
 
         when(taskPhotoRepository.findByTaskId(1L)).thenReturn(List.of(photo1, photo2));
+        when(photoService.presignedUrls(List.of(
+                "https://cdn.example.com/photo1.jpg",
+                "https://cdn.example.com/photo2.jpg")))
+                .thenReturn(List.of(
+                        "https://cdn.example.com/photo1.jpg?X-Amz-Signature=aaa",
+                        "https://cdn.example.com/photo2.jpg?X-Amz-Signature=bbb"));
 
         mockMvc.perform(get("/api/tasks/1/photos"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0]").value("https://cdn.example.com/photo1.jpg"))
-                .andExpect(jsonPath("$[1]").value("https://cdn.example.com/photo2.jpg"));
+                .andExpect(jsonPath("$[0]").value("https://cdn.example.com/photo1.jpg?X-Amz-Signature=aaa"))
+                .andExpect(jsonPath("$[1]").value("https://cdn.example.com/photo2.jpg?X-Amz-Signature=bbb"));
     }
 
     // -----------------------------------------------------------------------

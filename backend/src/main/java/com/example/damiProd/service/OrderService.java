@@ -223,14 +223,11 @@ public class OrderService {
     /**
      * Refuses a retired plan, read under the lock taken above.
      *
-     * 409 rather than 404: the plan exists and the client is not confused about
-     * which one it means — it was retired while this order was being filled in.
+     * Delegates to {@link SubscriptionService#requireUsablePlan} so that this,
+     * RecurringIgienizareService and the bulk move (TODO-37) cannot drift into
+     * three slightly different answers to one question.
      */
     private static void requireUsablePlan(Subscription plan) {
-        if (Boolean.FALSE.equals(plan.getIsActive())) {
-            throw new IllegalStateException(
-                    "Abonamentul „" + plan.getName() + "” a fost dezactivat și nu mai poate fi folosit"
-                            + " pentru comenzi noi. Alege alt abonament.");
-        }
+        SubscriptionService.requireUsablePlan(plan, "pentru comenzi noi");
     }
 }

@@ -265,21 +265,21 @@ function makeSite(area: Area): Site {
 // ---------------------------------------------------------------------------
 
 const PRODUCT_SEED: ReadonlyArray<Omit<Product, 'id'>> = [
-  { name: 'Toaletă ecologică standard', description: 'Cabină mobilă cu rezervor 250L, ventilație pasivă.', price: 850 },
-  { name: 'Toaletă ecologică cu chiuvetă', description: 'Cabină cu lavoar și rezervor apă curată 60L.', price: 1150 },
-  { name: 'Toaletă ecologică VIP', description: 'Cabină premium, oglindă, iluminat LED, pardoseală antiderapantă.', price: 1750 },
-  { name: 'Toaletă ecologică PMR', description: 'Cabină pentru persoane cu dizabilități, acces rampă, bare de sprijin.', price: 2100 },
-  { name: 'Toaletă ecologică dublă', description: 'Ansamblu de două cabine pe șasiu comun.', price: 1950 },
-  { name: 'Cabină duș mobilă', description: 'Duș cu boiler electric 30L și rezervor 200L.', price: 2400 },
-  { name: 'Pisoar mobil 4 posturi', description: 'Unitate pentru evenimente, rezervor 300L.', price: 1300 },
-  { name: 'Gard mobil galvanizat 3.5m', description: 'Panou 2.0 x 3.5 m, țeavă galvanizată la cald.', price: 180 },
-  { name: 'Gard mobil cu plasă opacă', description: 'Panou 2.0 x 3.5 m cu prelată de mascare șantier.', price: 210 },
-  { name: 'Picior beton gard mobil', description: 'Talpă prefabricată 27 kg pentru panouri mobile.', price: 45 },
-  { name: 'Clemă prindere gard mobil', description: 'Clemă zincată cu șurub pentru solidarizare panouri.', price: 12 },
-  { name: 'Container birou 6m', description: 'Container 6 x 2.4 m, izolat, instalație electrică, aer condiționat.', price: 9800 },
-  { name: 'Container vestiar 6m', description: 'Container 6 x 2.4 m cu dulapuri metalice și bănci.', price: 9200 },
-  { name: 'Container sanitar 6m', description: 'Container cu 2 dușuri, 2 WC-uri și boiler 80L.', price: 12500 },
-  { name: 'Container depozitare 12m', description: 'Container 12 x 2.4 m, uși duble, fără izolație.', price: 14200 },
+  { name: 'Toaletă ecologică standard', description: 'Cabină mobilă cu rezervor 250L, ventilație pasivă.', price: 850, isActive: true },
+  { name: 'Toaletă ecologică cu chiuvetă', description: 'Cabină cu lavoar și rezervor apă curată 60L.', price: 1150, isActive: true },
+  { name: 'Toaletă ecologică VIP', description: 'Cabină premium, oglindă, iluminat LED, pardoseală antiderapantă.', price: 1750, isActive: true },
+  { name: 'Toaletă ecologică PMR', description: 'Cabină pentru persoane cu dizabilități, acces rampă, bare de sprijin.', price: 2100, isActive: true },
+  { name: 'Toaletă ecologică dublă', description: 'Ansamblu de două cabine pe șasiu comun.', price: 1950, isActive: true },
+  { name: 'Cabină duș mobilă', description: 'Duș cu boiler electric 30L și rezervor 200L.', price: 2400, isActive: true },
+  { name: 'Pisoar mobil 4 posturi', description: 'Unitate pentru evenimente, rezervor 300L.', price: 1300, isActive: true },
+  { name: 'Gard mobil galvanizat 3.5m', description: 'Panou 2.0 x 3.5 m, țeavă galvanizată la cald.', price: 180, isActive: true },
+  { name: 'Gard mobil cu plasă opacă', description: 'Panou 2.0 x 3.5 m cu prelată de mascare șantier.', price: 210, isActive: true },
+  { name: 'Picior beton gard mobil', description: 'Talpă prefabricată 27 kg pentru panouri mobile.', price: 45, isActive: true },
+  { name: 'Clemă prindere gard mobil', description: 'Clemă zincată cu șurub pentru solidarizare panouri.', price: 12, isActive: true },
+  { name: 'Container birou 6m', description: 'Container 6 x 2.4 m, izolat, instalație electrică, aer condiționat.', price: 9800, isActive: true },
+  { name: 'Container vestiar 6m', description: 'Container 6 x 2.4 m cu dulapuri metalice și bănci.', price: 9200, isActive: true },
+  { name: 'Container sanitar 6m', description: 'Container cu 2 dușuri, 2 WC-uri și boiler 80L.', price: 12500, isActive: true },
+  { name: 'Container depozitare 12m', description: 'Container 12 x 2.4 m, uși duble, fără izolație.', price: 14200, isActive: true },
 ];
 
 /** Indexes of PRODUCT_SEED that make sense as a placed/collected cabin. */

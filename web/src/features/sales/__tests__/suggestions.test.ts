@@ -39,8 +39,8 @@ const CLIENT: Client = {
   address: null,
 };
 
-const STANDARD: Product = { id: 10, name: 'Toaletă standard', description: null, price: 850 };
-const VIP: Product = { id: 11, name: 'Toaletă VIP', description: null, price: 1750 };
+const STANDARD: Product = { id: 10, name: 'Toaletă standard', description: null, price: 850, isActive: true };
+const VIP: Product = { id: 11, name: 'Toaletă VIP', description: null, price: 1750, isActive: true };
 const PLAN: Subscription = {
   id: 20,
   name: 'Abonament Bronze',

@@ -70,6 +70,11 @@ function toInput(draft: Draft): ProductInput {
     name: draft.name.trim(),
     description: draft.description.trim() || null,
     price: parseDecimal(draft.price),
+    // The form never edits this — retiring is the Delete button (a soft delete,
+    // TODO-38), and `useProducts` only ever hands this form an active product.
+    // Sending true unconditionally would UN-retire one if that ever changed, so
+    // it is not written here; PUT is a full replace, hence the explicit value.
+    isActive: true,
   };
 }
 

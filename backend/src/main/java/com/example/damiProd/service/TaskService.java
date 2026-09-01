@@ -12,8 +12,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Collection;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import java.util.Optional;
 
 @Service
@@ -188,6 +192,30 @@ public class TaskService {
      */
     public List<Task> getTasksByOrderId(Long orderId) {
         return taskRepository.findAllByOrder_IdOrderByIdAsc(orderId);
+    }
+
+    /**
+     * Tasks for MANY orders at once, grouped by order id (TODO-43).
+     *
+     * One query instead of one per order. An order with no tasks is absent from
+     * the map rather than mapped to an empty list - the caller has the id list
+     * already and "no entry" is the same answer, so materialising empties would
+     * only invite the two representations to disagree.
+     *
+     * The per-order lists arrive in the SAME order that
+     * {@link #getTasksByOrderId} would give, which matters: the roll-up in
+     * {@link #summariseOrderTasks} picks a representative task, so a different
+     * sequence could summarise the same order differently depending on which
+     * endpoint asked.
+     */
+    public Map<Long, List<Task>> getTasksByOrderIds(Collection<Long> orderIds) {
+        if (orderIds == null || orderIds.isEmpty()) {
+            return Map.of();
+        }
+        return taskRepository.findAllByOrder_IdInOrderByOrder_IdAscIdAsc(orderIds).stream()
+                .filter(task -> task.getOrderId() != null)
+                .collect(Collectors.groupingBy(Task::getOrderId,
+                        LinkedHashMap::new, Collectors.toList()));
     }
 
     /**

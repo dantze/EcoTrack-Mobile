@@ -142,8 +142,17 @@ export interface AccessRequest {
 export interface EnrollmentStatus {
   /** No employees exist yet: the next approved request becomes ADMIN. */
   awaitingBootstrap: boolean;
-  /** Show the one-time setup-code field (first run, and only when configured). */
+  /**
+   * Show the one-time code field. True on first run (when configured) AND
+   * during an admin lockout — one field serves both, only the wording differs.
+   */
   setupCodeRequired: boolean;
+  /**
+   * No admin can sign in any more, so nobody is left to approve a request
+   * (TODO-30). The server has logged a recovery code; entering it mints a new
+   * ADMIN. Distinct from `awaitingBootstrap`, which is an EMPTY instance.
+   */
+  adminLockout: boolean;
 }
 
 /**
@@ -265,13 +274,21 @@ export interface OrdersApi {
 }
 
 export interface ProductsApi {
-  /** GET /products */
+  /** GET /products — active only, like `subscriptions.list()`. */
   list(): Promise<Product[]>;
+  /** GET /products/all — includes retired. */
+  listAll(): Promise<Product[]>;
   /** POST /products */
   create(input: Omit<Product, 'id'>): Promise<Product>;
   /** PUT /products/{id} */
   update(id: number, input: Omit<Product, 'id'>): Promise<Product>;
-  /** DELETE /products/{id} */
+  /**
+   * DELETE /products/{id} — SOFT delete (isActive = false), like a
+   * subscription (TODO-38).
+   *
+   * Throws 409 while UNFINISHED orders still use it. A finished order does not
+   * block: the row survives, so it keeps resolving its product through it.
+   */
   remove(id: number): Promise<void>;
 }
 
@@ -294,6 +311,18 @@ export interface SubscriptionsApi {
    * answers 409, so skipping this call cannot retire a plan that is in use.
    */
   usage(id: number): Promise<SubscriptionUsage>;
+  /**
+   * POST /subscriptions/{id}/orders/move — the way out of a refused delete.
+   *
+   * Re-points the named live orders onto `targetSubscriptionId`, so the retry
+   * can succeed. `orderIds` is required and is exactly what the operator saw in
+   * the refusal dialog: the server refuses the whole call if any of them has
+   * stopped being live since, rather than moving some of them.
+   *
+   * Does NOT touch active recurring plans — those block for a different reason
+   * and are stopped from Igienizări recurente. Resolves to how many moved.
+   */
+  moveOrders(id: number, targetSubscriptionId: number, orderIds: number[]): Promise<number>;
   /**
    * DELETE /subscriptions/{id} — soft delete (isActive = false).
    *
@@ -385,8 +414,25 @@ export interface TasksApi {
   /**
    * GET /tasks/order/{orderId}/exists — the order's SUMMARISED task status.
    * See OrderTaskStatus: one call per order, rolled up server-side.
+   *
+   * Kept although no screen calls it any more — Comenzi moved to
+   * `statusForOrders` (TODO-43). It is still a live backend endpoint that mobile
+   * uses, and it is what `contract.test.ts` measures the batch form against.
    */
   statusForOrder(orderId: number): Promise<OrderTaskStatus>;
+  /**
+   * GET /tasks/order-status?ids=… — the SAME roll-up for many orders at once
+   * (TODO-43), so a list of 200 orders is one request rather than 200.
+   *
+   * Every requested id comes back with an entry; an order with no task answers
+   * `hasTask: false` rather than being omitted. Office-only server-side
+   * (TODO-52) — a driver gets 403, which is not a case the web app hits, since
+   * only Comenzi calls it.
+   *
+   * The server caps the id list. Callers must chunk rather than assume any
+   * length works; `useOrderTaskStatuses` does.
+   */
+  statusForOrders(orderIds: number[]): Promise<Record<number, OrderTaskStatus>>;
   /** PATCH /tasks/{id}/status — body { status }. */
   updateStatus(id: number, status: TaskStatus): Promise<Task>;
   /**
@@ -400,7 +446,15 @@ export interface TasksApi {
   reassign(taskId: number, newRouteId: number): Promise<Task>;
   /** PUT /tasks/reassign — body { taskIds, newRouteId }. Powers bulk-select. */
   reassignMany(taskIds: number[], newRouteId: number): Promise<Task[]>;
-  /** GET /tasks/{id}/photos */
+  /**
+   * GET /tasks/{id}/photos
+   *
+   * **The URLs EXPIRE.** Task photos are private objects in Spaces (TODO-46);
+   * the server signs a short-lived link per request instead of handing out a
+   * permanent public URL. Fetch them when the gallery opens and let them go —
+   * `useTaskPhotos` sets no `staleTime`, which is what keeps that true. Never
+   * persist one, and never put one in a query key that outlives the view.
+   */
   listPhotos(taskId: number): Promise<TaskPhoto[]>;
   /** POST /tasks/{id}/photos (multipart, repeated field "files"). */
   uploadPhotos(taskId: number, files: File[]): Promise<TaskPhoto[]>;

@@ -119,13 +119,24 @@ class ProductControllerTest {
     // -----------------------------------------------------------------------
     // TEST 5 — DELETE /api/products/{id} → conflict when product in use
     // -----------------------------------------------------------------------
+    /**
+     * The refusal now arrives in the app's ONE error shape (TODO-38c).
+     *
+     * This endpoint used to catch IllegalStateException itself and answer
+     * {@code {"error": "<the Romanian text>"}} — the only place in the app where
+     * the message lived under `error`. GlobalExceptionHandler puts the status
+     * reason there ("Conflict") and the message under `message`, so a client
+     * still reading `error` would now show the user the word "Conflict". Both
+     * keys are asserted here for exactly that reason.
+     */
     @Test
     void deleteProduct_shouldReturn409WhenProductInUse() throws Exception {
-        doThrow(new IllegalStateException("Nu se poate șterge produsul deoarece este folosit în comenzi existente."))
-                .when(productService).deleteProduct(1L);
+        String refusal = "Nu se poate șterge produsul: 2 comenzi nefinalizate îl folosesc încă.";
+        doThrow(new IllegalStateException(refusal)).when(productService).deleteProduct(1L);
 
         mockMvc.perform(delete("/api/products/1"))
                 .andExpect(status().isConflict())
-                .andExpect(jsonPath("$.error").value("Nu se poate șterge produsul deoarece este folosit în comenzi existente."));
+                .andExpect(jsonPath("$.message").value(refusal))
+                .andExpect(jsonPath("$.error").value("Conflict"));
     }
 }

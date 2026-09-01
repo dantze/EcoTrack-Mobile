@@ -205,6 +205,36 @@ export const tasksApi: TasksApi = {
     };
   },
 
+  async statusForOrders(orderIds: number[]): Promise<Record<number, OrderTaskStatus>> {
+    if (orderIds.length === 0) return {};
+
+    const raw = await request<
+      Record<
+        string,
+        {
+          hasTask?: boolean;
+          taskId?: number | null;
+          routeId?: number | null;
+          scheduledTime?: string | null;
+          status?: string | null;
+        }
+      >
+    >(`/tasks/order-status?ids=${orderIds.join(',')}`);
+
+    const map: Record<number, OrderTaskStatus> = {};
+    for (const [key, value] of Object.entries(raw ?? {})) {
+      // JSON object keys are strings; the caller works in numbers.
+      map[Number(key)] = {
+        hasTask: value?.hasTask === true,
+        taskId: optNum(value?.taskId),
+        routeId: optNum(value?.routeId),
+        scheduledTime: optStr(value?.scheduledTime),
+        status: (optStr(value?.status) as TaskStatus | null) ?? null,
+      };
+    }
+    return map;
+  },
+
   async updateStatus(id: number, status: TaskStatus): Promise<Task> {
     const raw = await request<RawTask>(`/tasks/${id}/status`, {
       method: 'PATCH',
@@ -242,6 +272,11 @@ export const tasksApi: TasksApi = {
 
   async listPhotos(taskId: number): Promise<TaskPhoto[]> {
     // Returns List<String> — bare URLs. Ids are synthesised positionally.
+    //
+    // Each URL is a PRESIGNED, expiring link to a private object (TODO-46), not
+    // a stable address: the same photo comes back with a different query string
+    // on the next call. That is why the ids are positional rather than derived
+    // from the URL, and why nothing here caches them.
     return normalizePhotoUrls(await request<string[]>(`/tasks/${taskId}/photos`));
   },
 

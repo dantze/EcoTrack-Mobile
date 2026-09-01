@@ -82,11 +82,9 @@ public class RecurringIgienizareService {
             Subscription sub = subscriptionRepository.findByIdForUpdate(plan.getSubscription().getId())
                     .orElseThrow(() -> new ResourceNotFoundException(
                             "Subscription not found with id: " + plan.getSubscription().getId()));
-            if (Boolean.FALSE.equals(sub.getIsActive())) {
-                throw new IllegalStateException(
-                        "Abonamentul „" + sub.getName() + "” a fost dezactivat și nu mai poate fi folosit"
-                                + " pentru planuri recurente noi. Alege alt abonament.");
-            }
+            // One implementation of "a retired plan takes no new work", shared with
+            // OrderService and the bulk move (TODO-37).
+            SubscriptionService.requireUsablePlan(sub, "pentru planuri recurente noi");
             plan.setSubscription(sub);
         }
 

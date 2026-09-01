@@ -49,6 +49,9 @@ services:
       DO_SPACES_REGION: ${DO_SPACES_REGION:-fra1}
       ECOTRACK_SECURITY_ENFORCE: ${ECOTRACK_SECURITY_ENFORCE:-true}
       ECOTRACK_CORS_ALLOWED_ORIGINS: ${ECOTRACK_CORS_ALLOWED_ORIGINS:-http://localhost:5173,http://localhost:3000}
+      # Optional first-run admin code (TODO-36). Unset => the backend
+      # generates one and prints it to the log, which needs SSH to read.
+      ECOTRACK_SETUP_CODE: ${ECOTRACK_SETUP_CODE:-}
     ports:
       - "8080:8080"
     healthcheck:

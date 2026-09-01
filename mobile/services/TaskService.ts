@@ -192,7 +192,13 @@ export const TaskService = {
     },
 
     /**
-     * Get all photo URLs for a specific task
+     * Get all photo URLs for a specific task.
+     *
+     * **These URLs EXPIRE.** Task photos live in a private bucket (TODO-46), so
+     * the server signs a short-lived link per request rather than handing out a
+     * permanent public one. Render them and drop them; do not write them to
+     * AsyncStorage or hold them across a session. `CloudPhotoViewer` keeps them
+     * in component state, which is exactly right.
      */
     getTaskPhotos: async (taskId: number): Promise<string[]> => {
         const response = await apiFetch(`/tasks/${taskId}/photos`);

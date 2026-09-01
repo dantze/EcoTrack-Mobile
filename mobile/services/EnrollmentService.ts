@@ -40,8 +40,17 @@ import {
 export interface EnrollmentStatus {
     /** True while nobody has claimed this instance: the first request wins ADMIN. */
     awaitingBootstrap: boolean;
-    /** Show the setup-code field only when the server asks for it. */
+    /**
+     * Show the one-time code field. True on first run AND during an admin
+     * lockout - one field serves both, only the wording differs.
+     */
     setupCodeRequired: boolean;
+    /**
+     * No admin can sign in any more, so nobody is left to approve a request
+     * (TODO-30). The server logged a recovery code; entering it mints a new
+     * ADMIN. Not the same as `awaitingBootstrap`, which is an EMPTY instance.
+     */
+    adminLockout: boolean;
 }
 
 export interface EnrollmentTicket extends PendingTicket {
@@ -109,11 +118,15 @@ const normalizeUser = (raw: RawClaimUser): User => ({
 export const EnrollmentService = {
     /**
      * GET /api/enrollment/status
-     * → 200 `{ awaitingBootstrap: boolean, setupCodeRequired: boolean }`
+     * → 200 `{ awaitingBootstrap: boolean, setupCodeRequired: boolean,
+     *          adminLockout: boolean }`
      *
-     * Lets the screen decide whether to render the setup-code field. Leaks
-     * nothing beyond "has anyone claimed this server yet". Throws on a network
-     * failure; the screen renders its default form in that case.
+     * Lets the screen decide whether to render the code field, and what to call
+     * it. Leaks nothing beyond "has anyone claimed this server yet" and "can
+     * anyone approve a request right now" - neither of which helps a caller who
+     * does not have the corresponding code, and that only ever exists in the
+     * server log. Throws on a network failure; the screen renders its default
+     * form in that case.
      */
     getStatus: async (): Promise<EnrollmentStatus> => {
         const response = await apiFetch('/enrollment/status', {}, { anonymous: true });
@@ -124,6 +137,9 @@ export const EnrollmentService = {
         return {
             awaitingBootstrap: data?.awaitingBootstrap === true,
             setupCodeRequired: data?.setupCodeRequired === true,
+            // An older backend omits this; absent means "not locked out", which
+            // is the same form the screen rendered before the field existed.
+            adminLockout: data?.adminLockout === true,
         };
     },
 

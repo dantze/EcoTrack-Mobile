@@ -1,8 +1,14 @@
 /**
  * ProductController — /api/products
  *
- * DELETE answers 409 with `{error}` when the product is still referenced by an
- * order; the message arrives as ApiError.body for the UI to surface.
+ * `remove()` is a SOFT delete: the controller flips isActive to false. The
+ * product disappears from list() but is still returned by listAll(), and every
+ * order that already referenced it keeps resolving its name and price.
+ *
+ * It answers 409 while UNFINISHED orders still use it — the same strict "no
+ * COMPLETED task" rule as subscriptions. The Romanian message arrives in the
+ * standard error body, under `message`; it used to be under `error`, which was
+ * this endpoint's own invention and is gone (TODO-38c).
  */
 
 import type { ProductsApi } from '../contract';
@@ -13,6 +19,11 @@ import { normalizeProduct, type RawProduct } from './normalize';
 export const productsApi: ProductsApi = {
   async list(): Promise<Product[]> {
     const raw = await request<RawProduct[]>('/products');
+    return (raw ?? []).map(normalizeProduct);
+  },
+
+  async listAll(): Promise<Product[]> {
+    const raw = await request<RawProduct[]>('/products/all');
     return (raw ?? []).map(normalizeProduct);
   },
 

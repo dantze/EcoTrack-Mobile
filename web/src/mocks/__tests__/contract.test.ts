@@ -370,33 +370,66 @@ describe('the failures the UI must render', () => {
     await expect(api.clients.remove(client.id)).resolves.toBeUndefined();
   });
 
-  it('refuses to delete a product that is still referenced by an order (409)', async () => {
-    const client = await api.clients.create({ type: 'company', name: 'Product User SRL' });
+  // ── Retiring a product (TODO-38) ───────────────────────────────────────
+  //
+  // Products and subscriptions now follow the SAME rule, because they now have
+  // the same kind of delete: soft. A product used to be hard-deleted, so any
+  // reference at all had to block it — which meant one sale, years ago, kept it
+  // in the catalogue forever. Since the row survives, a FINISHED order keeps
+  // resolving its name and price through it and no longer blocks.
+
+  async function productWithOrder(name: string) {
+    const client = await api.clients.create({ type: 'company', name: `${name} SRL` });
     const product = await api.products.create({
-      name: 'Produs Test',
+      name,
       description: null,
       price: 100,
+      isActive: true,
     });
-    await api.orders.create(client.id, {
+    const order = await api.orders.create(client.id, {
       orderType: 'Amplasari',
       product: { id: product.id },
       quantity: 1,
     });
+    return { product, order };
+  }
+
+  it('refuses to retire a product an unfinished order still uses (409)', async () => {
+    const { product } = await productWithOrder('Blocat de comandă');
 
     await expect(api.products.remove(product.id)).rejects.toMatchObject({ status: 409 });
+
+    // A refused retire must not half-apply.
+    const live = await api.products.list();
+    expect(live.some((entry) => entry.id === product.id)).toBe(true);
   });
 
-  it('allows deleting an unreferenced product', async () => {
-    const product = await api.products.create({ name: 'Nefolosit', description: null, price: 10 });
+  it('allows retiring once the only order that used it is completed', async () => {
+    const { product, order } = await productWithOrder('Eliberat de finalizare');
+
+    const task = await api.tasks.create({ orderId: order.id, type: 'PLACEMENT' });
+    await api.tasks.updateStatus(task.id, 'COMPLETED');
+
+    await expect(api.products.remove(product.id)).resolves.toBeUndefined();
+
+    // SOFT: gone from the picker, still there for the order that used it.
+    expect((await api.products.list()).some((entry) => entry.id === product.id)).toBe(false);
+    expect((await api.products.listAll()).some((entry) => entry.id === product.id)).toBe(true);
+  });
+
+  it('allows retiring a product nothing has ever used', async () => {
+    const product = await api.products.create({
+      name: 'Nefolosit',
+      description: null,
+      price: 10,
+      isActive: true,
+    });
     await expect(api.products.remove(product.id)).resolves.toBeUndefined();
   });
 
   // ── Retiring a subscription (TODO-20) ──────────────────────────────────
   //
-  // The rule differs from the product one above because the DELETE differs: a
-  // product is hard-deleted, so any reference at all blocks it, while a
-  // subscription is only retired (isActive = false) and the row survives — so
-  // only work that has NOT been carried out yet blocks.
+  // Same rule, same reason — see the product block above.
 
   async function planWithOrder(name: string) {
     const client = await api.clients.create({ type: 'company', name: `${name} SRL` });
@@ -527,6 +560,42 @@ describe('the failures the UI must render', () => {
     expect(after.hasTask).toBe(true);
     expect(after.taskId).toBe(task.id);
     expect(after.routeId).toBe(routes[0]!.id);
+  });
+
+  /**
+   * The batch read (TODO-43) is a PERFORMANCE change and nothing else, so it has
+   * to answer exactly what the single-order read answers. If these two ever
+   * disagree, Comenzi's Curente/Arhivă split changes meaning depending on how it
+   * happened to fetch.
+   */
+  it('statusForOrders() agrees with statusForOrder(), id by id', async () => {
+    const client = await api.clients.create({ type: 'company', name: 'Batch SRL' });
+    const withTask = await api.orders.create(client.id, { orderType: 'Amplasari', quantity: 1 });
+    const withoutTask = await api.orders.create(client.id, { orderType: 'Amplasari', quantity: 2 });
+
+    const routes = await api.routes.list();
+    await api.tasks.createFromOrder(withTask.id, routes[0]!.id);
+
+    const batch = await api.tasks.statusForOrders([withTask.id, withoutTask.id]);
+
+    expect(batch[withTask.id]).toEqual(await api.tasks.statusForOrder(withTask.id));
+    expect(batch[withoutTask.id]).toEqual(await api.tasks.statusForOrder(withoutTask.id));
+  });
+
+  it('statusForOrders() answers for every id it was given, task or not', async () => {
+    const client = await api.clients.create({ type: 'company', name: 'Batch Gaps SRL' });
+    const order = await api.orders.create(client.id, { orderType: 'Amplasari', quantity: 1 });
+
+    // A missing entry would read as "no task" by accident. Comenzi decides
+    // Curente vs Arhivă from this, so absence must never stand in for an answer.
+    const batch = await api.tasks.statusForOrders([order.id, 999_999]);
+
+    expect(Object.keys(batch)).toHaveLength(2);
+    expect(batch[999_999]).toMatchObject({ hasTask: false, status: null });
+  });
+
+  it('statusForOrders() returns an empty map for an empty id list', async () => {
+    expect(await api.tasks.statusForOrders([])).toEqual({});
   });
 });
 

@@ -42,7 +42,7 @@ public class Session {
      *
      * Presenting any of these is proof that two parties hold tokens from this
      * family, so the session is revoked on sight. The cap keeps the row bounded
-     * on a session that refreshes every 30 minutes for 60 days; a token older
+     * on a session that refreshes every 30 minutes for 365 days; a token older
      * than the window is already unusable, it just stops being *attributable*.
      *
      * EAGER because the reuse check runs on the /auth/refresh path outside any
@@ -71,7 +71,8 @@ public class Session {
     @Column(name = "last_used_at", nullable = false)
     private Instant lastUsedAt;
 
-    // Refresh-token expiry for this session (~60 days from creation/last rotation).
+    // Refresh-token expiry for this session (ecotrack.security.refresh-token-ttl-days
+    // from creation or last rotation - a year, in every profile we ship).
     @Column(name = "expires_at", nullable = false)
     private Instant expiresAt;
 

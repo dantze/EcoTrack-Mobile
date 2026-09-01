@@ -533,7 +533,14 @@ const ordersApi: EcoTrackApi['orders'] = {
 // ---------------------------------------------------------------------------
 
 const productsApi: EcoTrackApi['products'] = {
-  list: () => respond(() => db.products.map((product) => ({ ...product }))),
+  // Active only, like GET /api/products. A retired product must vanish from
+  // every picker while staying resolvable on the orders that already use it.
+  list: () =>
+    respond(() =>
+      db.products.filter((product) => product.isActive).map((product) => ({ ...product })),
+    ),
+
+  listAll: () => respond(() => db.products.map((product) => ({ ...product }))),
 
   create: (input) =>
     respond(() => {
@@ -553,16 +560,33 @@ const productsApi: EcoTrackApi['products'] = {
 
   remove: (id) =>
     respond(() => {
-      const index = db.products.findIndex((product) => product.id === id);
-      if (index === -1) notFound('Product', id);
+      const product = db.products.find((entry) => entry.id === id);
+      if (!product) notFound('Product', id);
 
-      const inUse = db.orders.some(
-        (order) => order.orderType !== 'Igienizari' && order.productId === id,
-      );
-      // ProductController answers 409 {error} in this case.
-      if (inUse) throw new MockApiError('Produsul este folosit în comenzi existente.', 409);
+      // Same rule as ProductService.deleteProduct(): only UNFINISHED orders
+      // block, because the delete is soft and a finished order keeps resolving
+      // through the surviving row. "Unfinished" is the strict definition — no
+      // COMPLETED task — not a date comparison.
+      const live = db.orders.filter(
+        (order) =>
+          order.orderType !== 'Igienizari' &&
+          order.productId === id &&
+          !db.tasks.some((task) => task.orderId === order.id && task.status === 'COMPLETED'),
+      ).length;
 
-      db.products.splice(index, 1);
+      if (live > 0) {
+        const noun =
+          live === 1
+            ? '1 comandă nefinalizată îl folosește încă'
+            : `${live} ${live % 100 === 0 || live % 100 >= 20 ? 'de ' : ''}comenzi nefinalizate îl folosesc încă`;
+        throw new MockApiError(
+          `Nu se poate șterge produsul: ${noun}. Finalizează sau șterge comenzile, apoi încearcă din nou.`,
+          409,
+        );
+      }
+
+      // Soft delete, exactly like ProductService.deleteProduct().
+      product.isActive = false;
     }),
 };
 
@@ -655,6 +679,60 @@ const subscriptionsApi: EcoTrackApi['subscriptions'] = {
       const sub = db.subscriptions.find((entry) => entry.id === id);
       if (!sub) notFound('Subscription', id);
       return subscriptionUsage(id);
+    }),
+
+  moveOrders: (id, targetSubscriptionId, orderIds) =>
+    respond(() => {
+      const source = db.subscriptions.find((entry) => entry.id === id);
+      if (!source) notFound('Subscription', id);
+
+      // Every refusal SubscriptionService.moveOrders() makes, in the same order
+      // and with the same Romanian text — the mock has to refuse what live
+      // refuses, or the UI's error path is only ever exercised in production.
+      if (targetSubscriptionId === id) {
+        throw new MockApiError('Comenzile sunt deja pe acest abonament.', 409);
+      }
+      if (orderIds.length === 0) {
+        throw new MockApiError('Nu a fost selectată nicio comandă de mutat.', 409);
+      }
+      const target = db.subscriptions.find((entry) => entry.id === targetSubscriptionId);
+      if (!target) notFound('Subscription', targetSubscriptionId);
+      if (!target.isActive) {
+        throw new MockApiError(
+          `Abonamentul „${target.name}” a fost dezactivat și nu mai poate fi folosit ` +
+            'pentru comenzi noi. Alege alt abonament.',
+          409,
+        );
+      }
+
+      // Recomputed, not trusted from the caller: the dialog's list can be stale.
+      const movable = new Set(subscriptionUsage(id).orders.map((order) => order.id));
+      const stale = orderIds.filter((orderId) => !movable.has(orderId));
+      if (stale.length > 0) {
+        const noun =
+          stale.length === 1
+            ? '1 comandă nu mai poate fi mutată'
+            : `${stale.length} comenzi nu mai pot fi mutate`;
+        throw new MockApiError(
+          `Lista de comenzi nu mai este actuală: ${noun} de pe abonamentul ` +
+            `„${source.name}”. Reîncarcă lista și încearcă din nou.`,
+          409,
+        );
+      }
+
+      for (const orderId of orderIds) {
+        const order = db.orders.find((entry) => entry.id === orderId);
+        if (!order || order.orderType !== 'Igienizari') continue;
+        order.subscriptionId = targetSubscriptionId;
+        // Task.productName is a COPY of the plan name, so it moves too — but
+        // never on a COMPLETED task, which records what was done.
+        for (const task of db.tasks) {
+          if (task.orderId === orderId && task.status !== 'COMPLETED') {
+            task.productName = target.name;
+          }
+        }
+      }
+      return orderIds.length;
     }),
 
   remove: (id) =>
@@ -1067,6 +1145,29 @@ const tasksApi: EcoTrackApi['tasks'] = {
       };
     }),
 
+  statusForOrders: (orderIds) =>
+    respond((): Record<number, OrderTaskStatus> => {
+      const map: Record<number, OrderTaskStatus> = {};
+      // Every requested id gets an entry, exactly like the batch endpoint - an
+      // order with no task answers hasTask:false rather than being absent.
+      for (const orderId of orderIds) {
+        const tasks = db.tasks
+          .filter((entry) => entry.orderId === orderId)
+          .sort((a, b) => a.id - b.id);
+        const task = summariseOrderTasks(tasks);
+        map[orderId] = task
+          ? {
+              hasTask: true,
+              taskId: task.id,
+              routeId: task.routeId,
+              scheduledTime: task.scheduledTime,
+              status: task.status,
+            }
+          : { hasTask: false, taskId: null, routeId: null, scheduledTime: null, status: null };
+      }
+      return map;
+    }),
+
   updateStatus: (id, status: TaskStatus) =>
     respond(() => {
       const row = findTaskRow(id);
@@ -1329,8 +1430,13 @@ function findApprovableEmployee(role: Role): { employee: Employee; credential: C
 const enrollmentApi: EcoTrackApi['enrollment'] = {
   status(): Promise<EnrollmentStatus> {
     // The mock db is always seeded with employees, so it is never a fresh
-    // instance and never asks for the first-run setup code.
-    return respond(() => ({ awaitingBootstrap: false, setupCodeRequired: false }));
+    // instance and never asks for the first-run setup code. It also always has a
+    // signed-in admin available, so it is never locked out either.
+    return respond(() => ({
+      awaitingBootstrap: false,
+      setupCodeRequired: false,
+      adminLockout: false,
+    }));
   },
 
   request(input: EnrollmentRequestInput): Promise<EnrollmentTicket> {

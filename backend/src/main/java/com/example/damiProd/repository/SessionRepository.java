@@ -33,6 +33,24 @@ public interface SessionRepository extends JpaRepository<Session, Long> {
 
     List<Session> findByEmployeeIdAndRevokedAtIsNullOrderByLastUsedAtDesc(Long employeeId);
 
+    /**
+     * How many sessions belonging to holders of a given role can still
+     * authenticate someone. "Usable" is measured against the REFRESH token, not
+     * the access token: an access token expires every 30 minutes and its owner
+     * is not locked out, they just refresh.
+     *
+     * COUNT(DISTINCT s) because roles is a ManyToMany - without it a session
+     * whose owner holds the role twice (it cannot, but the join does not know
+     * that) would be counted per matching row.
+     *
+     * Used by EnrollmentService to detect the one state nobody can get out of:
+     * zero usable ADMIN sessions, so no one is left who can approve an
+     * enrollment request (TODO-30).
+     */
+    @Query("SELECT COUNT(DISTINCT s) FROM Session s JOIN s.employee e JOIN e.roles r "
+            + "WHERE r.roleName = :roleName AND s.revokedAt IS NULL AND s.expiresAt > :now")
+    long countUsableSessionsForRole(@Param("roleName") String roleName, @Param("now") Instant now);
+
     Optional<Session> findByIdAndEmployeeId(Long id, Long employeeId);
 
     /**

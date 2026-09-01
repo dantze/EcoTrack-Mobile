@@ -8,13 +8,6 @@
 # Every entry here is a thing the scanner is right about. Keep the reason
 # current, and delete the line the moment it stops being true.
 
-# HANDOFF-auth-security.md was deleted in ada49c1, so its allow-entry is gone
-# per this file's own rule — the scanner has nothing left to flag. The reason it
-# existed is NOT resolved and is kept here deliberately: a Google Maps key was
-# committed in 807aec2 and is still in git history, reachable by anyone who can
-# clone this repo. Deleting the file did not rotate the key. Rotate it in Google
-# Cloud (and restrict its replacement) — then this note can go.
-
 # mobile/google-services.json is Firebase's Android config. It is *designed* to
 # be committed and shipped inside the APK — anyone with the app has it — so it
 # is not a leak in the way a private key is. What matters is that the key it

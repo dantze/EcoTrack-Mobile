@@ -43,12 +43,14 @@ NO_CI_REQUIRED = {
     "DEPLOYMENT.md",    # the runbook; prose, ships in no build
     ".env.example",     # a template of NAMES only; read by nothing at build time
     # The compose files ARE load-bearing - deploy.yml watches docker-compose.yml
-    # and rebuilds the stack from it - but no ci-*.yml validates them.
-    # repo-hygiene.yml now at least PARSES them as YAML on every PR, which
-    # catches a syntax error before the VPS does. That is not the whole of
-    # TODO-29: `docker compose config -q` also resolves interpolation and
-    # validates the schema, which plain YAML parsing does not. Exempted here
-    # because they are covered, partially - not because it is fine.
+    # and rebuilds the stack from it - and no ci-*.yml validates them, because
+    # repo-hygiene.yml does instead. Its "Validate compose files" step runs
+    # `docker compose config -q` on every docker-compose*.yml on every PR, twice:
+    # once on the `:-` defaults and once with --env-file .env.example. That
+    # resolves interpolation and validates the Compose schema, not just the YAML
+    # (TODO-29). They are exempt from the ci-*.yml requirement because they are
+    # covered - by a check that has no `paths:` filter, which is stronger than a
+    # fourth ci-*.yml would have been.
     "docker-compose.yml",
     "docker-compose.dev-hosted.yml",
 }

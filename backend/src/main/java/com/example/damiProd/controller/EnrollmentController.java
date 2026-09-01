@@ -34,13 +34,23 @@ public class EnrollmentController {
     /**
      * Lets the login screen decide what to render: on a fresh install it shows
      * the setup-code field, afterwards just the name and the button. Leaks
-     * nothing beyond "has anyone claimed this server yet".
+     * nothing beyond "has anyone claimed this server yet" and "can anyone
+     * approve a request right now" - neither of which helps a caller who does
+     * not have the corresponding code, which is only ever in the server log.
+     *
+     * This is also where the lockout state is recomputed (TODO-30). Nothing else
+     * notices the last admin logging out, and this is the screen the locked-out
+     * person is looking at, so it is the right place to mint and log the
+     * recovery code. {@code reconcileLockoutState} is idempotent - it logs on the
+     * transition only - so polling this endpoint cannot flood the log.
      */
     @GetMapping("/status")
     public ResponseEntity<Map<String, Object>> status() {
+        enrollmentService.reconcileLockoutState();
         return ResponseEntity.ok(Map.of(
                 "awaitingBootstrap", enrollmentService.isAwaitingBootstrap(),
-                "setupCodeRequired", enrollmentService.setupCodeRequired()));
+                "setupCodeRequired", enrollmentService.setupCodeRequired(),
+                "adminLockout", enrollmentService.isAdminLockedOut()));
     }
 
     @PostMapping("/request")

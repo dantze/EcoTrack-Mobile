@@ -6,11 +6,14 @@ import com.example.damiProd.domain.IgienizareOrder;
 import com.example.damiProd.domain.Individual;
 import com.example.damiProd.domain.RecurringIgienizare;
 import com.example.damiProd.domain.Subscription;
+import com.example.damiProd.domain.Task;
+import com.example.damiProd.domain.TaskStatus;
 import com.example.damiProd.dto.SubscriptionUsageResponse;
 import com.example.damiProd.exception.ResourceNotFoundException;
 import com.example.damiProd.repository.OrderRepository;
 import com.example.damiProd.repository.RecurringIgienizareRepository;
 import com.example.damiProd.repository.SubscriptionRepository;
+import com.example.damiProd.repository.TaskRepository;
 import com.example.damiProd.service.SubscriptionService;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -42,6 +45,7 @@ class SubscriptionServiceTest {
     @Mock private SubscriptionRepository subscriptionRepository;
     @Mock private OrderRepository orderRepository;
     @Mock private RecurringIgienizareRepository recurringRepository;
+    @Mock private TaskRepository taskRepository;
 
     @InjectMocks
     private SubscriptionService subscriptionService;
@@ -291,5 +295,149 @@ class SubscriptionServiceTest {
         assertThat(usage.orders()).singleElement()
                 .extracting(SubscriptionUsageResponse.BlockingOrder::clientName)
                 .isEqualTo("Construct SRL");
+    }
+
+    // -----------------------------------------------------------------------
+    // moveOrders — the way out of a refused delete (TODO-37)
+    // -----------------------------------------------------------------------
+
+    private static Subscription otherPlan() {
+        Subscription sub = new Subscription();
+        sub.setId(2L);
+        sub.setName("Igienizare trimestrială");
+        sub.setIsActive(true);
+        return sub;
+    }
+
+    private static Task task(long id, TaskStatus status, String productName) {
+        Task task = new Task();
+        task.setId(id);
+        task.setStatus(status);
+        task.setProductName(productName);
+        return task;
+    }
+
+    @Test
+    void moveOrders_shouldRepointTheOrderAndItsPendingTasks() {
+        Subscription source = plan();
+        Subscription target = otherPlan();
+        IgienizareOrder live = order(10L, 101L, person("Ana Pop"));
+        live.setSubscription(source);
+        Task pending = task(55L, TaskStatus.NEW, "Igienizare lunară");
+
+        when(subscriptionRepository.findById(1L)).thenReturn(Optional.of(source));
+        when(subscriptionRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(target));
+        when(orderRepository.findLiveBySubscriptionId(1L)).thenReturn(List.of(live));
+        when(orderRepository.findById(10L)).thenReturn(Optional.of(live));
+        when(taskRepository.findAllByOrder_IdOrderByIdAsc(10L)).thenReturn(List.of(pending));
+
+        assertThat(subscriptionService.moveOrders(1L, 2L, List.of(10L))).isEqualTo(1);
+
+        assertThat(live.getSubscription()).isSameAs(target);
+        // Task.productName is a COPY of the plan name; leaving it behind would
+        // send the driver out with the old plan on their screen.
+        assertThat(pending.getProductName()).isEqualTo("Igienizare trimestrială");
+        verify(orderRepository).save(live);
+        verify(taskRepository).save(pending);
+    }
+
+    @Test
+    void moveOrders_shouldLeaveCompletedTasksAlone() {
+        Subscription source = plan();
+        Subscription target = otherPlan();
+        IgienizareOrder live = order(10L, 101L, person("Ana Pop"));
+        live.setSubscription(source);
+        Task done = task(55L, TaskStatus.COMPLETED, "Igienizare lunară");
+
+        when(subscriptionRepository.findById(1L)).thenReturn(Optional.of(source));
+        when(subscriptionRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(target));
+        when(orderRepository.findLiveBySubscriptionId(1L)).thenReturn(List.of(live));
+        when(orderRepository.findById(10L)).thenReturn(Optional.of(live));
+        when(taskRepository.findAllByOrder_IdOrderByIdAsc(10L)).thenReturn(List.of(done));
+
+        subscriptionService.moveOrders(1L, 2L, List.of(10L));
+
+        // A completed task records what was DONE, not what to do. (A live order
+        // cannot have one anyway - findLiveBySubscriptionId excludes it - so this
+        // pins the belt as well as the braces.)
+        assertThat(done.getProductName()).isEqualTo("Igienizare lunară");
+        verify(taskRepository, never()).save(done);
+    }
+
+    @Test
+    void moveOrders_shouldRefuseAnOrderThatIsNoLongerLive() {
+        Subscription source = plan();
+        Subscription target = otherPlan();
+        IgienizareOrder stillLive = order(10L, 101L, person("Ana Pop"));
+
+        when(subscriptionRepository.findById(1L)).thenReturn(Optional.of(source));
+        when(subscriptionRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(target));
+        // 11 was in the dialog but has been completed (or moved) since.
+        when(orderRepository.findLiveBySubscriptionId(1L)).thenReturn(List.of(stillLive));
+
+        assertThatThrownBy(() -> subscriptionService.moveOrders(1L, 2L, List.of(10L, 11L)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("nu mai este actuală");
+
+        // All or nothing: the one that WAS still movable must not have moved.
+        verify(orderRepository, never()).save(any());
+    }
+
+    @Test
+    void moveOrders_shouldRefuseARetiredTarget() {
+        Subscription source = plan();
+        Subscription target = otherPlan();
+        target.setIsActive(false);
+
+        when(subscriptionRepository.findById(1L)).thenReturn(Optional.of(source));
+        when(subscriptionRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(target));
+
+        assertThatThrownBy(() -> subscriptionService.moveOrders(1L, 2L, List.of(10L)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("a fost dezactivat");
+    }
+
+    @Test
+    void moveOrders_shouldTakeTheTargetsRowLockNotAPlainRead() {
+        // The whole point of TODO-39: this attaches work to the target plan, so
+        // it races deactivate() on that plan and must be ordered against it.
+        Subscription source = plan();
+        Subscription target = otherPlan();
+        IgienizareOrder live = order(10L, 101L, person("Ana Pop"));
+
+        when(subscriptionRepository.findById(1L)).thenReturn(Optional.of(source));
+        when(subscriptionRepository.findByIdForUpdate(2L)).thenReturn(Optional.of(target));
+        when(orderRepository.findLiveBySubscriptionId(1L)).thenReturn(List.of(live));
+        when(orderRepository.findById(10L)).thenReturn(Optional.of(live));
+        when(taskRepository.findAllByOrder_IdOrderByIdAsc(10L)).thenReturn(List.of());
+
+        subscriptionService.moveOrders(1L, 2L, List.of(10L));
+
+        verify(subscriptionRepository).findByIdForUpdate(2L);
+        verify(subscriptionRepository, never()).findById(2L);
+    }
+
+    @Test
+    void moveOrders_shouldRefuseMovingAPlanOntoItself() {
+        assertThatThrownBy(() -> subscriptionService.moveOrders(1L, 1L, List.of(10L)))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("deja pe acest abonament");
+        verifyNoInteractions(orderRepository);
+    }
+
+    @Test
+    void moveOrders_shouldRefuseAnEmptySelection() {
+        assertThatThrownBy(() -> subscriptionService.moveOrders(1L, 2L, List.of()))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("nicio comandă");
+        verifyNoInteractions(orderRepository);
+    }
+
+    @Test
+    void moveOrders_shouldRefuseAnUnknownSourcePlan() {
+        when(subscriptionRepository.findById(9L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> subscriptionService.moveOrders(9L, 2L, List.of(10L)))
+                .isInstanceOf(ResourceNotFoundException.class);
     }
 }

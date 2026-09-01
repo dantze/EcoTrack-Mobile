@@ -11,9 +11,10 @@ This has already bitten twice, which is why the script exists:
   - CLAUDE.md documented `ecotrack.security.enforce` as defaulting to `false`
     long after it was changed to `true`, in the section that calls itself "the
     single most important thing to understand before touching auth".
-  - OrderFulfilmentPolicy's javadoc pointed at `web/src/features/map/data.ts`
-    after the function moved to `web/src/lib/orderLifecycle.ts` — stale within
-    the same afternoon it was written.
+  - a javadoc pointed at the web file that used to hold a mirrored rule, after
+    that rule moved elsewhere — stale within the same afternoon it was written.
+    Note this passed a path check: the file still existed, the FUNCTION had
+    moved. That is why check 4 pins symbols, not just paths.
 
 Two checks:
   1. every repo path named in the docs, and in source comments, resolves
@@ -189,35 +190,61 @@ def property_value(key: str) -> str | None:
     return None
 
 
-# (property key, how the value must appear in CLAUDE.md, human hint)
+# CLAUDE.md deliberately does NOT restate most numbers — it says to read them
+# from application.properties rather than hardcoding a copy, which is the right
+# call: a number that lives in one place cannot disagree with itself.
+#
+# So the rule here is not "the doc must state the value". It is: **if the doc
+# states a value, it must be the real one.** Silence passes; a stale copy fails.
+# That way tightening the prose never fails the build, and drifting never passes.
+#
+# (property key, regex with ONE capturing group for the number, human hint)
 PINNED = [
     (
-        "ecotrack.security.enforce",
-        lambda v: v in CLAUDE_PLAIN,
-        "the enforcement-flag table must quote the real default, verbatim",
+        "ecotrack.security.refresh-token-ttl-days",
+        r"(\d+)-day rotating refresh",
+        "the Tokens paragraph's refresh-token lifetime",
     ),
     (
         "ecotrack.security.access-token-ttl-minutes",
-        lambda v: re.search(rf"\b{re.escape(v)}-minute access", CLAUDE_PLAIN),
-        "the Tokens paragraph states the access-token TTL",
+        r"(\d+)-minute access",
+        "the Tokens paragraph's access-token lifetime",
     ),
+]
+
+# Verbatim strings that must appear if the property exists at all — used where
+# the doc quotes the property expression itself rather than paraphrasing it.
+PINNED_VERBATIM = [
     (
-        "ecotrack.security.refresh-token-ttl-days",
-        lambda v: re.search(rf"\b{re.escape(v)}-day rotating refresh", CLAUDE_PLAIN),
-        "the Tokens paragraph states the refresh-token TTL",
+        "ecotrack.security.enforce",
+        "the enforcement-flag table must quote the real default, verbatim",
     ),
 ]
 
 if CLAUDE_MD.is_file():
-    for key, matcher, hint in PINNED:
+    for key, pattern, hint in PINNED:
         value = property_value(key)
         if value is None:
-            failures.append(f"application.properties no longer defines `{key}`, which CLAUDE.md documents")
-            continue
-        if not matcher(value):
             failures.append(
-                f"CLAUDE.md disagrees with application.properties on `{key}` "
-                f"(actual value `{value}`) — {hint}"
+                f"application.properties no longer defines `{key}`, which doc_claims.py pins"
+            )
+            continue
+        for stated in re.findall(pattern, CLAUDE_PLAIN):
+            if stated != value:
+                failures.append(
+                    f"CLAUDE.md says `{stated}` where application.properties says `{value}` "
+                    f"for `{key}` — {hint}"
+                )
+
+    for key, hint in PINNED_VERBATIM:
+        value = property_value(key)
+        if value is None:
+            failures.append(
+                f"application.properties no longer defines `{key}`, which doc_claims.py pins"
+            )
+        elif value not in CLAUDE_PLAIN:
+            failures.append(
+                f"CLAUDE.md does not quote the real value of `{key}` (`{value}`) — {hint}"
             )
 
 
@@ -234,31 +261,37 @@ if CLAUDE_MD.is_file():
 # So for the references that actually matter, pin the symbol too: the named
 # file must exist AND define what the pointer claims is there.
 #
-# (file whose comments do the pointing, path it must name, symbols that path must define)
+# (file that points, string it must contain, file pointed at, symbols that file must define)
 CROSS_REFERENCES = [
+    # "Live orders that block deleting a subscription" and "current orders that
+    # stay out of the archive" are one question answered twice — once in JPQL,
+    # once in TypeScript. Both sides name the other in a comment; these pins
+    # make those names break loudly instead of quietly going stale.
     (
-        "backend/src/main/java/com/example/damiProd/service/OrderFulfilmentPolicy.java",
-        "web/src/lib/orderLifecycle.ts",
-        ["isFulfilled", "deriveLifecycle"],
+        "web/src/features/sales/orderModel.ts",
+        "findLiveBySubscriptionId",
+        "backend/src/main/java/com/example/damiProd/repository/OrderRepository.java",
+        ["findLiveBySubscriptionId"],
     ),
     (
-        "web/src/lib/orderLifecycle.ts",
-        "shared/order-lifecycle-cases.json",
-        [],
+        "backend/src/main/java/com/example/damiProd/repository/OrderRepository.java",
+        "deriveLifecycle",
+        "web/src/features/map/data.ts",
+        ["deriveLifecycle"],
     ),
 ]
 
-for source_rel, target_rel, symbols in CROSS_REFERENCES:
+for source_rel, mention, target_rel, symbols in CROSS_REFERENCES:
     source = ROOT / source_rel
     target = ROOT / target_rel
     if not source.is_file():
-        failures.append(f"{source_rel} is gone — it is half of a pinned mirror pair")
+        failures.append(f"{source_rel} is gone — it is half of a pinned cross-reference")
         continue
-    source_text = source.read_text(encoding="utf-8", errors="replace")
-    if target_rel not in source_text:
+    if mention not in source.read_text(encoding="utf-8", errors="replace"):
         failures.append(
-            f"{source_rel} no longer points at `{target_rel}`. These two are a deliberate "
-            f"mirror pair; if one moved, update the pointer (and shared/README.md)."
+            f"{source_rel} no longer mentions `{mention}`. It is one half of a rule "
+            f"implemented twice, in two languages, with no reference between them — if the "
+            f"other half moved or was renamed, update the comment rather than dropping it."
         )
         continue
     if not target.is_file():
@@ -283,6 +316,7 @@ if failures:
     sys.exit(1)
 
 print(
-    f"doc-claims: OK ({len(doc_files)} doc file(s), {len(PINNED)} pinned claim(s), "
+    f"doc-claims: OK ({len(doc_files)} doc file(s), "
+    f"{len(PINNED) + len(PINNED_VERBATIM)} pinned claim(s), "
     f"{len(CROSS_REFERENCES)} cross-reference(s), 0 problems)."
 )

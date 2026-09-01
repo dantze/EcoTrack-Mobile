@@ -20,6 +20,12 @@ export interface DeepLink {
   number: (name: string) => number | null;
   /** True when the param is present and not "0"/"false". */
   flag: (name: string) => boolean;
+  /**
+   * Raw string value, or null when absent. For intents that are neither an id
+   * nor a switch — `/calendar?zi=2026-08-14`. The caller validates the shape;
+   * this only reads it.
+   */
+  raw: (name: string) => string | null;
   /** Drops the named params from the URL without adding a history entry. */
   clear: (...names: string[]) => void;
 }
@@ -45,6 +51,8 @@ export function useDeepLink(): DeepLink {
     [params],
   );
 
+  const raw = useCallback((name: string) => params.get(name), [params]);
+
   const clear = useCallback(
     (...names: string[]) => {
       setParams(
@@ -59,5 +67,5 @@ export function useDeepLink(): DeepLink {
     [setParams],
   );
 
-  return useMemo(() => ({ number, flag, clear }), [number, flag, clear]);
+  return useMemo(() => ({ number, flag, raw, clear }), [number, flag, raw, clear]);
 }

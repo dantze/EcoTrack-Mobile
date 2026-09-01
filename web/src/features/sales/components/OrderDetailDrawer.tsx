@@ -32,26 +32,16 @@ function MapsLink({ coordinates }: { coordinates: string | null }) {
   );
 }
 
-/**
- * `onEdit`/`onDelete` are optional: Comenzi's Arhivă tab opens this drawer
- * without them, so a fulfilled order is inspectable but not editable there.
- * There is no "dezarhivează" action by design — archived is DERIVED from the
- * order's tasks (`@/lib/orderLifecycle`), so the only way back is the work
- * reopening. The „Toate” tab still passes both handlers, which is the escape
- * hatch for an order the derivation got wrong.
- */
 export function OrderDetailDrawer({
   order,
   onClose,
   onEdit,
   onDelete,
-  archived = false,
 }: {
   order: Order;
   onClose: () => void;
-  onEdit?: () => void;
-  onDelete?: () => void;
-  archived?: boolean;
+  onEdit: () => void;
+  onDelete: () => void;
 }) {
   const statusesQuery = useOrderTaskStatuses([order.id]);
   const taskStatus = statusesQuery.data?.[order.id] ?? null;
@@ -75,30 +65,16 @@ export function OrderDetailDrawer({
         </span>
       }
       footer={
-        onEdit || onDelete ? (
-          <>
-            {onDelete && (
-              <Button variant="danger" onClick={onDelete}>
-                Șterge
-              </Button>
-            )}
-            {onEdit && (
-              <Button variant="primary" onClick={onEdit}>
-                Editează
-              </Button>
-            )}
-          </>
-        ) : undefined
+        <>
+          <Button variant="danger" onClick={onDelete}>
+            Șterge
+          </Button>
+          <Button variant="primary" onClick={onEdit}>
+            Editează
+          </Button>
+        </>
       }
     >
-      {archived && (
-        <p className="mb-4 rounded-sm border border-border bg-surface-sunken px-3 py-2 text-sm text-ink-muted">
-          Comandă arhivată — doar vizualizare. Arhivarea este dedusă din sarcinile
-          comenzii, așa că nu există o acțiune de dezarhivare: comanda revine în
-          „Curente” dacă o sarcină se redeschide.
-        </p>
-      )}
-
       <DetailSection title="General">
         <DetailRow label="Tip">{ORDER_TYPE_LABELS[order.orderType]}</DetailRow>
         <DetailRow label="Înregistrată">{formatDate(order.date)}</DetailRow>

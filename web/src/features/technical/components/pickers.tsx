@@ -20,8 +20,9 @@ import type { ReactNode } from 'react';
 import { Button, Modal, TextInput, cx } from '@/components/ui';
 import { weekdayLabel } from '@/components/domain';
 import { boost, recordUse } from '@/lib/recents';
+import { matchesQuery } from '@/lib/search';
 import type { Employee, Route } from '@/types/domain';
-import { driverLabel, matchesQuery, routeLabel, taskProgress } from '../utils';
+import { driverLabel, routeLabel, taskProgress } from '../utils';
 import { AsyncPanel } from './display';
 
 export interface PickerRowProps {

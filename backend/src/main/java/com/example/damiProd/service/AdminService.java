@@ -22,6 +22,29 @@ public class AdminService {
 
     private static final Logger log = LoggerFactory.getLogger(AdminService.class);
 
+    private static final String ADMIN_ROLE = "ADMIN";
+
+    /**
+     * The lockout guard's two refusals.
+     *
+     * Zero admins is unrecoverable, not merely inconvenient. With passwords and
+     * Google sign-in gone there is no break-glass credential, and the only path
+     * that mints an ADMIN without an existing one is the first-user bootstrap in
+     * EnrollmentService - which fires on employeeRepository.count() == 0, i.e.
+     * only against an EMPTY employee table. So the sole recovery from demoting
+     * the last admin is deleting every employee in the database.
+     *
+     * The same rule lives in web/src/features/admin/EmployeesPage.tsx, which
+     * disables the controls. That half is the friendly explanation; this half is
+     * the one that actually holds, because it also covers a direct API call, a
+     * script, or a future mobile admin screen.
+     */
+    static final String LAST_ADMIN_DEMOTE_MESSAGE =
+            "Nu se poate retrage rolul de administrator: acesta este ultimul administrator. "
+                    + "Promovează întâi pe altcineva.";
+    static final String LAST_ADMIN_DELETE_MESSAGE =
+            "Nu se poate șterge ultimul administrator. Promovează întâi pe altcineva.";
+
     private final EmployeeRepository employeeRepository;
     private final EmployeeRoleRepository employeeRoleRepository;
     private final TokenService tokenService;
@@ -102,6 +125,10 @@ public class AdminService {
      * Employee it points at, but revoking is still the right move: a demotion
      * must not leave the old device running on a session granted under the old
      * role, on any of up to 10 enrolled devices.
+     *
+     * Refuses with a 409 when the change would drop ADMIN from the last admin -
+     * see {@link #LAST_ADMIN_DEMOTE_MESSAGE}. An update that does not carry
+     * roleNames is not a demotion and is never blocked by it.
      */
     @Transactional
     public Optional<EmployeeResponse> updateEmployee(Long id, CreateEmployeeRequest request) {
@@ -136,6 +163,12 @@ public class AdminService {
                             });
                     roles.add(role);
                 }
+                // Checked BEFORE the roles are swapped in, because isLastAdmin
+                // reads the employee's CURRENT roles to decide whether this is
+                // the demotion that empties the admin set.
+                if (!containsAdmin(roles) && isLastAdmin(employee)) {
+                    throw new IllegalStateException(LAST_ADMIN_DEMOTE_MESSAGE);
+                }
                 if (!roles.equals(employee.getRoles())) {
                     credentialsChanged = true;
                 }
@@ -157,15 +190,39 @@ public class AdminService {
     }
 
     /**
-     * Delete an employee
+     * Delete an employee. Refused for the last remaining admin - see
+     * {@link #LAST_ADMIN_DELETE_MESSAGE}.
      */
     @Transactional
     public boolean deleteEmployee(Long id) {
-        if (employeeRepository.existsById(id)) {
-            employeeRepository.deleteById(id);
-            return true;
+        Optional<Employee> found = employeeRepository.findById(id);
+        if (found.isEmpty()) {
+            return false;
         }
-        return false;
+        if (isLastAdmin(found.get())) {
+            throw new IllegalStateException(LAST_ADMIN_DELETE_MESSAGE);
+        }
+        employeeRepository.deleteById(id);
+        return true;
+    }
+
+    /**
+     * True when this employee is an ADMIN and no other employee is.
+     *
+     * Deliberately asks the database rather than counting a cached list: two
+     * admins demoting each other concurrently would both read "2 admins" from a
+     * stale snapshot and both succeed. This is not airtight either - there is no
+     * optimistic locking anywhere in this app - but it narrows the window to the
+     * transaction rather than the request.
+     */
+    private boolean isLastAdmin(Employee employee) {
+        return containsAdmin(employee.getRoles())
+                && employeeRepository.countByRoleName(ADMIN_ROLE) <= 1;
+    }
+
+    private static boolean containsAdmin(Set<EmployeeRole> roles) {
+        return roles != null && roles.stream()
+                .anyMatch(role -> ADMIN_ROLE.equalsIgnoreCase(role.getRoleName()));
     }
 
     /**

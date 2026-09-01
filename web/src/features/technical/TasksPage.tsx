@@ -24,6 +24,7 @@ import { useDeepLink } from '@/lib/deepLink';
 import { useShortcuts } from '@/lib/hotkeys';
 import { useUndo } from '@/lib/undo';
 import { recordUse } from '@/lib/recents';
+import { matchesQuery } from '@/lib/search';
 import type { Task } from '@/types/domain';
 import { TaskStatusBadge } from '@/components/domain';
 import {
@@ -36,7 +37,6 @@ import {
 import {
   driverLabel,
   errorMessage,
-  matchesQuery,
   routeLabel,
   taskDate,
   todayIso,

@@ -104,6 +104,7 @@ export function CommandPalette({ open, onClose }: CommandPaletteProps) {
     const navItems: { path: string; label: string; roles: Role[]; keywords?: string }[] = [
       { path: '/harta', label: 'Hartă', roles: ['SALES', 'TECH'], keywords: 'map locatii geografic' },
       { path: '/comenzi', label: 'Comenzi', roles: ['SALES'], keywords: 'vanzari orders' },
+      { path: '/calendar', label: 'Calendar', roles: ['SALES'], keywords: 'luna zile programare comenzi' },
       { path: '/clienti', label: 'Clienți', roles: ['SALES'], keywords: 'clients firme persoane' },
       { path: '/produse', label: 'Produse', roles: ['SALES'], keywords: 'catalog preturi' },
       { path: '/abonamente', label: 'Abonamente', roles: ['SALES'], keywords: 'subscriptii' },

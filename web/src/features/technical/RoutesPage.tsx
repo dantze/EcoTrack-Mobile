@@ -11,6 +11,11 @@
  * a bare ordered array of ids — and is applied optimistically so the list never
  * snaps back while the request is in flight.
  *
+ * Above the stop list sits the one local suggestion left in `./grouping.ts`:
+ * a shorter stop order. It is a proposal with its numbers on show — nothing is
+ * reordered until the dispatcher accepts. (The "Grupare sugerată" card that
+ * proposed unassigned jobs for the route was removed — TODO-16.)
+ *
  * `?ruta=<id>` selects a route and `?nou=1` opens the create form, which is how
  * the command palette (⌘K) lands here.
  */
@@ -50,6 +55,7 @@ import { useDeepLink } from '@/lib/deepLink';
 import { useShortcuts } from '@/lib/hotkeys';
 import { useUndo } from '@/lib/undo';
 import { recordUse } from '@/lib/recents';
+import { matchesQuery } from '@/lib/search';
 import {
   useAssignDriver,
   useAssignTasksToRoute,
@@ -68,7 +74,6 @@ import {
   driverLabel,
   errorMessage,
   isUnassigned,
-  matchesQuery,
   routeLabel,
   sortByOrderIndex,
   taskProgress,
@@ -103,6 +108,7 @@ import {
   usePlacement,
 } from './components/placement';
 import { DriverPickerModal, RoutePickerModal } from './components/pickers';
+import { DispatchSuggestions } from './components/suggestions';
 
 export function RoutesPage() {
   return (
@@ -618,6 +624,20 @@ function RoutesScreen() {
                 )
               }
             />
+
+            {selectedRoute && !routeTasksQuery.isPending && (
+              <DispatchSuggestions
+                route={selectedRoute}
+                routeTasks={routeTasks}
+                busy={reorderTasks.isPending}
+                onApplyOrder={(orderedIds) =>
+                  reorderTasks.mutate(orderedIds, {
+                    onSuccess: () => toast.success('Ordinea opririlor a fost actualizată.'),
+                    onError: (error) => toast.error(errorMessage(error)),
+                  })
+                }
+              />
+            )}
 
             {selectedRoute && <HeldTray onCancel={placement.clear} />}
 

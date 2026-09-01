@@ -40,6 +40,34 @@ class TokenServiceTest {
         return employeeRepository.save(employee);
     }
 
+    /**
+     * Moves a timestamp decisively into the past.
+     *
+     * The session-hygiene tests below build a TokenService with a retention of 0
+     * days, so the prune cutoff is Instant.now() and the comparisons against it
+     * are STRICT (`revokedAt < cutoff`, `ORDER BY lastUsedAt`). Two Instant.now()
+     * calls microseconds apart can return the SAME value - the clock's
+     * granularity is coarser than the code is fast, ~15ms on Windows against
+     * ~microseconds on Linux - and then a row stamped "just now" is not yet
+     * before a cutoff of "now", and two sessions used "at the same time" have no
+     * defined order.
+     *
+     * That made three tests pass on CI and fail locally. Stamping an explicit
+     * age removes the race without weakening what is asserted: the point was
+     * never that the timestamp equals now, only that it is older than the cutoff.
+     */
+    private void backdateRevokedAt(Long sessionId, long secondsAgo) {
+        Session session = sessionRepository.findById(sessionId).orElseThrow();
+        session.setRevokedAt(Instant.now().minusSeconds(secondsAgo));
+        sessionRepository.saveAndFlush(session);
+    }
+
+    private void backdateLastUsedAt(Long sessionId, long secondsAgo) {
+        Session session = sessionRepository.findById(sessionId).orElseThrow();
+        session.setLastUsedAt(Instant.now().minusSeconds(secondsAgo));
+        sessionRepository.saveAndFlush(session);
+    }
+
     @Test
     void issueNewSession_persistsHashedTokensNotRawValues() {
         Employee employee = newEmployee("token_svc_user1");
@@ -157,8 +185,15 @@ class TokenServiceTest {
         TokenService capped = new TokenService(sessionRepository, 30, 60, 2, 30);
         Employee employee = newEmployee("token_svc_cap");
 
+        // Back-dated between issues so "least recently used" is unambiguous.
+        // Three issueNewSession calls in a row can land on the SAME Instant - the
+        // clock granularity is coarser than the calls are fast, notably on
+        // Windows - and lastUsedAt ties make the ORDER BY arbitrary, so the cap
+        // revoked whichever row the database happened to return last.
         TokenService.IssuedTokens oldest = capped.issueNewSession(employee, "Device-A");
+        backdateLastUsedAt(oldest.sessionId(), 120);
         TokenService.IssuedTokens middle = capped.issueNewSession(employee, "Device-B");
+        backdateLastUsedAt(middle.sessionId(), 60);
         TokenService.IssuedTokens newest = capped.issueNewSession(employee, "Device-C");
 
         // Three logins, cap of two: the least-recently-used one is revoked, and a
@@ -197,6 +232,10 @@ class TokenServiceTest {
         TokenService.IssuedTokens expired = pruning.issueNewSession(employee, "Device-expired");
 
         pruning.revokeByRefreshToken(loggedOut.refreshToken());
+        // Back-dated for the same reason the expired one below is: the cutoff is
+        // Instant.now() and the query is a STRICT `revokedAt < cutoff`, so a
+        // revocation stamped in the same clock tick as the cutoff is not stale yet.
+        backdateRevokedAt(loggedOut.sessionId(), 60);
         Session expiredSession = sessionRepository.findById(expired.sessionId()).orElseThrow();
         expiredSession.setExpiresAt(Instant.now().minusSeconds(60));
         sessionRepository.saveAndFlush(expiredSession);
@@ -297,6 +336,7 @@ class TokenServiceTest {
         TokenService.IssuedTokens tokens = pruning.issueNewSession(employee, "Device-A");
         TokenService.IssuedTokens rotated = pruning.rotate(tokens.refreshToken(), "Device-A").orElseThrow();
         pruning.revokeByRefreshToken(rotated.refreshToken());
+        backdateRevokedAt(tokens.sessionId(), 60);
 
         // A bulk `DELETE FROM Session` would strand the session_retired_tokens
         // rows or trip their foreign key - see SessionRepository#findStaleSessions.

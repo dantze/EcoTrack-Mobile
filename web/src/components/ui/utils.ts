@@ -6,6 +6,7 @@
  */
 
 import { useCallback, useEffect, useId, useRef } from 'react';
+import { fold } from '@/lib/search';
 
 export type ClassValue = string | false | null | undefined;
 
@@ -210,14 +211,12 @@ export function compareValues(
   return String(a).localeCompare(String(b), 'ro', { numeric: true, sensitivity: 'base' });
 }
 
-/** Diacritic-insensitive contains, for Select filtering and FilterBar search. */
-export function normalize(value: string): string {
-  return value
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLocaleLowerCase('ro');
-}
-
+/**
+ * Diacritic-insensitive contains, for Select's option filter. The fold itself
+ * lives in `@/lib/search` — the UI kit already reaches into it for `rankBy`
+ * (Autocomplete), and a second private copy of an NFD-strip is how the three
+ * search boxes in this app drifted apart in the first place.
+ */
 export function matches(haystack: string, needle: string): boolean {
-  return normalize(haystack).includes(normalize(needle));
+  return fold(haystack).includes(fold(needle));
 }

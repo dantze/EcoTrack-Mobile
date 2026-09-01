@@ -16,8 +16,10 @@ import {
   type Order,
   type Route,
   type Task,
+  type TaskStatus,
 } from '@/types/domain';
 import {
+  isAmplasare,
   orderAddress,
   orderCoordinates,
   orderPrimaryDate,
@@ -27,14 +29,11 @@ import { sortByOrderIndex, isUnassigned, routeLabel } from '@/features/technical
 import { distanceKm } from '@/features/technical/grouping';
 import { fold } from '@/lib/search';
 import {
-  deriveLifecycleFromTasks,
-  summarizeTaskStatus,
-} from '@/lib/orderLifecycle';
-import {
   LIFECYCLES,
   LIFECYCLE_LABEL,
   ROUTE_PALETTE,
   type CountBucket,
+  type Lifecycle,
   type MapBounds,
   type MapData,
   type MapFilters,
@@ -43,6 +42,73 @@ import {
   type MapRouteStop,
   type MapStats,
 } from './types';
+
+// ---------------------------------------------------------------------------
+// Lifecycle
+// ---------------------------------------------------------------------------
+
+/**
+ * Task evidence outranks dates because a task's status is what a technician
+ * actually reported on site, while a date is only the plan. An order can be
+ * completed early or start late; the moment there is a task, its status is
+ * the better source of truth.
+ */
+function deriveLifecycle(order: Order, orderTasks: readonly Task[], today: string): Lifecycle {
+  if (orderTasks.length > 0) {
+    if (orderTasks.every((task) => task.status === 'COMPLETED')) return 'done';
+    if (orderTasks.some((task) => task.status === 'IN_PROGRESS')) return 'active';
+
+    // Every task is still NEW: nobody has touched this order's work. If the
+    // anchor date is already behind us, that silence IS the signal — this is
+    // the queue a dispatcher needs to look at, not just another "upcoming".
+    const anchor = orderPrimaryDate(order);
+    if (anchor && anchor < today) return 'overdue';
+    // Anchor is today or in the future (or missing): no verdict from tasks
+    // yet, so fall through to the same date reasoning an order with no tasks
+    // at all would get.
+  }
+
+  return deriveLifecycleFromDates(order, today);
+}
+
+/**
+ * Scheduling-only lifecycle, used when there is no conclusive task evidence.
+ * Amplasari gets a window (start..end) because a placement occupies a site
+ * for a stretch of time; Ridicari/Igienizari are single-instant visits, so
+ * they only have a before/after.
+ */
+function deriveLifecycleFromDates(order: Order, today: string): Lifecycle {
+  if (isAmplasare(order)) {
+    const start = order.startDate;
+    if (!start) return 'unknown';
+    if (today < start) return 'upcoming';
+    // An indefinite contract has no end to compare against, which reads the
+    // same as an end date that has not arrived yet: still active.
+    const end = order.isIndefinite ? null : order.endDate;
+    if (!end || today <= end) return 'active';
+    return 'done';
+  }
+
+  const date = orderPrimaryDate(order);
+  if (!date) return 'unknown';
+  if (today < date) return 'upcoming';
+  // A pickup/sanitation visit dated today is being worked, not merely
+  // "coming up" — there is no separate task evidence here to say otherwise.
+  if (today === date) return 'active';
+  return 'done';
+}
+
+/**
+ * One status to represent however many tasks an order produced. Mirrors the
+ * precedence used for lifecycle's task evidence so a point's badge and its
+ * lifecycle never quietly disagree with each other.
+ */
+function summarizeTaskStatus(tasks: readonly Task[]): TaskStatus | null {
+  if (tasks.length === 0) return null;
+  if (tasks.every((task) => task.status === 'COMPLETED')) return 'COMPLETED';
+  if (tasks.some((task) => task.status === 'IN_PROGRESS')) return 'IN_PROGRESS';
+  return 'NEW';
+}
 
 // ---------------------------------------------------------------------------
 // Order -> point
@@ -144,7 +210,7 @@ function projectOrder(
       orderId: order.id,
       orderNumber: order.number,
       orderType: order.orderType,
-      lifecycle: deriveLifecycleFromTasks(order, orderTasks, today),
+      lifecycle: deriveLifecycle(order, orderTasks, today),
       lat: parsed.lat,
       lng: parsed.lng,
       clientId: order.client.id,

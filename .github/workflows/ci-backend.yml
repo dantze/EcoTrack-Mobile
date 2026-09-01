@@ -8,9 +8,6 @@ on:
   pull_request:
     paths:
       - 'backend/**'
-      # The mirror-pair contract. Editing ONLY this file must still re-run the
-      # backend suite, or OrderFulfilmentPolicySharedCasesTest stops guarding.
-      - 'shared/**'
       - '.github/workflows/ci-backend.yml'
       - '.github/scripts/junit_summary.py'
       - '.github/scripts/jacoco_summary.py'
@@ -18,9 +15,6 @@ on:
     branches: [main]
     paths:
       - 'backend/**'
-      # The mirror-pair contract. Editing ONLY this file must still re-run the
-      # backend suite, or OrderFulfilmentPolicySharedCasesTest stops guarding.
-      - 'shared/**'
       - '.github/workflows/ci-backend.yml'
       - '.github/scripts/junit_summary.py'
       - '.github/scripts/jacoco_summary.py'

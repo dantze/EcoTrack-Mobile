@@ -130,8 +130,9 @@ export interface RecurringRow {
 
 /**
  * Login credentials live beside the employee, never exposed through the API.
- * `email` is the address the mock /auth/google flow would match against —
- * the real Employee entity has no email field, so this is where it lives.
+ * `email` is an optional contact detail that nothing authenticates with; it
+ * sits here rather than on the employee only because the mock's `Employee`
+ * mirrors the API shape, which does not carry it.
  */
 export interface CredentialRow {
   employeeId: number;

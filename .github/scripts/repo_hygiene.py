@@ -40,12 +40,17 @@ NO_CI_REQUIRED = {
     "CLAUDE.md",
     "README.md",
     "TODO.md",          # the backlog; prose, ships in no build
-    # Deploy surface that no ci-*.yml `paths:` filter covers. Exempt only
-    # because repo-hygiene.yml parses them itself on every PR — if that step
-    # is ever removed, remove these too rather than leaving them unchecked.
+    "DEPLOYMENT.md",    # the runbook; prose, ships in no build
+    ".env.example",     # a template of NAMES only; read by nothing at build time
+    # The compose files ARE load-bearing - deploy.yml watches docker-compose.yml
+    # and rebuilds the stack from it - but no ci-*.yml validates them.
+    # repo-hygiene.yml now at least PARSES them as YAML on every PR, which
+    # catches a syntax error before the VPS does. That is not the whole of
+    # TODO-29: `docker compose config -q` also resolves interpolation and
+    # validates the schema, which plain YAML parsing does not. Exempted here
+    # because they are covered, partially - not because it is fine.
     "docker-compose.yml",
     "docker-compose.dev-hosted.yml",
-    ".env.example",     # a template; documentation, ships in no build
 }
 NO_CI_REQUIRED_GLOBS = ("HANDOFF-*.md",)
 

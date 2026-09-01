@@ -5,44 +5,16 @@
  * isActive to false. The plan disappears from list() but is still returned by
  * listAll(). Nothing is ever removed from the database.
  *
- * It is also REFUSED with 409 while unfulfilled orders still reference the
- * plan — that refusal arrives here as SubscriptionInUseError, carrying the
- * blocking orders so the screen can list them.
+ * It is REFUSED with a 409 while unfinished orders or active recurring plans
+ * still point at the plan; the Romanian message arrives as ApiError.body.
+ * `usage()` is the advisory preflight that names those blockers, so the UI can
+ * explain the refusal before the operator commits to a delete.
  */
 
-import type { SubscriptionsApi } from '../contract';
+import type { SubscriptionUsage, SubscriptionsApi } from '../contract';
 import type { Subscription } from '@/types/domain';
-import { ApiError, request } from '../http';
-import { SubscriptionInUseError, type BlockingOrder } from '../errors';
+import { request } from '../http';
 import { normalizeSubscription, type RawSubscription } from './normalize';
-
-/** The 409 body GlobalExceptionHandler emits for ResourceInUseException. */
-interface InUseBody {
-  message?: string;
-  blockingOrders?: BlockingOrder[];
-}
-
-/**
- * A 409 from DELETE means unfulfilled orders still reference the plan. Rethrow
- * it as SubscriptionInUseError so the screen can list them; anything else keeps
- * bubbling as the ApiError it already was.
- */
-function rethrowInUse(error: unknown): never {
-  if (error instanceof ApiError && error.status === 409) {
-    let parsed: InUseBody = {};
-    try {
-      parsed = JSON.parse(error.body) as InUseBody;
-    } catch {
-      // A 409 with an unparseable body still means "in use" — we just cannot
-      // name the blockers.
-    }
-    throw new SubscriptionInUseError(
-      parsed.message ?? 'Abonamentul nu poate fi șters: este folosit de comenzi nefinalizate.',
-      parsed.blockingOrders ?? [],
-    );
-  }
-  throw error;
-}
 
 export const subscriptionsApi: SubscriptionsApi = {
   async list(): Promise<Subscription[]> {
@@ -73,11 +45,18 @@ export const subscriptionsApi: SubscriptionsApi = {
     );
   },
 
+  async usage(id: number): Promise<SubscriptionUsage> {
+    const raw = await request<SubscriptionUsage>(`/subscriptions/${id}/usage`);
+    // The DTO is already domain-shaped (ids, numbers, resolved client names),
+    // so there is nothing for normalize.ts to absorb here.
+    return {
+      blocked: raw?.blocked ?? false,
+      orders: raw?.orders ?? [],
+      recurringPlans: raw?.recurringPlans ?? [],
+    };
+  },
+
   async remove(id: number): Promise<void> {
-    try {
-      await request<void>(`/subscriptions/${id}`, { method: 'DELETE' });
-    } catch (error) {
-      rethrowInUse(error);
-    }
+    await request<void>(`/subscriptions/${id}`, { method: 'DELETE' });
   },
 };

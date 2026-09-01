@@ -15,10 +15,25 @@ import java.io.IOException;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
 public class PhotoService {
+
+    /**
+     * What callers are allowed to upload. Lives here rather than on each
+     * controller because both upload endpoints (task photos, client ID photos)
+     * must accept the same set - when this list was duplicated, adding a format
+     * to one endpoint silently left the other rejecting it.
+     */
+    public static final Set<String> ALLOWED_IMAGE_TYPES = Set.of(
+            "image/jpeg",
+            "image/jpg",
+            "image/png",
+            "image/webp",
+            "image/heic",
+            "image/heif");
 
     @Value("${spaces.access-key}")
     private String accessKey;
@@ -50,25 +65,6 @@ public class PhotoService {
                     .build();
         }
         return s3Client;
-    }
-
-    /**
-     * Uploads a file to the root of the bucket.
-     */
-    public String uploadPhoto(MultipartFile file) throws IOException {
-        return uploadPhoto(file, null, null);
-    }
-
-    /**
-     * Uploads a file to a specific folder in DigitalOcean Spaces.
-     *
-     * @param file   The MultipartFile to upload.
-     * @param folder The folder path (e.g. "Individual Client Ids/"). Can be null.
-     * @return The public URL of the uploaded file.
-     * @throws IOException If an I/O error occurs.
-     */
-    public String uploadPhoto(MultipartFile file, String folder) throws IOException {
-        return uploadPhoto(file, folder, null);
     }
 
     /**

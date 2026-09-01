@@ -23,6 +23,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -44,13 +45,13 @@ export interface Shortcut {
 }
 
 interface Registration {
-  id: number;
+  id: string;
   shortcuts: Shortcut[];
 }
 
 interface ShortcutContextValue {
-  register: (id: number, shortcuts: Shortcut[]) => void;
-  unregister: (id: number) => void;
+  register: (id: string, shortcuts: Shortcut[]) => void;
+  unregister: (id: string) => void;
   /** Everything currently active, in registration order. */
   active: Shortcut[];
   /** The chord prefix waiting for its second key, for the on-screen hint. */
@@ -104,7 +105,7 @@ export function ShortcutProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const register = useCallback(
-    (id: number, shortcuts: Shortcut[]) => {
+    (id: string, shortcuts: Shortcut[]) => {
       const existing = registrations.current.findIndex((entry) => entry.id === id);
       if (existing >= 0) registrations.current[existing] = { id, shortcuts };
       else registrations.current.push({ id, shortcuts });
@@ -114,7 +115,7 @@ export function ShortcutProvider({ children }: { children: ReactNode }) {
   );
 
   const unregister = useCallback(
-    (id: number) => {
+    (id: string) => {
       registrations.current = registrations.current.filter((entry) => entry.id !== id);
       sync();
     },
@@ -204,8 +205,6 @@ export function ShortcutProvider({ children }: { children: ReactNode }) {
   return <ShortcutContext.Provider value={value}>{children}</ShortcutContext.Provider>;
 }
 
-let nextRegistrationId = 0;
-
 /**
  * Registers shortcuts for as long as the calling component is mounted.
  * Safe to call outside a provider (it becomes a no-op), so a screen can be
@@ -213,14 +212,22 @@ let nextRegistrationId = 0;
  */
 export function useShortcuts(shortcuts: Shortcut[]): void {
   const context = useContext(ShortcutContext);
-  const id = useRef<number | null>(null);
-  if (id.current === null) {
-    nextRegistrationId += 1;
-    id.current = nextRegistrationId;
-  }
 
+  // One stable id per mounted caller, from React rather than from a module
+  // counter bumped in the render body. React is free to render a component
+  // without committing it (StrictMode's double invoke, a discarded concurrent
+  // render), so anything mutated during render — a counter, or a ref — can end
+  // up describing a render that never mounted.
+  const id = useId();
+
+  // The handlers are read through this ref at keypress time, so a re-render
+  // with fresh closures does not have to re-register. Written in an effect for
+  // the same reason as the id, and declared BEFORE the registration effect so
+  // the newest handlers are already in place when registration runs.
   const latest = useRef(shortcuts);
-  latest.current = shortcuts;
+  useEffect(() => {
+    latest.current = shortcuts;
+  });
 
   // Re-register when the *shape* changes (combos, labels, disabled flags);
   // the handlers themselves are read through `latest` on every keypress.
@@ -232,17 +239,16 @@ export function useShortcuts(shortcuts: Shortcut[]): void {
   const unregister = context?.unregister;
 
   useEffect(() => {
-    if (!register || !unregister || id.current === null) return;
-    const registrationId = id.current;
+    if (!register || !unregister) return;
     register(
-      registrationId,
+      id,
       latest.current.map((item, index) => ({
         ...item,
         run: () => latest.current[index]?.run(),
       })),
     );
-    return () => unregister(registrationId);
-  }, [register, unregister, signature]);
+    return () => unregister(id);
+  }, [register, unregister, id, signature]);
 }
 
 /** Everything currently registered — the help overlay's data source. */

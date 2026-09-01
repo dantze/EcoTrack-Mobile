@@ -5,16 +5,12 @@ on:
   pull_request:
     paths:
       - 'web/**'
-      # See ci-backend.yml — the same contract, asserted from the other side.
-      - 'shared/**'
       - '.github/workflows/ci-web.yml'
       - '.github/scripts/bundle_budget.py'
   push:
     branches: [main]
     paths:
       - 'web/**'
-      # See ci-backend.yml — the same contract, asserted from the other side.
-      - 'shared/**'
       - '.github/workflows/ci-web.yml'
       - '.github/scripts/bundle_budget.py'
   # deploy.yml calls this workflow as its gate.

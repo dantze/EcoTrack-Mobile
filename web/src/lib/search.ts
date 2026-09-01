@@ -43,6 +43,23 @@ export function includesFolded(haystack: string, needle: string): boolean {
   return foldAligned(haystack).includes(foldAligned(trimmed));
 }
 
+/**
+ * "Does this row match the search box": true when ANY of `fields` contains the
+ * query, and true for an empty query.
+ *
+ * Lives here, next to the fold it uses, because every list screen in the app
+ * asks exactly this question — Comenzi, Clienți, Rute, Sarcini, Recurente. It
+ * used to be written out once per module, each with its own private copy of
+ * the NFD-strip, and the copies did not even agree on whether to lowercase
+ * before or after stripping.
+ *
+ * Query first, fields after, because the fields are variadic.
+ */
+export function matchesQuery(query: string, ...fields: (string | null | undefined)[]): boolean {
+  if (!query.trim()) return true;
+  return fields.some((field) => (field ? includesFolded(field, query) : false));
+}
+
 export interface MatchRange {
   start: number;
   /** Exclusive. */

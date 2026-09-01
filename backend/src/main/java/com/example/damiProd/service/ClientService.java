@@ -1,6 +1,7 @@
 package com.example.damiProd.service;
 
 import com.example.damiProd.domain.Client;
+import com.example.damiProd.domain.Company;
 import com.example.damiProd.domain.Individual;
 import com.example.damiProd.domain.Order;
 import com.example.damiProd.domain.Task;
@@ -49,20 +50,21 @@ public class ClientService {
     }
 
     public Client updateClient(Long id, Client clientDetails) {
-        Client existingClient = clientRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Client not found with id: " + id));
+        Client existingClient = getClientById(id);
 
         existingClient.setEmail(clientDetails.getEmail());
         existingClient.setPhone(clientDetails.getPhone());
         existingClient.setAddress(clientDetails.getAddress());
 
-        if (existingClient instanceof com.example.damiProd.domain.Individual individual) {
-            if (clientDetails instanceof com.example.damiProd.domain.Individual individualDetails) {
+        // Subtype fields only move across when the payload is the SAME subtype:
+        // a Company body must never be able to rewrite an Individual row.
+        if (existingClient instanceof Individual individual) {
+            if (clientDetails instanceof Individual individualDetails) {
                 individual.setFullName(individualDetails.getFullName());
                 individual.setCNP(individualDetails.getCNP());
             }
-        } else if (existingClient instanceof com.example.damiProd.domain.Company company) {
-            if (clientDetails instanceof com.example.damiProd.domain.Company companyDetails) {
+        } else if (existingClient instanceof Company company) {
+            if (clientDetails instanceof Company companyDetails) {
                 company.setName(companyDetails.getName());
                 company.setCUI(companyDetails.getCUI());
                 company.setAdminName(companyDetails.getAdminName());

@@ -1,6 +1,6 @@
 ---
 name: web-data-layer
-description: Use when adding or changing any API call in `web/` — a new method on the `EcoTrackApi` contract, a new fetch in `src/api/live/`, a mock in `src/mocks/`, or a TanStack Query key/mutation in a feature's `queries.ts`. Also use when a backend entity's JSON shape changed and the web app needs to follow, or when a screen needs data it cannot currently get. Covers keeping the live and mock implementations substitutable, `normalize.ts`, and query-key invalidation.
+description: Use when adding or changing any API call in `web/` — a new method on the `EcoTrackApi` contract, a new fetch in `src/api/live/`, a mock in `src/mocks/`, or a TanStack Query key/mutation in a feature's `queries.ts`. Also use when a backend entity's JSON shape changed and the web app needs to follow, when a screen needs data it cannot currently get, or when something works in mock mode but not against the live backend (or the reverse). Covers keeping the live and mock implementations substitutable, `normalize.ts`, and query-key invalidation.
 ---
 
 # Adding a call to the web data layer
@@ -11,10 +11,7 @@ default for local development and needs no backend at all, while production
 builds live. A change that lands in one implementation and not the other breaks
 that quietly — usually discovered in a demo.
 
-## The files, in order
-
-Four always; a fifth whenever the UI must **recognise** an error rather than
-just display it.
+## The four files, in order
 
 ### 1. `src/api/contract.ts` — the contract
 
@@ -26,7 +23,9 @@ neighbours do.
 are non-obvious and the file calls them out:
 
 - `reorderTasks` sends a **bare JSON array** of ids, not a wrapper object
-- `orderHasTask` returns an **object**, not a boolean
+- `statusForOrder` (`GET /tasks/order/{id}/exists`) returns an **object**, not a
+  boolean — the doc comment at the top of `contract.ts` still calls it by its
+  old name `orderHasTask`
 - task photo upload uses the multipart field name **`files`**
 
 ### 2. `src/api/live/` — the real implementation
@@ -62,7 +61,7 @@ that test**, by design.
 
 ### 4. The feature's `queries.ts`
 
-`src/features/{auth,sales,technical}/queries.ts`. Keys and the mutations that
+`src/features/{admin,auth,sales,technical}/queries.ts`. Keys and the mutations that
 invalidate them live together, namespaced by module so invalidating a parent key
 cascades:
 
@@ -78,25 +77,6 @@ A new key **must** start with its module name and nest under the parent whose
 invalidation should also refresh it. Expose mutations as hooks that already
 invalidate what they dirty — **screens supply only toasts**, never
 `invalidateQueries` of their own.
-
-### 5. `src/api/errors.ts` — only when the UI branches on an error
-
-Skip this for an error the UI merely shows. Add it the moment a screen has to
-*act* on one — render a list of blockers, offer a specific recovery, choose a
-different view.
-
-The trap: `ApiError` (live) and `MockApiError` (mock) are **different classes**.
-A screen that does `catch (e) { if (e instanceof ApiError) … }` works in
-production and silently does nothing in mock mode, or the reverse — the two
-implementations stop being substitutable at exactly the point the user needs the
-error to be useful. So the class lives in `src/api/errors.ts` and **both**
-implementations throw the same one.
-
-Carry the data the UI needs on the error itself, not just a message.
-`SubscriptionInUseError` is the worked example: it holds `BlockingOrder[]`, so
-the refusal dialog can list the orders standing in the way instead of printing a
-sentence the operator cannot act on. Give it the same fields on both sides — the
-mock reproducing the refusal is what keeps the screen testable without a backend.
 
 ## The import rule
 
@@ -119,3 +99,21 @@ cd web && npm run lint && npm run typecheck && npm run test:run && npm run build
 
 Then exercise it in mock mode (`npm run dev`, the default) — if the feature only
 works against a live backend, the mock half is unfinished.
+
+## Don't
+
+- **Don't add a contract method without the mock half.** `mocks/__tests__/contract.test.ts`
+  turns a missing one into a compile error on purpose; deleting the case to make
+  it pass defeats the only thing proving mock and live still agree.
+- **Don't normalise in a feature or a screen.** Wire-shape fixes belong in
+  `src/api/live/normalize.ts` and nowhere else, or the mock and live paths start
+  handing the UI different objects.
+- **Don't `invalidateQueries` from a screen.** The mutation hook already
+  invalidates what it dirties; a second, screen-local invalidation is how keys
+  drift out of `queries.ts`.
+- **Don't reuse `deriveLifecycle` (`features/map/data.ts`) to decide whether an
+  order is finished.** It falls back to date reasoning. The rule for guards,
+  archiving and anything that hides a row is `isOrderFulfilled` in
+  `features/sales/orderModel.ts` — a COMPLETED task and nothing else, matching
+  the backend's `OrderRepository.findLiveBySubscriptionId`. See CLAUDE.md,
+  "Two definitions of done".

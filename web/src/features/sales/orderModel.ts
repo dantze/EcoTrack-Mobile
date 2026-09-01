@@ -18,11 +18,11 @@ import {
   type RecurringIgienizare,
   type RidicareOrder,
   type Subscription,
+  type TaskStatus,
   formatCoordinates,
   parseCoordinates,
 } from '@/types/domain';
 import { formatDate, formatMoney } from '@/components/domain';
-import { orderPrimaryDate } from '@/lib/orderLifecycle';
 import { DEFAULT_PHONE_CODE, joinPhone, splitPhone } from './validation';
 
 // ---------------------------------------------------------------------------
@@ -41,14 +41,51 @@ export function isIgienizare(order: Order): order is IgienizareOrder {
   return order.orderType === 'Igienizari';
 }
 
+// ---------------------------------------------------------------------------
+// Fulfilment (TODO-21 / TODO-20 share this definition)
+// ---------------------------------------------------------------------------
+
 /**
- * The date the order is *about* — used for sorting, filtering and display.
+ * Is this order's work finished — i.e. does it belong in Arhivă rather than in
+ * Comenzi?
  *
- * Defined in `@/lib/orderLifecycle` because the lifecycle derivation there
- * reasons about the same anchor and must not fork it; re-exported here so the
- * screens that already import it from the order model keep working.
+ * **The rule is: a COMPLETED task, and nothing else.** An order with no task at
+ * all has certainly not been carried out, so it stays current even when its
+ * date is long past.
+ *
+ * This is deliberately NOT `deriveLifecycle` in `@/features/map/data.ts`, which
+ * falls back to date reasoning and will call a task-less past-dated order
+ * `'done'`. That fallback is fine for colouring a map pin and wrong here: an
+ * order that nobody ever executed must not disappear out of the operator's
+ * list because a date rolled over.
+ *
+ * It is the same rule the backend enforces in
+ * `OrderRepository.findLiveBySubscriptionId` (TODO-20), which refuses to retire
+ * a subscription while an order with no COMPLETED task still points at it.
+ * "Live orders that block deleting a subscription" and "current orders that
+ * stay out of the archive" are one question — keep the two answers identical.
+ *
+ * @param taskStatus the order's summarised task status, as served by
+ *   `api.tasks.statusForOrder` / `useOrderTaskStatuses`; `null` means the order
+ *   has no task, and `undefined` means the status has not loaded yet. Both read
+ *   as "not fulfilled", so an order is only ever hidden from Comenzi on
+ *   positive evidence.
  */
-export { orderPrimaryDate } from '@/lib/orderLifecycle';
+export function isOrderFulfilled(taskStatus: TaskStatus | null | undefined): boolean {
+  return taskStatus === 'COMPLETED';
+}
+
+/** The date the order is *about* — used for sorting, filtering and display. */
+export function orderPrimaryDate(order: Order): string | null {
+  switch (order.orderType) {
+    case 'Amplasari':
+      return order.startDate;
+    case 'Ridicari':
+      return order.pickupDate;
+    case 'Igienizari':
+      return order.sanitationDate;
+  }
+}
 
 /** "12 mar. 2026" or "12 mar. 2026 – 30 apr. 2026" for a placement window. */
 export function orderDateLabel(order: Order): string {

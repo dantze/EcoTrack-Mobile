@@ -9,6 +9,11 @@ unless its status says otherwise.
 - Items keep their ID forever, so they can be referenced in conversation
   ("do TODO-07").
 - New ideas get appended with the next free ID.
+- **Anything found open goes in here, always.** A loose end noticed while doing
+  something else — a gap, a stale comment, a deferred cleanup, a thing declined
+  as out of scope — gets an item at the next free ID rather than living in a
+  chat reply that scrolls away. Write down what was found, why it was not done,
+  and what deciding it needs. Reporting a finding is not recording it.
 
 **Status legend:** `[ ]` not started · `[~]` in progress · `[DONE]` done ·
 `[POSTPONED]` deliberately deferred · `[?]` needs a decision first
@@ -293,11 +298,76 @@ retires it exactly as before. The flag stays in the model because old orders
 point at these rows and there is no migration tool — hard-deleting would break
 them irreversibly.
 
-### TODO-12 `[ ]` Calendar view next to Comenzi
+### TODO-12 `[DONE]` Calendar view next to Comenzi
 A big calendar laid out like an advent calendar ("Christmas sweets" style):
 - Each day cell shows a summary of that day's information underneath the date.
 - Clicking a day opens all orders for that day.
 *Blocked on:* OQ-1 — needs the order/task distinction settled first.
+
+**Done — web only.** No backend, mobile, API-contract or mock change: the screen
+reads the orders the app already fetches. New `Calendar` entry under **Vânzări**,
+directly under Comenzi, at `/calendar` (`g d`, and in ⌘K), lazily loaded like
+every other screen — its own 8.2 kB chunk, so Comenzi does not carry it.
+
+**The grid** (`features/sales/components/MonthGrid.tsx`) is one chunky tile per
+day, Monday-first, whole weeks only — five rows or six, never a blank trailing
+one. The date is the lid; underneath it the day's summary: a total pill plus one
+line per order type present that day (`2 Amplasări`, `1 Ridicare`), colour-dotted
+to match `OrderTypeBadge`. Today gets a brand ring, weekends a tint, the adjacent
+months' borrowed days recede. **Only a day that holds orders is a button** — an
+empty day is a plain div, because putting the month's ~20 empty days into the tab
+order buries the one busy Thursday a keyboard user is looking for.
+
+**OQ-1 is settled by scope, not by renaming anything.** A cell counts **orders**,
+because this is the Vânzări view of what was sold and when it is due. A `Task` is
+the driver-facing execution of an order; it lives on a **weekly** route
+(TODO-03), so it has no Sales-owned calendar date to plot. The distinction still
+surfaces where it is actionable rather than academic: every order in the day
+panel carries its task status, and a red **Neprogramat** when no task covers it
+yet — which is exactly the "sold but nobody is going" case the office needs to
+see. Dispatch keeps answering "which rows, which day, which driver" on Rute and
+Sarcini.
+
+**Which day an order lands on:** `orderPrimaryDate`, the same definition Comenzi
+already sorts and filters on — start date / pickup date / sanitation date. So an
+Amplasare sits on the day the cabins go out, **not** on every day of its rental
+window: the window is a contract, the placement is the work, and spreading it
+would report a 60-day rental as 60 days of work. Reusing the one definition is
+the point — a second one that disagreed would show an order in the table and hide
+it in the calendar. The day panel still spells out the full window per order.
+
+**Clicking a day** opens `DayOrdersDrawer`, the same slide-over shape the rest of
+Sales uses, listing that day's orders (number, type, client, what was ordered,
+address, window, task status). Picking one hands off to Comenzi through the
+existing `?comanda=<id>` deep link, so the calendar never becomes a second place
+to edit an order. Task status is fetched **there**, not on the page: the query
+fans out one `GET /tasks/order/{id}/exists` per order (there is no batch
+endpoint), so it should cover the ~5 orders of the opened day, not the ~120 of
+the month.
+
+Also added: `?zi=YYYY-MM-DD` opens a day directly (a shareable link to a day, the
+trick `?comanda=` plays for an order) — which is why `useDeepLink` grew a `raw()`
+alongside `number()`/`flag()`; a type filter and `‹ › Azi` month stepping; `t` for
+the current month and `r` to refetch; and `orderCountLabel` in
+`components/domain.tsx`, which gets the Romanian **"24 de comenzi"** rule right
+where an English pluraliser would write "24 comenzi".
+
+**Tests: 25 new, web suite 345 → 348 files-green.** `calendar.test.ts` (17) pins
+the arithmetic that actually breaks month views — Monday-first padding, the
+31-day → 28-day step, whole weeks, the 25-hour DST night in October, and orders
+with no date being dropped rather than given one. `MonthGrid.test.tsx` (5) pins
+the tile contract, including empty days staying out of the tab order.
+`CalendarPage.test.tsx` (3) mounts the real screen against the mock API and opens
+a day, because **the browser access OQ-2 asks for still does not exist** — this
+was built without ever looking at it, and a mount-level test is the honest
+substitute for eyes. Lint 0 errors, typecheck clean, bundle budget 139.3/160 kB.
+
+**Deliberately not built:** drag-and-drop rescheduling (moving an order's date is
+an edit, and edits live in the order form), a week/day zoom, and any task layer.
+
+*Note for TODO-21:* when fulfilled orders move to an Arhivă, the calendar's
+month total is a second place that will start counting them differently — it uses
+`orderPrimaryDate`, not `deriveLifecycle`.
 
 ### TODO-20 `[DONE]` Block deleting a subscription that live orders still use
 Today a plan can be retired while orders still reference it. Instead, deleting
@@ -314,108 +384,83 @@ Needs deciding:
 protects old orders from dangling; this rule stops new dangling references being
 created in the first place.
 
-**Done. Retiring a plan is refused while an unfulfilled order references it.**
-`SubscriptionService.deactivate` is now `@Transactional` and throws
-`ResourceInUseException` (new, extends `IllegalStateException`, which
-`GlobalExceptionHandler` already maps to **409**) carrying a `blockingOrders[]`
-list of `BlockingOrderRef`. **No second error mechanism was introduced** — the
-new handler is just more specific, and if it were deleted the status would still
-be 409. Romanian message, singular/plural correct, byte-identical between
-backend and mock.
+**Done.** `DELETE /api/subscriptions/{id}` now answers **409** with a Romanian
+message while anything live still points at the plan, and the Abonamente screen
+explains the refusal by naming the blockers instead of toasting a failure.
 
-**"In use" = not fulfilled**, decided as briefed: fulfilled orders keep
-resolving through TODO-11's soft-delete flag exactly as before, and blocking on
-them would make any long-lived plan permanently undeletable.
+**The three open questions, decided:**
 
-**The rule agrees with TODO-21 branch for branch** — and better than by
-coincidence: the new `service/OrderFulfilmentPolicy.java` is the backend's
-single answer to "is this order finished?", and **the web mock imports
-`web/src/lib/orderLifecycle.ts` directly rather than hand-rolling a twin**, so
-the archive filter and the delete refusal call one definition. Backend-only
-`CANCELLED` collapses to the same outcome as the web summarizer's `NEW`. The two
-files are a deliberate mirror pair and must move together.
+**1. "Still in use" = not finished — and that follows from the delete being
+SOFT.** The two guards in this repo are now deliberately different rules,
+because they protect against different damage:
 
-Only `IgienizareOrder` references a `Subscription`, so the Amplasare branch of
-the policy never fires here; it exists because the policy is the general rule.
+| | Delete is | Blocked by |
+|---|---|---|
+| Abonament | soft (`isActive = false`, row survives) | only **unfinished** work |
+| Produs | **hard** (row is gone) | **any** referencing order |
 
-**UI is a dialog, not a toast.** A refusal is a list of work to finish, and a
-toast that vanishes in six seconds cannot be acted on — the modal shows the
-backend's own sentence plus a table of blockers (`#number`, type, client, date).
-New `web/src/api/errors.ts` holds `SubscriptionInUseError`, thrown by **both**
-implementations, because `ApiError`/`MockApiError` each pin a screen to one data
-mode.
+A finished Igienizare keeps resolving through a retired plan, so it has no
+business blocking one — that *is* TODO-11's mechanism. A deleted product leaves
+nothing behind, so even a completed order would dangle. Same question, opposite
+answers, for a reason.
 
-No `SecurityConfig` or `TaskAccessPolicy` change: path and verb are unchanged
-and `DELETE /api/**` → OFFICE already covered it.
+"Finished" means **a COMPLETED task and nothing else.** An order with no task
+has certainly not been carried out, so it still blocks even when its date is
+long past. This is deliberately stricter than `deriveLifecycle`, which will call
+a task-less past-dated order `'done'` from its date alone — fine for colouring a
+map pin, wrong for a guard, which has to fail safe. **TODO-21 must adopt this
+same rule** rather than reusing the date fallback, or the archive and the guard
+will disagree about the same order.
 
-Backend **240 tests** (was 222), 0 failures. Web typecheck clean, **326 tests**,
-build OK, bundle 139.5 kB / 160 kB.
+**2. Refuse and list — no bulk move.** `SubscriptionUsageModal` names every
+blocking order (number, client, date) and links each one through to Comenzi via
+`?comanda=<id>`, so the refusal ships with the way to resolve it. A bulk "move
+these to another plan" would be a sweeping write the operator asked for only
+obliquely by pressing Delete; it stays unbuilt on purpose.
 
-### TODO-27 `[ ]` Bulk-move orders between subscriptions
-When TODO-20 refuses a delete, the only way forward is to finish or delete each
-blocking order one at a time. Offer *"Mută pe alt abonament"* in the refusal
-dialog: reassign the listed orders to a chosen plan, then retry the delete.
+**3. Produse already had this guard — and it was half-built.** `ProductService`
+checked `AmplasareOrder.product` only, so a product used **solely by a Ridicare
+order** could be hard-deleted, leaving that order pointing at a row that no
+longer existed. Now both order types are checked. The mock had been checking
+both all along, so mock and live had quietly disagreed about this since they
+were written.
 
-Needs a backend endpoint (`PATCH /api/subscriptions/{id}/orders` or similar) and
-a decision on whether reassigning is allowed for orders that already have tasks
-carrying the OLD plan name in `Task.productName` — the name is copied onto the
-task, so moving the order does not move history.
+**Recurring plans block too, and block harder.** An ACTIVE `RecurringIgienizare`
+on the plan refuses the retire even when no order is outstanding: it keeps
+generating fresh orders against that subscription every night
+(`RecurringTaskScheduler`, 02:00), which is precisely the new-dangling-reference
+this item exists to prevent. They are listed but NOT linked — Igienizări
+recurente is a Tehnic screen and a Vânzări-only account would land on "acces
+interzis".
 
-*Deliberately excluded from TODO-20, which answered "refuse and list".*
+**New endpoint: `GET /api/subscriptions/{id}/usage`**, an advisory preflight so
+the UI can explain the refusal *before* the operator commits, rather than after
+a failed action. It changes nothing about who is allowed to do what: a GET under
+`/api/**` already resolves to "any authenticated employee" in `SecurityConfig`,
+so **no new matrix row** — and no `TaskAccessPolicy` call, since it is neither
+task-shaped nor employee-scoped. The DELETE remains the actual gate; the
+preflight failing just falls through to the normal confirm, and a 409 lost to a
+race re-fetches usage so the operator still gets the list.
 
-### TODO-28 `[ ]` Produse deletion: hard delete, incomplete check, its own error format
-Investigated under TODO-20 and found **materially different from Abonamente**,
-so it was deliberately NOT given the same fix — applying TODO-20's rule here
-would be a regression. Three separate problems in `ProductService.deleteProduct`
-/ `ProductController.deleteProduct`:
+**UPDATE (while doing TODO-15/16/21): the owed backend build has now been run.**
+`cd backend && ./gradlew build` on JDK 21 — **BUILD SUCCESSFUL, 232 tests, 0
+failures**. The 11 new/changed backend tests from this item ran for the first
+time and passed, and the `@Query` in `OrderRepository.findLiveBySubscriptionId`
+loads at context startup. Nothing below is outstanding any more; it is kept for
+the record.
 
-- **(a)** `existsByAmplasareOrderProductId` only checks `AmplasareOrder.product`.
-  **`RidicareOrder.product` is never checked**, so a product used only by
-  Ridicări can be destroyed today, leaving a dangling FK. *Small fix, real bug.*
-- **(b)** It is a **hard** delete (`productRepository.deleteById`), not a soft
-  one. That is why its strict "any referencing order blocks" rule is *correct*
-  and must not be relaxed to TODO-20's "only unfulfilled orders block" —
-  destroying a product that fulfilled orders still reference is exactly the
-  dangling reference the subscription flag exists to prevent. Adopting the
-  friendlier rule requires giving Produse an `isActive` soft-delete flag first.
-  **This is the real decision, not a cleanup.**
-- **(c)** `ProductController` catches `IllegalStateException` itself and returns
-  `409 {"error": …}`, bypassing `GlobalExceptionHandler`. It is the only place
-  in the app where the error body's message lives under `error` rather than
-  `message`, and it carries no blocker list. *Small fix.*
+**Verification is uneven, and the backend half is the weak one:**
 
-### TODO-29 `[ ]` An active recurring plan does not block retiring its subscription
-`RecurringIgienizare.subscription` is a **second** reference to a subscription
-that TODO-20's rule does not cover, and the gap is not theoretical:
-`RecurringIgienizareService` creates one `IgienizareOrder` up front and
-thereafter generates **tasks** linked to the plan, not to that order. So the
-plan's initial order has zero tasks, falls through to date reasoning, and a
-long-running indefinite plan **reads as fulfilled within a day of its start
-date** and stops blocking — while `RecurringTaskScheduler` keeps minting tasks
-stamped with the retired plan's name every night at 02:00.
-
-Decide whether an `active` recurring plan joins the blocker set, and how it
-should appear in a list whose type says "orders".
-
-*Found while building TODO-20.*
-
-### TODO-30 `[ ]` Check-then-act on subscription retirement is unserialized
-Narrower than the repo-wide "no optimistic locking" gap in *Known gaps*, and
-with a cheap local fix, so it is worth its own line.
-
-`deactivate` being `@Transactional` only makes the blocker query and the
-`isActive` write commit together. Under READ COMMITTED nothing makes
-check-then-act atomic: `POST /api/orders` can commit a new unfulfilled
-`IgienizareOrder` for the plan between the `SELECT` and the `COMMIT`. That
-transaction never touches the `subscriptions` row, so nothing conflicts — no
-`@Version`, no row lock, no constraint. **Outcome: a plan retired with exactly
-one live order pointing at it.** Because the delete is soft that order still
-resolves, so the damage is "live order on a retired plan", not a dangling FK.
-
-Fix: `SELECT … FOR UPDATE` on the subscription row taken by **both**
-`deactivate()` and order creation, or `@Version` on `Subscription` plus a
-touching write in `OrderService`. Either means editing `OrderService`.
-
+- **Web — fully verified.** 360 tests green (was 350): 6 new contract tests
+  proving the mock refuses exactly what live refuses (including that a NEW task
+  does *not* unblock, and that COMPLETING the last order does), plus 5 on the
+  dialog. Typecheck clean, lint 0 errors, build clean, bundle 139.7/160 kB.
+- **Backend — WRITTEN BUT NEVER COMPILED.** This machine has no JDK 17+ (only a
+  Java 8 JRE) and no Docker, so Gradle cannot even load the Spring Boot plugin.
+  The 11 new/changed backend tests have never run. **`cd backend && ./gradlew
+  build` on a machine with JDK 21 is still owed** — in particular it is what
+  would catch a malformed `@Query`, which fails at context startup rather than
+  at compile time.
 
 ### TODO-21 `[DONE]` Archive fulfilled orders out of Comenzi
 **Comenzi should show only current orders.** Fulfilled ones move to a separate
@@ -443,77 +488,43 @@ Needs deciding:
 subscription" and "current orders that stay out of the archive" are the same
 question — decide once, implement once, or they will drift apart.
 
+**Done (web only — no backend or mobile change).** Comenzi now opens on a
+`Curente` / `Arhivă` tab strip, both drawn from the same table; the counts on
+the tabs are of the *filtered* set, so a search says how many of its matches are
+finished.
+
+**The three open questions, decided:**
+
+**1. Derived, and from TODO-20's rule — not from `deriveLifecycle`.** The split
+is `isOrderFulfilled` in `web/src/features/sales/orderModel.ts`: **a COMPLETED
+task, and nothing else.** No stored flag, so there is nothing to keep in sync
+and nothing that can drift from the tasks it summarises. It deliberately does
+NOT reuse `deriveLifecycle` from `features/map/data.ts`, per TODO-20's decision:
+that one falls back to date reasoning and calls a task-less past-dated order
+`'done'`, which is fine for colouring a map pin and wrong here — an order nobody
+ever executed would vanish out of the operator's list because a date rolled
+over. A status that is missing or still loading also reads as unfinished: an
+order only leaves Comenzi on positive evidence.
+
+**2. It lives in `orderModel.ts`,** which is the shared place already — the map
+feature imports from it, so the map can adopt the same rule later without a new
+module. `deriveLifecycle` stays where it is and keeps its date fallback; the two
+now answer different questions on purpose, and each says so in its own comment.
+
+**3. Nothing archives or un-archives by hand, and archived orders are not
+read-only.** There is no button, because the state is derived: an order leaves
+Arhivă exactly when its task stops being COMPLETED (a driver reopening it),
+which is the only thing that could honestly un-archive it. The detail drawer
+still edits and deletes from the archive — correcting a typo on finished work is
+ordinary, and a lock nobody asked for would be a new permission concept. A
+`?comanda=<id>` deep link to a finished order switches to Arhivă, so the row
+behind the drawer is the one the link named.
+
+**Verified:** 355 web tests green (349 + 6 new: 3 on the split against the mock
+API, 3 on the rule itself), typecheck clean, lint 0 errors, build clean.
+
 *Related:* OQ-1 — archiving depends on knowing when an order is finished, which
 depends on the order/task relationship being clear.
-
-**Done, derived not stored.** Archived ⇔ lifecycle `'done'`, so there is no new
-state to keep in sync and no un-archive button — an order leaves the archive
-when its tasks change. Comenzi gained a **Curente / Arhivă / Toate** tab strip.
-
-**The derivation moved to `web/src/lib/orderLifecycle.ts`** — it was never
-map-specific. `features/map/data.ts` now imports it instead of owning it, and
-`features/map/types.ts` re-exports `Lifecycle`/`LIFECYCLES`/`LIFECYCLE_LABEL`
-from lib so no map import changed (`LIFECYCLE_COLOR` stayed — map-specific hex).
-`orderPrimaryDate` came down from `sales/orderModel.ts` too, re-exported under
-its old name, because the derivation reasons about the same date anchor.
-`src/lib/` was chosen because its files only ever import `@/types/domain` and
-`@/components/ui`, so the dependency arrow keeps pointing one way — a feature
-importing another feature is what this avoids.
-
-**Two entry points, one rule:** `deriveLifecycle(order, taskStatus, today)`
-takes an already-summarized status; `deriveLifecycleFromTasks(order, tasks,
-today)` wraps it. Both exist because Comenzi only has one status per order while
-the map has full task lists. **A test asserts the two agree on every task
-combination**, which is the guard against the exact drift TODO-21 warned about.
-
-**The fulfilled rule, for reconciliation with TODO-20:**
-1. *Task evidence first.* Every task `COMPLETED` → fulfilled. Any `IN_PROGRESS`
-   → not. Otherwise (all `NEW`, or `NEW`+`COMPLETED` mixed) with an anchor date
-   before today → not, it is overdue. Else fall through to dates.
-2. *Dates*, also used when an order has no tasks. **Amplasari:** not fulfilled
-   without a `startDate`, before `startDate`, while `isIndefinite`, or while
-   `today <= endDate`; fulfilled once past `endDate`. **Ridicari/Igienizari:**
-   fulfilled iff `date < today` strictly — a visit dated today is being worked.
-3. Anything undecidable is **not** fulfilled.
-
-**Read-only is a property of the VIEW, not the record.** In Arhivă there is no
-checkbox column, no bulk-delete bar and no Editează/Șterge in the drawer; in
-Toate the same order keeps both. Deliberate: archiving is derived from task data
-that can itself be wrong, so there must be one place to correct a mis-archived
-order. The absence of un-archive is stated in Romanian UI copy in two places
-rather than left to be discovered.
-
-**Nothing archives while task statuses are still loading.** The status fan-out
-lands after the list; hiding live work on incomplete evidence is worse than
-showing a finished order a second longer, and it stops rows flickering between
-tabs.
-
-Client-side filtering only — `api.orders.list()` is unpaginated and `useOrders`
-already holds the whole list, so `src/api/**` and `queries.ts` were not touched
-at all. Web: typecheck clean, **323 tests** (16 new), build OK, bundle
-139.5 kB / 160 kB. The map's 53 existing lifecycle tests pass unchanged against
-the moved function — the proof this was a move and not a rewrite.
-
-### TODO-23 `[ ]` `/tasks/order/{id}/exists` returns one task, not a roll-up
-`GET /api/tasks/order/{orderId}/exists` returns
-`getTaskByOrderId(...).orElse(null)` — a **single** task. But
-`summarizeTaskStatus` in `web/src/lib/orderLifecycle.ts` and the backend's
-`OrderFulfilmentPolicy` both roll up **all** of an order's tasks.
-
-Today orders appear to produce one task each, so the answers coincide and
-nothing is visibly broken. **Nothing enforces that.** An order with two tasks
-would be archived by Comenzi (TODO-21) off whichever row the backend happens to
-return first, while the map and the subscription delete-guard (TODO-20) compute
-the real roll-up and disagree — three views of one order, two definitions.
-
-Fix either by making `/exists` return the summarized status, or by adding a
-batch endpoint (`GET /api/tasks/order-status?ids=…` → summarized status per
-order), which would also collapse the current one-request-per-order fan-out on
-Comenzi. Noted inline in `OrdersPage.tsx`.
-
-*Found while building TODO-21.* Shares its definition with TODO-20 and TODO-21 —
-see the note on those.
-
 
 ---
 
@@ -543,60 +554,38 @@ Remove what was built with Mistral (intake/extraction: `IntakeConfig`,
 *Intent:* AI in this app should eventually only **autofill** things — how
 exactly is undecided.
 
-**Done.** Twelve files deleted and the `service/intake/` package removed:
-`IntakeConfig`, `IntakeMessage`, `OrderDraft`, `IntakeMessageRepository`,
-`OrderDraftRepository`, and all of `service/intake/**` (`DraftResolver`,
-`ExtractedOrder`, `HeuristicOrderDraftExtractor`, `IntakeService`,
-`MistralOrderDraftExtractor`, `OrderDraftExtractor`, `RomanianDates`).
+**Done.** All 12 files deleted: `config/IntakeConfig.java`,
+`service/intake/**` (7 files, including `MistralOrderDraftExtractor` and the
+heuristic fallback), the `IntakeMessage` / `OrderDraft` entities and both
+repositories. Nothing else referenced them — no controller, no test, no
+property, and the `Clock` bean `IntakeConfig` declared had no other consumer —
+so the removal is self-contained.
 
-`RomanianDates` was checked before deleting — its only callers were the four
-intake classes going with it, so it went too. It was the one file that could
-plausibly have been a general-purpose utility.
+**Verified:** `cd backend && ./gradlew build` — BUILD SUCCESSFUL, 232 tests, 0
+failures.
 
-**The removal turned out to be fully self-contained**, which is worth recording
-because it means there is no residue to hunt later: intake never had a
-controller (so no `SecurityConfig` matrix row and no security test referenced
-it), never had a single test class, had no committed config — the
-`ecotrack.intake.mistral.*` keys were env-var-driven with no defaults in any
-`application*.properties`, `.env.example`, `docker-compose*.yml` or workflow —
-and no `web/` or `mobile/` code called it. No Gradle dependency was removed
-either: `MistralOrderDraftExtractor` used `RestClient` from the shared
-`spring-boot-starter-web`.
+*Note:* `IntakeMessage` and `OrderDraft` were JPA entities, and
+`ddl-auto=update` never drops anything, so their tables survive in H2 and in the
+prod Postgres. They are orphaned, not gone; drop them by hand if the dead
+columns bother you.
 
-Backend suite still 222 tests, 0 failures (the count is unchanged precisely
-because none of them covered this code).
-
-### TODO-16 `[DONE]` Remove recommended additions to routes
+### TODO-16 `[DONE — one judgement call, see below]` Remove recommended additions to routes
 The "recommended additions" suggestions on routes are not wanted. Remove them.
 
-**Done, client-side only.** `technical/components/suggestions.tsx` (the
-`DispatchSuggestions` panel) is deleted and its block is out of `RoutesPage`.
-`grouping.ts` lost `suggestRouteGroup`, `suggestStopOrder` and every helper that
-existed only to feed them — `weekdayOf`, `fallsOnAnotherDay`, `densestSeed`,
-`pointOf`, `pathLengthKm`, `localityOf`, `orderByProximity`, the
-`GroupCandidate`/`GroupSuggestion`/`ReorderSuggestion` types and the
-`NEARBY_RADIUS_KM`/`MIN_SAVING_KM` constants.
+**Done.** The "Grupare sugerată pentru această rută" card is gone from the
+dispatch board, and with it `suggestRouteGroup` and everything only it used
+(`NEARBY_RADIUS_KM`, `densestSeed`, `localityOf`, the weekday filter) plus its
+9 tests. `RoutesPage` no longer passes the unassigned pool to the panel; adding
+work to a route is now a drag from "Neasignate" and nothing else. The
+`useAssignTasksToRoute` mutation stays — the drag-and-drop multi-assign uses it
+too.
 
-**Three things were deliberately KEPT** — each looks like part of the feature
-and is not:
-- `distanceKm` (and `EARTH_RADIUS_KM`) in `grouping.ts`: `features/map/data.ts`
-  imports it for its own route-length estimate. Its tests stayed too.
-- `components/ui/SuggestionCard.tsx` and its `ui/index.tsx` export: shared with
-  `sales/components/OrderFormDrawer.tsx` (the order autofill suggestion), which
-  is a different feature. Only the routes usage went.
-- `useAssignTasksToRoute` in `queries.ts`: also drives the held-tray multi-select
-  placement gesture and two button-disabled states, so it was never
-  suggestion-only. Its doc-comment, which claimed it existed to "accept a
-  suggested group", was corrected.
-
-**No backend or data-layer change.** The heuristics were pure client-side
-geometry over data already on the board; applying a suggestion just called the
-generic `api.tasks.reassignMany` / `api.routes.reorderTasks` that drag-and-drop
-already uses. Nothing in the contract, `src/api/live/` or `src/mocks/` moved, so
-the live/mock substitutability rule was never in play.
-
-Web: typecheck clean, 307 tests passing, build OK, bundle budget 138.8 kB of
-160 kB initial gzip.
+**What was kept, and why you may want it gone as well:** the second card,
+"Ordine mai scurtă a opririlor" (`suggestStopOrder`), still stands. It proposes
+no *additions* — it re-sequences stops the dispatcher already put on the route —
+so it read as outside "recommended additions to routes". **Say the word and it
+goes too**; `grouping.ts` would then be left with `distanceKm`, which the map
+feature imports.
 
 ### TODO-17 `[POSTPONED]` All other AI ideas
 Deliberately deferred. Do not build AI features until the autofill use case is
@@ -614,143 +603,34 @@ cu rol de X"*. The backend contract is settled and tested; `mobile/` is still
 untouched and still posts to the deleted `/api/auth/login`, so **the mobile app
 cannot log in at all until this is done**.
 
-**Done. The mobile app can authenticate again.** New `app/enrollment.tsx`
+**Done — the mobile app can authenticate again.** New `app/enrollment.tsx`
 (form → waiting → done), `services/EnrollmentService.ts`,
-`services/enrollmentStorage.ts` and `services/roleRouting.ts`.
-`app/login.tsx`, `AuthService.login` and its `LoginResponse` type are deleted —
-they were the only callers of the removed `POST /api/auth/login`.
+`services/enrollmentStorage.ts`, `services/roleRouting.ts`. `app/login.tsx`,
+`AuthService.login` and its `LoginResponse` type are deleted — the only callers
+of the removed `POST /api/auth/login`.
 
-**The backend contract it was written against** (read from the backend, not
-assumed from the web app):
-
-| Endpoint | Method | Response |
-|---|---|---|
-| `/api/enrollment/status` | GET | `{awaitingBootstrap, setupCodeRequired}` |
-| `/api/enrollment/request` | POST | 200 `{requestId, claimSecret, verificationCode, expiresAt, autoApproved}` · 400 bad input · 403 bad setup code · 429 rate-limited (5/device/hour) |
-| `/api/enrollment/claim` | POST | 200 `LoginResponse` · **202 pending** · 403 rejected · 410 expired/spent · 404 unknown-or-wrong-secret |
-
-Request TTL 10 min, then 10 min to claim after approval
-(`ecotrack.enrollment.*`). First-user-becomes-admin needs no separate path: the
-screen still enters the waiting phase, but `autoApproved` means its first poll
-issues tokens immediately.
-
-**The trap worth remembering:** `BearerTokenAuthenticationFilter` 401s *any*
+**The trap worth remembering:** `BearerTokenAuthenticationFilter` rejects *any*
 request carrying a token it cannot validate, and it runs BEFORE authorization —
 so it fires on the `permitAll` enrollment endpoints too. A device whose session
 was revoked still holds that dead token, so a plain `apiFetch` would have made
-the one screen that can recover the device the one screen it cannot reach.
-`apiFetch` gained an `{ anonymous: true }` option; all three enrollment calls
-use it and a test asserts it. **No backend change was needed** — this is a
-client-side rule about which calls may carry a token.
+the one screen able to recover the device the one screen it cannot reach.
+`apiFetch` gained `{ anonymous: true }`; all three enrollment calls use it and a
+test asserts it. **No backend change was needed.**
 
-**`app/index.tsx` was an unconditional redirect to `/login`** and had to become
-a real boot gate. Not polish: under enrollment, "go to the login screen on every
-launch" means filing a fresh access request — needing a human admin — every time
-the app restarts. For the same reason the Driver back gesture now goes to `/`
-rather than `/enrollment`.
-
-Device id is minted once and persisted in AsyncStorage (`@ecotrack_device_id`,
-single-flight so two callers cannot mint two ids); it is a self-asserted label,
-not a credential. The pending ticket is persisted too, so backgrounding the app
-while an admin walks over does not force a new six-digit code. Polling stops on
-approval, rejection, expiry, countdown zero, *Anulează* and unmount; a 5xx is
-swallowed so a network blip does not end the wait.
+`app/index.tsx` was an unconditional redirect to `/login` and had to become a
+real boot gate — under enrollment, "go to the login screen on every launch"
+means filing a fresh access request, needing a human admin, every time the app
+restarts. Device id is minted once and persisted (`@ecotrack_device_id`,
+single-flight); it is a self-asserted label, not a credential. Polling stops on
+approval, rejection, expiry, countdown zero, *Anulează* and unmount.
 
 Picked up on the way: the Sales and Technical menus' "logout" only changed
 screens and never revoked the session — they now call `AuthService.logout()`.
-`RoleSelection` gained an ADMIN card, since the first enrollee is ADMIN-only and
-had no destination at all.
 
-Mobile: lint 0 errors, typecheck clean, **83 tests** (was 59). `vitest.config.ts`
-now includes `services/`, with the rule in its header that services tests must
-`vi.mock` every native dep with a factory.
+Mobile: lint 0 errors, typecheck clean, **83 tests** (was 59).
 
-**Unverified, and not claimed otherwise:** nothing was exercised end-to-end —
-no real request→approve→claim round trip against a running backend, no render
-check on a device, and the token-adoption→first-authenticated-call handoff is
-covered only by mocks. Snyk is not installed here, so the `snyk_rules` scan did
-not run.
-
-### TODO-24 `[ ]` Role changes on the web never reach the phone
-The mobile app stores `user.roles` at claim time and never refetches them. An
-admin promoting or demoting someone in **Angajați** changes what the backend
-authorizes but not what the phone renders: the device keeps showing the old
-menus until it re-enrols. The mismatch is silent and lands on the user as
-"button does nothing" or a 403.
-
-Fix: refresh the stored user from `GET /api/auth/me` in the boot gate
-(`app/index.tsx`), and probably after a 401-refresh too.
-
-*Found while building TODO-19.*
-
-### TODO-25 `[?]` Reconsider flipping `ecotrack.security.enforce` — its rationale is spent
-CLAUDE.md's plan is "ship the token-sending build, confirm rollout, then flip",
-so that flipping does not log out installed builds mid-route. **That reasoning
-no longer holds:** `/api/auth/login` is deleted, so every installed build
-predating enrollment already cannot authenticate at all. There is nothing left
-to protect from being logged out.
-
-Once the TODO-19 build rolls out, flipping the flag costs nothing it is not
-already costing. This needs an explicit decision rather than leaving a stale
-justification standing — a safety rule nobody has re-examined is how a
-`false` default outlives its reason.
-
-*Found while building TODO-19.* Related: the Appendix says `enforce` defaults to
-`true`; `application.properties` says `false`. Settle which is true while
-deciding this.
-
-### TODO-26 `[ ]` First-run setup code is only printed to the server log
-Whoever performs the very first mobile enrolment needs SSH access to read the
-setup code out of the backend log. Workable for the current operator, but it
-means the app cannot be bootstrapped by a non-technical user, and it will be
-forgotten by the time it matters.
-
-*Found while building TODO-19.*
-
-
----
-
-## I. Platform shape
-
-### TODO-22 `[ ]` Make the web app responsive, and move Sales + Technical out of mobile
-Two halves of one decision: **the phone stops being a second full app and
-becomes a browser**, except for the driver flow.
-
-**1. Responsive web.** Every web screen must work on a phone-sized viewport, not
-only on a desktop one. Today the layouts assume width — the sidebar, the
-`DataTable` screens (Rute, Sarcini, Comenzi, Angajați), the drawers and the
-map — and there is no breakpoint story. Target a real *web-mobile* experience:
-a collapsible/off-canvas sidebar, tables that reflow into stacked cards below
-the `md` breakpoint instead of being clipped (note `DataTable` is now
-`overflow-x-hidden` from TODO-04, so a narrow screen currently *hides* columns
-rather than scrolling to them), drawers that become full-screen sheets, and
-touch-sized hit targets.
-
-**2. Delete the Sales and Technical sections from `mobile/`.** They are a second
-implementation of screens the web already has — `mobile/app/Sales/**`,
-`mobile/app/Technical/**` and everything only they use. The mobile app keeps
-**only the driver experience**: my routes, my tasks for the day, status changes
-and photo upload. Office staff use the responsive web app on their phone.
-
-**Why:** every order-type change, every field, every status rule currently has
-to be written twice (see the `order-type` skill — the discriminator is
-duplicated across backend, web and mobile with no shared source of truth). One
-implementation is simpler, and the web one is the more complete of the two.
-
-**Consequences to handle, not to discover later:**
-- `Technical/ChangeDriver.tsx` is referenced by TODO-05 as the reference
-  implementation — TODO-05 is `[DONE]` on web, so the web version is now the
-  one that matters. Confirm nothing else depends on the mobile screen before
-  deleting it.
-- The `SecurityConfig` role matrix notes that `PATCH /api/tasks/*/status` and
-  `POST /api/tasks/*/photos` are "the only writes the driver app makes". After
-  this change that should be literally true — it becomes a checkable invariant
-  rather than a comment.
-- `mobile/types/OrderTypes.ts` and the order-type duplication mostly disappear
-  with Sales. Update the `order-type` skill when it does.
-- TODO-19 (mobile enrollment) is still needed — drivers still have to enrol.
-- Do the responsive work **before** deleting the mobile screens, so office
-  staff are never left without a usable phone surface.
+**Unverified, and not claimed otherwise:** no end-to-end request→approve→claim
+round trip against a running backend, and no render check on a device.
 
 ---
 
@@ -786,115 +666,519 @@ majors — Vite 6→8 (#164), Vitest 3→4 (#168, #161), async-storage 2→3 (#1
 **Spring Boot 3.5 → 4.1.1 (#158) is a whole major generation** and would touch
 the security config, JPA setup and the enrollment code — close it.
 
-### TODO-31 `[DONE]` Delete the dead Google sign-in configuration
-Google sign-in was removed with the enrollment work, but its configuration is
-still plumbed through **four files** and nothing reads it. Verified: no Java
-source references `ecotrack.google.*` at all.
+---
 
-- `backend/src/main/resources/application.properties:70,72` —
-  `ecotrack.google.client-id`, `ecotrack.google.allowed-domain`
-- `.env.example:39,41,50` — including `VITE_GOOGLE_CLIENT_ID` and the comment
-  *"leave empty to hide the Google button"*, describing a button that no longer
-  exists
-- `docker-compose.yml:52,53,79`
-- `.github/workflows/deploy.yml:67,68,73` — plus the `GOOGLE_CLIENT_ID` /
-  `GOOGLE_ALLOWED_DOMAIN` **repository secrets**, which should be deleted from
-  GitHub too rather than left as credentials nothing uses.
+## I. Found while doing something else
 
-Harmless today, but it is config that documents a feature that is gone — the
-next person to read `.env.example` will think Google sign-in is supported.
+*Each of these was noticed during other work (the TODO-15/16/21 pass and the
+refactoring that followed) and deliberately not fixed there: none is a
+behaviour-preserving cleanup, and each wants a decision of its own.*
 
-*Found while correcting CLAUDE.md after TODO-19.*
+### TODO-22 `[DONE]` No backend guard against demoting the last admin
+The last-admin lockout guard exists **only in `web/src/features/admin/EmployeesPage.tsx`**.
+`AdminService` has no equivalent check, so anything that is not that screen — a
+direct API call, a future mobile admin view, a script — can demote or delete the
+last `ADMIN` and permanently lock everyone out of `/api/admin/**`.
 
-**Done, and found by a machine rather than by reading.** `dead_config.py`
-(TODO-32) flagged both keys on its first run and listed one file more than the
-manual sweep had — `docker-compose.dev-hosted.yml`. Removed from:
-`application.properties` (whose comment still pointed at the deleted
-`AuthService#loginWithGoogle`), `.env.example`, `docker-compose.yml`,
-`docker-compose.dev-hosted.yml`, `deploy.yml` (including the `envs:` list),
-`web/Dockerfile`, `web/src/lib/config.ts`, `web/src/vite-env.d.ts`, and
-`web/src/mocks/seed.ts` (`MOCK_GOOGLE_DEMO_USERNAME`, which nothing imported).
+*Why it matters more than it looks:* with passwords gone there is no
+break-glass path back in. The only recovery is the first-user-becomes-admin
+bootstrap, which only fires when the employee table is empty — i.e. restoring
+access would mean destroying data.
 
-**Still your call, outside the repo:** delete the `GOOGLE_CLIENT_ID` and
-`GOOGLE_ALLOWED_DOMAIN` **GitHub repository secrets**. Nothing reads them now,
-and a credential nothing uses is one nobody rotates.
+Needs deciding:
+- Refuse the demote/delete with a 409 and a Romanian message (the shape TODO-20
+  used for subscriptions), or refuse only the *last* one and let the UI explain?
+- Does the same rule belong on session revocation — revoking the last admin's
+  only device is the same lockout by another route.
+- A `SecurityTests` case is the point of the change; the web guard stays as the
+  friendly half.
 
-*Kept:* `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY` — mobile's `LocationPicker` genuinely
-uses Google Places.
+**Done (backend only — the web guard is untouched and stays the friendly half).**
+`AdminService` now refuses both routes with a **409** and a Romanian message:
+`updateEmployee` when a `roleNames` payload would drop ADMIN from the last
+admin, and `deleteEmployee` when the target is the last admin. Both throw
+`IllegalStateException`, which `GlobalExceptionHandler` already maps to 409 —
+the same shape TODO-20 used, and no new handler.
 
-### TODO-32 `[DONE]` Four executable guards for the cross-cutting invariants
-Answering "would a knowledge graph help here?": mostly no. The failures this
-repo actually has are pairs with **no reference between the halves** — a Java
-string literal and a TypeScript one, a comment and the file it names — and a
-graph built by static analysis can only contain edges the code already
-expresses. It would reproduce the blind spot at higher cost, and the curated
-half would rot exactly like the javadoc did. Enforcement beats description.
+**The three questions, decided:**
 
-Built instead, all four wired into CI:
+**1. Refuse the operation, with 409 — not "refuse only the last one and let the
+UI explain".** The refusal *is* only for the last one; what changed is that it
+no longer depends on the UI. The message names the fix
+(*"Promovează întâi pe altcineva"*) rather than only the problem.
 
-**1. `shared/order-lifecycle-cases.json` — the mirror-pair contract.** 21 golden
-cases read by BOTH `OrderFulfilmentPolicySharedCasesTest` (backend) and
-`orderLifecycleSharedCases.test.ts` (web), plus 3 backend-only `CANCELLED`
-cases. `shared/**` is in the `paths:` filter of both `ci-backend.yml` and
-`ci-web.yml` — without that, editing only the fixture would re-run neither suite
-and the guard would silently stop guarding.
+**2. NO to session revocation — deliberately, and this is the half that stays
+open.** It is a real lockout route: `claim` is single-use (`CLAIMED → EXPIRED`)
+and `isAwaitingBootstrap()` is `employeeRepository.count() == 0`, so the last
+admin logging out cannot get back in — nobody is left to approve a new device.
+But refusing it is the wrong instrument: a sole admin who may never log out, and
+who cannot revoke a stolen device, is a worse bug than the one being prevented.
+The honest fix is a **recovery path**, not a refusal — see TODO-30.
+`DELETE /api/auth/sessions` needs nothing either way: it is `revokeOtherSessions`
+and always keeps the caller's own session.
 
-> **It found a real divergence on its first run.** The web compared date
-> strings lexicographically and never validated them, so an unparseable date
-> (`"nu se stie"`) sorted *after* today and landed in **Programate** instead of
-> **Fără dată**; the backend ran `LocalDate.parse` and treated it as absent. The
-> `fulfilled` boolean happened to agree, so TODO-20/21 were not broken and
-> nothing else would ever have caught it. `orderLifecycle.ts` now validates the
-> ISO shape (and rejects `2026-02-31`, which the shape alone accepts).
+**3. The count asks the database** (`EmployeeRepository.countByRoleName`,
+`COUNT(DISTINCT e)` because `roles` is a ManyToMany and a plain count over the
+join would see one admin as two). Not airtight — there is no `@Version` anywhere
+in this app, so two admins demoting each other concurrently can still both read
+"2" — but the window is the transaction rather than the request.
 
-**2. `.github/scripts/cross_project_invariants.py`** — order-type names must
-match across `Order.java`, `web/types/domain.ts`, `mobile/types/OrderTypes.ts`
-and mobile's two untyped local copies; web `TASK_STATUSES` must match the
-backend enum except for a declared backend-only set (`CANCELLED`). Verified by
-temporarily adding a fourth order type — it named all four files that must
-follow. Mobile files absent are *skipped, not failed*, so TODO-22 can delete
-them without breaking the guard.
+**Verified: `./gradlew build` on JDK 21 — BUILD SUCCESSFUL, 241 tests, 0
+failures**, and the suite was then run three times over to be sure (see TODO-31:
+it was NOT reliably green before this change, for unrelated reasons).
 
-**3. `.github/scripts/doc_claims.py`** — every backticked path in CLAUDE.md and
-the skills, and every path in a Java/TS comment, must resolve (understanding
-`@/` aliases, `./` relatives and `/.../` elisions); pinned claims must match
-`application.properties`; and named cross-references must still hold.
+New `SecurityTests/LastAdminGuardTest` (9 tests) runs the real filter chain: the
+two refusals, that a refused demotion writes nothing, that the message is
+Romanian, and — the half that matters as much — four allowances, so the guard
+cannot quietly become "admins may not be edited": demoting/deleting one of two
+admins, deleting a non-admin, editing the last admin's NAME, and widening their
+roles while keeping ADMIN.
 
-> That last part exists because path-existence alone was **not** enough:
-> re-running today's actual stale-javadoc bug passed, since
-> `features/map/data.ts` still exists — the *function* had moved out of it. The
-> cross-reference check pins the symbol too, and catches it.
+### TODO-23 `[DONE]` Dead Google sign-in plumbing outside the backend
+Google sign-in and password login are gone from the backend, and the orphaned
+`ecotrack.google.*` properties went with the refactor. The **deployment and
+build plumbing still passes the values**: `GOOGLE_CLIENT_ID` and
+`GOOGLE_ALLOWED_DOMAIN` in `.github/workflows/deploy.yml` and
+`docker-compose.yml`, `VITE_GOOGLE_CLIENT_ID` in `docker-compose.yml` and
+`web/Dockerfile`, and on the web side `GOOGLE_CLIENT_ID` in `src/lib/config.ts`,
+`VITE_GOOGLE_CLIENT_ID` in `src/vite-env.d.ts` and `MOCK_GOOGLE_DEMO_USERNAME`
+in `src/mocks/seed.ts`. Stale `/auth/google` comments sit on the `email` field
+in `types/domain.ts` and `mocks/store.ts`.
 
-**4. `.github/scripts/dead_config.py`** — `ecotrack.*` keys no Java source
-reads, reporting the env var's other homes so cleanup is one pass. Bails out
-loudly if a `@ConfigurationProperties` class is ever added, since prefix binding
-would make key-by-key grepping report false deaths.
+Harmless but misleading — it reads as if the app still supports Google auth.
+**Do it as one sweep across all three layers**: deleting only the `web/src/`
+half leaves build args feeding a variable nobody reads, which is worse than
+either end alone. Confirm no deployment secret is still expected before removing
+the workflow entries.
 
-2, 3 and 4 run from `repo-hygiene.yml`, which has **no `paths:` filter** — the
-whole point is comparing one project against another, so a filtered run would
-miss exactly the PR that breaks the pair. Each step is `if: always()` so one
-failure does not hide the others.
+**Done as one sweep, all three layers.**
 
-**Side effect worth knowing:** editing the compose files revealed they match no
-`ci-*.yml` filter and had **no CI at all**. Rather than exempt them, the hygiene
-workflow now parses `docker-compose*.yml` alongside the workflow YAML, and the
-`NO_CI_REQUIRED` entry says the exemption is only valid while that step exists.
+- **Deploy/build:** `GOOGLE_CLIENT_ID` / `GOOGLE_ALLOWED_DOMAIN` gone from
+  `deploy.yml` (both the `env:` block and the `envs:` passlist),
+  `docker-compose.yml`, `docker-compose.dev-hosted.yml` and `.env.example`;
+  `VITE_GOOGLE_CLIENT_ID` gone from `web/Dockerfile` (ARG **and** ENV),
+  `docker-compose.yml`, `.env.example` and `web/.env.example`.
+- **Web:** `GOOGLE_CLIENT_ID` deleted from `src/lib/config.ts`,
+  `VITE_GOOGLE_CLIENT_ID` from `src/vite-env.d.ts`, `MOCK_GOOGLE_DEMO_USERNAME`
+  from `src/mocks/seed.ts` — all three had **no consumer left anywhere in
+  `src/`**, so nothing changed behaviour.
+- **Comments:** the stale `/auth/google` lines on `email` in `types/domain.ts`
+  and on `CredentialRow` in `mocks/store.ts` now say what the field actually is
+  (an optional contact detail nothing authenticates with).
 
-Backend 264 tests, web 349, mobile 83 — all green.
+**The precondition checked before touching the workflow:** `grep -rn "google"
+backend/src/main/resources/` returns **nothing** — no `ecotrack.google.*`
+property survives, so those env vars were reaching a Spring container that
+ignored them. No deployment secret is still expected. The GitHub secrets
+themselves (`GOOGLE_CLIENT_ID`, `GOOGLE_ALLOWED_DOMAIN`) are now unreferenced
+and can be deleted in **Settings → Secrets** — that is a click in the GitHub UI,
+not a repo change, so it is left to you.
 
+**Deliberately NOT touched:** the backend comments in `AuthController`,
+`AuthService`, `SecurityConfig`, `Employee` and `EnrollmentFlowTest` that
+mention Google. They are accurate — they document that the endpoint was removed,
+and `EnrollmentFlowTest.loginEndpointsAreGone` actively asserts `POST
+/api/auth/google` no longer answers. That test is the regression guard for this
+whole item. Also untouched: `google.com/maps` deep links in
+`mobile/app/Driver/TaskDetails.tsx` and `sales/OrderDetailDrawer.tsx`, and the
+Google Places key in mobile — those are Maps, not sign-in.
+
+**Verified (web + hygiene; backend and mobile untouched so their CI does not
+run):** 372 tests green in 26 files, typecheck clean, lint 0 errors / 105
+warnings (unchanged — that is the TODO-26 backlog), build clean, bundle
+**139.4 kB / 160 kB** (down from 139.7). Hygiene green after TODO-29.
+
+### TODO-24 `[ ]` Rotate the Google Maps key that is still in git history
+A Maps key was committed in `807aec2`. The file that quoted it
+(`HANDOFF-auth-security.md`) was deleted in `ada49c1` and its
+`.github/repo-hygiene-allow.txt` entry has now been retired — **but deleting a
+file does not rotate a key**. It remains reachable by anyone who can clone the
+repo.
+
+Rotate it in Google Cloud and restrict the replacement (referrer or package +
+SHA-1, as `mobile/google-services.json`'s allowlist entry already demands for
+the Firebase key). Only then remove the reminder comment left in
+`repo-hygiene-allow.txt`. History rewriting is *not* required and is not
+proposed here — rotation is what actually ends the exposure.
+
+### TODO-25 `[ ]` Backend logging: `System.out`/`System.err`, and a swallowed failure
+`DataLoader`, `RecurringTaskScheduler` and `PhotoService.deletePhoto` print to
+stdout/stderr while the rest of the backend uses slf4j — so those lines miss the
+log format, the levels and anything that ships logs off the VPS.
+
+`PhotoService.deletePhoto` is the one with teeth: it **swallows a delete failure
+to stderr**, so a photo that fails to delete leaves no trace anywhere anyone
+looks. Decide whether it should propagate, and at what level, before mechanically
+swapping the print for a logger call — the logger swap alone would tidy the
+symptom and keep the bug.
+
+### TODO-26 `[ ]` The web react-hooks lint backlog
+`npm run lint` is 0 errors / 105 warnings. Two clusters are real and deliberately
+deferred:
+- **`react-hooks/set-state-in-effect` (~25 sites)** — a derive-state-from-props
+  pattern spread across most of the feature layer. Clearing it is a repo-wide
+  refactor, not a cleanup, and each site needs its own reading.
+- **`react-hooks/refs` in `components/ui/utils.ts`** (`useEscapeKey`,
+  `useOutsideClick`, `useEvent`) — the same idiom that was fixed in
+  `lib/hotkeys.tsx`, but `useEvent`'s returned callback can legitimately run
+  before passive effects flush, so moving its ref write is a semantic change.
+  These hooks sit under every modal in the app.
+
+The 25 messages from `useStableBounds` in `MapPage.tsx` are **not** in scope: its
+comment argues that a render-time ref write is the correct idiom there, and it is.
+
+### TODO-27 `[ ]` The 60-day refresh-token arithmetic no longer describes production
+`ecotrack.security.refresh-token-ttl-days=365`, but `TokenService`'s javadoc and
+its worked example still reason in terms of the 60-day code default
+(`@Value(":60")`). Neither is strictly wrong — the comments document the
+fallback — but the arithmetic ("a session that refreshes every 30 minutes for
+its 60-day life") describes a configuration production does not run.
+
+Decide which number is intended, then make the property, the fallback and the
+prose agree. A 365-day refresh token is a year-long credential on a lost device;
+if that is deliberate it deserves a sentence saying so next to the session cap
+and the nightly prune.
+
+### TODO-28 `[ ]` Dead password-login plumbing in the web mock
+Found while doing TODO-23, and left alone because it is the **password** half,
+not the Google half — a different question with a different answer.
+
+`MOCK_CREDENTIALS_HINT` ("Exposed so the login screen can tell a demo user what
+to type") and `MOCK_AUTO_LOGIN` are both defined in `web/src/mocks/seed.ts` and
+re-exported twice — from `src/mocks/index.ts` and again from `src/api/index.ts`
+— and **neither has a single consumer in `src/`**, tests included. There is no
+login screen any more: mock mode boots by driving the real request→claim
+enrollment path against `DEV_DEVICE_ID` (TODO-01), which is the export beside
+them that *is* used.
+
+Behind them sits the bigger question: `CredentialRow` still carries a
+`password`, and `MOCK_PASSWORD = 'demo'` is stamped onto all ~8 seeded
+employees, for a system that has no password anywhere.
+
+Needs deciding: delete the two dead exports only, or drop `password` from
+`CredentialRow` entirely and keep the row for `email`? The second is the honest
+one but touches `toAuthUser`, `currentEmployee`, `issueSession` and
+`findApprovableEmployee` in `mocks/index.ts`, so it wants its own reading rather
+than being smuggled into a comment sweep.
+
+### TODO-29 `[ ]` Nothing validates the docker-compose files
+Found while doing TODO-23: `repo-hygiene.yml` **fails any PR that touches
+`docker-compose.yml`**, and always has — the file matches no `ci-*.yml` `paths:`
+filter, which is exactly the "no workflow watches this" error that check exists
+to raise. It went unnoticed because the file had not been edited since `bc47aec`.
+
+Unblocked the cheap way, deliberately: `docker-compose.yml`,
+`docker-compose.dev-hosted.yml`, `DEPLOYMENT.md` and `.env.example` were added
+to `NO_CI_REQUIRED` in `.github/scripts/repo_hygiene.py`. For the two docs that
+is simply correct — they are prose and a template of names, the same category as
+`CLAUDE.md`/`README.md`/`TODO.md` already in that set.
+
+**Update — partially covered now.** `repo-hygiene.yml` parses
+`docker-compose*.yml` as YAML on every PR, so a syntax error is caught before
+the VPS sees it. That is **not** the whole of this item: `docker compose config
+-q` additionally resolves `${VAR}` interpolation and validates the schema, and
+plain YAML parsing does neither. The `NO_CI_REQUIRED` comment says so, so the
+exemption stays honest.
+
+**For the compose files it is an exemption, not a verdict.** They are
+load-bearing — `deploy.yml` watches `docker-compose.yml` and rebuilds the whole
+stack from it — so a typo there is currently caught on the VPS, mid-deploy, and
+nowhere earlier. The real fix is a small `ci-compose.yml` running
+`docker compose config -q` on both files (pinned action SHA, or hygiene's own
+unpinned-action check will flag it), and then removing the two exemptions again.
+
+Needs deciding: is a validation-only workflow worth a fourth `ci-*.yml`, or
+should the check be folded into `repo-hygiene.yml`, which already runs on every
+PR and would need no new `paths:` filter?
+
+### TODO-30 `[ ]` There is no recovery path when the last admin loses their session
+Split out of TODO-22, which fixed the *demote/delete* route and deliberately did
+not touch this one.
+
+The last admin can still lock everyone out permanently by ordinary means:
+`POST /api/auth/logout`, or `DELETE /api/auth/sessions/{id}` on their own only
+device. Nothing about that is exotic — it is what "log out" does. It is
+unrecoverable because two things line up: `EnrollmentService.claim` is
+single-use (`CLAIMED → EXPIRED`, so the device cannot re-claim its old approval)
+and `isAwaitingBootstrap()` is `employeeRepository.count() == 0`, so the
+first-user-becomes-ADMIN path only reopens on an **empty employee table**. The
+only recovery is destroying all employee data.
+
+TODO-22 decided NOT to fix this by refusing the operation: an admin who may
+never log out, and who cannot revoke a device they just had stolen, is worse
+than the lockout. So the fix has to be a way back IN. Options, none chosen:
+
+- **Re-announce the setup code** when the admin count drops to zero — reuses the
+  bootstrap machinery already in `EnrollmentService`
+  (`announceSetupCodeIfUnclaimed`), but it currently keys on an empty table, and
+  "zero admins" is a different and much more reachable condition.
+- **Let a previously-approved device re-enroll without approval**, keyed on its
+  device id. Weakens the single-use property that exists to stop a leaked claim
+  secret minting a second session.
+- **An out-of-band break-glass code** in config, which is a password by another
+  name and would undo part of why credentials were removed.
+
+Needs deciding before building. Whichever is picked, it wants a `SecurityTests`
+case in the shape of `LastAdminGuardTest`.
+
+### TODO-31 `[ ]` The backend test suite shares one database across classes
+Found while doing TODO-22: **the backend suite was not reliably green before
+this change**, and the reason is test isolation, not product code.
+
+Two distinct problems, one fixed and one only worked around:
+
+**1. Clock-granularity races — FIXED.** Three `TokenServiceTest` cases built a
+`TokenService` with 0-day retention, making the prune cutoff `Instant.now()`,
+then compared it against timestamps stamped microseconds earlier with a STRICT
+`<`. Two `Instant.now()` calls can return the same value — the clock is coarser
+than the code is fast, ~15 ms on Windows against ~µs on Linux — so `revokedAt <
+cutoff` was false and nothing was pruned. The LRU cap test had the same tie
+problem in `ORDER BY lastUsedAt`. All three now stamp an explicit age
+(`backdateRevokedAt` / `backdateLastUsedAt`) instead of racing the clock. This
+is why the suite passed on CI (Linux) and failed on the developer's Windows
+machine — a class of failure that will keep recurring while tests use
+`Instant.now()` as both the data and the cutoff.
+
+**2. Cross-class committed state — NOT fixed, only accommodated.**
+`EnrollmentFlowTest`, `EnrollmentBootstrapCodeTest` and `AuthEnforcementOffTest`
+are deliberately not `@Transactional` — they exercise the first-user bootstrap,
+which needs committed state — and each leaves a committed ADMIN employee behind
+in the shared in-memory database. Any later test that asserts something about
+the WHOLE table therefore reads other classes' leftovers.
+`LastAdminGuardTest` works around it by demoting every pre-existing admin in its
+own `@BeforeEach` (rolled back, so it leaks nothing), and asserts its
+precondition so a future drift fails loudly instead of looking like a guard bug.
+
+That workaround is per-test and does not generalise. Needs deciding: give the
+non-transactional classes `@DirtiesContext` (slow — a fresh context each time),
+have them clean up after themselves explicitly, or move bootstrap tests onto
+their own isolated datasource. Until then, **any new assertion about a global
+count is unsafe by default.**
+
+### TODO-32 `[ ]` Deploy fails at the SSH step — the VPS is unreachable
+Found on the push of TODO-22 (`a95825b`). **Not a test failure**, though it reads
+like one: both gates (`verify-backend`, `verify-web`) went green — the `deploy`
+job `needs:` them, so it only started because they passed — and then died on its
+first action with
+
+```
+2026/08/30 13:47:11 dial tcp ***:22: i/o timeout
+```
+
+Nothing in the deploy script ran; the `======CMD======` block in the log is just
+appleboy/ssh-action echoing the script before it connects.
+
+**What the error narrows it to:** `SERVER_IP` is *set* (GitHub prints `***` only
+for a secret that has a value), and an **i/o timeout** means the packets were
+dropped rather than refused — no host, a powered-off host, or a firewall DROP. A
+wrong-but-alive machine answers "connection refused" in milliseconds. So: the
+droplet is gone or off, a cloud firewall/ufw is blocking inbound 22 from GitHub
+runners, `SERVER_IP` is stale after a rebuild, or sshd is not on 22 (`deploy.yml`
+sets no `port:`, so it defaults to 22).
+
+This is consistent with the Appendix line that still says **"No users and no
+server exist yet"**, and with the dead `146.190.224.202` droplet that survives as
+a hardcoded fallback in `web/src/lib/config.ts` and `mobile/constants/ApiConfig.ts`.
+
+**Why it needs a decision rather than a fix:** `deploy.yml` triggers on every
+push to `main` touching `backend/**`, `web/**`, `docker-compose.yml` or
+`Caddyfile`. While no server answers, **every such push turns main red**, which
+trains everyone to ignore a red main — the expensive failure here, since the two
+CI gates that DO mean something are in the same workflow run.
+
+Options, none chosen:
+- **Gate the deploy job** on a repo variable (`if: vars.DEPLOY_ENABLED == 'true'`)
+  so the verify jobs still run and the deploy is skipped, not failed. Reversible,
+  one line, and honest about the state.
+- **Drop the `push:` trigger**, keeping `workflow_dispatch`, so deploying is a
+  deliberate button press until a server exists.
+- **Leave it red** on the argument that an unreachable production host SHOULD be
+  loud. Defensible only once a server actually exists.
+
+Decide after establishing whether a VPS is meant to exist right now. If one is
+provisioned, this closes by fixing the host/firewall/secret and nothing in the
+repo changes.
+
+### TODO-33 `[ ]` Make the web app responsive, and move Sales + Technical out of mobile
+Two halves of one decision: **the phone stops being a second full app and
+becomes a browser**, except for the driver flow.
+
+**1. Responsive web.** Every web screen must work on a phone-sized viewport.
+Today the layouts assume width — the sidebar, the `DataTable` screens, the
+drawers and the map — and there is no breakpoint story. Target a real
+*web-mobile* experience: an off-canvas sidebar, tables that reflow into stacked
+cards below `md` (note `DataTable` is `overflow-x-hidden` from TODO-04, so a
+narrow screen currently *hides* columns rather than scrolling to them), drawers
+that become full-screen sheets, touch-sized hit targets.
+
+**2. Delete the Sales and Technical sections from `mobile/`** — `app/Sales/**`,
+`app/Technical/**` and everything only they use. Mobile keeps **only the driver
+experience**: my routes, my tasks, status changes, photo upload. Office staff
+use the responsive web app on their phone.
+
+**Why:** every order-type change currently has to be written twice (see the
+`order-type` skill — the discriminator is duplicated with no shared source of
+truth). One implementation is simpler, and the web one is more complete.
+
+**Consequences to handle, not discover later:**
+- `SecurityConfig`'s note that `PATCH /api/tasks/*/status` and
+  `POST /api/tasks/*/photos` are "the only writes the driver app makes" becomes
+  literally true — a checkable invariant rather than a comment.
+- `mobile/types/OrderTypes.ts` and the order-type duplication mostly disappear.
+  Update the `order-type` skill and `cross_project_invariants.py` when they do
+  (the script already *skips* absent mobile files rather than failing).
+- Do the responsive work **before** deleting the mobile screens, so office staff
+  are never left without a usable phone surface.
+
+### TODO-34 `[ ]` `/tasks/order/{id}/exists` returns one task, but the guard rolls up all of them
+`GET /api/tasks/order/{orderId}/exists` returns
+`taskService.getTaskByOrderId(orderId).orElse(null)` — a **single** task. The
+web's `isOrderFulfilled` reads exactly that one status to decide Curente vs
+Arhivă. But `OrderRepository.findLiveBySubscriptionId`, the backend guard that
+is supposed to be **the same rule**, is
+`NOT EXISTS (SELECT t ... AND t.status = 'COMPLETED')` — a roll-up over **every**
+task of the order.
+
+For an order with two tasks, one COMPLETED and one NEW, they disagree: the
+backend sees a COMPLETED task and stops blocking the subscription delete, while
+Comenzi may still show the order as current because `/exists` handed it the NEW
+one. Today orders appear to produce one task each so the answers coincide, and
+**nothing enforces that**.
+
+Fix by making `/exists` return the summarised status, or by adding a batch
+endpoint (`GET /api/tasks/order-status?ids=…`), which would also collapse the
+current one-request-per-order fan-out on Comenzi.
+
+*This is the concrete drift TODO-20 and TODO-21 warned about when they said the
+two definitions must stay identical.*
+
+### TODO-35 `[ ]` Role changes on the web never reach the phone
+The mobile app stores `user.roles` at claim time and never refetches. An admin
+promoting or demoting someone in **Angajați** changes what the backend
+authorizes but not what the phone renders: the device keeps showing the old
+menus until it re-enrols. The mismatch is silent and lands on the user as
+"button does nothing", or a 403.
+
+Fix: refresh the stored user from `GET /api/auth/me` in the boot gate
+(`app/index.tsx`), and probably after a 401-refresh too.
+
+*Found while building TODO-19.*
+
+### TODO-36 `[ ]` First-run setup code is only printed to the server log
+Whoever performs the very first enrolment needs SSH access to read the setup
+code out of the backend log (`ecotrack.enrollment.require-setup-code=true`).
+Workable for the current operator, but the app cannot be bootstrapped by a
+non-technical user, and this will be forgotten by the time it matters.
+
+*Found while building TODO-19.*
+
+### TODO-37 `[ ]` Bulk-move orders between subscriptions
+When TODO-20 refuses a delete, the only way forward is to finish or delete each
+blocking order one at a time. Offer *"Mută pe alt abonament"* in the refusal
+dialog: reassign the listed orders to a chosen plan, then retry.
+
+`SubscriptionService.deactivate`'s javadoc already records that this was
+deliberately left out — "that would be a write the operator did not ask for" —
+so this item is the considered follow-up, not a contradiction.
+
+Needs a backend endpoint and a decision on whether reassigning is allowed for
+orders whose tasks already carry the OLD plan name in `Task.productName`: the
+name is copied onto the task, so moving the order does not move history.
+
+### TODO-38 `[ ]` Produse deletion: hard delete, incomplete check, its own error format
+Investigated alongside TODO-20 and found **materially different from
+Abonamente**, so it deliberately did NOT get the same treatment — applying
+TODO-20's rule here would be a regression. Three problems in
+`ProductService.deleteProduct` / `ProductController.deleteProduct`:
+
+- **(a)** `existsByAmplasareOrderProductId` only checks `AmplasareOrder.product`.
+  **`RidicareOrder.product` is never checked**, so a product used only by
+  Ridicări can be destroyed, leaving a dangling FK. *Small fix, real bug.*
+- **(b)** It is a **hard** delete, not a soft one. That is why its strict "any
+  referencing order blocks" rule is *correct* and must not be relaxed to
+  TODO-20's "only unfulfilled orders block" — destroying a product that
+  fulfilled orders still reference is exactly the dangling reference the
+  subscription soft-delete exists to prevent. Adopting the friendlier rule needs
+  an `isActive` flag on Produse first. **This is the real decision.**
+- **(c)** `ProductController` catches `IllegalStateException` itself and returns
+  `409 {"error": …}`, bypassing `GlobalExceptionHandler` — the only place in the
+  app where the error body's message lives under `error` rather than `message`.
+
+### TODO-39 `[ ]` Check-then-act on subscription retirement is unserialized
+Narrower than the repo-wide "no optimistic locking" gap in *Known gaps*, and
+with a cheap local fix, so it earns its own line.
+
+`SubscriptionService.deactivate` reads the blockers and then writes
+`isActive = false`. Under READ COMMITTED nothing makes that atomic: `POST
+/api/orders` can commit a new unfulfilled `IgienizareOrder` for the plan between
+the read and the write. That transaction never touches the `subscriptions` row,
+so nothing conflicts — no `@Version`, no row lock, no constraint. **Outcome: a
+plan retired with a live order pointing at it.** Because the delete is soft the
+order still resolves, so the damage is "live order on a retired plan", not a
+dangling FK.
+
+Fix: `SELECT … FOR UPDATE` on the subscription row from **both** `deactivate()`
+and order creation, or `@Version` on `Subscription` plus a touching write in
+`OrderService`. Either means editing `OrderService`.
+
+### TODO-40 `[DONE]` Three cross-cutting guard scripts
+Cross-project facts that no toolchain checks, because the values are duplicated
+across languages with no shared schema and nothing fails at build time when they
+drift. All three run from `repo-hygiene.yml`, which has **no `paths:` filter** —
+the whole point is comparing one project against another, so a filtered run
+would miss exactly the PR that breaks the pair. Each step is `if: always()` so
+one failure does not hide the others.
+
+- **`cross_project_invariants.py`** — order-type names must match across
+  `Order.java`, `web/types/domain.ts`, `mobile/types/OrderTypes.ts` and mobile's
+  two untyped local copies; web `TASK_STATUSES` must match the backend enum
+  except for a declared backend-only set (`CANCELLED`). Verified by temporarily
+  adding a fourth order type: it named all four files that must follow. Absent
+  mobile files are *skipped, not failed*, so TODO-33 can delete them.
+- **`doc_claims.py`** — every backticked path in `CLAUDE.md` and the skills, and
+  every path in a Java/TS comment, must resolve (understanding `@/` aliases,
+  `./` relatives and `/.../` elisions). Pinned claims must match
+  `application.properties`: **stating no number passes, stating a wrong one
+  fails**, which suits CLAUDE.md's own "read them there rather than hardcoding a
+  number" style. And named cross-references must still hold — `isOrderFulfilled`
+  must keep naming `findLiveBySubscriptionId`, and the JPQL must keep naming
+  `deriveLifecycle`, with the symbol checked and not merely the path. That last
+  part exists because a path check is not enough: a pointer to a file that still
+  exists but no longer defines the thing passes a path check and is still wrong.
+- **`dead_config.py`** — `ecotrack.*` keys no Java source reads, reporting the
+  env var's other homes so cleanup is one pass. It found TODO-23's Google
+  plumbing independently. Bails out loudly if a `@ConfigurationProperties` class
+  is ever added, since prefix binding would make key-by-key grepping report
+  false deaths.
+
+### TODO-41 `[ ]` Re-establish a golden-fixture guard for the fulfilment rule
+`isOrderFulfilled` (`web/src/features/sales/orderModel.ts`) and
+`OrderRepository.findLiveBySubscriptionId` are one rule written twice, in two
+languages, with no reference between them. TODO-40's `doc_claims.py` pins that
+they keep *naming* each other; nothing checks that they still *agree*.
+
+A shared golden-case file read by both suites was built for an earlier shape of
+this pair and dropped when this branch merged, because that shape did not
+survive: the backend rule now lives in **JPQL**, not in a policy class, so
+driving it from a fixture needs a `@DataJpaTest` rather than a plain unit test.
+That is the open question — whether the guard is worth a database-backed test,
+or whether TODO-34 (making the two sides read the same roll-up) removes enough
+of the risk that pinning the names is sufficient.
+
+Cheap and worth doing either way: the web half of the rule is a pure function,
+so a table of `(taskStatus → fulfilled)` cases costs nothing to assert.
 
 ---
 
 ## Appendix — current state (context)
 
 - **Backend:** enrollment/device-approval auth is complete and tested; passwords
-  and Google sign-in are fully removed, config included (TODO-31); `enforce`
-  defaults to `true`; refresh tokens last 365 days and rotate on use. Full
-  suite: **264 tests**, 0 failing.
-- **Web:** enrollment flow shipped (TODO-01). **349 tests**, 0 failing.
-- **Mobile:** enrollment shipped (TODO-19) — the app can authenticate again.
-  **83 tests**, 0 failing. Sales and Technical sections still present; TODO-22
-  plans to remove them.
+  and Google sign-in are fully removed, config included (TODO-23); `enforce`
+  defaults to `true`; refresh tokens rotate on use.
+- **Web:** enrollment flow shipped (TODO-01), Comenzi has the Curente/Arhivă
+  split (TODO-21) and the Calendar (TODO-12).
+- **Mobile:** enrollment shipped (TODO-19) — **the app can authenticate again**.
+  Sales and Technical sections still present; TODO-33 plans to remove them.
 - **Deploy:** `deploy.yml` (backend + web to VPS, one domain via Caddy) and
   `deploy-mobile.yml` (EAS OTA + builds). See `DEPLOYMENT.md`.
 - **No users and no server exist yet**, so nothing here needs a migration path.

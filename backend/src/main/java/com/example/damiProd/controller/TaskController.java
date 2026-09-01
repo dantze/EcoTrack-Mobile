@@ -22,21 +22,12 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 @RestController
 @RequestMapping("/api/tasks")
 public class TaskController {
 
     private static final Logger log = LoggerFactory.getLogger(TaskController.class);
-    private static final Set<String> ALLOWED_IMAGE_TYPES = Set.of(
-            "image/jpeg",
-            "image/jpg",
-            "image/png",
-            "image/webp",
-            "image/heic",
-            "image/heif"
-    );
 
     private final TaskService taskService;
     private final PhotoService photoService;
@@ -278,7 +269,7 @@ public class TaskController {
                 continue;
 
             String contentType = file.getContentType();
-            if (contentType != null && !ALLOWED_IMAGE_TYPES.contains(contentType.toLowerCase())) {
+            if (contentType != null && !PhotoService.ALLOWED_IMAGE_TYPES.contains(contentType.toLowerCase())) {
                 log.warn("Skipping file upload for task {} with disallowed content type: {}", id, contentType);
                 continue;
             }

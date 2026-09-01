@@ -5,9 +5,11 @@ description: Use before committing, pushing, or opening a PR in this monorepo, a
 
 # Verify a change the way CI will
 
-CI is four workflows. Three are path-filtered per project; the fourth runs on
-every PR regardless. Running everything wastes minutes (`./gradlew build` is the
-long pole); running the wrong subset produces a red PR.
+Four workflows gate a PR. Three are path-filtered per project; the fourth runs
+on every PR regardless. (`audit.yml` also exists but is scheduled weekly and on
+demand — it is not part of PR gating, so never wait on it.) Running everything
+wastes minutes (`./gradlew build` is the long pole); running the wrong subset
+produces a red PR.
 
 ## Step 1 — what changed
 
@@ -22,17 +24,12 @@ filters verbatim** — if a row matches, that workflow will run on your PR.
 
 | Changed | Workflow | Run |
 |---|---|---|
-| `backend/**`, `shared/**`, `.github/workflows/ci-backend.yml`, `.github/scripts/junit_summary.py`, `.github/scripts/jacoco_summary.py` | `ci-backend.yml` | backend block below |
-| `web/**`, `shared/**`, `.github/workflows/ci-web.yml`, `.github/scripts/bundle_budget.py` | `ci-web.yml` | web block below |
+| `backend/**`, `.github/workflows/ci-backend.yml`, `.github/scripts/junit_summary.py`, `.github/scripts/jacoco_summary.py` | `ci-backend.yml` | backend block below |
+| `web/**`, `.github/workflows/ci-web.yml`, `.github/scripts/bundle_budget.py` | `ci-web.yml` | web block below |
 | `mobile/**`, `.github/workflows/ci-mobile.yml` | `ci-mobile.yml` | mobile block below |
 | **anything at all** | `repo-hygiene.yml` | hygiene block below — always |
 
 Always run from the project subdirectory, never the repo root.
-
-**`shared/**` is in TWO rows on purpose.** `shared/order-lifecycle-cases.json`
-holds golden cases that the backend and web suites BOTH read, so a change to it
-must re-run both — a fixture only one side checks is not a contract. If you
-edit it, run the backend block and the web block, however small the diff looks.
 
 ### backend
 
@@ -80,7 +77,8 @@ npm run typecheck
 npm run test:run
 ```
 
-There is no build step in mobile CI.
+There is no build step in mobile CI. Do not substitute `npx expo` anything —
+CI runs exactly these three.
 
 ### hygiene — every change, no exceptions
 
@@ -140,3 +138,6 @@ check; do not describe a partial run as passing.
 - **Don't run `npm run test`** when you mean `test:run`. Watch mode never exits.
 - **Don't skip the hygiene script** because your change looks project-local.
   It runs on every PR; if it fails, your PR is red no matter how green the rest is.
+- **Don't assume a doc-only or `.claude/`-only change needs nothing.** Those
+  paths match no project filter, which is exactly the case the hygiene script
+  exists for — it is the only check that will run, so run it.

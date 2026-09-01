@@ -5,18 +5,27 @@
  * record detail and the create/edit form are slide-overs, so the list never
  * unmounts and the filters survive.
  *
+ * **Two views, one table (TODO-21).** `Curente` holds the work still to do and
+ * `Arhivă` the orders that are finished, split by `isOrderFulfilled` in
+ * `./orderModel` — a COMPLETED task and nothing else, the same rule the backend
+ * uses to decide which orders block retiring a subscription (TODO-20). The
+ * split is DERIVED, not stored: there is no archive flag to keep in sync, and
+ * nothing to press. An order leaves Arhivă exactly when its task stops being
+ * COMPLETED (a driver reopening it), which is the only thing that could
+ * honestly un-archive it. Archived orders are not read-only either — the drawer
+ * still edits and deletes, because correcting a typo on finished work is
+ * ordinary, and a lock nobody asked for would be a new permission concept.
+ *
+ * The two derivations behind the table — what the filter strip lets through,
+ * and which half each survivor lands in — are pure functions in
+ * `./orderFilters`, so they can be read and tested without rendering a screen
+ * this long.
+ *
  * Two entry points besides clicking a row: `?comanda=<id>` opens that order's
  * drawer and `?nou=1` opens an empty form, which is how the command palette
- * (⌘K) reaches this screen and what makes an order link shareable.
- *
- * **Curente vs Arhivă.** The list defaults to work that is still live;
- * fulfilled orders move to the Arhivă tab, read-only. "Fulfilled" is DERIVED
- * by `isFulfilled` in `@/lib/orderLifecycle` — the same function the map's
- * `done` lifecycle uses — never stored, so there is nothing to keep in sync and
- * nothing to un-archive: an order comes back the moment one of its tasks
- * reopens. Unlike the active/inactive split TODO-11 removed from Abonamente
- * (which surfaced a soft-delete flag as if it were a status), this is a real
- * state an order actually reaches.
+ * (⌘K) reaches this screen and what makes an order link shareable. A deep link
+ * to a finished order switches to Arhivă, so the row behind the drawer is the
+ * one the link named.
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -42,9 +51,6 @@ import {
 } from '@/components/domain';
 import { ORDER_TYPES, type Order, clientName } from '@/types/domain';
 import { useDeepLink } from '@/lib/deepLink';
-import { isFulfilled } from '@/lib/orderLifecycle';
-import { todayIso } from '@/features/technical/utils';
-import { includesFolded } from '@/lib/search';
 import { useShortcuts } from '@/lib/hotkeys';
 import { recordUse } from '@/lib/recents';
 import { ErrorNotice, FilterBar, FilterField, SearchInput } from './components/FilterBar';
@@ -52,7 +58,19 @@ import { OrderDetailDrawer } from './components/OrderDetailDrawer';
 import { OrderFormDrawer } from './components/OrderFormDrawer';
 import { Toaster, errorMessage, toast } from './components/Toaster';
 import { useConfirm } from './components/useConfirm';
-import { orderAddress, orderDateLabel, orderPrimaryDate, orderSummary } from './orderModel';
+import {
+  filterOrders,
+  hasActiveFilters,
+  splitByFulfilment,
+  type OrderFilters,
+} from './orderFilters';
+import {
+  isOrderFulfilled,
+  orderAddress,
+  orderDateLabel,
+  orderPrimaryDate,
+  orderSummary,
+} from './orderModel';
 import { useClients, useDeleteOrders, useOrderTaskStatuses, useOrders } from './queries';
 
 const TYPE_OPTIONS: SelectOption<string>[] = [
@@ -60,11 +78,13 @@ const TYPE_OPTIONS: SelectOption<string>[] = [
   ...ORDER_TYPES.map((type) => ({ value: type, label: ORDER_TYPE_LABELS[type] })),
 ];
 
-/**
- * `toate` exists so an operator can still see one uninterrupted list — the
- * split is a default, not a wall.
- */
-type OrderTab = 'curente' | 'arhiva' | 'toate';
+/** Which half of the split the table is showing. */
+type View = 'current' | 'archive';
+
+const VIEW_LABELS: Record<View, string> = {
+  current: 'Curente',
+  archive: 'Arhivă',
+};
 
 type DrawerState =
   | { kind: 'none' }
@@ -78,12 +98,12 @@ export function OrdersPage() {
   const deleteOrders = useDeleteOrders();
   const { confirm, confirmDialog } = useConfirm();
 
-  const [tab, setTab] = useState<OrderTab>('curente');
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
   const [clientFilter, setClientFilter] = useState('');
   const [dateFrom, setDateFrom] = useState<string | null>(null);
   const [dateTo, setDateTo] = useState<string | null>(null);
+  const [view, setView] = useState<View>('current');
   const [selected, setSelected] = useState<Set<RowKey>>(new Set());
   const [drawer, setDrawer] = useState<DrawerState>({ kind: 'none' });
   const searchRef = useRef<HTMLInputElement>(null);
@@ -136,42 +156,6 @@ export function OrdersPage() {
 
   const statusesQuery = useOrderTaskStatuses(orders.map((order) => order.id));
 
-  /**
-   * Task evidence is fanned out one request per order, so it lands after the
-   * list does. Until it is here NOTHING is archived: hiding a live order from
-   * Comenzi on incomplete evidence is a far worse error than showing a
-   * finished one for another second, and it also stops rows flickering between
-   * the two tabs while the statuses stream in.
-   *
-   * Caveat worth knowing: `GET /tasks/order/{id}/exists` reports ONE task's
-   * status, not a roll-up of all of them, so an order that somehow produced
-   * several tasks is judged on whichever the backend returns first. The map,
-   * which loads every task, summarises properly. Both feed the same
-   * `isFulfilled`; only the evidence differs. A batch/roll-up endpoint would
-   * close the gap.
-   */
-  const statuses = statusesQuery.data;
-  const archivedIds = useMemo(() => {
-    if (!statuses) return new Set<number>();
-    const today = todayIso();
-    return new Set(
-      orders
-        .filter((order) => isFulfilled(order, statuses[order.id] ?? null, today))
-        .map((order) => order.id),
-    );
-  }, [orders, statuses]);
-
-  const tabCounts = useMemo(
-    () => ({
-      curente: orders.length - archivedIds.size,
-      arhiva: archivedIds.size,
-      toate: orders.length,
-    }),
-    [orders.length, archivedIds],
-  );
-
-  const viewingArchive = tab === 'arhiva';
-
   const clientOptions = useMemo<SelectOption<string>[]>(
     () => [
       { value: '', label: 'Toți clienții' },
@@ -182,36 +166,38 @@ export function OrdersPage() {
     [clientsQuery.data],
   );
 
-  const rows = useMemo(() => {
-    const needle = search.trim();
-    return orders.filter((order) => {
-      if (tab === 'curente' && archivedIds.has(order.id)) return false;
-      if (tab === 'arhiva' && !archivedIds.has(order.id)) return false;
-      if (needle) {
-        const haystack = [
-          String(order.number),
-          clientName(order.client),
-          orderAddress(order) ?? '',
-          orderSummary(order),
-        ];
-        // Diacritic-insensitive: a typed "bucuresti" has to find "București".
-        if (!haystack.some((value) => includesFolded(value, needle))) return false;
-      }
-      if (typeFilter && order.orderType !== typeFilter) return false;
-      if (clientFilter && String(order.client.id) !== clientFilter) return false;
-      if (dateFrom || dateTo) {
-        const date = orderPrimaryDate(order);
-        if (!date) return false;
-        const day = date.slice(0, 10);
-        if (dateFrom && day < dateFrom) return false;
-        if (dateTo && day > dateTo) return false;
-      }
-      return true;
-    });
-  }, [orders, tab, archivedIds, search, typeFilter, clientFilter, dateFrom, dateTo]);
+  const taskStatuses = statusesQuery.data;
 
-  const filtersActive =
-    search !== '' || typeFilter !== '' || clientFilter !== '' || dateFrom !== null || dateTo !== null;
+  // Which rows the table shows: the filter strip narrows, then the tab picks a
+  // half. Both derivations live in `./orderFilters` — see that file for why the
+  // Curente/Arhivă split is computed rather than stored.
+  const filters = useMemo<OrderFilters>(
+    () => ({
+      search,
+      type: typeFilter,
+      clientId: clientFilter,
+      from: dateFrom,
+      to: dateTo,
+    }),
+    [search, typeFilter, clientFilter, dateFrom, dateTo],
+  );
+
+  const matching = useMemo(() => filterOrders(orders, filters), [orders, filters]);
+  const { current, archived } = useMemo(
+    () => splitByFulfilment(matching, taskStatuses),
+    [matching, taskStatuses],
+  );
+  const rows = view === 'archive' ? archived : current;
+
+  const showView = (next: View) => {
+    if (next === view) return;
+    setView(next);
+    // A selection made in one view must not be carried into a bulk delete in
+    // the other, where its rows are not even on screen.
+    setSelected(new Set());
+  };
+
+  const filtersActive = hasActiveFilters(filters);
 
   const resetFilters = () => {
     setSearch('');
@@ -224,6 +210,15 @@ export function OrdersPage() {
   const openOrder = drawer.kind === 'detail' || drawer.kind === 'edit'
     ? orders.find((order) => order.id === drawer.orderId) ?? null
     : null;
+
+  // A link (or the command palette) can name a finished order while the table
+  // is on Curente. Follow the order rather than opening a drawer over a list
+  // that does not contain its row.
+  const openOrderIsArchived = openOrder !== null && isOrderFulfilled(taskStatuses?.[openOrder.id]);
+  useEffect(() => {
+    if (!openOrder) return;
+    setView(openOrderIsArchived ? 'archive' : 'current');
+  }, [openOrder, openOrderIsArchived]);
 
   const removeOrders = async (ids: number[], label: string) => {
     const confirmed = await confirm({
@@ -311,7 +306,8 @@ export function OrdersPage() {
         subtitle={
           ordersQuery.isLoading
             ? 'Se încarcă…'
-            : `${rows.length} din ${tabCounts[tab]} comenzi${filtersActive ? ' (filtrate)' : ''}`
+            : `${rows.length} ${view === 'archive' ? 'comenzi finalizate' : 'comenzi curente'}` +
+              ` din ${orders.length} în total${filtersActive ? ' (filtrate)' : ''}`
         }
         actions={
           <>
@@ -330,27 +326,13 @@ export function OrdersPage() {
       />
 
       <Tabs
-        active={tab}
-        onChange={(id) => {
-          setTab(id as OrderTab);
-          // Selection is per-tab: carrying ids into a read-only view would
-          // leave a bulk-delete bar armed over rows that cannot be deleted.
-          setSelected(new Set());
-        }}
         items={[
-          { id: 'curente', label: 'Curente', count: tabCounts.curente },
-          { id: 'arhiva', label: 'Arhivă', count: tabCounts.arhiva },
-          { id: 'toate', label: 'Toate', count: tabCounts.toate },
+          { id: 'current', label: VIEW_LABELS.current, count: current.length },
+          { id: 'archive', label: VIEW_LABELS.archive, count: archived.length },
         ]}
+        active={view}
+        onChange={(id) => showView(id as View)}
       />
-
-      {viewingArchive && (
-        <p className="border-b border-border bg-surface-sunken px-5 py-2 text-sm text-ink-muted">
-          Comenzi finalizate — doar vizualizare. Arhivarea se deduce din sarcinile
-          comenzii; nu există dezarhivare, comanda revine în „Curente” dacă o
-          sarcină se redeschide.
-        </p>
-      )}
 
       <FilterBar>
         <FilterField label="Căutare">
@@ -403,78 +385,82 @@ export function OrdersPage() {
           loading={ordersQuery.isLoading}
           activeKey={openOrder?.id ?? null}
           onRowClick={(order) => openDetail(order.id)}
-          selectedKeys={viewingArchive ? undefined : selected}
-          onSelectionChange={viewingArchive ? undefined : setSelected}
+          selectedKeys={selected}
+          onSelectionChange={setSelected}
           bulkActions={
-            viewingArchive ? undefined : (
-              <Button
-                size="sm"
-                variant="danger"
-                loading={deleteOrders.isPending}
-                onClick={() =>
-                  void removeOrders(
-                    [...selected].map(Number),
-                    `${selected.size} comenzi vor fi șterse definitiv.`,
-                  )
-                }
-              >
-                Șterge selecția
-              </Button>
-            )
-          }
-          empty={
-            <EmptyState
-              title={
-                filtersActive
-                  ? 'Nicio comandă pentru filtrele curente'
-                  : viewingArchive
-                    ? 'Arhiva este goală'
-                    : 'Nu există comenzi'
-              }
-              body={
-                filtersActive
-                  ? 'Modificați filtrele sau resetați-le.'
-                  : viewingArchive
-                    ? 'Comenzile ajung aici automat când toate sarcinile lor sunt finalizate.'
-                    : 'Creați prima comandă pentru un client existent.'
-              }
-              action={
-                filtersActive ? (
-                  <Button variant="secondary" onClick={resetFilters}>
-                    Resetează filtrele
-                  </Button>
-                ) : viewingArchive ? undefined : (
-                  <Button variant="primary" onClick={() => setDrawer({ kind: 'create' })}>
-                    + Comandă
-                  </Button>
+            <Button
+              size="sm"
+              variant="danger"
+              loading={deleteOrders.isPending}
+              onClick={() =>
+                void removeOrders(
+                  [...selected].map(Number),
+                  `${selected.size} comenzi vor fi șterse definitiv.`,
                 )
               }
-            />
+            >
+              Șterge selecția
+            </Button>
+          }
+          empty={
+            view === 'archive' ? (
+              <EmptyState
+                title={
+                  filtersActive
+                    ? 'Nicio comandă finalizată pentru filtrele curente'
+                    : 'Arhiva este goală'
+                }
+                body={
+                  filtersActive
+                    ? 'Modificați filtrele sau resetați-le.'
+                    : 'O comandă ajunge aici când sarcina ei este marcată finalizată.'
+                }
+                action={
+                  filtersActive ? (
+                    <Button variant="secondary" onClick={resetFilters}>
+                      Resetează filtrele
+                    </Button>
+                  ) : (
+                    <Button variant="secondary" onClick={() => showView('current')}>
+                      Vezi comenzile curente
+                    </Button>
+                  )
+                }
+              />
+            ) : (
+              <EmptyState
+                title={filtersActive ? 'Nicio comandă pentru filtrele curente' : 'Nu există comenzi'}
+                body={
+                  filtersActive
+                    ? 'Modificați filtrele sau resetați-le.'
+                    : archived.length > 0
+                      ? 'Toate comenzile sunt finalizate — sunt în Arhivă.'
+                      : 'Creați prima comandă pentru un client existent.'
+                }
+                action={
+                  filtersActive ? (
+                    <Button variant="secondary" onClick={resetFilters}>
+                      Resetează filtrele
+                    </Button>
+                  ) : (
+                    <Button variant="primary" onClick={() => setDrawer({ kind: 'create' })}>
+                      + Comandă
+                    </Button>
+                  )
+                }
+              />
+            )
           }
         />
       )}
 
       {drawer.kind === 'detail' && openOrder && (
-        // Read-only is a property of the ARHIVĂ VIEW, not of the record: the
-        // same order opened from „Toate” keeps Editează/Șterge. Archiving is
-        // derived from task data that can itself be wrong, so there has to be
-        // one place left to correct a mis-archived order — and a delete of a
-        // finished order is a legitimate action, not an edit to live work.
         <OrderDetailDrawer
           order={openOrder}
-          archived={viewingArchive}
           onClose={() => setDrawer({ kind: 'none' })}
-          onEdit={
-            viewingArchive ? undefined : () => setDrawer({ kind: 'edit', orderId: openOrder.id })
-          }
-          onDelete={
-            viewingArchive
-              ? undefined
-              : () =>
-                  void removeOrders(
-                    [openOrder.id],
-                    `Comanda #${openOrder.number} va fi ștearsă.`,
-                  )
+          onEdit={() => setDrawer({ kind: 'edit', orderId: openOrder.id })}
+          onDelete={() =>
+            void removeOrders([openOrder.id], `Comanda #${openOrder.number} va fi ștearsă.`)
           }
         />
       )}

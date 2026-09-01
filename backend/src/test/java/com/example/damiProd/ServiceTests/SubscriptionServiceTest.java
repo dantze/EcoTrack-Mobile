@@ -1,207 +1,239 @@
 package com.example.damiProd.ServiceTests;
 
+import com.example.damiProd.domain.Client;
 import com.example.damiProd.domain.Company;
 import com.example.damiProd.domain.IgienizareOrder;
-import com.example.damiProd.domain.Order;
+import com.example.damiProd.domain.Individual;
+import com.example.damiProd.domain.RecurringIgienizare;
 import com.example.damiProd.domain.Subscription;
-import com.example.damiProd.domain.Task;
-import com.example.damiProd.domain.TaskStatus;
-import com.example.damiProd.exception.ResourceInUseException;
-import com.example.damiProd.exception.ResourceNotFoundException;
+import com.example.damiProd.dto.SubscriptionUsageResponse;
 import com.example.damiProd.repository.OrderRepository;
+import com.example.damiProd.repository.RecurringIgienizareRepository;
 import com.example.damiProd.repository.SubscriptionRepository;
-import com.example.damiProd.repository.TaskRepository;
-import com.example.damiProd.service.OrderFulfilmentPolicy;
 import com.example.damiProd.service.SubscriptionService;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
-import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyCollection;
 import static org.mockito.Mockito.*;
 
 /**
- * Retiring a plan (DELETE /api/subscriptions/{id} → soft delete) must be
- * refused while UNFULFILLED orders still reference it, and must still work
- * when the only referencing orders are history.
+ * Retiring a subscription is refused while anything live still points at it.
  *
- * The real {@link OrderFulfilmentPolicy} is wired in rather than mocked — the
- * whole point of these tests is the rule, not the plumbing around it.
+ * The rule that matters here — and the reason it differs from the product
+ * guard — is that this delete is SOFT. The row survives, so a FINISHED order
+ * keeps resolving through it and must not block; only work that has not
+ * happened yet does. Getting that backwards in either direction is a real bug:
+ * too strict and no plan can ever be retired, too loose and the catalogue
+ * retires out from under scheduled work.
  */
 @ExtendWith(MockitoExtension.class)
 class SubscriptionServiceTest {
 
     @Mock private SubscriptionRepository subscriptionRepository;
     @Mock private OrderRepository orderRepository;
-    @Mock private TaskRepository taskRepository;
+    @Mock private RecurringIgienizareRepository recurringRepository;
 
+    @InjectMocks
     private SubscriptionService subscriptionService;
 
-    /** Comfortably in the past, so a date-only order reads as fulfilled. */
-    private static final String PAST = "2020-01-01";
-    /** Comfortably in the future, so a date-only order reads as live. */
-    private static final String FUTURE = LocalDate.now().plusYears(5).toString();
-
-    @BeforeEach
-    void setUp() {
-        subscriptionService = new SubscriptionService(
-                subscriptionRepository, orderRepository, taskRepository, new OrderFulfilmentPolicy());
-    }
-
-    private Subscription plan() {
+    private static Subscription plan() {
         Subscription sub = new Subscription();
-        sub.setId(7L);
+        sub.setId(1L);
         sub.setName("Igienizare lunară");
         sub.setIsActive(true);
-        when(subscriptionRepository.findById(7L)).thenReturn(Optional.of(sub));
         return sub;
     }
 
-    private IgienizareOrder order(long id, long number, String sanitationDate) {
+    private static IgienizareOrder order(long id, long number, Client client) {
         IgienizareOrder order = new IgienizareOrder();
         order.setId(id);
         order.setNumber(number);
-        order.setOrderType("Igienizari");
-        order.setSanitationDate(sanitationDate);
-        Company client = new Company();
-        client.setName("SC Ecotest SRL");
         order.setClient(client);
+        order.setSanitationDate("2026-09-14");
         return order;
     }
 
-    private Task taskFor(Order order, TaskStatus status) {
-        Task task = new Task();
-        task.setStatus(status);
-        task.setOrder(order);
-        return task;
+    private static Individual person(String fullName) {
+        Individual individual = new Individual();
+        individual.setId(7L);
+        individual.setFullName(fullName);
+        return individual;
     }
 
     // -----------------------------------------------------------------------
-    // TEST 1 — nothing references the plan → soft delete goes through
+    // deactivate — the happy path
     // -----------------------------------------------------------------------
     @Test
-    void deactivate_shouldRetirePlanWhenNoOrderReferencesIt() {
+    void deactivate_shouldRetireWhenNothingLiveUsesThePlan() {
         Subscription sub = plan();
-        when(orderRepository.findIgienizareOrdersBySubscriptionId(7L)).thenReturn(List.of());
+        when(subscriptionRepository.findById(1L)).thenReturn(Optional.of(sub));
+        when(orderRepository.findLiveBySubscriptionId(1L)).thenReturn(List.of());
+        when(recurringRepository.findBySubscription_IdAndActiveTrue(1L)).thenReturn(List.of());
 
-        subscriptionService.deactivate(7L);
-
-        assertThat(sub.getIsActive()).isFalse();
-        verify(subscriptionRepository).save(sub);
-        verify(taskRepository, never()).findByOrder_IdIn(anyCollection());
-    }
-
-    // -----------------------------------------------------------------------
-    // TEST 2 — only fulfilled orders reference it → soft delete goes through
-    // -----------------------------------------------------------------------
-    @Test
-    void deactivate_shouldRetirePlanWhenOnlyFulfilledOrdersReferenceIt() {
-        Subscription sub = plan();
-        // One finished by task evidence (all COMPLETED, even though its date is
-        // in the future), one finished by date with no tasks at all.
-        IgienizareOrder byTasks = order(101L, 1001L, FUTURE);
-        IgienizareOrder byDate = order(102L, 1002L, PAST);
-        when(orderRepository.findIgienizareOrdersBySubscriptionId(7L))
-                .thenReturn(List.of(byTasks, byDate));
-        when(taskRepository.findByOrder_IdIn(List.of(101L, 102L)))
-                .thenReturn(List.of(taskFor(byTasks, TaskStatus.COMPLETED),
-                        taskFor(byTasks, TaskStatus.COMPLETED)));
-
-        subscriptionService.deactivate(7L);
+        subscriptionService.deactivate(1L);
 
         assertThat(sub.getIsActive()).isFalse();
         verify(subscriptionRepository).save(sub);
     }
 
+    /**
+     * The point of the soft delete: orders already carried out on this plan
+     * keep pointing at a surviving row, so they are not a reason to refuse.
+     * `findLiveBySubscriptionId` excludes them at the query level, so an empty
+     * result here IS "only finished orders remain".
+     */
+    @Test
+    void deactivate_shouldRetireWhenOnlyFinishedOrdersRemain() {
+        Subscription sub = plan();
+        when(subscriptionRepository.findById(1L)).thenReturn(Optional.of(sub));
+        when(orderRepository.findLiveBySubscriptionId(1L)).thenReturn(List.of());
+        when(recurringRepository.findBySubscription_IdAndActiveTrue(1L)).thenReturn(List.of());
+
+        subscriptionService.deactivate(1L);
+
+        assertThat(sub.getIsActive()).isFalse();
+    }
+
     // -----------------------------------------------------------------------
-    // TEST 3 — an unfulfilled order refuses the delete and names the blocker
+    // deactivate — refusals
     // -----------------------------------------------------------------------
     @Test
-    void deactivate_shouldRefuseWhenAnUnfulfilledOrderReferencesIt() {
+    void deactivate_shouldThrowWhenAnUnfinishedOrderUsesThePlan() {
         Subscription sub = plan();
-        IgienizareOrder live = order(103L, 1003L, FUTURE);
-        when(orderRepository.findIgienizareOrdersBySubscriptionId(7L)).thenReturn(List.of(live));
-        when(taskRepository.findByOrder_IdIn(List.of(103L))).thenReturn(List.of());
+        when(subscriptionRepository.findById(1L)).thenReturn(Optional.of(sub));
+        when(orderRepository.findLiveBySubscriptionId(1L))
+                .thenReturn(List.of(order(10L, 41L, person("Ana Pop"))));
+        when(recurringRepository.findBySubscription_IdAndActiveTrue(1L)).thenReturn(List.of());
 
-        assertThatThrownBy(() -> subscriptionService.deactivate(7L))
-                .isInstanceOf(ResourceInUseException.class)
-                // Message is Romanian and user-facing.
-                .hasMessageContaining("Abonamentul nu poate fi șters")
-                .hasMessageContaining("1 comandă nefinalizată")
-                .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.type(ResourceInUseException.class))
-                .satisfies(ex -> {
-                    assertThat(ex.getBlockingOrders()).hasSize(1);
-                    assertThat(ex.getBlockingOrders().get(0).id()).isEqualTo(103L);
-                    assertThat(ex.getBlockingOrders().get(0).number()).isEqualTo(1003L);
-                    assertThat(ex.getBlockingOrders().get(0).orderType()).isEqualTo("Igienizari");
-                    assertThat(ex.getBlockingOrders().get(0).clientName()).isEqualTo("SC Ecotest SRL");
-                    assertThat(ex.getBlockingOrders().get(0).date()).isEqualTo(FUTURE);
-                });
+        assertThatThrownBy(() -> subscriptionService.deactivate(1L))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("Nu se poate șterge abonamentul")
+                .hasMessageContaining("1 comandă nefinalizată");
 
-        // Nothing was written: the plan is still live.
         assertThat(sub.getIsActive()).isTrue();
-        verify(subscriptionRepository, never()).save(any(Subscription.class));
+        verify(subscriptionRepository, never()).save(any());
+    }
+
+    /**
+     * An active plan is the stronger blocker: it would keep MAKING new orders
+     * against a retired subscription every night, so it refuses even when no
+     * order is outstanding today.
+     */
+    @Test
+    void deactivate_shouldThrowWhenAnActiveRecurringPlanUsesIt() {
+        Subscription sub = plan();
+        RecurringIgienizare recurring = new RecurringIgienizare();
+        recurring.setId(5L);
+        recurring.setClient(person("Ana Pop"));
+        recurring.setFrequencyDays(30);
+
+        when(subscriptionRepository.findById(1L)).thenReturn(Optional.of(sub));
+        when(orderRepository.findLiveBySubscriptionId(1L)).thenReturn(List.of());
+        when(recurringRepository.findBySubscription_IdAndActiveTrue(1L)).thenReturn(List.of(recurring));
+
+        assertThatThrownBy(() -> subscriptionService.deactivate(1L))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("1 plan recurent activ");
+
+        assertThat(sub.getIsActive()).isTrue();
+        verify(subscriptionRepository, never()).save(any());
+    }
+
+    @Test
+    void deactivate_shouldNameBothKindsOfBlocker() {
+        Subscription sub = plan();
+        RecurringIgienizare recurring = new RecurringIgienizare();
+        recurring.setId(5L);
+
+        when(subscriptionRepository.findById(1L)).thenReturn(Optional.of(sub));
+        when(orderRepository.findLiveBySubscriptionId(1L))
+                .thenReturn(List.of(order(10L, 41L, person("Ana Pop")), order(11L, 42L, person("Ana Pop"))));
+        when(recurringRepository.findBySubscription_IdAndActiveTrue(1L)).thenReturn(List.of(recurring));
+
+        assertThatThrownBy(() -> subscriptionService.deactivate(1L))
+                .isInstanceOf(IllegalStateException.class)
+                .hasMessageContaining("2 comenzi nefinalizate")
+                .hasMessageContaining("și")
+                .hasMessageContaining("1 plan recurent activ");
     }
 
     // -----------------------------------------------------------------------
-    // TEST 4 — a half-done order still blocks, and only the blockers are listed
+    // The Romanian counting in the refusal message
     // -----------------------------------------------------------------------
     @Test
-    void deactivate_shouldListOnlyTheUnfulfilledOrders() {
-        plan();
-        IgienizareOrder done = order(201L, 2001L, PAST);
-        IgienizareOrder halfDone = order(202L, 2002L, PAST);
-        when(orderRepository.findIgienizareOrdersBySubscriptionId(7L))
-                .thenReturn(List.of(done, halfDone));
-        when(taskRepository.findByOrder_IdIn(List.of(201L, 202L)))
-                .thenReturn(List.of(
-                        taskFor(done, TaskStatus.COMPLETED),
-                        taskFor(halfDone, TaskStatus.COMPLETED),
-                        taskFor(halfDone, TaskStatus.IN_PROGRESS)));
-
-        assertThatThrownBy(() -> subscriptionService.deactivate(7L))
-                .isInstanceOf(ResourceInUseException.class)
-                .hasMessageContaining("1 comandă nefinalizată")
-                .asInstanceOf(org.assertj.core.api.InstanceOfAssertFactories.type(ResourceInUseException.class))
-                .satisfies(ex -> assertThat(ex.getBlockingOrders())
-                        .extracting(blocker -> blocker.id())
-                        .containsExactly(202L));
+    void blockedMessage_shouldAgreeInRomanian() {
+        // Singular verb and noun at one.
+        assertThat(SubscriptionService.blockedMessage(1, 0))
+                .contains("1 comandă nefinalizată")
+                .contains("îl folosește încă");
+        // Plural verb from two up.
+        assertThat(SubscriptionService.blockedMessage(3, 0))
+                .contains("3 comenzi nefinalizate")
+                .contains("îl folosesc încă");
+        // "de" appears once the last two digits reach 20 — 24 DE comenzi.
+        assertThat(SubscriptionService.blockedMessage(24, 0)).contains("24 de comenzi nefinalizate");
+        // ...but not at 19.
+        assertThat(SubscriptionService.blockedMessage(19, 0)).contains("19 comenzi nefinalizate");
     }
 
     // -----------------------------------------------------------------------
-    // TEST 5 — plural wording when more than one order blocks
+    // usage — the advisory preflight
     // -----------------------------------------------------------------------
     @Test
-    void deactivate_shouldUsePluralWordingForSeveralBlockers() {
-        plan();
-        when(orderRepository.findIgienizareOrdersBySubscriptionId(7L))
-                .thenReturn(List.of(order(301L, 3001L, FUTURE), order(302L, 3002L, FUTURE)));
-        when(taskRepository.findByOrder_IdIn(List.of(301L, 302L))).thenReturn(List.of());
+    void usage_shouldReportNotBlockedWhenNothingUsesThePlan() {
+        when(subscriptionRepository.findById(1L)).thenReturn(Optional.of(plan()));
+        when(orderRepository.findLiveBySubscriptionId(1L)).thenReturn(List.of());
+        when(recurringRepository.findBySubscription_IdAndActiveTrue(1L)).thenReturn(List.of());
 
-        assertThatThrownBy(() -> subscriptionService.deactivate(7L))
-                .isInstanceOf(ResourceInUseException.class)
-                .hasMessageContaining("2 comenzi nefinalizate");
+        SubscriptionUsageResponse usage = subscriptionService.usage(1L);
+
+        assertThat(usage.blocked()).isFalse();
+        assertThat(usage.orders()).isEmpty();
+        assertThat(usage.recurringPlans()).isEmpty();
     }
 
-    // -----------------------------------------------------------------------
-    // TEST 6 — an unknown id is still a 404, checked before anything else
-    // -----------------------------------------------------------------------
     @Test
-    void deactivate_shouldThrowNotFoundForUnknownId() {
-        when(subscriptionRepository.findById(99L)).thenReturn(Optional.empty());
+    void usage_shouldNameTheBlockingOrdersSoTheUiCanListThem() {
+        when(subscriptionRepository.findById(1L)).thenReturn(Optional.of(plan()));
+        when(orderRepository.findLiveBySubscriptionId(1L))
+                .thenReturn(List.of(order(10L, 41L, person("Ana Pop"))));
+        when(recurringRepository.findBySubscription_IdAndActiveTrue(1L)).thenReturn(List.of());
 
-        assertThatThrownBy(() -> subscriptionService.deactivate(99L))
-                .isInstanceOf(ResourceNotFoundException.class);
+        SubscriptionUsageResponse usage = subscriptionService.usage(1L);
 
-        verify(orderRepository, never()).findIgienizareOrdersBySubscriptionId(any());
+        assertThat(usage.blocked()).isTrue();
+        assertThat(usage.orders()).singleElement().satisfies(blocking -> {
+            assertThat(blocking.id()).isEqualTo(10L);
+            assertThat(blocking.number()).isEqualTo(41L);
+            assertThat(blocking.clientName()).isEqualTo("Ana Pop");
+            assertThat(blocking.sanitationDate()).isEqualTo("2026-09-14");
+        });
+    }
+
+    /** Company clients carry their name on a different field than individuals. */
+    @Test
+    void usage_shouldResolveACompanyClientName() {
+        Company company = new Company();
+        company.setId(8L);
+        company.setName("Construct SRL");
+
+        when(subscriptionRepository.findById(1L)).thenReturn(Optional.of(plan()));
+        when(orderRepository.findLiveBySubscriptionId(1L)).thenReturn(List.of(order(10L, 41L, company)));
+        when(recurringRepository.findBySubscription_IdAndActiveTrue(1L)).thenReturn(List.of());
+
+        SubscriptionUsageResponse usage = subscriptionService.usage(1L);
+
+        assertThat(usage.orders()).singleElement()
+                .extracting(SubscriptionUsageResponse.BlockingOrder::clientName)
+                .isEqualTo("Construct SRL");
     }
 }

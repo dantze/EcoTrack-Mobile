@@ -1,13 +1,17 @@
 ---
 name: api-endpoint
-description: Use when adding, changing, moving or deleting any backend `/api/**` endpoint in `backend/` — any new @GetMapping / @PostMapping / @PatchMapping / @PutMapping / @DeleteMapping under `controller/`, or any change to an existing route's path or HTTP verb. Covers the SecurityConfig role-matrix row (and why matcher ORDER matters), the TaskAccessPolicy row-level call that the matrix does not replace, Romanian error messages, and which test classes must be extended. Use it before writing the controller method, not after.
+description: Use when adding, changing, moving or deleting any backend `/api/**` endpoint in `backend/` — any new @GetMapping / @PostMapping / @PatchMapping / @PutMapping / @DeleteMapping under `controller/`, or any change to an existing route's path or HTTP verb. Also use when a request that should work returns 401 or 403 after a routing change. Covers the SecurityConfig role-matrix row (and why matcher ORDER matters), the TaskAccessPolicy row-level call that the matrix does not replace, Romanian error messages, and which test classes must be extended. Use it before writing the controller method, not after.
 ---
 
 # Adding an `/api/**` endpoint
 
 Four things move together. Miss the third and a driver can read another
-driver's day — with nothing failing loudly, in any test, in either
-enforcement mode.
+driver's day — with nothing failing loudly, in any test.
+
+Enforcement is **on by default** now (`ecotrack.security.enforce` resolves to
+`true` in the base properties), so a missing or misplaced matcher row is a live
+403/401 in dev, not a latent one. For the flag itself, the token lifecycle and
+the two clients, see the `auth-security` skill.
 
 Work in this order.
 
@@ -26,21 +30,26 @@ Under `backend/src/main/java/com/example/damiProd/controller/`.
 ## 2. The role-matrix row in `SecurityConfig`
 
 `backend/src/main/java/com/example/damiProd/config/SecurityConfig.java`, inside
-the `if (enforceSecurity)` branch (~line 187). Role constants are defined at the
-top of the class: `ADMIN`, `SALES`, `TECH`, `DRIVER`, and
-`OFFICE = { ADMIN, SALES, TECH }`.
+the `if (enforceSecurity)` branch. Role constants are defined at the top of the
+class: `ADMIN`, `SALES`, `TECH`, `DRIVER`, and `OFFICE = { ADMIN, SALES, TECH }`.
 
 **First matching rule wins, so position is the whole game.** The existing rows,
 in order:
 
 | Rule | Who |
 |---|---|
+| `OPTIONS /**`, then `/actuator/health` | permitted — the probe MUST stay above the deny-list below, or the container never reports healthy |
+| `INFRA_DENY_LIST` — `/h2-console/**`, `/actuator/**`, `/env/**`, `/heapdump`, `/jolokia/**` | `denyAll()`, in BOTH enforcement modes |
+| `GET /api/enrollment/status`, `POST /api/enrollment/request`, `POST /api/enrollment/claim` | permitted — the only unauthenticated app surface |
+| `POST /api/auth/refresh`, `POST /api/auth/logout` | permitted (they authenticate with the refresh token itself) |
+| the rest of `/api/auth/**` | authenticated |
 | `/api/admin/**` | `ADMIN` |
 | `POST/PUT/PATCH/DELETE /api/employees/**` | `ADMIN` |
 | `PATCH /api/tasks/*/status` | `DRIVER`, `SALES`, `TECH`, `ADMIN` |
 | `POST /api/tasks/*/photos` | `DRIVER`, `SALES`, `TECH`, `ADMIN` |
 | `POST/PUT/PATCH/DELETE /api/**` | `OFFICE` |
-| `GET /api/**` (any verb not above) | authenticated |
+| `/api/**` (anything left — the reads) | authenticated |
+| `/error` | permitted |
 | everything else | `denyAll()` |
 
 The two driver rows work **only** because they sit above the
@@ -50,6 +59,7 @@ catch-all is dead code that reads as if it works.
 So:
 
 - A write that office staff perform → **nothing to add**, the catch-all covers it.
+- A read for any authenticated employee → **nothing to add**.
 - A write the **driver app** performs → needs its own row, placed **above** the
   catch-alls. There are currently exactly two. A third is a real decision:
   the driver app's write surface is deliberately small.
@@ -107,11 +117,13 @@ Controller-level behaviour goes in `ControllerTests/` as usual.
 
 ### The trap
 
-`@WebMvcTest` slices are **not profiled**, so they see the base default
-`ecotrack.security.enforce=false` rather than the test profile's `true`. A
-`@WebMvcTest` that "proves" your endpoint is guarded proves nothing — the
-matrix is inert in that slice. Security assertions belong in the
-`@SpringBootTest` classes above, which run the real chain.
+A `@WebMvcTest` slice cannot prove anything about auth, for three separate
+reasons at once: it does **not** pick up the app's own `SecurityConfig`, the
+slices in `ControllerTests/` run `@AutoConfigureMockMvc(addFilters = false)`, and
+`TaskAccessPolicy` is a `@MockitoBean` there whose void guards no-op. A green
+controller slice says the wiring works and nothing about who may call it.
+Security assertions belong in the `@SpringBootTest` classes above, which run the
+real chain.
 
 ## Before you finish
 

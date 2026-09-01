@@ -848,4 +848,3 @@ export const MOCK_AUTO_LOGIN = {
   username: EMPLOYEE_SEED[0]!.username,
   password: MOCK_PASSWORD,
 };
-

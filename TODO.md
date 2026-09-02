@@ -27,11 +27,11 @@ unless its status says otherwise.
 **Status legend:** `[ ]` not started · `[~]` in progress · `[DONE]` done ·
 `[POSTPONED]` deliberately deferred · `[?]` needs a decision first
 
-**Next free ID: TODO-69.** (Highest used is TODO-68.)
+**Next free ID: TODO-71.** (Highest used is TODO-70.)
 
 ---
 
-## Still open — 23 of 68
+## Still open — 24 of 70
 
 The whole of what is left, in one place. Everything not listed here is `[DONE]`.
 
@@ -58,6 +58,7 @@ The whole of what is left, in one place. Everything not listed here is `[DONE]`.
 - **TODO-66** `[ ]` — The map tiles stay light in dark mode *(J)*
 - **TODO-67** `[ ]` — Confirm the map's cold-load fix against a live tile server *(J)*
 - **TODO-68** `[ ]` — This machine cannot run the backend suite or the hygiene guards *(G)*
+- **TODO-70** `[ ]` — Orders created before the numbering fix are still `#0` *(J)*
 
 **Done, but flagged by whoever did it** — not open, but not finished-and-forgotten
 either:
@@ -142,6 +143,8 @@ full text lives further down.
 | TODO-66 | **`[ ]`** | J | The map tiles stay light in dark mode |
 | TODO-67 | **`[ ]`** | J | Confirm the map's cold-load fix against a live tile server |
 | TODO-68 | **`[ ]`** | G | This machine cannot run the backend suite or the hygiene guards |
+| TODO-69 | `[DONE]` | J | Three bugs only a live backend could show |
+| TODO-70 | **`[ ]`** | J | Orders created before the numbering fix are still `#0` |
 
 ---
 
@@ -2921,7 +2924,7 @@ smoke test mount `/comenzi` with a smaller seeded dataset; or fix TODO-43, which
 removes the fan-out that makes this screen slow in the first place and is the
 only option that makes the app faster rather than the test looser.
 
-### TODO-68 `[DONE]` Three bugs only a live backend could show
+### TODO-69 `[DONE]` Three bugs only a live backend could show
 The web had never actually been run against the Spring backend — mock mode is
 the default and every test uses it. Booting both and driving the real UI found
 three things at once, none of which any test could have caught.
@@ -2968,8 +2971,8 @@ errors; a client created; an order created and rendered as **#33** with the date
 picked from the calendar. Backend **302 tests**; web typecheck, lint, build and
 **458 tests** green (the one failure is TODO-64's known `/comenzi` timeout).
 
-### TODO-69 `[ ]` Orders created before the numbering fix are still `#0`
-TODO-68 numbers orders from now on. It does not touch rows that already exist,
+### TODO-70 `[ ]` Orders created before the numbering fix are still `#0`
+TODO-69 numbers orders from now on. It does not touch rows that already exist,
 so any database written before it has orders whose `number` is 0 — they all
 render as "#0" on Comenzi and sort arbitrarily under
 `findLiveBySubscriptionId`'s `ORDER BY o.number`.

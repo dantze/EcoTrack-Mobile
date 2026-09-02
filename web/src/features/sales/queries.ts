@@ -14,7 +14,13 @@ import {
   type UseMutationResult,
   type UseQueryResult,
 } from '@tanstack/react-query';
-import { api, type ClientInput, type OrderInput, type SubscriptionUsage } from '@/api';
+import {
+  api,
+  type ClientInput,
+  type OrderInput,
+  type ProductUsage,
+  type SubscriptionUsage,
+} from '@/api';
 import type {
   Client,
   Order,
@@ -32,6 +38,7 @@ export const salesKeys = {
   orderTaskStatuses: (fingerprint: string) =>
     ['orders', 'task-status', fingerprint] as const,
   products: ['products'] as const,
+  productUsage: (id: number) => ['products', id, 'usage'] as const,
   subscriptions: ['subscriptions'] as const,
   activeSubscriptions: ['subscriptions', 'active'] as const,
   subscriptionUsage: (id: number) => ['subscriptions', id, 'usage'] as const,
@@ -331,6 +338,25 @@ export function useUpdateProduct(): UseMutationResult<
       void queryClient.invalidateQueries({ queryKey: salesKeys.products });
     },
   });
+}
+
+/**
+ * One-shot `GET /products/{id}/usage` for the delete guard (TODO-57), the exact
+ * counterpart of `useCheckSubscriptionUsage` — an event handler asks, rather
+ * than every row in the catalogue holding a query it will probably never need.
+ *
+ * `staleTime: 0` for the same reason as the subscription one: a product can be
+ * freed up by finishing its last order in another tab, and a cached "still
+ * blocked" would refuse a delete the server would now allow.
+ */
+export function useCheckProductUsage(): (id: number) => Promise<ProductUsage> {
+  const queryClient = useQueryClient();
+  return (id: number) =>
+    queryClient.fetchQuery({
+      queryKey: salesKeys.productUsage(id),
+      queryFn: () => api.products.usage(id),
+      staleTime: 0,
+    });
 }
 
 export function useDeleteProduct(): UseMutationResult<

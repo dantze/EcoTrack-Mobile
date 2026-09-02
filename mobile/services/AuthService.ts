@@ -2,6 +2,8 @@ import { API_BASE_URL } from '../constants/ApiConfig';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { clearTokens, getRefreshToken, setTokens } from './tokenStore';
 import { clearPendingTicket } from './enrollmentStorage';
+import { apiFetch } from './http';
+import { normalizeUser, rolesEqual, type RawUser, type User } from './userModel';
 
 /**
  * The session this device holds, and what it is allowed to do with it.
@@ -13,13 +15,23 @@ import { clearPendingTicket } from './enrollmentStorage';
  * that already exists.
  */
 
-export interface User {
-    id: number;
-    username: string;
-    fullName: string;
-    phone: string;
-    county: string | null;
-    roles: string[];
+/**
+ * The user shape lives in `userModel.ts` now, with the normaliser that builds
+ * it (TODO-35), and is re-exported so every existing
+ * `import { AuthService, User } from './AuthService'` keeps working.
+ */
+export type { User } from './userModel';
+
+/** What {@link AuthService.syncCurrentUser} reports back. */
+export interface UserSync {
+    /** The employee as the server currently sees them. */
+    user: User;
+    /**
+     * True when the ROLES differ from the copy this device had. The caller
+     * re-routes on this: the menus are drawn from the cached roles, so a change
+     * means what is on screen no longer matches what the backend authorises.
+     */
+    rolesChanged: boolean;
 }
 
 /** What a successful enrollment claim yields: who you are, plus the token pair. */
@@ -47,6 +59,66 @@ export const AuthService = {
             await AsyncStorage.removeItem(ACTIVE_DRIVER_KEY);
         } catch (error) {
             console.error('Error persisting the session:', error);
+        }
+    },
+
+    /**
+     * Re-reads the employee behind this device's token and rewrites the cached
+     * copy (TODO-35).
+     *
+     * <b>The problem it solves.</b> `user.roles` was written once, at claim
+     * time, and never refetched — so an admin promoting or demoting someone in
+     * Angajați changed what the backend authorises but not what the phone
+     * renders. The device kept drawing the old menus until it re-enrolled, and
+     * the mismatch landed on the user as "button does nothing", or a 403.
+     *
+     * Never a privilege leak: authorization always reads the Employee the token
+     * points at, never this copy. What the copy decides is which buttons exist.
+     *
+     * <b>It returns null rather than throwing, and the caller keeps the cache.</b>
+     * A phone in a basement must not be sent back to enrollment because one GET
+     * failed — the refresh token is what proves there is a session, and it is
+     * still there. A token that is genuinely dead takes the other path: the
+     * 401-refresh in `http.ts` fails, tokens are cleared, and the
+     * session-expired hook lands the device on the enrollment screen.
+     *
+     * <b>And it gives up after `timeoutMs`, for the same reason.</b> The boot
+     * gate awaits this before it renders anything, so an unanswered request
+     * would hold a driver on the loading spinner for as long as the platform's
+     * own socket timeout — which is exactly the situation (bad signal, on site)
+     * where they most need the app to just open. The answer is a nicety; the
+     * cached roles are the fallback, and they are what the app used to run on
+     * indefinitely.
+     */
+    syncCurrentUser: async ({ timeoutMs = 6000 } = {}): Promise<UserSync | null> => {
+        const cached = await AuthService.getCurrentUser();
+        const controller = new AbortController();
+        let timer: ReturnType<typeof setTimeout> | undefined;
+
+        try {
+            // Raced rather than left to the signal alone: aborting asks the
+            // platform's fetch to stop, and this guarantees the caller is
+            // unblocked on the deadline whether or not it honours that.
+            const timeout = new Promise<null>((resolve) => {
+                timer = setTimeout(() => {
+                    controller.abort();
+                    resolve(null);
+                }, timeoutMs);
+            });
+            const response = await Promise.race([
+                apiFetch('/auth/me', { signal: controller.signal }),
+                timeout,
+            ]);
+            if (!response || !response.ok) return null;
+
+            const user = normalizeUser((await response.json()) as RawUser);
+            await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(user));
+            return { user, rolesChanged: !rolesEqual(cached?.roles, user.roles) };
+        } catch (error) {
+            console.error('Could not refresh the stored user:', error);
+            return null;
+        } finally {
+            if (timer !== undefined) clearTimeout(timer);
         }
     },
 

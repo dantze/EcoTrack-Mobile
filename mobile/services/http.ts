@@ -30,12 +30,32 @@ let refreshInFlight: Promise<string | null> | null = null;
 
 let onSessionExpired: (() => void) | null = null;
 
+let onSessionRenewed: (() => void) | null = null;
+
 /**
  * Registers what to do when the session is gone for good — refresh itself was
  * rejected, so the user has to log in again. Wired in `app/_layout.tsx`.
  */
 export const setOnSessionExpired = (handler: (() => void) | null): void => {
     onSessionExpired = handler;
+};
+
+/**
+ * Registers what to do after a silent refresh SUCCEEDS (TODO-35).
+ *
+ * The device has just proved its session is still live, which is the natural
+ * moment to re-read who it belongs to: `user.roles` is a cached copy that
+ * decides which menus are drawn, and nothing else ever refetches it between
+ * launches.
+ *
+ * Today a role change also revokes every session that employee holds, so the
+ * usual path is the expired one above. This exists because that guarantee is a
+ * side effect of a different feature (`AdminService.updateEmployee`) and could
+ * be relaxed without anyone noticing this depended on it. Fire-and-forget: the
+ * request that triggered the refresh must not wait on it.
+ */
+export const setOnSessionRenewed = (handler: (() => void) | null): void => {
+    onSessionRenewed = handler;
 };
 
 const withAuthHeader = (init: RequestInit, token: string | null): RequestInit => {
@@ -118,9 +138,17 @@ export const apiFetch = async (
 
     if (response.status !== 401) return response;
 
-    // /auth/** answers 401 to mean "these credentials are wrong" — login and
-    // refresh failures are the caller's to render, not something to retry.
-    if (path.startsWith('/auth/')) return response;
+    // The two /auth endpoints that authenticate with the REFRESH token rather
+    // than the access token. Their 401 means "this credential is wrong", which
+    // no retry can fix, and the caller renders it.
+    //
+    // Deliberately NOT all of /auth/**, which is what this said until TODO-35.
+    // GET /auth/me is an ordinary bearer read, and the boot gate calls it on
+    // every launch — where the stored access token is almost always older than
+    // its 30-minute life. Blanket-excluding /auth/** meant that call 401'd and
+    // gave up before the refresh it was entitled to, so the roles it exists to
+    // re-read were never re-read.
+    if (path === '/auth/refresh' || path === '/auth/logout') return response;
 
     // Nothing to refresh with: the app is running token-less against a backend
     // that is not enforcing, and this 401 came from somewhere else.
@@ -132,6 +160,10 @@ export const apiFetch = async (
         onSessionExpired?.();
         return response;
     }
+
+    // Not awaited, and never for /auth/me itself — that request IS the hook's
+    // work, and letting it re-trigger the hook would be a loop.
+    if (path !== '/auth/me') onSessionRenewed?.();
 
     return fetch(url, withAuthHeader(init, newAccessToken));
 };

@@ -1,7 +1,10 @@
 package com.example.damiProd.RepositoryTests;
 
+import com.example.damiProd.domain.AmplasareOrder;
 import com.example.damiProd.domain.Company;
 import com.example.damiProd.domain.IgienizareOrder;
+import com.example.damiProd.domain.Order;
+import com.example.damiProd.domain.Product;
 import com.example.damiProd.domain.Subscription;
 import com.example.damiProd.domain.SubscriptionType;
 import com.example.damiProd.domain.Task;
@@ -37,6 +40,11 @@ import static org.assertj.core.api.Assertions.assertThat;
  * <ul>
  *   <li>{@code OrderRepository.findLiveBySubscriptionId} — JPQL, refuses to
  *       retire a subscription while an unfinished order points at it</li>
+ *   <li>{@code OrderRepository.countLiveByProductId} and its listed twin
+ *       {@code findLiveByProductId} — the same refusal for a product, and the
+ *       dialog that explains it (TODO-57). Two queries, one predicate: they are
+ *       run against every case here so the dialog can never name a different set
+ *       of orders from the one the refusal counted</li>
  *   <li>{@link TaskService#summariseOrderTasks} — what
  *       {@code GET /api/tasks/order/{id}/exists} reports</li>
  *   <li>{@code isOrderFulfilled} in the web app — the Curente / Arhivă split</li>
@@ -92,12 +100,18 @@ class FulfilmentRuleTest {
         }
 
         // A plan of its own per case: these run in one shared transaction, so a
-        // shared subscription would let one case's orders answer another's.
+        // shared subscription would let one case's orders answer another's. The
+        // product below is per-case for the same reason.
         Subscription plan = em.persist(subscription());
         IgienizareOrder order = em.persist(order(plan));
+        Product product = em.persist(product());
+        AmplasareOrder placement = em.persist(placement(product));
         List<Task> tasks = new ArrayList<>();
         for (TaskStatus status : statuses) {
-            tasks.add(em.persist(task(order, status)));
+            tasks.add(em.persist(task(order, TaskType.SANITIZATION, status)));
+            // The placement gets the SAME statuses, so the product rule is
+            // driven by the same case rather than by a second fixture.
+            em.persist(task(placement, TaskType.PLACEMENT, status));
         }
         em.flush();
 
@@ -122,7 +136,21 @@ class FulfilmentRuleTest {
                 .extracting(IgienizareOrder::getId)
                 .containsExactlyElementsOf(fulfilled ? List.of() : List.of(order.getId()));
 
-        // 3. The two must say the same thing about the same order — which is the
+        // 3. The product half of the same rule (TODO-38), and its listed form
+        //    (TODO-57). The count is what refuses a product delete; the list is
+        //    what the dialog names. They must agree with each other AND with the
+        //    subscription answer above, or a refusal counting three orders opens
+        //    a dialog showing two.
+        assertThat(orderRepository.countLiveByProductId(product.getId()))
+                .as("countLiveByProductId must %s this placement",
+                        fulfilled ? "release" : "still block on")
+                .isEqualTo(fulfilled ? 0 : 1);
+        assertThat(orderRepository.findLiveByProductId(product.getId()))
+                .as("findLiveByProductId lists exactly what countLiveByProductId counts")
+                .extracting(Order::getId)
+                .containsExactlyElementsOf(fulfilled ? List.of() : List.of(placement.getId()));
+
+        // 4. The two must say the same thing about the same order — which is the
         //    whole point of the fixture, and what drifted in TODO-34.
         boolean fulfilledPerSummary = summary
                 .map(task -> task.getStatus() == TaskStatus.COMPLETED)
@@ -142,6 +170,25 @@ class FulfilmentRuleTest {
         return plan;
     }
 
+    private Product product() {
+        return new Product("Toaletă Standard", "Standard", 450.0);
+    }
+
+    /**
+     * The product side's equivalent of {@link #order}: an Amplasare carrying the
+     * product, so the same case exercises both deletion guards.
+     */
+    private AmplasareOrder placement(Product product) {
+        AmplasareOrder placement = new AmplasareOrder();
+        placement.setOrderType("Amplasari");
+        placement.setDate(new Date());
+        placement.setClient(acme);
+        placement.setProduct(product);
+        placement.setQuantity(2);
+        placement.setStartDate("2026-03-04");
+        return placement;
+    }
+
     private IgienizareOrder order(Subscription plan) {
         IgienizareOrder order = new IgienizareOrder();
         order.setOrderType("Igienizari");
@@ -156,8 +203,8 @@ class FulfilmentRuleTest {
      * Scheduled time is left null on every task, deliberately: the fixture's
      * expected summary must follow from the statuses alone, never from a date.
      */
-    private Task task(IgienizareOrder order, TaskStatus status) {
-        Task task = new Task(TaskType.SANITIZATION, null, "Str. Exemplu 5, Cluj", "Acme SRL");
+    private Task task(Order order, TaskType type, TaskStatus status) {
+        Task task = new Task(type, null, "Str. Exemplu 5, Cluj", "Acme SRL");
         task.setStatus(status);
         task.setOrder(order);
         return task;

@@ -16,6 +16,15 @@ import { AppColors } from '../constants/Colors';
  *
  * The refresh token is what proves there is a session — the access token
  * expires every 30 minutes and `apiFetch` renews it silently.
+ *
+ * It is also where the cached user is brought back up to date (TODO-35). The
+ * stored `user.roles` decides which menus this device draws, and it used to be
+ * written once, at claim time, and never again — so an admin changing someone's
+ * role in Angajați left the phone rendering menus the backend would refuse. The
+ * gate now re-reads the employee from `GET /api/auth/me` and routes on THAT,
+ * falling back to the cached copy when the call cannot be made: a phone with no
+ * signal must not be sent back to enrollment, and the refresh token still says
+ * the session is good.
  */
 
 type Gate = { kind: 'loading' } | { kind: 'redirect'; href: string };
@@ -28,16 +37,22 @@ export default function Index() {
 
         (async () => {
             try {
-                const [hasSession, user] = await Promise.all([
+                const [hasSession, cached] = await Promise.all([
                     AuthService.hasStoredSession(),
                     AuthService.getCurrentUser(),
                 ]);
                 if (!active) return;
 
-                if (!hasSession || !user) {
+                if (!hasSession || !cached) {
                     setGate({ kind: 'redirect', href: '/enrollment' });
                     return;
                 }
+
+                // Fresh roles win; a failed call leaves the cached ones, which
+                // are still the roles this device was last told it had.
+                const synced = await AuthService.syncCurrentUser();
+                if (!active) return;
+                const user = synced?.user ?? cached;
 
                 const destination = destinationForRoles(user.roles);
                 if (destination.kind === 'screen') {

@@ -36,6 +36,7 @@ import type {
   EcoTrackApi,
   OrderInput,
   OrderTaskStatus,
+  ProductUsage,
   SessionDevice,
   SubscriptionUsage,
 } from '@/api/contract';
@@ -74,10 +75,12 @@ import {
   placeOnRoute,
   tasksOfRoute,
   type AccessRequestRow,
+  type AmplasareRow,
   type AuthSessionRow,
   type CredentialRow,
   type OrderRow,
   type RecurringRow,
+  type RidicareRow,
   type TaskRow,
 } from './store';
 
@@ -532,6 +535,40 @@ const ordersApi: EcoTrackApi['orders'] = {
 // Products
 // ---------------------------------------------------------------------------
 
+/**
+ * Mirrors OrderRepository.findLiveByProductId — the listed form of the count
+ * the delete below refuses on (TODO-57).
+ *
+ * "Live" is the same strict rule as everywhere else: an order counts until it
+ * has a COMPLETED task. Only the two order types that CARRY a product are
+ * looked at; an Igienizare carries a subscription instead.
+ */
+function productUsage(productId: number): ProductUsage {
+  const orders = db.orders
+    .filter(
+      (order): order is AmplasareRow | RidicareRow =>
+        (order.orderType === 'Amplasari' || order.orderType === 'Ridicari') &&
+        order.productId === productId,
+    )
+    .filter(
+      (order) =>
+        !db.tasks.some((task) => task.orderId === order.id && task.status === 'COMPLETED'),
+    )
+    .sort((left, right) => left.number - right.number)
+    .map((order) => ({
+      id: order.id,
+      number: order.number,
+      clientName: displayNameForClient(order.clientId),
+      orderType: order.orderType,
+      // The order's primary date and quantity, which the two subtypes keep
+      // under different names — same mapping as ProductUsageResponse.
+      date: order.orderType === 'Amplasari' ? order.startDate : order.pickupDate,
+      quantity: order.orderType === 'Amplasari' ? order.quantity : order.pickupQuantity,
+    }));
+
+  return { blocked: orders.length > 0, orders };
+}
+
 const productsApi: EcoTrackApi['products'] = {
   // Active only, like GET /api/products. A retired product must vanish from
   // every picker while staying resolvable on the orders that already use it.
@@ -558,6 +595,13 @@ const productsApi: EcoTrackApi['products'] = {
       return { ...updated };
     }),
 
+  usage: (id) =>
+    respond(() => {
+      const product = db.products.find((entry) => entry.id === id);
+      if (!product) notFound('Product', id);
+      return productUsage(id);
+    }),
+
   remove: (id) =>
     respond(() => {
       const product = db.products.find((entry) => entry.id === id);
@@ -567,12 +611,12 @@ const productsApi: EcoTrackApi['products'] = {
       // block, because the delete is soft and a finished order keeps resolving
       // through the surviving row. "Unfinished" is the strict definition — no
       // COMPLETED task — not a date comparison.
-      const live = db.orders.filter(
-        (order) =>
-          order.orderType !== 'Igienizari' &&
-          order.productId === id &&
-          !db.tasks.some((task) => task.orderId === order.id && task.status === 'COMPLETED'),
-      ).length;
+      //
+      // Counted off `productUsage` rather than re-filtered here, for the same
+      // reason the backend's count and list share one predicate: the dialog
+      // must never name a different set of orders from the one this refusal
+      // counted.
+      const live = productUsage(id).orders.length;
 
       if (live > 0) {
         const noun =

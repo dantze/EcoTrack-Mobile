@@ -27,11 +27,11 @@ unless its status says otherwise.
 **Status legend:** `[ ]` not started · `[~]` in progress · `[DONE]` done ·
 `[POSTPONED]` deliberately deferred · `[?]` needs a decision first
 
-**Next free ID: TODO-64.** (Highest used is TODO-63.)
+**Next free ID: TODO-69.** (Highest used is TODO-68.)
 
 ---
 
-## Still open — 20 of 63
+## Still open — 23 of 68
 
 The whole of what is left, in one place. Everything not listed here is `[DONE]`.
 
@@ -39,7 +39,6 @@ The whole of what is left, in one place. Everything not listed here is `[DONE]`.
 - **TODO-31** `[ ]` — The backend test suite shares one database across classes *(J)*
 - **TODO-32** `[ ]` — Deploy fails at the SSH step — the VPS is unreachable *(G)*
 - **TODO-33** `[ ]` — Make the web app responsive, and move Sales + Technical out of mobile *(H)*
-- **TODO-35** `[ ]` — Role changes on the web never reach the phone *(H)*
 - **TODO-45** `[ ]` — Drop `individual.id_photo_url` once every environment is drained *(E)*
 - **TODO-48** `[ ]` — `bootNavigation.test.tsx` fails on Node 24 *(G)*
 - **TODO-50** `[ ]` — Nothing checks that the index at the top of TODO.md is true *(G)*
@@ -48,13 +47,17 @@ The whole of what is left, in one place. Everything not listed here is `[DONE]`.
 - **TODO-54** `[ ]` — The live production build still ships the mock seed database *(G)*
 - **TODO-55** `[ ]` — The bundle budget measures the mock build, not the deployed one *(G)*
 - **TODO-56** `[ ]` — An admin cannot revoke another employee's session *(A)*
-- **TODO-57** `[ ]` — Produse has no "what is still using it" dialog *(D)*
 - **TODO-58** `[ ]` — The UI rebuild stopped short on four surfaces *(J)*
 - **TODO-59** `[ ]` — The eager bundle grew from ~125 kB to ~260 kB gzip *(J)*
 - **TODO-60** `[ ]` — Mantine's full stylesheet ships for four components *(J)*
 - **TODO-61** `[ ]` — The legacy `brand-*` ramp has no dark values *(J)*
 - **TODO-62** `[ ]` — `PageHeader` and `CommandBar` are two components for one job *(J)*
 - **TODO-63** `[ ]` — The dispatch board is still drag-and-drop only *(J)*
+- **TODO-64** `[ ]` — Two `/comenzi` tests time out under the full web suite *(J)*
+- **TODO-65** `[ ]` — `web/`'s dependencies were declared but never installed *(J)*
+- **TODO-66** `[ ]` — The map tiles stay light in dark mode *(J)*
+- **TODO-67** `[ ]` — Confirm the map's cold-load fix against a live tile server *(J)*
+- **TODO-68** `[ ]` — This machine cannot run the backend suite or the hygiene guards *(G)*
 
 **Done, but flagged by whoever did it** — not open, but not finished-and-forgotten
 either:
@@ -105,7 +108,7 @@ full text lives further down.
 | TODO-32 | **`[ ]`** | G | Deploy fails at the SSH step — the VPS is unreachable |
 | TODO-33 | **`[ ]`** | H | Make the web app responsive, and move Sales + Technical out of mobile |
 | TODO-34 | `[DONE]` | C | `/tasks/order/{id}/exists` returns one task, but the guard rolls up all of them |
-| TODO-35 | **`[ ]`** | H | Role changes on the web never reach the phone |
+| TODO-35 | `[DONE]` | H | Role changes on the web never reach the phone |
 | TODO-36 | `[DONE]` | A | First-run setup code is only printed to the server log |
 | TODO-37 | `[DONE]` | D | Bulk-move orders between subscriptions |
 | TODO-38 | `[DONE]` | D | Produse deletion: hard delete, incomplete check, its own error format |
@@ -127,7 +130,18 @@ full text lives further down.
 | TODO-54 | **`[ ]`** | G | The live production build still ships the mock seed database |
 | TODO-55 | **`[ ]`** | G | The bundle budget measures the mock build, not the deployed one |
 | TODO-56 | **`[ ]`** | A | An admin cannot revoke another employee's session |
-| TODO-57 | **`[ ]`** | D | Produse has no "what is still using it" dialog |
+| TODO-57 | `[DONE]` | D | Produse has no "what is still using it" dialog |
+| TODO-58 | **`[ ]`** | J | The UI rebuild stopped short on four surfaces |
+| TODO-59 | **`[ ]`** | J | The eager bundle grew from ~125 kB to ~260 kB gzip |
+| TODO-60 | **`[ ]`** | J | Mantine's full stylesheet ships for four components |
+| TODO-61 | **`[ ]`** | J | The legacy `brand-*` ramp has no dark values |
+| TODO-62 | **`[ ]`** | J | `PageHeader` and `CommandBar` are two components for one job |
+| TODO-63 | **`[ ]`** | J | The dispatch board is still drag-and-drop only |
+| TODO-64 | **`[ ]`** | J | Two `/comenzi` tests time out under the full web suite |
+| TODO-65 | **`[ ]`** | J | `web/`'s dependencies were declared but never installed |
+| TODO-66 | **`[ ]`** | J | The map tiles stay light in dark mode |
+| TODO-67 | **`[ ]`** | J | Confirm the map's cold-load fix against a live tile server |
+| TODO-68 | **`[ ]`** | G | This machine cannot run the backend suite or the hygiene guards |
 
 ---
 
@@ -1325,7 +1339,7 @@ The web mock enforces the new rule with the same Romanian text, and
 that a COMPLETED task releases the product, and that a retired product leaves
 `list()` but stays in `listAll()`.
 
-### TODO-57 `[ ]` Produse has no "what is still using it" dialog
+### TODO-57 `[DONE]` Produse has no "what is still using it" dialog
 Found while doing TODO-38. Retiring a product is now refused the same way
 retiring a subscription is, but the two refusals are not equally useful.
 
@@ -1345,6 +1359,48 @@ parameterised over both, since the two would otherwise be the same JSX twice.
 The bulk move from TODO-37 has **no** product equivalent and probably should not:
 moving an order to a different product changes what is physically delivered,
 which is a real decision per order, not a bulk one. Say so if this is picked up.
+
+**Done, and the bulk move was left out for exactly that reason** — said in the
+code, in `ProductUsageModal`'s header, so the next person does not read its
+absence as an oversight.
+
+Backend: `ProductUsageResponse`, `OrderRepository.findLiveByProductId` and
+`GET /api/products/{id}/usage`, mirroring the subscription trio. No SecurityConfig
+row — it is a GET under `/api/**`, which the matrix already limits to
+authenticated employees, and it exposes nothing a driver could not already read
+from `GET /api/orders`.
+
+**The list and the count are one predicate, written twice.** `findLiveByProductId`
+is `countLiveByProductId` with the rows kept: the count is what refuses the
+delete, the list is what the dialog names. Drift between them would show as a
+refusal counting three orders opening a dialog that lists two, so
+`FulfilmentRuleTest` now runs BOTH against every case in
+`shared/fulfilment-cases.json` — each case grows an Amplasare on a product of its
+own, carrying the same task statuses as the Igienizare it already had. That also
+closes a real hole in the fixture: the product half of the fulfilment rule
+(TODO-38) had no golden-case coverage at all.
+
+Web: one component parameterised over both, as the item guessed, but split where
+the two dialogs actually differ rather than by a flag. `UsageModal.tsx` holds the
+shell and the linked list of blocking orders; `SubscriptionUsageModal` keeps the
+bulk move and the recurring plans, `ProductUsageModal` adds the type/date/quantity
+label a product needs. Parameterising the subscription-only parts in would have
+made the shared component a switch over which caller it had, which is worse than
+the duplication it removes.
+
+`ProductsPage` now preflights the usage call before offering the confirm and
+re-asks on a 409, the same flow Abonamente uses — the DELETE stays the guard.
+The mock enforces the identical rule and counts its refusal off the same
+`productUsage()` helper the dialog reads, so mock and live cannot disagree about
+which orders block.
+
+**Mobile got nothing**, deliberately: it has no subscription usage dialog either,
+so adding a product one would break the parity rather than complete it. If Produse
+ever gains one there, both should arrive together.
+
+A stale comment was fixed in passing: `OrderRepository`'s "Deletion guards" header
+still described the product delete as HARD and the two rules as different, which
+TODO-38 made untrue.
 
 ### TODO-39 `[DONE]` Check-then-act on subscription retirement is unserialized
 Narrower than the repo-wide "no optimistic locking" gap in *Known gaps*, and
@@ -2172,6 +2228,14 @@ checks against — the same class of Windows/runtime-specific breakage as TODO-3
 and TODO-44. Needs deciding whether to pin the Node version CI and developers
 use, or to give this test a jsdom-compatible fetch.
 
+**Bigger than one test, and worth knowing before the next person counts
+failures.** Found again while doing TODO-57 (Node 24.20.0): the same error takes
+down `src/routes/__tests__/screensSmoke.test.tsx` as well, all ten of its cases,
+because it also boots the real router. So `npm run test:run` reports **11 failed
+across 2 files**, not one — re-verified from a clean stash at HEAD on 2026-09-02,
+where it fails identically. Every other web test file passes. The fix is the
+same single decision; only the blast radius was understated.
+
 ### TODO-49 `[DONE]` CLAUDE.md's Known gaps still says mobile cannot authenticate
 ``Known gaps`` opens with "**The mobile app cannot authenticate.** It still posts
 to the deleted `/api/auth/login` and has no enrollment screens (TODO-19)." The
@@ -2280,6 +2344,56 @@ would miss.
 *Related:* TODO-40, which made the same argument for the three cross-cutting
 guards that already run there.
 
+**It had already drifted, in all three places at once, which settles the
+argument.** Doing TODO-35/57 on 2026-09-02 found:
+
+- the *Index* table ended at **TODO-57** — rows for TODO-58 through TODO-67 were
+  never added, ten items;
+- the *Still open* list ended at **TODO-63**, missing the four open items above
+  it;
+- **"Next free ID: TODO-64" was wrong** — TODO-64 through TODO-67 already
+  existed, written by the UI and map passes. Trusting that line would have
+  created a SECOND TODO-64, which is the one mistake this file cannot absorb,
+  since an ID is a permanent name. It nearly did: the new item below was written
+  as TODO-64 and renumbered to TODO-68 on discovering the clash.
+
+All three repaired by hand in the same pass. Note what the drift was NOT: nobody
+failed to write their item down. Every one of the ten is present, in its section,
+with its full text. Only the three hand-maintained summaries were missed — which
+is the argument for checking them mechanically rather than for trying harder.
+
+### TODO-68 `[ ]` This machine cannot run the backend suite or the hygiene guards
+Found while doing TODO-35/57, and recorded because it puts an asterisk on "the
+tests pass" for every backend change made here.
+
+**No JDK 17+.** `java -version` is 1.8.0_503 and it is the only JVM installed, so
+`./gradlew` cannot even configure the project: *"Could not resolve
+org.springframework.boot:spring-boot-gradle-plugin:3.5.7 … requires at least JVM
+runtime version 17. This build uses a Java 8 JVM."* The `java { toolchain {
+languageVersion = 21 } }` block in `build.gradle` does not help — a toolchain
+decides which JDK COMPILES, after Gradle has already started on the one it was
+launched with, and `settings.gradle` applies no foojay resolver, so nothing is
+auto-provisioned either. No Docker to borrow a JDK from.
+
+**No `python3`.** The path resolves to the Microsoft Store alias stub, which
+prints an install prompt and exits non-zero. That is the interpreter for all four
+checks the `verify` skill calls mandatory-on-every-PR — `repo_hygiene.py`,
+`cross_project_invariants.py`, `doc_claims.py`, `dead_config.py` — plus
+`bundle_budget.py`.
+
+So of the documented verification, `web` and `mobile` (lint, typecheck, tests,
+build) run here and **the backend suite and every hygiene guard do not**. Backend
+changes are currently verified by review and by CI, which is where TODO-35/57's
+Java changes were left.
+
+Needs deciding, and it is one decision about the developer environment rather
+than a code change: install a JDK 21 and a Python 3 on this machine (`winget` is
+available), or add the foojay toolchain resolver to `settings.gradle` so Gradle
+provisions its own JDK — that second one is a repo change and would still need a
+Gradle-capable JVM to launch, so it only helps machines that have 17+ but not 21.
+The Python half has no repo-side workaround short of rewriting five guard scripts
+in Node.
+
 ---
 
 ## H. Mobile
@@ -2353,7 +2467,7 @@ truth). One implementation is simpler, and the web one is more complete.
 - Do the responsive work **before** deleting the mobile screens, so office staff
   are never left without a usable phone surface.
 
-### TODO-35 `[ ]` Role changes on the web never reach the phone
+### TODO-35 `[DONE]` Role changes on the web never reach the phone
 The mobile app stores `user.roles` at claim time and never refetches. An admin
 promoting or demoting someone in **Angajați** changes what the backend
 authorizes but not what the phone renders: the device keeps showing the old
@@ -2390,6 +2504,51 @@ rests on "a role change always revokes sessions", which is a side effect of a
 different feature and could be relaxed without anyone noticing this depended on
 it. Deferred by the owner pending TODO-33, which may move Sales and Technical
 out of mobile entirely and change what the cached roles are even for.
+
+**Done — and it stays worth having even if TODO-33 deletes the Sales and
+Technical screens**, because the boot gate routes on those roles no matter how
+many screens are left to route to.
+
+`AuthService.syncCurrentUser()` re-reads the employee from `GET /api/auth/me`
+and rewrites the cached copy, reporting whether the ROLE SET changed. Two callers:
+
+- **`app/index.tsx`, the boot gate** — routes on the fresh answer, so a restart
+  is enough to pick up a role change.
+- **`setOnSessionRenewed` in `services/http.ts`** — a new hook fired after each
+  successful silent refresh, wired in `app/_layout.tsx`. On a real role change it
+  alerts and sends the device back through the gate; on no change it does
+  nothing, because re-routing every 30 minutes would throw away whatever screen
+  the user was on for nothing. This is the half that survives the guarantee being
+  relaxed: it does not depend on a role change revoking sessions.
+
+**A failed call keeps the cached roles** and returns null. A phone with no signal
+still holds a valid refresh token, and treating one lost packet as "signed out"
+would be a worse bug than the one being fixed. A token that is genuinely dead
+still takes the existing path: the 401-refresh fails, `onSessionExpired` fires,
+the device lands on enrollment.
+
+**One thing had to move for this to work at all.** `apiFetch` returned early on a
+401 from anything under `/auth/**` — "these credentials are wrong, the caller
+renders it". That is true of `/auth/refresh` and `/auth/logout`, which
+authenticate with the refresh token, and false of `GET /auth/me`, which is an
+ordinary bearer read. At launch the stored access token is nearly always past its
+30-minute life, so under the blanket rule the boot-gate sync 401'd and gave up
+**every single time** — the fix would have shipped looking correct and doing
+nothing. The check now names the two endpoints instead of the prefix, and
+`services/__tests__/http.test.ts` pins it.
+
+Also deduplicated on the way through: the user normaliser existed twice, in
+`EnrollmentService` and (about to be) in `AuthService`. It now lives once in
+`services/userModel.ts` with `rolesEqual`, both dependency-free so the node
+Vitest project runs them with no mocking. Two normalisers would have let the
+roles stored at claim time and the roles stored on a refresh differ in case
+alone, which `roleRouting` reads as different roles.
+
+Covered by `services/__tests__/AuthService.test.ts` (rewrites the copy, uppercases,
+no false "changed" on reordered roles, keeps the cache on failure) and
+`services/__tests__/http.test.ts` (which 401s retry, and that `/auth/me` does not
+re-trigger its own hook). The residual gap — a phone idle on a menu still shows
+the old one until its next request — is recorded in CLAUDE.md's *Known gaps*.
 
 ---
 

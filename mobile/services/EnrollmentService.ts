@@ -1,5 +1,6 @@
 import { apiFetch } from './http';
-import { AuthService, AuthSession, User } from './AuthService';
+import { AuthService, AuthSession } from './AuthService';
+import { normalizeUser } from './userModel';
 import {
     clearPendingTicket,
     getDeviceId,
@@ -95,23 +96,12 @@ const messageFrom = async (response: Response, fallback: string): Promise<string
     }
 };
 
-interface RawClaimUser {
-    id?: number;
-    username?: string;
-    fullName?: string;
-    phone?: string | null;
-    county?: string | null;
-    roles?: string[] | null;
-}
-
-const normalizeUser = (raw: RawClaimUser): User => ({
-    id: raw.id ?? 0,
-    username: raw.username ?? '',
-    fullName: raw.fullName ?? '',
-    phone: raw.phone ?? '',
-    county: raw.county ?? null,
-    roles: Array.isArray(raw.roles) ? raw.roles.map((role) => role.toUpperCase()) : [],
-});
+// The user normaliser used to live here. It moved to `userModel.ts` (TODO-35)
+// when `AuthService.syncCurrentUser` started reading the same employee off
+// GET /api/auth/me: two copies would let the roles stored at claim time and the
+// roles stored on a later refresh differ in case alone, and `roleRouting` would
+// then send the same person to different screens depending on which write was
+// last.
 
 // ------------------------------------------------------------------ the API
 

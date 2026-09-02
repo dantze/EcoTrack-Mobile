@@ -1,6 +1,12 @@
 package com.example.damiProd.ServiceTests;
 
+import com.example.damiProd.domain.AmplasareOrder;
+import com.example.damiProd.domain.Company;
+import com.example.damiProd.domain.Individual;
+import com.example.damiProd.domain.Order;
 import com.example.damiProd.domain.Product;
+import com.example.damiProd.domain.RidicareOrder;
+import com.example.damiProd.dto.ProductUsageResponse;
 import com.example.damiProd.exception.ResourceNotFoundException;
 import com.example.damiProd.repository.OrderRepository;
 import com.example.damiProd.repository.ProductRepository;
@@ -162,6 +168,114 @@ class ProductServiceTest {
         legacy.setIsActive(null);
 
         assertThat(legacy.isRetired()).isFalse();
+    }
+
+    // -----------------------------------------------------------------------
+    // TEST 6 — usage(): the blockers behind the refusal (TODO-57)
+    // -----------------------------------------------------------------------
+    /**
+     * The delete's message counts; this names. They read the SAME predicate -
+     * countLiveByProductId and findLiveByProductId - so the dialog can never
+     * list a different set of orders from the one the refusal counted. What is
+     * tested here is the mapping on top of it: the two subtypes keep their date
+     * and their quantity under different field names, and getting that wrong
+     * shows an empty date on every pickup.
+     */
+    @Test
+    void usage_shouldReportNotBlockedWhenNothingLiveUsesTheProduct() {
+        when(productRepository.findById(1L)).thenReturn(Optional.of(cabin()));
+        when(orderRepository.findLiveByProductId(1L)).thenReturn(List.of());
+        // List.<Order>of(...) elsewhere in this class: List.of(anAmplasareOrder)
+        // infers List<AmplasareOrder>, which is not a List<Order>.
+
+        ProductUsageResponse usage = productService.usage(1L);
+
+        assertThat(usage.blocked()).isFalse();
+        assertThat(usage.orders()).isEmpty();
+    }
+
+    @Test
+    void usage_shouldNameAPlacementWithItsStartDateAndQuantity() {
+        AmplasareOrder order = new AmplasareOrder();
+        order.setId(9L);
+        order.setNumber(41L);
+        order.setOrderType("Amplasari");
+        order.setClient(new Company("office@acme.ro", "0311", "Bd. Firmei 20",
+                "Acme SRL", "RO12345678", "Maria"));
+        order.setStartDate("2026-09-14");
+        order.setQuantity(3);
+
+        when(productRepository.findById(1L)).thenReturn(Optional.of(cabin()));
+        when(orderRepository.findLiveByProductId(1L)).thenReturn(List.<Order>of(order));
+
+        ProductUsageResponse usage = productService.usage(1L);
+
+        assertThat(usage.blocked()).isTrue();
+        assertThat(usage.orders()).singleElement().satisfies(blocking -> {
+            assertThat(blocking.id()).isEqualTo(9L);
+            assertThat(blocking.number()).isEqualTo(41L);
+            assertThat(blocking.clientName()).isEqualTo("Acme SRL");
+            assertThat(blocking.orderType()).isEqualTo("Amplasari");
+            assertThat(blocking.date()).isEqualTo("2026-09-14");
+            assertThat(blocking.quantity()).isEqualTo(3);
+        });
+    }
+
+    /**
+     * A pickup carries the same two facts under pickupDate / pickupQuantity.
+     * Reading only the placement's fields is how Ridicari were missed once
+     * already, in the guard this dialog explains.
+     */
+    @Test
+    void usage_shouldNameAPickupWithItsOwnDateAndQuantityFields() {
+        RidicareOrder order = new RidicareOrder();
+        order.setId(10L);
+        order.setNumber(42L);
+        order.setOrderType("Ridicari");
+        order.setClient(new Individual("ana@pop.ro", "0722", "Str. Exemplu 5",
+                "Ana Pop", "2900101123456"));
+        order.setPickupDate("2026-10-02");
+        order.setPickupQuantity(2);
+
+        when(productRepository.findById(1L)).thenReturn(Optional.of(cabin()));
+        when(orderRepository.findLiveByProductId(1L)).thenReturn(List.<Order>of(order));
+
+        assertThat(productService.usage(1L).orders()).singleElement().satisfies(blocking -> {
+            assertThat(blocking.clientName()).isEqualTo("Ana Pop");
+            assertThat(blocking.orderType()).isEqualTo("Ridicari");
+            assertThat(blocking.date()).isEqualTo("2026-10-02");
+            assertThat(blocking.quantity()).isEqualTo(2);
+        });
+    }
+
+    /**
+     * "Nothing uses it" and "there is no such product" must not look the same:
+     * an empty answer for an unknown id would invite a delete of nothing.
+     */
+    @Test
+    void usage_shouldThrowWhenTheProductDoesNotExist() {
+        when(productRepository.findById(9L)).thenReturn(Optional.empty());
+
+        assertThatThrownBy(() -> productService.usage(9L))
+                .isInstanceOf(ResourceNotFoundException.class);
+
+        verify(orderRepository, never()).findLiveByProductId(any());
+    }
+
+    /** A client that is neither subtype still has to be identifiable. */
+    @Test
+    void usage_shouldFallBackToTheClientIdWhenTheNameCannotBeResolved() {
+        AmplasareOrder order = new AmplasareOrder();
+        order.setId(11L);
+        order.setOrderType("Amplasari");
+        order.setClient(null);
+
+        when(productRepository.findById(1L)).thenReturn(Optional.of(cabin()));
+        when(orderRepository.findLiveByProductId(1L)).thenReturn(List.<Order>of(order));
+
+        assertThat(productService.usage(1L).orders()).singleElement()
+                .extracting(ProductUsageResponse.BlockingOrder::clientName)
+                .isEqualTo("—");
     }
 
     // -----------------------------------------------------------------------

@@ -2,6 +2,8 @@ package com.example.damiProd.ControllerTests;
 
 import com.example.damiProd.controller.ProductController;
 import com.example.damiProd.domain.Product;
+import com.example.damiProd.dto.ProductUsageResponse;
+import com.example.damiProd.exception.ResourceNotFoundException;
 import com.example.damiProd.service.ProductService;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -138,5 +140,57 @@ class ProductControllerTest {
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.message").value(refusal))
                 .andExpect(jsonPath("$.error").value("Conflict"));
+    }
+
+    // -----------------------------------------------------------------------
+    // TEST 6 — GET /api/products/{id}/usage → the blockers behind that refusal
+    // -----------------------------------------------------------------------
+    /**
+     * The counted refusal above is not answerable on its own (TODO-57): the
+     * operator's next question is always WHICH orders. This is the endpoint that
+     * answers it, and the fields asserted here are exactly the ones the dialog
+     * renders — number, client, type, date — so a row can be labelled and linked
+     * without a second call.
+     */
+    @Test
+    void usage_shouldNameTheBlockingOrders() throws Exception {
+        when(productService.usage(1L)).thenReturn(new ProductUsageResponse(true, List.of(
+                new ProductUsageResponse.BlockingOrder(9L, 41L, "Acme SRL", "Amplasari", "2026-09-14", 3),
+                new ProductUsageResponse.BlockingOrder(10L, 42L, "Ana Pop", "Ridicari", null, null))));
+
+        mockMvc.perform(get("/api/products/1/usage"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.blocked").value(true))
+                .andExpect(jsonPath("$.orders[0].id").value(9))
+                .andExpect(jsonPath("$.orders[0].number").value(41))
+                .andExpect(jsonPath("$.orders[0].clientName").value("Acme SRL"))
+                .andExpect(jsonPath("$.orders[0].orderType").value("Amplasari"))
+                .andExpect(jsonPath("$.orders[0].date").value("2026-09-14"))
+                .andExpect(jsonPath("$.orders[0].quantity").value(3))
+                .andExpect(jsonPath("$.orders[1].orderType").value("Ridicari"))
+                .andExpect(jsonPath("$.orders[1].date").doesNotExist());
+    }
+
+    @Test
+    void usage_shouldReturnNotBlockedWhenNothingUsesTheProduct() throws Exception {
+        when(productService.usage(1L)).thenReturn(new ProductUsageResponse(false, List.of()));
+
+        mockMvc.perform(get("/api/products/1/usage"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.blocked").value(false))
+                .andExpect(jsonPath("$.orders").isEmpty());
+    }
+
+    /**
+     * An unknown product is a 404, not an empty answer — "nothing uses it" and
+     * "there is no such product" must not look the same to the dialog.
+     */
+    @Test
+    void usage_shouldReturn404ForAnUnknownProduct() throws Exception {
+        when(productService.usage(9L))
+                .thenThrow(new ResourceNotFoundException("Product not found with id: 9"));
+
+        mockMvc.perform(get("/api/products/9/usage"))
+                .andExpect(status().isNotFound());
     }
 }

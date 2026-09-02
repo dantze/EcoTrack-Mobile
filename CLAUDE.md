@@ -128,6 +128,23 @@ plumbing is shared in spirit across both: `services/tokenStore.ts` holds the
 pair and `services/http.ts` attaches `Authorization` and does a single-flight
 refresh-and-retry on one 401.
 
+**Mobile re-reads its own roles now** (TODO-35). `user.roles` is a cached copy in
+device storage that decides which menus are drawn — it used to be written once,
+at claim time, and never again, so an admin promoting or demoting someone left
+the phone rendering buttons the backend would refuse.
+`AuthService.syncCurrentUser()` re-reads the employee from `GET /api/auth/me` and
+rewrites that copy; the boot gate (`app/index.tsx`) routes on the fresh answer,
+and `setOnSessionRenewed` in `services/http.ts` runs it again after every silent
+refresh, sending the device back through the gate only when the role SET actually
+changed. A failed call keeps the cached copy: the refresh token is what proves
+there is a session, and no-signal must not read as signed-out.
+
+That is also why `apiFetch` no longer treats **all** of `/auth/**` as
+non-retryable — only `/auth/refresh` and `/auth/logout`, which authenticate with
+the refresh token. `GET /auth/me` is an ordinary bearer read, and at launch the
+stored access token is nearly always past its 30-minute life, so the blanket rule
+made the sync 401 and give up on every boot.
+
 **One rule the enrollment screens depend on:**
 `BearerTokenAuthenticationFilter` rejects any request carrying a token it cannot
 validate, and it runs BEFORE authorization — so it fires on the `permitAll`
@@ -295,6 +312,14 @@ where they used to be two — the product delete was hard, which forced it to bl
 on *any* reference and meant a product sold once could never leave the catalogue.
 `SubscriptionService.moveOrders` (TODO-37) is the fourth caller of the same
 definition. All four move together.
+
+`findLiveByProductId` is `countLiveByProductId` with the rows kept instead of
+counted (TODO-57) — the count refuses the delete, the list is what
+`GET /api/products/{id}/usage` names in the dialog explaining it. **One
+predicate, written twice**, so a refusal that counted three orders cannot open a
+dialog showing two; `FulfilmentRuleTest` runs both against every case in the
+shared fixture. `GET /api/subscriptions/{id}/usage` is the same arrangement on
+the subscription side.
 
 Both are roll-ups over **all** of an order's tasks, because an order is not
 limited to one: `TaskService.summariseOrderTasks` is what
@@ -519,15 +544,17 @@ has the one-time fix.
 
 Deliberate or unresolved; do not assume these are safe.
 
-- **A role change on the web reaches an enrolled phone only by kicking it out.**
-  Mobile stores `user.roles` at claim time and never refetches, so the menus are
-  drawn from a cached copy. A role change does revoke every session that employee
-  holds (`AdminService.updateEmployee`), and mobile clears its tokens when the
-  401's refresh fails — so the device is forced back to enrollment on its next
-  call rather than running indefinitely on stale roles. The gap is the stretch
-  before that call: stale menus, and a tap that boots the user to the enrollment
-  screen. Not a privilege leak — authorization always reads the `Employee` the
-  token points at, never the cached roles (TODO-35).
+- **A phone's menus can lag a role change by up to one token refresh.**
+  Narrowed, not closed, by TODO-35. `user.roles` is still a cached copy — what
+  changed is that it is now re-read from `GET /api/auth/me` at every launch and
+  after every silent refresh, instead of only at claim time. So the window is
+  "until this device's next refresh or restart" (≤30 minutes of use) rather than
+  "until it re-enrolls", and in practice a role change also revokes the
+  employee's sessions (`AdminService.updateEmployee`), which forces the device
+  through enrollment on its very next call. Nothing polls, so a phone sitting
+  idle on a menu shows the old one until it is used. Never a privilege leak —
+  authorization always reads the `Employee` the token points at, never the
+  cached roles.
 - **No optimistic locking anywhere.** There is no `@Version` on any entity.
   Concurrent edits to the same task/route/order are silent last-write-wins, and
   because Spring Data `save()` issues a full-row UPDATE, the loser's other field

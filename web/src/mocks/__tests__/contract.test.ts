@@ -417,6 +417,66 @@ describe('the failures the UI must render', () => {
     expect((await api.products.listAll()).some((entry) => entry.id === product.id)).toBe(true);
   });
 
+  // The refusal above counts; usage() names (TODO-57). They must agree, or the
+  // dialog lists two orders under a refusal that counted three.
+  it('names the orders behind a refused product retire', async () => {
+    const { product, order } = await productWithOrder('Explicat');
+
+    const usage = await api.products.usage(product.id);
+
+    expect(usage.blocked).toBe(true);
+    expect(usage.orders).toHaveLength(1);
+    expect(usage.orders[0]).toMatchObject({
+      id: order.id,
+      clientName: 'Explicat SRL',
+      orderType: 'Amplasari',
+      quantity: 1,
+    });
+  });
+
+  it('stops naming an order once it is finished — the same rule as the delete', async () => {
+    const { product, order } = await productWithOrder('Eliberat de usage');
+
+    const task = await api.tasks.create({ orderId: order.id, type: 'PLACEMENT' });
+    await api.tasks.updateStatus(task.id, 'COMPLETED');
+
+    const usage = await api.products.usage(product.id);
+    expect(usage.blocked).toBe(false);
+    expect(usage.orders).toEqual([]);
+    // And the delete agrees, which is the point of asking beforehand.
+    await expect(api.products.remove(product.id)).resolves.toBeUndefined();
+  });
+
+  it('counts a pickup as a blocker too, with its own date and quantity fields', async () => {
+    const client = await api.clients.create({ type: 'company', name: 'Ridicare SRL' });
+    const product = await api.products.create({
+      name: 'Blocat de ridicare',
+      description: null,
+      price: 100,
+      isActive: true,
+    });
+    await api.orders.create(client.id, {
+      orderType: 'Ridicari',
+      product: { id: product.id },
+      pickupQuantity: 2,
+      pickupDate: '2026-10-02',
+    });
+
+    const usage = await api.products.usage(product.id);
+
+    expect(usage.orders).toHaveLength(1);
+    expect(usage.orders[0]).toMatchObject({
+      orderType: 'Ridicari',
+      date: '2026-10-02',
+      quantity: 2,
+    });
+    await expect(api.products.remove(product.id)).rejects.toMatchObject({ status: 409 });
+  });
+
+  it('404s on usage() for a product that does not exist', async () => {
+    await expect(api.products.usage(999_999)).rejects.toMatchObject({ status: 404 });
+  });
+
   it('allows retiring a product nothing has ever used', async () => {
     const product = await api.products.create({
       name: 'Nefolosit',

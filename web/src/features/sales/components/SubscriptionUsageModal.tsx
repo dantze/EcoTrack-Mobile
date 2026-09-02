@@ -19,13 +19,18 @@
  * Local state (the chosen target) lives here and resets by NOT BEING MOUNTED —
  * the caller renders this only while a delete stands refused, per the house rule
  * from TODO-26.
+ *
+ * The shell and the list of blocking orders are shared with `ProductUsageModal`
+ * (TODO-57) and live in `UsageModal.tsx`. What stayed here is what only a plan
+ * has: the bulk move, and the active recurring plans.
  */
 
 import { useState } from 'react';
-import { Badge, Button, Modal, Select } from '@/components/ui';
+import { Badge, Button, Select } from '@/components/ui';
 import { formatDate } from '@/components/domain';
 import type { SubscriptionUsage } from '@/api';
 import type { Subscription } from '@/types/domain';
+import { BlockingOrderList, UsageModal } from './UsageModal';
 
 export interface SubscriptionUsageModalProps {
   subscription: Subscription;
@@ -51,47 +56,23 @@ export function SubscriptionUsageModal({
   const [targetId, setTargetId] = useState<number | null>(null);
 
   return (
-    <Modal
-      open
-      onClose={onClose}
-      width="lg"
+    <UsageModal
       title={`Abonamentul „${subscription.name}” nu poate fi șters`}
-      footer={
-        <Button variant="secondary" onClick={onClose} disabled={moving}>
-          Am înțeles
-        </Button>
-      }
+      intro="Abonamentul este încă folosit. Finalizați sau ștergeți elementele de mai jos, ori mutați-le pe alt abonament, apoi încercați din nou."
+      onClose={onClose}
+      busy={moving}
     >
-      <p className="text-sm text-ink-muted">
-        Abonamentul este încă folosit. Finalizați sau ștergeți elementele de mai jos, ori mutați-le
-        pe alt abonament, apoi încercați din nou.
-      </p>
-
       {orders.length > 0 && (
-        <section className="mt-4">
-          <h3 className="mb-2 text-xs font-semibold tracking-wide text-ink-subtle uppercase">
-            Comenzi nefinalizate ({orders.length})
-          </h3>
-          <ul className="flex flex-col gap-1.5">
-            {orders.map((order) => (
-              <li key={order.id}>
-                <button
-                  type="button"
-                  onClick={() => onOpenOrder(order.id)}
-                  className="flex w-full cursor-pointer items-center justify-between gap-3 rounded-md border border-border bg-surface px-3 py-2 text-left transition hover:border-accent-300 hover:shadow-card focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-                >
-                  <span className="flex min-w-0 items-center gap-2 text-sm">
-                    <span className="tabular shrink-0 font-semibold text-ink">#{order.number}</span>
-                    <span className="truncate text-ink-muted">{order.clientName}</span>
-                  </span>
-                  <span className="shrink-0 text-xs text-ink-subtle">
-                    {formatDate(order.sanitationDate)}
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
+        <BlockingOrderList
+          heading="Comenzi nefinalizate"
+          orders={orders.map((order) => ({
+            id: order.id,
+            number: order.number,
+            clientName: order.clientName,
+            meta: formatDate(order.sanitationDate),
+          }))}
+          onOpenOrder={onOpenOrder}
+        />
       )}
 
       {orders.length > 0 && (
@@ -171,6 +152,6 @@ export function SubscriptionUsageModal({
           </p>
         </section>
       )}
-    </Modal>
+    </UsageModal>
   );
 }

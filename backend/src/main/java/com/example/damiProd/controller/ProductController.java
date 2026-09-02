@@ -1,6 +1,7 @@
 package com.example.damiProd.controller;
 
 import com.example.damiProd.domain.Product;
+import com.example.damiProd.dto.ProductUsageResponse;
 import com.example.damiProd.service.ProductService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -32,6 +33,21 @@ public class ProductController {
     @GetMapping("/all")
     public ResponseEntity<List<Product>> getEveryProduct() {
         return ResponseEntity.ok(productService.getEveryProduct());
+    }
+
+    /**
+     * What still uses this product, so the UI can explain a refusal before the
+     * operator commits to one (TODO-57). Advisory only - DELETE re-checks.
+     *
+     * Mirrors GET /api/subscriptions/{id}/usage, down to the shape of the
+     * answer, because the two deletes are the same rule. No role row of its own
+     * in SecurityConfig: it is a GET under /api/**, which the matrix already
+     * limits to authenticated employees, and it exposes nothing a driver could
+     * not already read from GET /api/orders.
+     */
+    @GetMapping("/{id}/usage")
+    public ResponseEntity<ProductUsageResponse> usage(@PathVariable Long id) {
+        return ResponseEntity.ok(productService.usage(id));
     }
 
     @PostMapping

@@ -283,6 +283,15 @@ export interface ProductsApi {
   /** PUT /products/{id} */
   update(id: number, input: Omit<Product, 'id'>): Promise<Product>;
   /**
+   * GET /products/{id}/usage — what still keeps this product in the catalogue.
+   *
+   * The twin of `subscriptions.usage()` (TODO-57), and advisory for the same
+   * reason: it exists so the UI can NAME the blocking orders before the
+   * operator commits to a delete, instead of only counting them in a refusal.
+   * `remove()` enforces the rule server-side either way.
+   */
+  usage(id: number): Promise<ProductUsage>;
+  /**
    * DELETE /products/{id} — SOFT delete (isActive = false), like a
    * subscription (TODO-38).
    *
@@ -290,6 +299,26 @@ export interface ProductsApi {
    * block: the row survives, so it keeps resolving its product through it.
    */
   remove(id: number): Promise<void>;
+}
+
+/** One unfinished order still using a product. */
+export interface BlockingProductOrder {
+  id: number;
+  number: number;
+  clientName: string;
+  /** 'Amplasari' | 'Ridicari' — an Igienizare carries a plan, not a product. */
+  orderType: string;
+  /** The order's primary date: start date for a placement, pickup for a pickup. */
+  date: string | null;
+  /** How many cabins the order moves, where the order records one. */
+  quantity: number | null;
+}
+
+export interface ProductUsage {
+  /** True when `orders` is non-empty — the server's own verdict. */
+  blocked: boolean;
+  /** Amplasare and Ridicare orders with no COMPLETED task. */
+  orders: BlockingProductOrder[];
 }
 
 export interface SubscriptionsApi {

@@ -22,16 +22,18 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
 
     // ─── Deletion guards ────────────────────────────────────────────────────
     //
-    // Two different rules, because the two deletes are different operations.
+    // ONE rule, obeyed by both deletes.
     //
-    // A PRODUCT delete is a HARD delete: the row goes away, so ANY order still
-    // pointing at it would dangle — finished or not. Both order types that
-    // carry a product have to be checked.
+    // Both deletes are the same operation now: a SOFT delete (isActive = false
+    // — see SubscriptionService.deactivate and ProductService.deleteProduct).
+    // The row survives and old orders keep resolving through it, so only work
+    // that is NOT finished has to block. That is what makes TODO-11's
+    // retire-instead-of-delete safe.
     //
-    // A SUBSCRIPTION delete is a SOFT delete (isActive = false, see
-    // SubscriptionService.deactivate): the row survives and old orders keep
-    // resolving through it, so only work that is NOT finished has to block.
-    // That is exactly what makes TODO-11's retire-instead-of-delete safe.
+    // The product half used to be a HARD delete, which forced it to block on ANY
+    // reference at all — a product sold once could never leave the catalogue.
+    // TODO-38 made it soft; this comment still described the old behaviour until
+    // TODO-57 came looking for the orders behind the count.
 
     // Used by ProductService to prevent deleting a product still in use
     @Query("SELECT COUNT(o) > 0 FROM AmplasareOrder o WHERE o.product.id = :productId")
@@ -57,6 +59,26 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
             + "   OR  (TYPE(o) = RidicareOrder  AND TREAT(o AS RidicareOrder).product.id  = :productId)) "
             + "AND NOT EXISTS (SELECT t FROM Task t WHERE t.order.id = o.id AND t.status = 'COMPLETED')")
     long countLiveByProductId(@Param("productId") Long productId);
+
+    /**
+     * The same orders {@link #countLiveByProductId} counts, listed (TODO-57).
+     *
+     * <strong>The predicate below must stay identical to that one's.</strong>
+     * They are the guard and its explanation: the count refuses the delete, this
+     * list tells the operator which orders to go and finish. A drift between them
+     * shows up as a dialog naming two orders under a refusal that counted three.
+     * {@code FulfilmentRuleTest} asserts they agree, case by case, against a real
+     * schema.
+     *
+     * The delete itself stays a COUNT: it runs on every attempt and has no use
+     * for the rows.
+     */
+    @Query("SELECT o FROM Order o LEFT JOIN FETCH o.client "
+            + "WHERE ((TYPE(o) = AmplasareOrder AND TREAT(o AS AmplasareOrder).product.id = :productId) "
+            + "   OR  (TYPE(o) = RidicareOrder  AND TREAT(o AS RidicareOrder).product.id  = :productId)) "
+            + "AND NOT EXISTS (SELECT t FROM Task t WHERE t.order.id = o.id AND t.status = 'COMPLETED') "
+            + "ORDER BY o.number ASC")
+    List<Order> findLiveByProductId(@Param("productId") Long productId);
 
     /**
      * Igienizare orders on this plan whose work is NOT finished yet.

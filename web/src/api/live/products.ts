@@ -6,12 +6,13 @@
  * order that already referenced it keeps resolving its name and price.
  *
  * It answers 409 while UNFINISHED orders still use it — the same strict "no
- * COMPLETED task" rule as subscriptions. The Romanian message arrives in the
+ * COMPLETED task" rule as subscriptions, and `usage()` names the orders behind
+ * that refusal (TODO-57). The Romanian message arrives in the
  * standard error body, under `message`; it used to be under `error`, which was
  * this endpoint's own invention and is gone (TODO-38c).
  */
 
-import type { ProductsApi } from '../contract';
+import type { ProductUsage, ProductsApi } from '../contract';
 import type { Product } from '@/types/domain';
 import { request } from '../http';
 import { normalizeProduct, type RawProduct } from './normalize';
@@ -37,6 +38,14 @@ export const productsApi: ProductsApi = {
     return normalizeProduct(
       await request<RawProduct>(`/products/${id}`, { method: 'PUT', body: { ...input, id } }),
     );
+  },
+
+  async usage(id: number): Promise<ProductUsage> {
+    const raw = await request<ProductUsage>(`/products/${id}/usage`);
+    // The DTO is already domain-shaped (ids, numbers, resolved client names),
+    // so there is nothing for normalize.ts to absorb here — same as
+    // `subscriptions.usage()`.
+    return { blocked: raw?.blocked ?? false, orders: raw?.orders ?? [] };
   },
 
   async remove(id: number): Promise<void> {

@@ -1,7 +1,7 @@
 import { Stack, useRouter } from 'expo-router';
 import { useEffect } from 'react';
 import { Alert } from 'react-native';
-import { setOnSessionExpired } from '../services/http';
+import { setOnSessionExpired, setOnSessionRenewed } from '../services/http';
 import { AuthService } from '../services/AuthService';
 
 export const unstable_settings = {
@@ -27,6 +27,29 @@ export default function RootLayout() {
       router.replace('/enrollment');
     });
     return () => setOnSessionExpired(null);
+  }, [router]);
+
+  // A role change on the web reaches the phone here (TODO-35). The menus are
+  // drawn from a cached `user.roles` written at claim time, so a promotion or a
+  // demotion left this device rendering buttons the backend would refuse — a
+  // tap that "does nothing", or a 403. Every silent refresh now re-reads the
+  // employee, and a device whose roles actually moved is sent back through the
+  // boot gate, which routes it by the new ones.
+  //
+  // Not a privilege leak either way: authorization reads the Employee the token
+  // points at, never this copy. What it fixes is the confusion.
+  useEffect(() => {
+    setOnSessionRenewed(() => {
+      void (async () => {
+        const synced = await AuthService.syncCurrentUser();
+        // Only on a real change: re-routing on every refresh would throw away
+        // whatever screen the user was on, twice an hour, for nothing.
+        if (!synced?.rolesChanged) return;
+        Alert.alert('Rolurile au fost actualizate', 'Aplicația se va deschide din nou cu noile drepturi.');
+        router.replace('/');
+      })();
+    });
+    return () => setOnSessionRenewed(null);
   }, [router]);
 
   return (

@@ -1,6 +1,7 @@
 package com.example.damiProd.service;
 
 import com.example.damiProd.domain.Product;
+import com.example.damiProd.dto.ProductUsageResponse;
 import com.example.damiProd.exception.ResourceNotFoundException;
 import com.example.damiProd.repository.ProductRepository;
 import com.example.damiProd.repository.OrderRepository;
@@ -32,6 +33,23 @@ public class ProductService {
 
     public Product saveProduct(Product product) {
         return productRepository.save(product);
+    }
+
+    /**
+     * What is still holding this product in the catalogue (TODO-57).
+     *
+     * Advisory, and the exact counterpart of {@code SubscriptionService.usage}:
+     * the UI calls it to name the blockers before the operator commits to a
+     * delete, and {@link #deleteProduct} re-checks. The two answers come from
+     * the same predicate - {@code findLiveByProductId} is the listed form of the
+     * {@code countLiveByProductId} the delete counts - so the dialog can never
+     * name a different set of orders from the one the refusal counted.
+     */
+    public ProductUsageResponse usage(Long id) {
+        // 404 for an unknown product, rather than a misleading "nothing uses it".
+        productRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Product not found with id: " + id));
+        return ProductUsageResponse.of(orderRepository.findLiveByProductId(id));
     }
 
     /**

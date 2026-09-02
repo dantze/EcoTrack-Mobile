@@ -6,7 +6,9 @@
  */
 
 import { useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Plus, RefreshCw } from 'lucide-react';
+import { ApiError, type ProductUsage } from '@/api';
 import { CommandBar, ToolbarSeparator, Workbench } from '@/components/layout';
 import {
   Button,
@@ -19,9 +21,11 @@ import { formatMoney } from '@/components/domain';
 import type { Product } from '@/types/domain';
 import { includesFolded } from '@/lib/search';
 import { ErrorNotice, SearchInput } from './components/FilterBar';
+import { ProductUsageModal } from './components/ProductUsageModal';
 import { errorMessage, toast } from './components/Toaster';
 import { useConfirm } from './components/useConfirm';
 import {
+  useCheckProductUsage,
   useCreateProduct,
   useDeleteProduct,
   useProducts,
@@ -85,6 +89,8 @@ export function ProductsPage() {
   const updateProduct = useUpdateProduct();
   const deleteProduct = useDeleteProduct();
   const { confirm, confirmDialog } = useConfirm();
+  const checkUsage = useCheckProductUsage();
+  const navigate = useNavigate();
 
   const [search, setSearch] = useState('');
   const [adding, setAdding] = useState(false);
@@ -93,6 +99,8 @@ export function ProductsPage() {
   const [editErrors, setEditErrors] = useState<DraftErrors>({});
   const [newDraft, setNewDraft] = useState<Draft>(EMPTY_DRAFT);
   const [newErrors, setNewErrors] = useState<DraftErrors>({});
+  /** Set when a delete was refused — drives the "what still uses it" dialog. */
+  const [blocked, setBlocked] = useState<{ product: Product; usage: ProductUsage } | null>(null);
 
   const products = useMemo(() => productsQuery.data ?? [], [productsQuery.data]);
 
@@ -152,7 +160,27 @@ export function ProductsPage() {
     }
   };
 
+  /**
+   * Ask the server what still uses the product BEFORE offering to delete it, so
+   * a refusal arrives as an explanation with the blockers named rather than as a
+   * failed action (TODO-57). Same flow as Abonamente, because it is the same
+   * rule — and the preflight is advisory either way: the DELETE re-checks, and
+   * the catch below handles losing that race.
+   */
   const remove = async (product: Product) => {
+    let usage: ProductUsage | null = null;
+    try {
+      usage = await checkUsage(product.id);
+    } catch {
+      // The preflight is a convenience, not the guard. If it fails, carry on to
+      // the confirm — the DELETE is what actually enforces the rule.
+    }
+
+    if (usage?.blocked) {
+      setBlocked({ product, usage });
+      return;
+    }
+
     const confirmed = await confirm({
       title: 'Șterge produsul?',
       body: `„${product.name}” va fi șters. Comenzile existente nu sunt modificate.`,
@@ -164,6 +192,19 @@ export function ProductsPage() {
       await deleteProduct.mutateAsync(product.id);
       toast.success('Produsul a fost șters.');
     } catch (error) {
+      // Lost the race with someone creating an order: re-ask, so the operator
+      // sees the current list rather than a counted message they cannot act on.
+      if (error instanceof ApiError && error.status === 409) {
+        try {
+          const fresh = await checkUsage(product.id);
+          if (fresh.blocked) {
+            setBlocked({ product, usage: fresh });
+            return;
+          }
+        } catch {
+          /* fall through to the toast */
+        }
+      }
       toast.error(errorMessage(error, 'Nu s-a putut șterge produsul'));
     }
   };
@@ -392,6 +433,15 @@ export function ProductsPage() {
               }
             />
           }
+        />
+      )}
+
+      {blocked && (
+        <ProductUsageModal
+          product={blocked.product}
+          usage={blocked.usage}
+          onClose={() => setBlocked(null)}
+          onOpenOrder={(orderId) => navigate(`/comenzi?comanda=${orderId}`)}
         />
       )}
 

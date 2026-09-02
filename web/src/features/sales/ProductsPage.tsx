@@ -6,19 +6,20 @@
  */
 
 import { useMemo, useState } from 'react';
+import { Plus, RefreshCw } from 'lucide-react';
+import { CommandBar, ToolbarSeparator, Workbench } from '@/components/layout';
 import {
   Button,
   DataTable,
   EmptyState,
-  PageHeader,
   TextInput,
   type Column,
 } from '@/components/ui';
 import { formatMoney } from '@/components/domain';
 import type { Product } from '@/types/domain';
 import { includesFolded } from '@/lib/search';
-import { ErrorNotice, FilterBar, FilterField, SearchInput } from './components/FilterBar';
-import { Toaster, errorMessage, toast } from './components/Toaster';
+import { ErrorNotice, SearchInput } from './components/FilterBar';
+import { errorMessage, toast } from './components/Toaster';
 import { useConfirm } from './components/useConfirm';
 import {
   useCreateProduct,
@@ -86,6 +87,7 @@ export function ProductsPage() {
   const { confirm, confirmDialog } = useConfirm();
 
   const [search, setSearch] = useState('');
+  const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editDraft, setEditDraft] = useState<Draft>(EMPTY_DRAFT);
   const [editErrors, setEditErrors] = useState<DraftErrors>({});
@@ -262,47 +264,69 @@ export function ProductsPage() {
   ];
 
   return (
-    <>
-      <PageHeader
+    <Workbench>
+      <CommandBar
         title="Produse"
         subtitle={
           productsQuery.isLoading ? 'Se încarcă…' : `${rows.length} din ${products.length} produse`
         }
+        tools={
+          <div className="w-44 sm:w-56 xl:w-72">
+            <SearchInput value={search} onChange={setSearch} placeholder="Nume sau descriere" />
+          </div>
+        }
         actions={
-          <Button
-            variant="secondary"
-            loading={productsQuery.isFetching}
-            onClick={() => void productsQuery.refetch()}
-          >
-            Reîmprospătează
-          </Button>
+          <>
+            <Button
+              variant={adding ? 'secondary' : 'primary'}
+              size="sm"
+              icon={<Plus aria-hidden />}
+              aria-expanded={adding}
+              onClick={() => setAdding((open) => !open)}
+            >
+              Produs nou
+            </Button>
+            <ToolbarSeparator />
+            <Button
+              variant="ghost"
+              size="sm"
+              icon={<RefreshCw aria-hidden />}
+              loading={productsQuery.isFetching}
+              onClick={() => void productsQuery.refetch()}
+            >
+              Reîmprospătează
+            </Button>
+          </>
         }
       />
 
-      <FilterBar>
-        <FilterField label="Căutare">
-          <SearchInput value={search} onChange={setSearch} placeholder="Nume sau descriere" />
-        </FilterField>
-        <div className="ml-auto flex items-end gap-2">
-          <div className="w-52">
+      {/* The add row is a panel under the ribbon rather than three permanent
+          inputs in the filter strip: a catalogue is read far more often than
+          it is extended, and the fields were costing every visit 56px. */}
+      {adding && (
+        <div className="flex shrink-0 flex-wrap items-end gap-2 border-b border-border bg-surface px-3 py-2.5 sm:px-4">
+          <div className="w-full sm:w-52">
             <TextInput
               id="product-new-name"
               label="Produs nou"
               placeholder="Nume"
               value={newDraft.name}
               error={newErrors.name}
+              inputSize="sm"
+              autoFocus
               onChange={(event) => setNewDraft({ ...newDraft, name: event.target.value })}
             />
           </div>
-          <div className="w-64">
+          <div className="w-full sm:w-64">
             <TextInput
               label="Descriere"
               placeholder="Opțional"
               value={newDraft.description}
+              inputSize="sm"
               onChange={(event) => setNewDraft({ ...newDraft, description: event.target.value })}
             />
           </div>
-          <div className="w-28">
+          <div className="w-full sm:w-28">
             <TextInput
               id="product-new-price"
               label="Preț (RON)"
@@ -310,16 +334,25 @@ export function ProductsPage() {
               inputMode="decimal"
               value={newDraft.price}
               error={newErrors.price}
+              inputSize="sm"
               onChange={(event) =>
                 setNewDraft({ ...newDraft, price: event.target.value.replace(/[^\d.,]/g, '') })
               }
             />
           </div>
-          <Button variant="primary" loading={createProduct.isPending} onClick={() => void create()}>
-            + Adaugă
+          <Button
+            variant="primary"
+            size="sm"
+            loading={createProduct.isPending}
+            onClick={() => void create()}
+          >
+            Adaugă
+          </Button>
+          <Button variant="ghost" size="sm" onClick={() => setAdding(false)}>
+            Renunță
           </Button>
         </div>
-      </FilterBar>
+      )}
 
       {productsQuery.isError ? (
         <ErrorNotice
@@ -331,6 +364,7 @@ export function ProductsPage() {
           rows={rows}
           columns={columns}
           rowKey={(product) => product.id}
+          ariaLabel="Catalog de produse"
           initialSort={{ key: 'name', dir: 'asc' }}
           loading={productsQuery.isLoading}
           activeKey={editingId}
@@ -350,7 +384,11 @@ export function ProductsPage() {
                   <Button variant="secondary" size="sm" onClick={() => setSearch('')}>
                     Golește căutarea
                   </Button>
-                ) : undefined
+                ) : (
+                  <Button variant="primary" size="sm" onClick={() => setAdding(true)}>
+                    + Produs
+                  </Button>
+                )
               }
             />
           }
@@ -358,7 +396,6 @@ export function ProductsPage() {
       )}
 
       {confirmDialog}
-      <Toaster />
-    </>
+    </Workbench>
   );
 }

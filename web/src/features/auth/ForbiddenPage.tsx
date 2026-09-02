@@ -3,22 +3,21 @@
  * roles do not cover the route they landed on — e.g. a Sales-only account
  * opening /rute directly. Distinct from NotFoundPage: the route exists, the
  * account just cannot see it.
+ *
+ * The way out is deliberately NOT "/": `HomeRedirect` renders this very screen
+ * for an account with neither SALES nor TECH, so a link home would be a loop.
+ * `StatusScreen` resolves it from the roles the account actually holds.
  */
 
-import { Link } from 'react-router-dom';
-import { Button } from '@/components/ui';
+import { ShieldOff } from 'lucide-react';
+import { StatusScreen } from './StatusScreen';
 
 export function ForbiddenPage() {
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-3 px-6 py-16 text-center">
-      <p className="text-sm font-semibold text-ink">Acces interzis</p>
-      <p className="max-w-sm text-sm text-ink-muted">
-        Contul tău nu are rolul necesar pentru această secțiune. Dacă ai nevoie de acces,
-        contactează un administrator.
-      </p>
-      <Link to="/">
-        <Button variant="secondary">Înapoi la pagina principală</Button>
-      </Link>
-    </div>
+    <StatusScreen
+      icon={<ShieldOff aria-hidden />}
+      title="Acces interzis"
+      body="Contul tău nu are rolul necesar pentru această secțiune. Dacă ai nevoie de acces, cere-i unui administrator să ți-l acorde din Angajați."
+    />
   );
 }

@@ -336,7 +336,7 @@ function PickerBody({
       element.className = cx(
         'grid size-6 cursor-pointer place-items-center rounded-full text-[10px] font-semibold',
         'text-white shadow ring-2 ring-white',
-        place.scope === 'client' ? 'bg-brand-600' : 'bg-slate-400',
+        place.scope === 'client' ? 'bg-primary' : 'bg-ink-subtle',
       );
       element.textContent = String(place.count);
       element.addEventListener('click', (browserEvent) => {
@@ -481,7 +481,7 @@ function PickerBody({
             aria-label="Rezultate căutare"
             className={cx(
               'absolute inset-x-0 top-full z-10 mt-1 max-h-56 overflow-y-auto rounded-lg',
-              'border border-border bg-white py-1 shadow-modal',
+              'border border-border bg-surface py-1 shadow-modal',
             )}
           >
             {visibleResults.map((result, index) => (
@@ -492,7 +492,7 @@ function PickerBody({
                 aria-selected={index === highlighted}
                 className={cx(
                   'cursor-pointer px-3 py-1.5',
-                  index === highlighted ? 'bg-brand-50' : 'hover:bg-surface-sunken',
+                  index === highlighted ? 'bg-accent-50' : 'hover:bg-surface-sunken',
                 )}
                 onMouseEnter={() => setHighlighted(index)}
                 // `onMouseDown` rather than `onClick`: the input's blur would

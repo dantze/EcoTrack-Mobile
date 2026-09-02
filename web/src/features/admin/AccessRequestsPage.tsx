@@ -17,7 +17,8 @@
 
 import { useState } from 'react';
 import type { AccessRequest } from '@/api/contract';
-import { Badge, Button, EmptyState, PageHeader, Select, Spinner, useToast } from '@/components/ui';
+import { CommandBar, Workbench, WorkbenchBody } from '@/components/layout';
+import { Badge, Button, EmptyState, Select, Spinner, useToast } from '@/components/ui';
 import { ROLE_LABELS } from '@/components/domain';
 import type { Role } from '@/types/domain';
 import { useAccessRequests, useApproveRequest, useRejectRequest } from './queries';
@@ -121,28 +122,34 @@ export function AccessRequestsPage() {
   const requests = data ?? [];
 
   return (
-    <div className="flex flex-col gap-5 p-6">
-      <PageHeader
+    <Workbench>
+      <CommandBar
         title="Cereri de acces"
-        subtitle="Verifică codul cu persoana care cere accesul, apoi alege-i rolul."
+        subtitle={
+          isLoading
+            ? 'Se încarcă…'
+            : `${requests.length} în așteptare · verifică codul cu persoana care cere accesul, apoi alege-i rolul`
+        }
       />
 
-      {isLoading ? (
-        <div className="flex justify-center py-16">
-          <Spinner className="size-6 text-brand-600" />
-        </div>
-      ) : requests.length === 0 ? (
-        <EmptyState
-          title="Nicio cerere în așteptare"
-          body="Cererile apar aici imediat ce cineva deschide aplicația și cere acces."
-        />
-      ) : (
-        <ul className="flex flex-col gap-3">
-          {requests.map((request) => (
-            <RequestCard key={request.id} request={request} />
-          ))}
-        </ul>
-      )}
-    </div>
+      <WorkbenchBody>
+        {isLoading ? (
+          <div className="flex justify-center py-16">
+            <Spinner className="size-6 text-primary" />
+          </div>
+        ) : requests.length === 0 ? (
+          <EmptyState
+            title="Nicio cerere în așteptare"
+            body="Cererile apar aici imediat ce cineva deschide aplicația și cere acces."
+          />
+        ) : (
+          <ul className="mx-auto flex w-full max-w-3xl flex-col gap-3">
+            {requests.map((request) => (
+              <RequestCard key={request.id} request={request} />
+            ))}
+          </ul>
+        )}
+      </WorkbenchBody>
+    </Workbench>
   );
 }

@@ -1,98 +1,419 @@
+/* Layer order: Mantine's stylesheets sit BELOW Tailwind so a utility class can
+   always win against a Mantine component style without `!important`. The order
+   is declared before anything is imported — first declaration wins. */
+@layer mantine, theme, base, components, utilities;
+
 @import 'tailwindcss';
+@import 'tw-animate-css';
+/* The shadcn CLI's companion sheet: the `data-open:` / `data-checked:` custom
+   variants and the `scroll-fade-*` utilities every primitive in
+   src/components/shadcn is written against. Not optional — without it those
+   classes silently compile to nothing. */
+@import 'shadcn/tailwind.css';
+
+@import '@mantine/core/styles.css' layer(mantine);
+@import '@mantine/dates/styles.css' layer(mantine);
+@import '@mantine/notifications/styles.css' layer(mantine);
+@import '@mantine/spotlight/styles.css' layer(mantine);
+@import '@mantine/charts/styles.css' layer(mantine);
 
 /**
- * Design tokens.
+ * EcoTrack design tokens.
  *
- * Desktop back-office palette: cool slate neutrals, a single brand accent
- * carried over from the mobile app's splash (#16283C), and status colours that
- * map onto TaskStatus / order types. Density is tuned for tables, not touch.
+ * ONE token system, three consumers:
+ *   · shadcn/ui  reads the semantic set (--background, --primary, --border …)
+ *   · Mantine    reads --mantine-* , bridged from the same values in
+ *                src/theme/mantine.ts + the resolver below
+ *   · Tailwind   exposes everything as utilities through `@theme inline`
  *
- * Light mode only — this is an internal back-office tool that lives on office
- * monitors, and a second theme is surface area nobody asked for.
+ * The look is Microsoft Outlook on the web: a dark navy app rail, a bright
+ * "communication blue" for selection and primary actions, cool neutral
+ * surfaces, hairline borders, and density tuned for lists rather than touch.
+ *
+ * Dark mode is real. Every colour below is declared twice — once on `:root`,
+ * once under `.dark` — and every Tailwind token is an INDIRECTION
+ * (`@theme inline`) onto those runtime variables, so a utility such as
+ * `bg-surface` follows the theme without a single `dark:` override.
  */
 
-@theme {
-  /* Brand — navy. The single accent; everything else is neutral. */
-  --color-brand-50: #eef4fb;
-  --color-brand-100: #d6e4f2;
-  --color-brand-200: #b7cde8;
-  --color-brand-300: #8db0d6;
-  --color-brand-400: #5a86b5;
-  --color-brand-500: #2c5a8f;
-  --color-brand-600: #1f3f63;
-  --color-brand-700: #16283c;
-  --color-brand-800: #11202f;
-  --color-brand-900: #0d1826;
+@custom-variant dark (&:is(.dark *));
 
-  --color-surface: #ffffff;
-  --color-surface-sunken: #f6f8fa;
-  --color-surface-raised: #ffffff;
-  /* Header/toolbar fill — a touch cooler than the page so tables read as a slab. */
-  --color-surface-header: #f1f5f9;
-  --color-border: #e3e8ee;
-  --color-border-strong: #cbd5e1;
+/* ───────────────────────────────────────────────────────────────────────────
+   Runtime palette — light
+   ─────────────────────────────────────────────────────────────────────────── */
 
-  --color-ink: #0f172a;
-  --color-ink-muted: #64748b;
-  /* Was #94a3b8 (2.6:1 on white) — failed WCAG AA for the placeholder, hint,
-     and empty-cell text it's used for. Darkened to clear 4.5:1; see the a11y
-     pass notes for the full contrast audit. */
-  --color-ink-subtle: #66768d;
+:root {
+  color-scheme: light;
 
-  --color-status-new: #64748b;
-  --color-status-progress: #b45309;
-  --color-status-done: #15803d;
+  /* Brand navy — the app rail and the deepest chrome. Fixed across themes:
+     Outlook's rail does not lighten in light mode, it IS the dark element. */
+  --brand-50: #eef4fb;
+  --brand-100: #dae7f6;
+  --brand-200: #b7cde8;
+  --brand-300: #8db0d6;
+  --brand-400: #5a86b5;
+  --brand-500: #2c5a8f;
+  --brand-600: #1f3f63;
+  --brand-700: #16283c;
+  --brand-800: #11202f;
+  --brand-900: #0d1826;
 
-  /* Semantic feedback ramps — used by Badge, Toast, validation states. */
-  --color-danger-50: #fef2f2;
-  --color-danger-100: #fee2e2;
-  --color-danger-200: #fecaca;
-  --color-danger-500: #ef4444;
-  --color-danger-600: #dc2626;
-  --color-danger-700: #b91c1c;
+  /* Communication blue — selection, links, primary actions. */
+  --accent-50: #eff6fd;
+  --accent-100: #dbeafe;
+  --accent-200: #bfdcf7;
+  --accent-300: #8ec2ef;
+  --accent-400: #4a9ae0;
+  --accent-500: #0f6cbd;
+  --accent-600: #0c5697;
+  --accent-700: #0a4478;
+  --accent-800: #08355d;
+  --accent-900: #062544;
 
-  --color-success-50: #f0fdf4;
-  --color-success-100: #dcfce7;
-  --color-success-200: #bbf7d0;
-  --color-success-600: #16a34a;
-  --color-success-700: #15803d;
+  /* Surfaces, from the page floor upward. */
+  --background: #f3f4f6;
+  --surface: #ffffff;
+  --surface-sunken: #f3f4f6;
+  --surface-raised: #ffffff;
+  --surface-header: #f7f8fa;
+  --surface-hover: #f2f5f9;
+  --surface-active: #e7eef7;
+  --surface-inverse: #16283c;
 
-  --color-warning-50: #fffbeb;
-  --color-warning-100: #fef3c7;
-  --color-warning-200: #fde68a;
-  --color-warning-600: #d97706;
-  --color-warning-700: #b45309;
+  --border-color: #e2e6ec;
+  --border-strong: #c8d0da;
 
-  --color-info-50: #eff6ff;
-  --color-info-100: #dbeafe;
-  --color-info-200: #bfdbfe;
-  --color-info-600: #2563eb;
-  --color-info-700: #1d4ed8;
+  --ink: #14181f;
+  --ink-muted: #5a6472;
+  --ink-subtle: #6b7684;
+  --ink-inverse: #ffffff;
 
-  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
-  --font-mono: ui-monospace, 'SF Mono', 'Cascadia Code', monospace;
+  /* Status — task lifecycle. */
+  --status-new: #5a6472;
+  --status-progress: #b45309;
+  --status-done: #15803d;
+
+  /* Semantic ramps. */
+  --danger-50: #fef2f2;
+  --danger-100: #fee2e2;
+  --danger-200: #fecaca;
+  --danger-500: #ef4444;
+  --danger-600: #dc2626;
+  --danger-700: #b91c1c;
+
+  --success-50: #f0fdf4;
+  --success-100: #dcfce7;
+  --success-200: #bbf7d0;
+  --success-600: #16a34a;
+  --success-700: #15803d;
+
+  --warning-50: #fffbeb;
+  --warning-100: #fef3c7;
+  --warning-200: #fde68a;
+  --warning-600: #d97706;
+  --warning-700: #b45309;
+
+  --info-50: #eff6ff;
+  --info-100: #dbeafe;
+  --info-200: #bfdbfe;
+  --info-600: #2563eb;
+  --info-700: #1d4ed8;
+
+  /* ── shadcn semantic set ── */
+  --foreground: var(--ink);
+  --card: var(--surface);
+  --card-foreground: var(--ink);
+  --popover: var(--surface-raised);
+  --popover-foreground: var(--ink);
+  --primary: var(--accent-500);
+  --primary-foreground: #ffffff;
+  --secondary: #eceff3;
+  --secondary-foreground: var(--ink);
+  --muted: #f2f4f7;
+  --muted-foreground: var(--ink-muted);
+  --accent: var(--surface-hover);
+  --accent-foreground: var(--ink);
+  --destructive: var(--danger-600);
+  --destructive-foreground: #ffffff;
+  --border: var(--border-color);
+  --input: var(--border-strong);
+  --ring: var(--accent-400);
+
+  --chart-1: #0f6cbd;
+  --chart-2: #16a34a;
+  --chart-3: #d97706;
+  --chart-4: #7c3aed;
+  --chart-5: #dc2626;
+
+  /* The rail is always dark chrome — Outlook's identity. */
+  --sidebar: #16283c;
+  --sidebar-foreground: #dbe4f0;
+  --sidebar-primary: var(--accent-400);
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: rgb(255 255 255 / 0.1);
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: rgb(255 255 255 / 0.1);
+  --sidebar-ring: var(--accent-300);
+
+  --radius: 0.5rem;
+
+  /* Elevation. */
+  --shadow-card-v: 0 1px 2px 0 rgb(16 24 40 / 0.04), 0 1px 3px 0 rgb(16 24 40 / 0.06);
+  --shadow-popover-v: 0 12px 32px -12px rgb(16 24 40 / 0.24), 0 2px 8px -3px rgb(16 24 40 / 0.12);
+  --shadow-modal-v: 0 24px 64px -20px rgb(16 24 40 / 0.3), 0 4px 12px -6px rgb(16 24 40 / 0.14);
+  --shadow-panel-v: -18px 0 56px -28px rgb(16 24 40 / 0.35);
+  --shadow-toast-v: 0 10px 28px -12px rgb(16 24 40 / 0.28), 0 2px 6px -3px rgb(16 24 40 / 0.14);
+  --shadow-sticky-v: 0 1px 0 0 var(--border-color), 0 6px 12px -10px rgb(16 24 40 / 0.45);
+  --shadow-rail-v: 1px 0 0 0 rgb(255 255 255 / 0.06);
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   Runtime palette — dark
+   ─────────────────────────────────────────────────────────────────────────── */
+
+.dark {
+  color-scheme: dark;
+
+  --accent-50: #0a1c2c;
+  --accent-100: #0d2740;
+  --accent-200: #123554;
+  --accent-300: #1b4b76;
+  --accent-400: #3f8fd4;
+  --accent-500: #4aa3e8;
+  --accent-600: #6bb6ef;
+  --accent-700: #93cbf5;
+  --accent-800: #bcdefa;
+  --accent-900: #e0f0fd;
+
+  --background: #0f1419;
+  --surface: #171c23;
+  --surface-sunken: #0f1419;
+  --surface-raised: #1d232c;
+  --surface-header: #1a2029;
+  --surface-hover: #222932;
+  --surface-active: #2a323d;
+  --surface-inverse: #e8ecf1;
+
+  --border-color: #2a313b;
+  --border-strong: #3b4450;
+
+  --ink: #e8ecf1;
+  --ink-muted: #9aa5b4;
+  --ink-subtle: #8b96a5;
+  --ink-inverse: #0f1419;
+
+  --status-new: #9aa5b4;
+  --status-progress: #f0b45e;
+  --status-done: #5fd08a;
+
+  --danger-50: #2a1416;
+  --danger-100: #3a1a1e;
+  --danger-200: #4d2227;
+  --danger-500: #f87171;
+  --danger-600: #ef4444;
+  --danger-700: #fca5a5;
+
+  --success-50: #10231a;
+  --success-100: #163224;
+  --success-200: #1d4331;
+  --success-600: #4ade80;
+  --success-700: #86efac;
+
+  --warning-50: #2a1f0d;
+  --warning-100: #3a2a10;
+  --warning-200: #4d3816;
+  --warning-600: #fbbf24;
+  --warning-700: #fcd34d;
+
+  --info-50: #0f1e33;
+  --info-100: #142942;
+  --info-200: #1b3556;
+  --info-600: #60a5fa;
+  --info-700: #93c5fd;
+
+  --foreground: var(--ink);
+  --card: var(--surface);
+  --card-foreground: var(--ink);
+  --popover: var(--surface-raised);
+  --popover-foreground: var(--ink);
+  --primary: #3f8fd4;
+  --primary-foreground: #04121f;
+  --secondary: #242b35;
+  --secondary-foreground: var(--ink);
+  --muted: #1e242d;
+  --muted-foreground: var(--ink-muted);
+  --accent: var(--surface-hover);
+  --accent-foreground: var(--ink);
+  --destructive: #e5484d;
+  --destructive-foreground: #ffffff;
+  --border: var(--border-color);
+  --input: var(--border-strong);
+  --ring: #3f8fd4;
+
+  --chart-1: #4aa3e8;
+  --chart-2: #4ade80;
+  --chart-3: #fbbf24;
+  --chart-4: #a78bfa;
+  --chart-5: #f87171;
+
+  --sidebar: #11161c;
+  --sidebar-foreground: #c3ccd8;
+  --sidebar-primary: #4aa3e8;
+  --sidebar-primary-foreground: #04121f;
+  --sidebar-accent: rgb(255 255 255 / 0.08);
+  --sidebar-accent-foreground: #ffffff;
+  --sidebar-border: rgb(255 255 255 / 0.08);
+  --sidebar-ring: #4aa3e8;
+
+  --shadow-card-v: 0 1px 2px 0 rgb(0 0 0 / 0.5), 0 1px 3px 0 rgb(0 0 0 / 0.4);
+  --shadow-popover-v: 0 12px 32px -12px rgb(0 0 0 / 0.7), 0 2px 8px -3px rgb(0 0 0 / 0.5);
+  --shadow-modal-v: 0 24px 64px -20px rgb(0 0 0 / 0.8), 0 4px 12px -6px rgb(0 0 0 / 0.6);
+  --shadow-panel-v: -18px 0 56px -28px rgb(0 0 0 / 0.75);
+  --shadow-toast-v: 0 10px 28px -12px rgb(0 0 0 / 0.7), 0 2px 6px -3px rgb(0 0 0 / 0.5);
+  --shadow-sticky-v: 0 1px 0 0 var(--border-color), 0 6px 12px -10px rgb(0 0 0 / 0.8);
+  --shadow-rail-v: 1px 0 0 0 rgb(255 255 255 / 0.05);
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   Tailwind token surface
+   Everything is `inline` (an indirection onto the runtime vars above) so a
+   utility follows the active theme with no `dark:` variant anywhere.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+@theme inline {
+  --color-brand-50: var(--brand-50);
+  --color-brand-100: var(--brand-100);
+  --color-brand-200: var(--brand-200);
+  --color-brand-300: var(--brand-300);
+  --color-brand-400: var(--brand-400);
+  --color-brand-500: var(--brand-500);
+  --color-brand-600: var(--brand-600);
+  --color-brand-700: var(--brand-700);
+  --color-brand-800: var(--brand-800);
+  --color-brand-900: var(--brand-900);
+
+  --color-accent-50: var(--accent-50);
+  --color-accent-100: var(--accent-100);
+  --color-accent-200: var(--accent-200);
+  --color-accent-300: var(--accent-300);
+  --color-accent-400: var(--accent-400);
+  --color-accent-500: var(--accent-500);
+  --color-accent-600: var(--accent-600);
+  --color-accent-700: var(--accent-700);
+  --color-accent-800: var(--accent-800);
+  --color-accent-900: var(--accent-900);
+
+  --color-surface: var(--surface);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-header: var(--surface-header);
+  --color-surface-hover: var(--surface-hover);
+  --color-surface-active: var(--surface-active);
+  --color-surface-inverse: var(--surface-inverse);
+
+  --color-border: var(--border-color);
+  --color-border-strong: var(--border-strong);
+
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-subtle: var(--ink-subtle);
+  --color-ink-inverse: var(--ink-inverse);
+
+  --color-status-new: var(--status-new);
+  --color-status-progress: var(--status-progress);
+  --color-status-done: var(--status-done);
+
+  --color-danger-50: var(--danger-50);
+  --color-danger-100: var(--danger-100);
+  --color-danger-200: var(--danger-200);
+  --color-danger-500: var(--danger-500);
+  --color-danger-600: var(--danger-600);
+  --color-danger-700: var(--danger-700);
+
+  --color-success-50: var(--success-50);
+  --color-success-100: var(--success-100);
+  --color-success-200: var(--success-200);
+  --color-success-600: var(--success-600);
+  --color-success-700: var(--success-700);
+
+  --color-warning-50: var(--warning-50);
+  --color-warning-100: var(--warning-100);
+  --color-warning-200: var(--warning-200);
+  --color-warning-600: var(--warning-600);
+  --color-warning-700: var(--warning-700);
+
+  --color-info-50: var(--info-50);
+  --color-info-100: var(--info-100);
+  --color-info-200: var(--info-200);
+  --color-info-600: var(--info-600);
+  --color-info-700: var(--info-700);
+
+  /* shadcn semantic aliases */
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+
+  /* shadcn primitives reference `font-heading`; in this app headings are the
+     same face at a heavier weight, not a second typeface. */
+  --font-heading: var(--font-sans);
+
+  --font-sans:
+    'Segoe UI', -apple-system, BlinkMacSystemFont, 'Inter', ui-sans-serif, system-ui, 'Helvetica Neue', sans-serif;
+  --font-mono: ui-monospace, 'SF Mono', 'Cascadia Code', 'Segoe UI Mono', monospace;
 
   --text-xs: 0.75rem;
   --text-sm: 0.8125rem;
   --text-base: 0.875rem;
 
-  /* Elevation. Overlays sit on a cool shadow so they read as glass over slate. */
-  --shadow-card: 0 1px 2px 0 rgb(15 23 42 / 0.04), 0 1px 3px 0 rgb(15 23 42 / 0.06);
-  --shadow-popover:
-    0 12px 32px -12px rgb(15 23 42 / 0.28), 0 2px 8px -3px rgb(15 23 42 / 0.14);
-  --shadow-modal:
-    0 24px 64px -20px rgb(15 23 42 / 0.35), 0 4px 12px -6px rgb(15 23 42 / 0.16);
-  --shadow-panel: -18px 0 56px -28px rgb(15 23 42 / 0.4);
-  --shadow-toast:
-    0 10px 28px -12px rgb(15 23 42 / 0.3), 0 2px 6px -3px rgb(15 23 42 / 0.16);
-  /* Sticky table header lifts off the rows once the body scrolls under it. */
-  --shadow-sticky: 0 1px 0 0 var(--color-border), 0 6px 12px -10px rgb(15 23 42 / 0.5);
+  --shadow-card: var(--shadow-card-v);
+  --shadow-popover: var(--shadow-popover-v);
+  --shadow-modal: var(--shadow-modal-v);
+  --shadow-panel: var(--shadow-panel-v);
+  --shadow-toast: var(--shadow-toast-v);
+  --shadow-sticky: var(--shadow-sticky-v);
+  --shadow-rail: var(--shadow-rail-v);
 
   --animate-fade-in: ui-fade-in 120ms ease-out;
   --animate-scale-in: ui-scale-in 140ms cubic-bezier(0.16, 1, 0.3, 1);
   --animate-slide-left: ui-slide-left 180ms cubic-bezier(0.16, 1, 0.3, 1);
   --animate-slide-up: ui-slide-up 160ms cubic-bezier(0.16, 1, 0.3, 1);
   --animate-toast-in: ui-toast-in 200ms cubic-bezier(0.16, 1, 0.3, 1);
+  --animate-shimmer: ui-shimmer 1.4s ease-in-out infinite;
 }
 
 @keyframes ui-fade-in {
@@ -148,6 +469,20 @@
   }
 }
 
+@keyframes ui-shimmer {
+  0%,
+  100% {
+    opacity: 0.55;
+  }
+  50% {
+    opacity: 0.9;
+  }
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   Base
+   ─────────────────────────────────────────────────────────────────────────── */
+
 html,
 body,
 #root {
@@ -156,24 +491,29 @@ body,
 
 body {
   margin: 0;
-  background: var(--color-surface-sunken);
-  color: var(--color-ink);
+  background: var(--background);
+  color: var(--ink);
   font-family: var(--font-sans);
-  font-size: var(--text-base);
+  font-size: 0.875rem;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  overscroll-behavior: none;
 }
 
 @layer base {
-  ::selection {
-    background: var(--color-brand-100);
-    color: var(--color-brand-900);
+  * {
+    border-color: var(--border-color);
   }
 
-  /* Thin, quiet scrollbars — dense tables scroll a lot and chrome-heavy bars
-     eat into the data. */
+  ::selection {
+    background: color-mix(in srgb, var(--accent-500) 22%, transparent);
+    color: var(--ink);
+  }
+
+  /* Thin, quiet scrollbars — dense lists scroll a lot. */
   * {
     scrollbar-width: thin;
-    scrollbar-color: var(--color-border-strong) transparent;
+    scrollbar-color: var(--border-strong) transparent;
   }
 
   ::-webkit-scrollbar {
@@ -186,14 +526,14 @@ body {
   }
 
   ::-webkit-scrollbar-thumb {
-    background-color: var(--color-border-strong);
+    background-color: var(--border-strong);
     background-clip: content-box;
     border: 3px solid transparent;
     border-radius: 9999px;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background-color: var(--color-ink-subtle);
+    background-color: var(--ink-subtle);
     background-clip: content-box;
   }
 
@@ -207,6 +547,56 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* One-line clamp used by list rows (subject/preview lines). */
+.clamp-1 {
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.clamp-2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ───────────────────────────────────────────────────────────────────────────
+   Mantine bridge
+   Mantine ships its own variables; the few that decide how a Mantine control
+   reads next to a shadcn one are re-pointed at our palette here. The rest of
+   the mapping is in src/theme/mantine.ts.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+:root,
+.dark {
+  --mantine-font-family: var(--font-sans);
+  --mantine-font-family-monospace: var(--font-mono);
+  --mantine-font-size-sm: 0.8125rem;
+  --mantine-font-size-md: 0.875rem;
+  --mantine-radius-default: var(--radius);
+  --mantine-color-text: var(--ink);
+  --mantine-color-body: var(--surface);
+  --mantine-color-error: var(--danger-600);
+  --mantine-color-placeholder: var(--ink-subtle);
+  --mantine-color-dimmed: var(--ink-muted);
+  --mantine-color-anchor: var(--primary);
+  --mantine-color-default: var(--surface);
+  --mantine-color-default-hover: var(--surface-hover);
+  --mantine-color-default-color: var(--ink);
+  --mantine-color-default-border: var(--border-color);
+}
+
+/* Mantine portals must sit under our overlays' stacking, not above them. */
+.mantine-Popover-dropdown,
+.mantine-Menu-dropdown,
+.mantine-Select-dropdown,
+.mantine-Combobox-dropdown {
+  box-shadow: var(--shadow-popover-v);
+  border-color: var(--border-color);
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -214,5 +604,6 @@ body {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }

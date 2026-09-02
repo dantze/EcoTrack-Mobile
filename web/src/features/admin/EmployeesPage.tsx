@@ -15,12 +15,12 @@
  */
 
 import { useMemo, useState } from 'react';
+import { CommandBar, Workbench } from '@/components/layout';
 import {
   Badge,
   DataTable,
   EmptyState,
   IconButton,
-  PageHeader,
   Select,
   Spinner,
   TextInput,
@@ -102,22 +102,27 @@ export function EmployeesPage() {
   }
 
   return (
-    <div className="flex flex-col gap-5 p-6">
-      <PageHeader
+    <Workbench>
+      <CommandBar
         title="Angajați"
         subtitle={`${employees.length} persoane cu acces · rolul decide ce pot face`}
-      />
-
-      <TextInput
-        label="Caută"
-        value={query}
-        onChange={(event) => setQuery(event.target.value)}
-        className="max-w-sm"
+        tools={
+          <div className="w-48 sm:w-64">
+            <TextInput
+              placeholder="Caută după nume sau utilizator"
+              value={query}
+              inputSize="sm"
+              clearable
+              onClear={() => setQuery('')}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          </div>
+        }
       />
 
       {isLoading ? (
         <div className="flex justify-center py-16">
-          <Spinner className="size-6 text-brand-600" />
+          <Spinner className="size-6 text-primary" />
         </div>
       ) : filtered.length === 0 ? (
         <EmptyState
@@ -127,6 +132,7 @@ export function EmployeesPage() {
       ) : (
         <DataTable
           rows={filtered}
+          ariaLabel="Angajați"
           rowKey={(employee) => employee.id}
           columns={[
             {
@@ -134,8 +140,8 @@ export function EmployeesPage() {
               header: 'Nume',
               render: (employee) => (
                 <div>
-                  <p className="font-medium text-content">{employee.fullName}</p>
-                  <p className="text-xs text-content-muted">{employee.username}</p>
+                  <p className="font-medium text-ink">{employee.fullName}</p>
+                  <p className="text-xs text-ink-muted">{employee.username}</p>
                 </div>
               ),
             },
@@ -181,6 +187,6 @@ export function EmployeesPage() {
           ]}
         />
       )}
-    </div>
+    </Workbench>
   );
 }

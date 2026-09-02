@@ -12,6 +12,10 @@
  */
 
 import type { ReactNode } from 'react';
+import { Sparkles, TriangleAlert } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/shadcn/alert';
+import { ItemActions } from '@/components/shadcn/item';
+import { cn } from '@/lib/utils';
 import { Button } from './Button';
 
 export function SuggestionCard({
@@ -45,49 +49,39 @@ export function SuggestionCard({
   onDismiss: () => void;
 }) {
   const stacked = layout === 'stacked';
+
   return (
-    <div className="rounded-md border border-brand-200 bg-brand-50/60 px-3 py-2.5">
-      <div className={stacked ? 'flex flex-col gap-2' : 'flex items-start justify-between gap-3'}>
+    <Alert className="border-info-200 bg-info-50 text-ink">
+      <Sparkles className="text-info-700" />
+      <div
+        className={cn(
+          'col-start-2',
+          stacked ? 'flex flex-col gap-2' : 'flex items-start justify-between gap-3',
+        )}
+      >
         <div className="min-w-0">
-          <p className="flex items-center gap-1.5 text-sm font-medium text-brand-700">
-            <SparkIcon />
-            {title}
-          </p>
+          <AlertTitle className="text-info-700">{title}</AlertTitle>
           {details && details.length > 0 && (
-            <ul className="mt-1.5 flex flex-col gap-0.5">
-              {details.map((detail) => (
-                <li key={detail} className="text-xs text-ink-muted">
-                  · {detail}
-                </li>
-              ))}
-            </ul>
+            <AlertDescription className="mt-1.5 text-xs text-ink-muted">
+              <ul className="flex flex-col gap-0.5">
+                {details.map((detail) => (
+                  <li key={detail}>· {detail}</li>
+                ))}
+              </ul>
+            </AlertDescription>
           )}
           {basis && <p className="mt-1.5 text-xs text-ink-subtle italic">{basis}</p>}
         </div>
-        <div className={stacked ? 'flex justify-end gap-1.5' : 'flex shrink-0 gap-1.5'}>
+        <ItemActions className={cn('gap-1.5', stacked ? 'justify-end' : 'shrink-0')}>
           <Button size="sm" variant="secondary" disabled={busy} onClick={onDismiss}>
             {dismissLabel}
           </Button>
           <Button size="sm" variant="primary" loading={busy} onClick={onApply}>
             {applyLabel}
           </Button>
-        </div>
+        </ItemActions>
       </div>
-    </div>
-  );
-}
-
-/** Non-decorative-looking but decorative: the card's text carries the meaning. */
-function SparkIcon() {
-  return (
-    <svg
-      viewBox="0 0 16 16"
-      aria-hidden
-      className="size-3.5 shrink-0"
-      fill="currentColor"
-    >
-      <path d="M8 1.5 9.3 5.4 13.2 6.7 9.3 8 8 11.9 6.7 8 2.8 6.7 6.7 5.4zM12.5 10.2l.6 1.7 1.7.6-1.7.6-.6 1.7-.6-1.7-1.7-.6 1.7-.6z" />
-    </svg>
+    </Alert>
   );
 }
 
@@ -98,15 +92,12 @@ function SparkIcon() {
  */
 export function WarningNote({ children }: { children: ReactNode }) {
   return (
-    <p
+    <Alert
       role="status"
-      className="mt-1.5 flex items-start gap-1.5 rounded border border-warning-200 bg-warning-50 px-2 py-1.5 text-xs text-warning-700"
+      className="mt-1.5 border-warning-200 bg-warning-50 text-xs text-warning-700"
     >
-      <svg viewBox="0 0 16 16" aria-hidden className="mt-px size-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round">
-        <path d="M8 2.8 14.2 13H1.8z" />
-        <path d="M8 6.6v2.8M8 11.4h.01" />
-      </svg>
-      <span>{children}</span>
-    </p>
+      <TriangleAlert className="text-warning-600" />
+      <AlertTitle className="font-normal text-warning-700">{children}</AlertTitle>
+    </Alert>
   );
 }

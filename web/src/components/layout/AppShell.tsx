@@ -1,118 +1,53 @@
 /**
- * Desktop shell: fixed sidebar + full-height content column.
+ * The application shell.
  *
- * Deliberately not a phone layout — the sidebar is always visible, there is no
- * bottom tab bar, and content is free to use the full width for tables.
+ * Outlook's frame: a navy global bar across the top, a role-aware navigation
+ * pane on the left, and the screen filling everything else. The pane collapses
+ * to an icon rail on demand and disappears into a Sheet below `lg` — a phone
+ * gets the whole width for content, which is the only way the dense screens in
+ * this app are usable at 390 px.
  *
- * Nav is role-aware: a section only appears if the signed-in user holds the
- * role that section's routes are gated on in src/routes/router.tsx (SALES for
- * Vânzări, TECH for Tehnic) — a Sales-only account never even sees a Tehnic
- * link it would bounce off of.
- *
- * The shell also owns the two app-wide keyboard affordances, because they must
- * work on every screen and outlive any single page:
+ * The shell also owns the app-wide keyboard affordances, because they must work
+ * on every screen and outlive any single page:
  *   ⌘K / Ctrl+K  the command palette (jump to any record, run any action)
  *   ?            the shortcut help overlay, built from the live registry
  *   g then …     jump straight to a section
+ *   [            collapse / expand the navigation pane
  * Screens add their own keys with `useShortcuts` from `@/lib/hotkeys`; they
  * appear in the help overlay automatically.
  */
 
-import { useState } from 'react';
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { DATA_MODE } from '@/api';
+import { Suspense, lazy, useState } from 'react';
+import { Outlet, useNavigate } from 'react-router-dom';
+import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { useAuth } from '@/auth';
-import { AccountMenu } from '@/features/auth/AccountMenu';
-import { CommandPalette } from '@/features/command/CommandPalette';
-import { GLOBAL_GROUP, ShortcutHelp } from '@/features/command/ShortcutHelp';
-import { ShortcutProvider, comboLabel, useShortcuts, usePendingChord } from '@/lib/hotkeys';
+import { Button } from '@/components/shadcn/button';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/shadcn/sheet';
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/shadcn/tooltip';
+import { GLOBAL_GROUP, ShortcutProvider, useShortcuts, usePendingChord } from '@/lib/hotkeys';
 import { UndoProvider, focusIsEditable, useUndo } from '@/lib/undo';
-import type { Role } from '@/types/domain';
+import { NAV_SECTIONS, NavPane } from './nav';
+import { TopBar } from './TopBar';
+import { usePersistentState } from './Workbench';
 
-interface NavItem {
-  to: string;
-  label: string;
-  /** Second key of the `g …` chord that jumps here. */
-  chord: string;
-}
+/**
+ * Both overlays are lazy, and the reason is weight rather than tidiness.
+ *
+ * The palette reaches for cmdk, the whole UI kit barrel (and through it
+ * Mantine's date package) and both feature modules' query hooks, so importing
+ * it from the shell put every one of those on the FIRST paint of every screen
+ * — to render something that is invisible until ⌘K is pressed. Neither can be
+ * opened before its chunk arrives, because the only thing that opens them is a
+ * keystroke handled here.
+ */
+const CommandPalette = lazy(async () => ({
+  default: (await import('@/features/command/CommandPalette')).CommandPalette,
+}));
 
-interface NavSectionDef {
-  title: string;
-  /** Visible when the account holds ANY of these — matches RequireRole. */
-  roles: Role[];
-  items: NavItem[];
-}
-
-const NAV_SECTIONS: NavSectionDef[] = [
-  {
-    // Cross-module, so it sits above both sections rather than inside one.
-    title: 'General',
-    roles: ['SALES', 'TECH'],
-    items: [{ to: '/harta', label: 'Hartă', chord: 'h' }],
-  },
-  {
-    title: 'Vânzări',
-    roles: ['SALES'],
-    items: [
-      { to: '/comenzi', label: 'Comenzi', chord: 'c' },
-      { to: '/calendar', label: 'Calendar', chord: 'd' },
-      { to: '/clienti', label: 'Clienți', chord: 'l' },
-      { to: '/produse', label: 'Produse', chord: 'p' },
-      { to: '/abonamente', label: 'Abonamente', chord: 'a' },
-    ],
-  },
-  {
-    title: 'Tehnic',
-    roles: ['TECH'],
-    items: [
-      { to: '/rute', label: 'Rute', chord: 'r' },
-      { to: '/sarcini', label: 'Sarcini', chord: 's' },
-      { to: '/recurente', label: 'Igienizări recurente', chord: 'i' },
-    ],
-  },
-  {
-    // Admin-only. `hasRole` treats ADMIN as satisfying every gate, so this is
-    // the one section that is genuinely exclusive rather than additive.
-    title: 'Admin',
-    roles: ['ADMIN'],
-    items: [
-      { to: '/cereri', label: 'Cereri de acces', chord: 'q' },
-      { to: '/angajati', label: 'Angajați', chord: 'e' },
-    ],
-  },
-];
-
-function NavSection({ title, items }: { title: string; items: NavItem[] }) {
-  return (
-    <div className="mb-5">
-      <p className="mb-1 px-3 text-[0.6875rem] font-semibold tracking-wide text-white/40 uppercase">
-        {title}
-      </p>
-      <nav className="flex flex-col gap-0.5">
-        {items.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            className={({ isActive }) =>
-              [
-                'group flex items-center justify-between rounded-md px-3 py-1.5 text-sm transition-colors',
-                isActive ? 'bg-white/15 font-medium text-white' : 'text-white/70 hover:bg-white/10',
-              ].join(' ')
-            }
-          >
-            <span className="truncate">{item.label}</span>
-            <span
-              aria-hidden
-              className="ml-2 shrink-0 font-mono text-[0.625rem] text-white/0 transition-colors group-hover:text-white/45"
-            >
-              g {item.chord}
-            </span>
-          </NavLink>
-        ))}
-      </nav>
-    </div>
-  );
-}
+const ShortcutHelp = lazy(async () => ({
+  default: (await import('@/features/command/ShortcutHelp')).ShortcutHelp,
+}));
 
 export function AppShell() {
   return (
@@ -131,6 +66,8 @@ function ShellBody() {
   const navigate = useNavigate();
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
+  const [navOpen, setNavOpen] = useState(false);
+  const [collapsed, setCollapsed] = usePersistentState('ecotrack.nav.collapsed', false);
   const pendingChord = usePendingChord();
 
   const visibleSections = NAV_SECTIONS.filter((section) =>
@@ -169,6 +106,12 @@ function ShellBody() {
         setHelpOpen((open) => !open);
       },
     },
+    {
+      combo: '[',
+      description: 'Restrânge / extinde panoul de navigare',
+      group: GLOBAL_GROUP,
+      run: () => setCollapsed(!collapsed),
+    },
     ...visibleSections.flatMap((section) =>
       section.items.map((item) => ({
         combo: `g ${item.chord}`,
@@ -180,69 +123,78 @@ function ShellBody() {
   ]);
 
   return (
-    <div className="flex h-full">
-      <aside className="flex w-56 shrink-0 flex-col bg-brand-700 px-2 py-4">
-        <div className="mb-4 px-3">
-          <p className="text-sm font-semibold text-white">EcoTrack</p>
-          <p className="text-xs text-white/50">Dami Prod</p>
-        </div>
+    <div className="flex h-full flex-col bg-background">
+      <TopBar
+        onOpenNav={() => setNavOpen(true)}
+        onOpenPalette={() => setPaletteOpen(true)}
+        onOpenHelp={() => setHelpOpen(true)}
+      />
 
-        <button
-          type="button"
-          onClick={() => setPaletteOpen(true)}
-          className="mx-1 mb-5 flex items-center justify-between gap-2 rounded-md bg-white/10 px-2.5 py-1.5 text-sm text-white/70 transition-colors hover:bg-white/15 hover:text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-400"
-        >
-          <span className="flex min-w-0 items-center gap-1.5">
-            <svg viewBox="0 0 16 16" aria-hidden className="size-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth={1.5}>
-              <circle cx="7.2" cy="7.2" r="4.2" />
-              <path d="m10.4 10.4 2.6 2.6" strokeLinecap="round" />
-            </svg>
-            <span className="truncate">Caută…</span>
-          </span>
-          <kbd className="shrink-0 rounded border border-white/25 px-1 font-mono text-[0.625rem] text-white/60">
-            {comboLabel('mod+k')}
-          </kbd>
-        </button>
-
-        {visibleSections.map((section) => (
-          <NavSection key={section.title} title={section.title} items={section.items} />
-        ))}
-
-        <div className="mt-auto flex flex-col gap-2 px-1">
-          {DATA_MODE === 'mock' && (
-            <span className="mx-2 inline-flex w-fit items-center rounded bg-amber-400/20 px-1.5 py-0.5 text-xs text-amber-200">
-              date demo
-            </span>
+      <div className="flex min-h-0 flex-1">
+        {/* Desktop pane. Hidden rather than unmounted below lg so its scroll
+            position survives a resize. */}
+        <aside
+          className={cn(
+            'hidden shrink-0 flex-col border-r border-border bg-surface transition-[width] duration-150 lg:flex',
+            collapsed ? 'w-[52px]' : 'w-[232px]',
           )}
-          <button
-            type="button"
-            onClick={() => setHelpOpen(true)}
-            className="mx-1 rounded px-2 py-1 text-left text-xs text-white/45 transition-colors hover:text-white/80 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-400"
-          >
-            Scurtături tastatură · ?
-          </button>
-          <div className="border-t border-white/10 pt-2">
-            <AccountMenu />
-          </div>
-        </div>
-      </aside>
+        >
+          <NavPane sections={visibleSections} collapsed={collapsed} />
 
-      <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-white">
-        <Outlet />
-      </main>
+          <div className="shrink-0 border-t border-border p-1.5">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label={collapsed ? 'Extinde panoul' : 'Restrânge panoul'}
+                  aria-expanded={!collapsed}
+                  onClick={() => setCollapsed(!collapsed)}
+                  className={cn('text-ink-muted', collapsed ? 'mx-auto flex' : 'ml-auto flex')}
+                >
+                  {collapsed ? <PanelLeftOpen /> : <PanelLeftClose />}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="right">
+                {collapsed ? 'Extinde panoul' : 'Restrânge panoul'}
+                <span className="ml-2 font-mono text-[0.625rem] opacity-70">[</span>
+              </TooltipContent>
+            </Tooltip>
+          </div>
+        </aside>
+
+        <main className="flex min-w-0 flex-1 flex-col overflow-hidden bg-background">
+          <Outlet />
+        </main>
+      </div>
+
+      {/* Mobile navigation. */}
+      <Sheet open={navOpen} onOpenChange={setNavOpen}>
+        <SheetContent side="left" className="w-[280px] gap-0 bg-surface p-0">
+          <SheetHeader className="border-b border-border px-3 py-2.5">
+            <SheetTitle className="text-sm">Navigare</SheetTitle>
+          </SheetHeader>
+          <NavPane sections={visibleSections} onNavigate={() => setNavOpen(false)} />
+        </SheetContent>
+      </Sheet>
 
       {/* Chord feedback: "g" alone means nothing until the second key lands. */}
       {pendingChord && (
         <div
           role="status"
-          className="pointer-events-none fixed bottom-4 left-1/2 z-[80] -translate-x-1/2 rounded-md bg-ink px-3 py-1.5 text-xs text-white shadow-popover"
+          className="pointer-events-none fixed bottom-4 left-1/2 z-[80] -translate-x-1/2 rounded-md bg-surface-inverse px-3 py-1.5 text-xs text-ink-inverse shadow-popover"
         >
           <kbd className="font-mono">{pendingChord}</kbd> … apasă a doua tastă
         </div>
       )}
 
-      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
-      <ShortcutHelp open={helpOpen} onClose={() => setHelpOpen(false)} />
+      {/* No fallback: there is nothing to show while a dialog that is not on
+          screen yet loads, and a spinner over the page would be worse than the
+          ~80ms of nothing. */}
+      <Suspense fallback={null}>
+        {paletteOpen && <CommandPalette open onClose={() => setPaletteOpen(false)} />}
+        {helpOpen && <ShortcutHelp open onClose={() => setHelpOpen(false)} />}
+      </Suspense>
     </div>
   );
 }

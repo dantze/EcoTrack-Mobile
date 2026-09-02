@@ -22,7 +22,7 @@ export interface HoverCardProps {
 export function HoverCard({ point, x, y }: HoverCardProps) {
   return (
     <div
-      className="pointer-events-none absolute z-10 w-64 -translate-x-1/2 -translate-y-[calc(100%+14px)] animate-fade-in rounded-lg border border-border bg-white p-3 shadow-popover"
+      className="pointer-events-none absolute z-10 w-64 -translate-x-1/2 -translate-y-[calc(100%+14px)] animate-fade-in rounded-lg border border-border bg-surface p-3 shadow-popover"
       style={{ left: x, top: y }}
     >
       <div className="flex items-start justify-between gap-2">

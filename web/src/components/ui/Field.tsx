@@ -1,11 +1,25 @@
 /**
  * Field shell — the label / control / hint / error stack every form control
  * shares, so the vertical rhythm of a form is decided in exactly one place.
+ *
+ * Built on shadcn's `Field` primitives rather than bare elements: `Field`
+ * carries the `group/field` hooks the checkbox and input primitives style
+ * themselves against, and `FieldError` already renders `role="alert"`, which
+ * is what puts a validation message in front of a screen reader.
+ *
+ * The label is deliberately smaller and quieter than shadcn's default. A form
+ * in this app is a dense grid of ten fields inside a drawer, not a marketing
+ * sign-up, and a 14px label per row doubles the height of every one of them.
  */
 
 import type { ReactNode } from 'react';
-import { AlertIcon } from './icons';
-import { cx } from './utils';
+import {
+  Field as ShadcnField,
+  FieldDescription,
+  FieldError,
+  FieldLabel,
+} from '@/components/shadcn/field';
+import { cn } from './utils';
 
 export interface FieldShellProps {
   id: string;
@@ -19,6 +33,9 @@ export interface FieldShellProps {
   children: ReactNode;
 }
 
+/** Id of the `<label>` a control can point `aria-labelledby` at. */
+export const labelId = (id: string) => `${id}-label`;
+
 export function FieldShell({
   id,
   hintId,
@@ -31,29 +48,37 @@ export function FieldShell({
   children,
 }: FieldShellProps) {
   return (
-    <div className={cx('flex min-w-0 flex-col gap-1', className)}>
+    <ShadcnField
+      data-invalid={error ? true : undefined}
+      className={cn('min-w-0 gap-1.5', className)}
+    >
       {label && (
-        <label htmlFor={id} className="text-xs font-medium text-ink-muted">
-          {label}
-          {required && (
-            <span className="text-danger-600" aria-hidden>
-              {' *'}
-            </span>
-          )}
-        </label>
+        <FieldLabel
+          id={labelId(id)}
+          htmlFor={id}
+          className="w-full text-xs font-medium text-ink-muted"
+        >
+          <span className="truncate">
+            {label}
+            {required && (
+              <span className="text-destructive" aria-hidden>
+                {' *'}
+              </span>
+            )}
+          </span>
+        </FieldLabel>
       )}
       {children}
       {error ? (
-        <span id={errorId} role="alert" className="flex items-start gap-1 text-xs text-danger-600">
-          <AlertIcon className="mt-px size-3.5 shrink-0" />
-          <span>{error}</span>
-        </span>
+        <FieldError id={errorId} className="text-xs text-destructive">
+          {error}
+        </FieldError>
       ) : hint ? (
-        <span id={hintId} className="text-xs text-ink-subtle">
+        <FieldDescription id={hintId} className="text-xs text-ink-subtle">
           {hint}
-        </span>
+        </FieldDescription>
       ) : null}
-    </div>
+    </ShadcnField>
   );
 }
 
@@ -72,6 +97,10 @@ export function describedBy(
 /**
  * Horizontal group of fields on one row of a form. Feature screens use this
  * instead of hand-rolling a grid per modal.
+ *
+ * Always one column below `sm`. Two 40px inputs side by side inside a 390px
+ * drawer leaves ~150px each, which is narrower than the dates and money
+ * amounts that go in them — the row has to stack, not shrink.
  */
 export function FieldRow({
   children,
@@ -84,11 +113,10 @@ export function FieldRow({
 }) {
   return (
     <div
-      className={cx(
-        'grid gap-3',
-        columns === 1 && 'grid-cols-1',
-        columns === 2 && 'grid-cols-2',
-        columns === 3 && 'grid-cols-3',
+      className={cn(
+        'grid grid-cols-1 gap-3',
+        columns === 2 && 'sm:grid-cols-2',
+        columns === 3 && 'sm:grid-cols-2 lg:grid-cols-3',
         className,
       )}
     >

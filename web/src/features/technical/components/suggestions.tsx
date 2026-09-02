@@ -48,7 +48,7 @@ export function DispatchSuggestions({
   const dismiss = (key: string) => setDismissed((current) => new Set(current).add(key));
 
   return (
-    <div className="flex flex-col gap-2 border-b border-border bg-white px-2 py-2">
+    <div className="flex flex-col gap-2 border-b border-border bg-surface px-2 py-2">
       <SuggestionCard
         title="Ordine mai scurtă a opririlor"
         layout="stacked"

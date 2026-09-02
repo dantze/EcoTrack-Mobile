@@ -12,6 +12,11 @@
  *   waiting  → the six-digit code, a countdown, polling
  *   done     → "Sunteți înregistrat cu rol de X", then into the app
  *
+ * Those three are rendered as a stepper rather than three unrelated cards,
+ * because the middle one is a WAIT: someone staring at a code needs to see
+ * that something else has to happen before anything changes, and roughly how
+ * far along they are. It is the difference between "waiting" and "broken".
+ *
  * It is a route, not a modal, so it can be reached with a live session
  * already in hand: the address bar keeps /login after a bounce, and mock mode
  * enrolls itself on boot whichever URL was loaded. An authenticated visitor is
@@ -25,8 +30,9 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { FormEvent } from 'react';
+import type { FormEvent, ReactNode } from 'react';
 import { Navigate, useLocation, useNavigate } from 'react-router-dom';
+import { Check, Copy, Leaf, ShieldCheck } from 'lucide-react';
 import { api } from '@/api';
 import type { EnrollmentStatus } from '@/api/contract';
 import { useAuth } from '@/auth';
@@ -36,7 +42,7 @@ import {
   readPendingTicket,
   savePendingTicket,
 } from '@/auth/storage';
-import { Button, Spinner, TextInput } from '@/components/ui';
+import { Button, IconButton, Spinner, TextInput, cx } from '@/components/ui';
 import { ROLE_LABELS } from '@/components/domain';
 import type { Role } from '@/types/domain';
 
@@ -44,6 +50,12 @@ import type { Role } from '@/types/domain';
 const POLL_INTERVAL_MS = 3000;
 
 type Phase = 'form' | 'waiting' | 'done';
+
+const STEPS: { phase: Phase; label: string }[] = [
+  { phase: 'form', label: 'Cerere' },
+  { phase: 'waiting', label: 'Aprobare' },
+  { phase: 'done', label: 'Acces' },
+];
 
 function useCountdown(expiresAt: string | null): string | null {
   const [now, setNow] = useState(() => Date.now());
@@ -205,9 +217,9 @@ export function EnrollmentPage() {
   // about to be signed in. Same spinner as RequireAuth, same reason.
   if (status === 'loading') {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-surface-sunken">
-        <Spinner className="size-6 text-brand-600" />
-      </div>
+      <Field>
+        <Spinner className="size-6 text-sidebar-foreground" />
+      </Field>
     );
   }
   // 'done' is exempt: that branch has just been issued a session and is showing
@@ -217,98 +229,236 @@ export function EnrollmentPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-surface-sunken px-4">
-      <div className="w-full max-w-md rounded-xl border border-border bg-surface p-8 shadow-sm">
-        <h1 className="text-xl font-semibold text-content">EcoTrack</h1>
+    <Field>
+      <div className="w-full max-w-md">
+        <Lockup />
 
-        {phase === 'form' && (
-          <>
-            <p className="mt-1 text-sm text-content-muted">
-              {serverStatus?.awaitingBootstrap
-                ? 'Nicio persoană nu are încă acces. Prima cerere devine administrator.'
-                : serverStatus?.adminLockout
-                  ? 'Niciun administrator nu mai este conectat, deci nimeni nu poate aproba cereri. Cu codul de recuperare din jurnalul serverului poți crea un administrator nou.'
-                  : 'Trimite o cerere de acces. Un administrator o va aproba.'}
-            </p>
+        <div className="mt-6 rounded-xl border border-border bg-surface p-6 shadow-modal sm:p-7">
+          <Stepper phase={phase} />
 
-            <form onSubmit={onSubmit} className="mt-6 flex flex-col gap-4" noValidate>
-              <TextInput
-                label="Nume complet"
-                value={fullName}
-                onChange={(event) => setFullName(event.target.value)}
-                autoFocus
-                autoComplete="name"
-              />
-
-              {/* One field, two states — first run and admin lockout (TODO-30).
-                  `setupCodeRequired` is true for both; only the wording tells
-                  them apart, because the person reading it is looking for the
-                  code in a different place each time. */}
-              {serverStatus?.setupCodeRequired && (
-                <TextInput
-                  label={serverStatus.adminLockout ? 'Cod de recuperare' : 'Cod de configurare'}
-                  hint={
-                    serverStatus.adminLockout
-                      ? 'Afișat în jurnalul serverului când ultimul administrator s-a deconectat.'
-                      : 'Afișat în log-ul serverului la prima pornire.'
-                  }
-                  value={setupCode}
-                  onChange={(event) => setSetupCode(event.target.value)}
-                  autoComplete="off"
-                />
-              )}
-
-              {error && (
-                <p role="alert" className="text-sm text-danger-600">
-                  {error}
-                </p>
-              )}
-
-              <Button type="submit" disabled={submitting}>
-                {submitting ? 'Se trimite…' : 'Solicită acces'}
-              </Button>
-            </form>
-          </>
-        )}
-
-        {phase === 'waiting' && ticket && (
-          <>
-            <p className="mt-1 text-sm text-content-muted">
-              Spune acest cod administratorului. El îl va verifica înainte să aprobe.
-            </p>
-
-            <p className="my-8 text-center font-mono text-5xl tracking-[0.3em] text-content">
-              {ticket.verificationCode}
-            </p>
-
-            <div className="flex items-center justify-center gap-2 text-sm text-content-muted">
-              <Spinner className="size-4" />
-              <span>Se așteaptă aprobarea{countdown ? ` · expiră în ${countdown}` : ''}</span>
-            </div>
-
-            {error && (
-              <p role="alert" className="mt-4 text-center text-sm text-danger-600">
-                {error}
+          {phase === 'form' && (
+            <>
+              <h1 className="mt-6 text-base font-semibold text-ink">Cere acces</h1>
+              <p className="mt-1 text-sm leading-relaxed text-ink-muted">
+                {serverStatus?.awaitingBootstrap
+                  ? 'Nicio persoană nu are încă acces. Prima cerere devine administrator.'
+                  : serverStatus?.adminLockout
+                    ? 'Niciun administrator nu mai este conectat, deci nimeni nu poate aproba cereri. Cu codul de recuperare din jurnalul serverului poți crea un administrator nou.'
+                    : 'Trimite o cerere de acces. Un administrator o va aproba.'}
               </p>
-            )}
 
-            <Button
-              variant="ghost"
-              className="mt-6 w-full"
-              onClick={() => startOver(null)}
-            >
-              Anulează
-            </Button>
-          </>
-        )}
+              <form onSubmit={onSubmit} className="mt-5 flex flex-col gap-4" noValidate>
+                <TextInput
+                  label="Nume complet"
+                  value={fullName}
+                  onChange={(event) => setFullName(event.target.value)}
+                  autoFocus
+                  autoComplete="name"
+                />
 
-        {phase === 'done' && (
-          <p className="my-10 text-center text-lg font-medium text-content">
-            Sunteți înregistrat cu rol de{' '}
-            {grantedRole ? ROLE_LABELS[grantedRole] : 'utilizator'}
-          </p>
-        )}
+                {/* One field, two states — first run and admin lockout (TODO-30).
+                    `setupCodeRequired` is true for both; only the wording tells
+                    them apart, because the person reading it is looking for the
+                    code in a different place each time. */}
+                {serverStatus?.setupCodeRequired && (
+                  <TextInput
+                    label={serverStatus.adminLockout ? 'Cod de recuperare' : 'Cod de configurare'}
+                    hint={
+                      serverStatus.adminLockout
+                        ? 'Afișat în jurnalul serverului când ultimul administrator s-a deconectat.'
+                        : 'Afișat în log-ul serverului la prima pornire.'
+                    }
+                    value={setupCode}
+                    onChange={(event) => setSetupCode(event.target.value)}
+                    autoComplete="off"
+                  />
+                )}
+
+                {error && <ErrorNote>{error}</ErrorNote>}
+
+                <Button type="submit" variant="primary" block loading={submitting}>
+                  {submitting ? 'Se trimite…' : 'Solicită acces'}
+                </Button>
+              </form>
+            </>
+          )}
+
+          {phase === 'waiting' && ticket && (
+            <>
+              <h1 className="mt-6 text-base font-semibold text-ink">Spune codul administratorului</h1>
+              <p className="mt-1 text-sm leading-relaxed text-ink-muted">
+                Îl va compara cu cel de pe ecranul lui înainte să aprobe. Ține pagina deschisă.
+              </p>
+
+              <CodeDisplay code={ticket.verificationCode} />
+
+              <div className="mt-5 flex items-center justify-center gap-2 rounded-lg border border-border bg-surface-sunken px-3 py-2.5 text-sm text-ink-muted">
+                <Spinner className="size-4 shrink-0" />
+                <span>Se așteaptă aprobarea</span>
+                {countdown && (
+                  <span className="tabular text-ink-subtle">· expiră în {countdown}</span>
+                )}
+              </div>
+
+              {error && <ErrorNote className="mt-4">{error}</ErrorNote>}
+
+              <Button variant="ghost" block className="mt-4" onClick={() => startOver(null)}>
+                Anulează cererea
+              </Button>
+            </>
+          )}
+
+          {phase === 'done' && (
+            <div className="flex flex-col items-center gap-3 py-8 text-center">
+              <span className="flex size-11 items-center justify-center rounded-full bg-success-50 text-success-600 ring-1 ring-success-200 ring-inset">
+                <ShieldCheck aria-hidden className="size-5" />
+              </span>
+              <p className="text-base font-medium text-ink">
+                Sunteți înregistrat cu rol de {grantedRole ? ROLE_LABELS[grantedRole] : 'utilizator'}
+              </p>
+              <p className="text-sm text-ink-muted">Vă ducem în aplicație…</p>
+            </div>
+          )}
+        </div>
+
+        <p className="mt-5 text-center text-xs leading-relaxed text-sidebar-foreground/70">
+          Accesul se acordă per dispozitiv. Nu există parolă — dacă schimbi telefonul sau
+          browserul, ceri acces din nou.
+        </p>
       </div>
+    </Field>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Chrome
+// ---------------------------------------------------------------------------
+
+/**
+ * The navy field the card sits on. Uses the app rail's own colour rather than a
+ * page background: this screen has no rail, and borrowing its navy is what
+ * makes /login read as the same product in both themes without a `dark:` rule.
+ */
+function Field({ children }: { children: ReactNode }) {
+  return (
+    <div className="flex min-h-screen items-center justify-center bg-sidebar px-4 py-10">
+      {children}
     </div>
+  );
+}
+
+function Lockup() {
+  return (
+    <div className="flex items-center justify-center gap-2.5">
+      <span className="flex size-9 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
+        <Leaf aria-hidden className="size-5" />
+      </span>
+      <span className="text-lg font-semibold tracking-tight text-sidebar-foreground">EcoTrack</span>
+    </div>
+  );
+}
+
+/** Where in the three-step flow this device is. Purely informative. */
+function Stepper({ phase }: { phase: Phase }) {
+  const current = STEPS.findIndex((step) => step.phase === phase);
+
+  return (
+    <ol className="flex items-center gap-2" aria-label="Pașii înregistrării">
+      {STEPS.map((step, index) => {
+        const done = index < current;
+        const active = index === current;
+        return (
+          <li key={step.phase} className="flex min-w-0 flex-1 items-center gap-2">
+            <span
+              aria-current={active ? 'step' : undefined}
+              className={cx(
+                'flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold',
+                done && 'bg-success-100 text-success-700',
+                active && 'bg-primary text-primary-foreground',
+                !done && !active && 'bg-surface-sunken text-ink-subtle ring-1 ring-border ring-inset',
+              )}
+            >
+              {done ? <Check aria-hidden className="size-3.5" /> : index + 1}
+            </span>
+            <span
+              className={cx(
+                'truncate text-xs',
+                active ? 'font-medium text-ink' : 'text-ink-subtle',
+              )}
+            >
+              {step.label}
+            </span>
+            {index < STEPS.length - 1 && (
+              <span aria-hidden className="h-px min-w-2 flex-1 bg-border" />
+            )}
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+/**
+ * The six digits, one box each.
+ *
+ * Grouped rather than run together because this number is READ ALOUD — the
+ * person on the other end of the call is transcribing it, and a wall of six
+ * glyphs is where digits get dropped. The copy button is for the other route,
+ * where the code goes into a chat message.
+ */
+function CodeDisplay({ code }: { code: string }) {
+  const [copied, setCopied] = useState(false);
+
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    } catch {
+      // Clipboard access can be refused outright (insecure context, denied
+      // permission). The code is on screen either way, so there is nothing to
+      // recover from and nothing worth interrupting the user about.
+    }
+  }
+
+  return (
+    <div className="mt-6 flex items-center justify-center gap-2">
+      <div
+        className="flex gap-1.5 sm:gap-2"
+        role="group"
+        aria-label={`Cod de verificare: ${code.split('').join(' ')}`}
+      >
+        {code.split('').map((digit, index) => (
+          <span
+            key={index}
+            aria-hidden
+            className="flex size-11 items-center justify-center rounded-md border border-border bg-surface-sunken font-mono text-xl font-semibold text-ink tabular-nums sm:size-12 sm:text-2xl"
+          >
+            {digit}
+          </span>
+        ))}
+      </div>
+      <IconButton
+        label={copied ? 'Cod copiat' : 'Copiază codul'}
+        variant="ghost"
+        onClick={() => void copy()}
+      >
+        {copied ? <Check aria-hidden /> : <Copy aria-hidden />}
+      </IconButton>
+    </div>
+  );
+}
+
+function ErrorNote({ children, className }: { children: ReactNode; className?: string }) {
+  return (
+    <p
+      role="alert"
+      className={cx(
+        'rounded-md border border-danger-200 bg-danger-50 px-3 py-2 text-sm text-danger-700',
+        className,
+      )}
+    >
+      {children}
+    </p>
   );
 }

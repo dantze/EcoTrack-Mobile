@@ -59,9 +59,12 @@ describe('CalendarPage', () => {
 
     await user.click(tile);
 
-    const panel = await screen.findByRole('dialog');
+    // On a desktop-width viewport the day opens in the reading pane beside the
+    // month, not in a dialog over it — the whole point of the pane is that the
+    // calendar stays visible while a day is read. (Below `lg` the same content
+    // is a Sheet; that path is the `dialog` one.)
+    const panel = await screen.findByRole('region', { name: dayPart });
     expect(within(panel).getByText(dayPart)).toBeInTheDocument();
-    // One button per order, plus the header's Închide and the footer's.
     expect(within(panel).getAllByText(/^#\d+$/)).toHaveLength(expected);
   });
 

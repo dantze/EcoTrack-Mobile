@@ -32,6 +32,16 @@ import type { ReactNode } from 'react';
 
 const CHORD_TIMEOUT_MS = 1400;
 
+/**
+ * Section heading for the shortcuts that work everywhere.
+ *
+ * It lives here rather than next to the help overlay that renders it: the
+ * shell registers the global shortcuts and must name their group, and
+ * importing that name from `ShortcutHelp` used to pull the overlay — and
+ * through it the whole UI kit — into the shell's eager chunk.
+ */
+export const GLOBAL_GROUP = 'General';
+
 export interface Shortcut {
   /** Combo string, e.g. "mod+k", "?", "g c". */
   combo: string;

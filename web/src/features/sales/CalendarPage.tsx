@@ -16,14 +16,24 @@
 
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Button, PageHeader, Select, Skeleton, type SelectOption } from '@/components/ui';
+import { useMediaQuery } from '@mantine/hooks';
+import { CalendarDays, ChevronLeft, ChevronRight, List, Plus, RefreshCw } from 'lucide-react';
+import {
+  CommandBar,
+  ListDetail,
+  ToolbarSeparator,
+  Workbench,
+  usePersistentState,
+} from '@/components/layout';
+import { Button, Select, Skeleton, type SelectOption } from '@/components/ui';
 import { ORDER_TYPE_LABELS, orderCountLabel } from '@/components/domain';
 import { ORDER_TYPES, type OrderTypeTag } from '@/types/domain';
 import { useDeepLink, useDeepLinkOnce } from '@/lib/deepLink';
 import { useShortcuts } from '@/lib/hotkeys';
 import { recordUse } from '@/lib/recents';
-import { ErrorNotice, FilterBar, FilterField } from './components/FilterBar';
-import { DayOrdersDrawer } from './components/DayOrdersDrawer';
+import { ErrorNotice } from './components/FilterBar';
+import { DayOrdersPane } from './components/DayOrdersDrawer';
+import { MonthAgenda } from './components/MonthAgenda';
 import { MonthGrid } from './components/MonthGrid';
 import {
   buildMonthGrid,
@@ -109,9 +119,19 @@ export function CalendarPage() {
 
   const selectedBucket = selectedIso === null ? undefined : buckets.get(selectedIso);
 
+  // A 7-column grid needs ~700px to be readable; below that the same month is
+  // better read as an agenda — the days that HAVE work, in order. `undefined`
+  // on the first render (and in jsdom) counts as the wide case.
+  const isWide = useMediaQuery('(min-width: 768px)', true, { getInitialValueInEffect: false });
+  const [preferredView, setPreferredView] = usePersistentState<'grid' | 'agenda'>(
+    'ecotrack.calendar.view',
+    'grid',
+  );
+  const view = isWide ? preferredView : 'agenda';
+
   return (
-    <>
-      <PageHeader
+    <Workbench>
+      <CommandBar
         title="Calendar"
         subtitle={
           ordersQuery.isLoading
@@ -120,91 +140,148 @@ export function CalendarPage() {
                 typeFilter ? ` · doar ${ORDER_TYPE_LABELS[typeFilter]}` : ''
               }`
         }
+        tools={
+          <>
+            <div className="w-36 sm:w-40">
+              <Select
+                value={typeFilter}
+                options={TYPE_OPTIONS}
+                onChange={setTypeFilter}
+                size="sm"
+              />
+            </div>
+            {isWide && (
+              <div className="flex items-center rounded-md border border-border p-0.5">
+                <Button
+                  variant={view === 'grid' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  aria-pressed={view === 'grid'}
+                  icon={<CalendarDays aria-hidden />}
+                  onClick={() => setPreferredView('grid')}
+                >
+                  <span className="hidden lg:inline">Lună</span>
+                </Button>
+                <Button
+                  variant={view === 'agenda' ? 'secondary' : 'ghost'}
+                  size="sm"
+                  aria-pressed={view === 'agenda'}
+                  icon={<List aria-hidden />}
+                  onClick={() => setPreferredView('agenda')}
+                >
+                  <span className="hidden lg:inline">Agendă</span>
+                </Button>
+              </div>
+            )}
+          </>
+        }
         actions={
           <>
             <Button
-              variant="secondary"
+              variant="ghost"
+              size="sm"
+              iconOnly
+              onClick={() => step(-1)}
+              aria-label="Luna anterioară"
+              icon={<ChevronLeft aria-hidden />}
+            />
+            <span className="min-w-36 text-center text-sm font-semibold text-ink">
+              {monthLabel(monthIso)}
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              iconOnly
+              onClick={() => step(1)}
+              aria-label="Luna următoare"
+              icon={<ChevronRight aria-hidden />}
+            />
+            <Button variant="secondary" size="sm" onClick={goToday}>
+              Azi
+            </Button>
+            <ToolbarSeparator />
+            <Button
+              variant="primary"
+              size="sm"
+              icon={<Plus aria-hidden />}
+              onClick={() => navigate('/comenzi?nou=1')}
+            >
+              Comandă nouă
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              icon={<RefreshCw aria-hidden />}
               onClick={() => void ordersQuery.refetch()}
               loading={ordersQuery.isFetching}
             >
               Reîmprospătează
             </Button>
-            <Button variant="primary" onClick={() => navigate('/comenzi?nou=1')}>
-              + Comandă
-            </Button>
           </>
         }
       />
 
-      <FilterBar>
-        <div className="flex items-center gap-1">
-          <Button variant="ghost" iconOnly onClick={() => step(-1)} aria-label="Luna anterioară">
-            ‹
-          </Button>
-          <span className="min-w-40 text-center text-sm font-semibold text-ink">
-            {monthLabel(monthIso)}
-          </span>
-          <Button variant="ghost" iconOnly onClick={() => step(1)} aria-label="Luna următoare">
-            ›
-          </Button>
-          <Button variant="secondary" onClick={goToday}>
-            Azi
-          </Button>
-        </div>
-        <FilterField label="Tip">
-          <div className="w-40">
-            <Select value={typeFilter} options={TYPE_OPTIONS} onChange={setTypeFilter} />
-          </div>
-        </FilterField>
-        {typeFilter && (
-          <Button variant="ghost" onClick={() => setTypeFilter('')}>
-            Resetează
-          </Button>
-        )}
-      </FilterBar>
-
-      <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">
-        {ordersQuery.isError ? (
-          <ErrorNotice
-            message="Nu s-au putut prelua comenzile."
-            onRetry={() => void ordersQuery.refetch()}
-          />
-        ) : ordersQuery.isLoading ? (
-          <div className="grid grid-cols-7 gap-2">
-            {Array.from({ length: 35 }, (_, index) => (
-              <Skeleton key={index} className="h-[6.5rem] rounded-xl" />
-            ))}
-          </div>
-        ) : (
-          <>
-            <MonthGrid
-              cells={cells}
-              buckets={buckets}
-              selectedIso={selectedIso}
-              onSelectDay={setSelectedIso}
-            />
-            {/* The grid stays: an empty month is still a month someone is
-                looking at, and swapping it for an empty state would hide the
-                dates they came to check. */}
-            {total === 0 && (
-              <p className="mt-4 text-center text-sm text-ink-muted">
-                Nicio comandă în {monthLabel(monthIso).toLowerCase()}
-                {typeFilter ? ` pentru ${ORDER_TYPE_LABELS[typeFilter].toLowerCase()}` : ''}.
-              </p>
+      <ListDetail
+        storageKey="ecotrack.pane.calendar"
+        defaultListSize={64}
+        selected={selectedIso !== null && selectedBucket !== undefined}
+        onCloseDetail={() => setSelectedIso(null)}
+        detailTitle="Comenzile zilei"
+        list={
+          <div className="min-h-0 flex-1 overflow-y-auto p-3 sm:p-4">
+            {ordersQuery.isError ? (
+              <ErrorNotice
+                message="Nu s-au putut prelua comenzile."
+                onRetry={() => void ordersQuery.refetch()}
+              />
+            ) : ordersQuery.isLoading ? (
+              <div className="grid grid-cols-7 gap-2">
+                {Array.from({ length: 35 }, (_, index) => (
+                  <Skeleton key={index} className="h-[6.5rem] rounded-xl" />
+                ))}
+              </div>
+            ) : view === 'agenda' ? (
+              <MonthAgenda
+                cells={cells}
+                buckets={buckets}
+                selectedIso={selectedIso}
+                onSelectDay={setSelectedIso}
+                emptyLabel={`Nicio comandă în ${monthLabel(monthIso).toLowerCase()}${
+                  typeFilter ? ` pentru ${ORDER_TYPE_LABELS[typeFilter].toLowerCase()}` : ''
+                }.`}
+              />
+            ) : (
+              <>
+                <MonthGrid
+                  cells={cells}
+                  buckets={buckets}
+                  selectedIso={selectedIso}
+                  onSelectDay={setSelectedIso}
+                />
+                {/* The grid stays: an empty month is still a month someone is
+                    looking at, and swapping it for an empty state would hide
+                    the dates they came to check. */}
+                {total === 0 && (
+                  <p className="mt-4 text-center text-sm text-ink-muted">
+                    Nicio comandă în {monthLabel(monthIso).toLowerCase()}
+                    {typeFilter ? ` pentru ${ORDER_TYPE_LABELS[typeFilter].toLowerCase()}` : ''}.
+                  </p>
+                )}
+              </>
             )}
-          </>
-        )}
-      </div>
-
-      {selectedIso !== null && selectedBucket && (
-        <DayOrdersDrawer
-          key={selectedIso}
-          iso={selectedIso}
-          orders={selectedBucket.orders}
-          onClose={() => setSelectedIso(null)}
-          onOpenOrder={openOrder}
-        />
-      )}
-    </>
+          </div>
+        }
+        detail={
+          selectedIso !== null &&
+          selectedBucket && (
+            <DayOrdersPane
+              key={selectedIso}
+              iso={selectedIso}
+              orders={selectedBucket.orders}
+              onOpenOrder={openOrder}
+            />
+          )
+        }
+      />
+    </Workbench>
   );
 }

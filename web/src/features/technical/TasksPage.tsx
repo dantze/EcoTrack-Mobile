@@ -10,12 +10,13 @@
  */
 
 import { useMemo, useState } from 'react';
+import { RefreshCw, SlidersHorizontal, X } from 'lucide-react';
+import { CommandBar, ListDetail, ToolbarSeparator, Workbench } from '@/components/layout';
 import {
   Button,
   DataTable,
   DateInput,
   EmptyState,
-  PageHeader,
   Select,
   TextInput,
 } from '@/components/ui';
@@ -47,7 +48,7 @@ import { AddressCell, ErrorBlock, TaskTypeBadge, Toolbar } from './components/di
 import { InlineDateInput } from './components/inline';
 import { FeedbackProvider, useFeedback } from './components/feedback';
 import { RoutePickerModal } from './components/pickers';
-import { TaskDetailDrawer } from './components/TaskDetailDrawer';
+import { TaskDetailPane } from './components/TaskDetailDrawer';
 
 export function TasksPage() {
   return (
@@ -84,6 +85,7 @@ function TasksScreen() {
   const [selected, setSelected] = useState<Set<RowKey>>(new Set());
   const [openTaskId, setOpenTaskId] = useState<number | null>(null);
   const [bulkPickerOpen, setBulkPickerOpen] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
 
   const tasksQuery = useTasks();
   const routesQuery = useRoutes();
@@ -247,160 +249,215 @@ function TasksScreen() {
     query !== '';
 
   return (
-    <>
-      <PageHeader
+    <Workbench>
+      <CommandBar
         title="Sarcini"
         subtitle={
           tasksQuery.isPending
             ? 'Se încarcă…'
             : `${filtered.length} din ${tasks.length} sarcini${selected.size > 0 ? ` · ${selected.size} selectate` : ''}`
         }
-        actions={
-          filtersActive && (
-            <Button variant="ghost" onClick={resetFilters}>
-              Resetează filtrele
+        tools={
+          <>
+            <div className="hidden w-56 md:block xl:w-72">
+              <TextInput
+                id={SEARCH_FIELD_ID}
+                placeholder="client, adresă, note…  ( / )"
+                value={query}
+                inputSize="sm"
+                clearable
+                onClear={() => setQuery('')}
+                onChange={(event) => setQuery(event.target.value)}
+              />
+            </div>
+            <Button
+              variant={showFilters ? 'secondary' : 'ghost'}
+              size="sm"
+              icon={<SlidersHorizontal aria-hidden />}
+              aria-expanded={showFilters}
+              onClick={() => setShowFilters((open) => !open)}
+            >
+              <span className="hidden sm:inline">Filtre</span>
+              {filtersActive && (
+                <span aria-label="filtre active" className="ml-1 size-1.5 rounded-full bg-primary" />
+              )}
             </Button>
-          )
+          </>
+        }
+        actions={
+          <>
+            <Button size="sm" variant="secondary" onClick={() => setDay(todayIso())}>
+              Azi
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setRange(weekRange(0))}>
+              Săptămâna asta
+            </Button>
+            <Button size="sm" variant="ghost" onClick={() => setRange(weekRange(1))}>
+              Săptămâna următoare
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setRange({ from: null, to: null })}
+              disabled={dateFrom === null && dateTo === null}
+            >
+              Toate datele
+            </Button>
+            <ToolbarSeparator />
+            <Button
+              size="sm"
+              variant="ghost"
+              icon={<RefreshCw aria-hidden />}
+              loading={tasksQuery.isFetching}
+              onClick={() => void tasksQuery.refetch()}
+            >
+              Reîmprospătează
+            </Button>
+            {filtersActive && (
+              <Button size="sm" variant="ghost" icon={<X aria-hidden />} onClick={resetFilters}>
+                Resetează filtrele
+              </Button>
+            )}
+          </>
         }
       />
 
-      <Toolbar>
-        <div className="w-40">
-          <Select
-            label="Status"
-            value={status}
-            options={[{ value: ALL, label: 'Toate statusurile' }, ...TASK_STATUS_OPTIONS]}
-            onChange={setStatus}
-          />
-        </div>
+      {showFilters && (
+        <Toolbar>
+          <div className="w-full sm:hidden">
+            <TextInput
+              label="Căutare"
+              placeholder="client, adresă, note…"
+              value={query}
+              inputSize="sm"
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          </div>
+          <div className="w-40">
+            <Select
+              label="Status"
+              value={status}
+              size="sm"
+              options={[{ value: ALL, label: 'Toate statusurile' }, ...TASK_STATUS_OPTIONS]}
+              onChange={setStatus}
+            />
+          </div>
 
-        <div className="w-40">
-          <Select
-            label="Tip"
-            value={type}
-            options={[{ value: ALL, label: 'Toate tipurile' }, ...TASK_TYPE_OPTIONS]}
-            onChange={setType}
-          />
-        </div>
+          <div className="w-40">
+            <Select
+              label="Tip"
+              value={type}
+              size="sm"
+              options={[{ value: ALL, label: 'Toate tipurile' }, ...TASK_TYPE_OPTIONS]}
+              onChange={setType}
+            />
+          </div>
 
-        <div className="w-40">
-          <DateInput label="De la" value={dateFrom} onChange={setDateFrom} />
-        </div>
-        <div className="w-40">
-          <DateInput label="Până la" value={dateTo} onChange={setDateTo} />
-        </div>
-        <Button size="sm" variant="ghost" onClick={() => setDay(todayIso())}>
-          Azi
-        </Button>
-        <Button size="sm" variant="ghost" onClick={() => setRange(weekRange(0))}>
-          Săptămâna asta
-        </Button>
-        <Button size="sm" variant="ghost" onClick={() => setRange(weekRange(1))}>
-          Săptămâna urmatoare
-        </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={() => setRange({ from: null, to: null })}
-          disabled={dateFrom === null && dateTo === null}
-        >
-          Toate datele
-        </Button>
+          <div className="w-36">
+            <DateInput label="De la" value={dateFrom} onChange={setDateFrom} size="sm" />
+          </div>
+          <div className="w-36">
+            <DateInput label="Până la" value={dateTo} onChange={setDateTo} size="sm" />
+          </div>
 
-        <div className="w-48">
-          <Select
-            label="Rută"
-            searchable
-            value={route}
-            options={[
-              { value: ALL, label: 'Toate rutele' },
-              { value: NO_ROUTE, label: 'Fără rută' },
-              ...(routesQuery.data ?? []).map((item) => ({
-                value: String(item.id),
-                label: routeLabel(item),
-              })),
-            ]}
-            onChange={setRoute}
-          />
-        </div>
+          <div className="w-48">
+            <Select
+              label="Rută"
+              searchable
+              size="sm"
+              value={route}
+              options={[
+                { value: ALL, label: 'Toate rutele' },
+                { value: NO_ROUTE, label: 'Fără rută' },
+                ...(routesQuery.data ?? []).map((item) => ({
+                  value: String(item.id),
+                  label: routeLabel(item),
+                })),
+              ]}
+              onChange={setRoute}
+            />
+          </div>
 
-        <div className="w-44">
-          <Select
-            label="Șofer"
-            searchable
-            value={driver}
-            options={[
-              { value: ALL, label: 'Toți șoferii' },
-              ...(driversQuery.data ?? []).map((item) => ({
-                value: String(item.id),
-                label: item.fullName,
-              })),
-            ]}
-            onChange={setDriver}
-          />
-        </div>
+          <div className="w-44">
+            <Select
+              label="Șofer"
+              searchable
+              size="sm"
+              value={driver}
+              options={[
+                { value: ALL, label: 'Toți șoferii' },
+                ...(driversQuery.data ?? []).map((item) => ({
+                  value: String(item.id),
+                  label: item.fullName,
+                })),
+              ]}
+              onChange={setDriver}
+            />
+          </div>
+        </Toolbar>
+      )}
 
-        <div className="w-56">
-          <TextInput
-            id={SEARCH_FIELD_ID}
-            label="Căutare"
-            placeholder="client, adresă, note…  ( / )"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-          />
-        </div>
-      </Toolbar>
-
-      {tasksQuery.error ? (
-        <ErrorBlock error={tasksQuery.error} onRetry={() => void tasksQuery.refetch()} />
-      ) : (
-        <DataTable
-          rows={filtered}
-          columns={columns}
-          rowKey={(task) => task.id}
-          initialSort={{ key: 'date', dir: 'asc' }}
-          loading={tasksQuery.isPending}
-          activeKey={openTaskId}
-          onRowClick={(task) => {
-            recordUse('task', task.id);
-            setOpenTaskId(task.id);
-          }}
-          selectedKeys={selected}
-          onSelectionChange={setSelected}
-          bulkActions={
-            <>
-              <Button
-                size="sm"
-                variant="primary"
-                onClick={() => setBulkPickerOpen(true)}
-                loading={reassign.isPending}
-              >
-                Reasignează pe rută
-              </Button>
-              <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>
-                Golește selecția
-              </Button>
-            </>
-          }
-          empty={
-            <EmptyState
-              title={filtersActive ? 'Nicio sarcină pentru filtrele curente' : 'Nicio sarcină'}
-              body={
-                filtersActive
-                  ? 'Ajustează filtrele sau resetează-le.'
-                  : 'Sarcinile se generează automat din comenzile de vânzări.'
-              }
-              action={
-                filtersActive ? (
-                  <Button size="sm" variant="secondary" onClick={resetFilters}>
-                    Resetează filtrele
+      <ListDetail
+        storageKey="ecotrack.pane.tasks"
+        selected={openTaskId !== null}
+        onCloseDetail={() => setOpenTaskId(null)}
+        detailTitle="Detalii sarcină"
+        list={
+          tasksQuery.error ? (
+            <ErrorBlock error={tasksQuery.error} onRetry={() => void tasksQuery.refetch()} />
+          ) : (
+            <DataTable
+              rows={filtered}
+              columns={columns}
+              rowKey={(task) => task.id}
+              ariaLabel="Sarcini"
+              initialSort={{ key: 'date', dir: 'asc' }}
+              loading={tasksQuery.isPending}
+              activeKey={openTaskId}
+              mobile={{ primary: 'client', secondary: ['address', 'route'], trailing: 'status' }}
+              onRowClick={(task) => {
+                recordUse('task', task.id);
+                setOpenTaskId(task.id);
+              }}
+              selectedKeys={selected}
+              onSelectionChange={setSelected}
+              bulkActions={
+                <>
+                  <Button
+                    size="sm"
+                    variant="primary"
+                    onClick={() => setBulkPickerOpen(true)}
+                    loading={reassign.isPending}
+                  >
+                    Reasignează pe rută
                   </Button>
-                ) : undefined
+                  <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>
+                    Golește selecția
+                  </Button>
+                </>
+              }
+              empty={
+                <EmptyState
+                  title={filtersActive ? 'Nicio sarcină pentru filtrele curente' : 'Nicio sarcină'}
+                  body={
+                    filtersActive
+                      ? 'Ajustează filtrele sau resetează-le.'
+                      : 'Sarcinile se generează automat din comenzile de vânzări.'
+                  }
+                  action={
+                    filtersActive ? (
+                      <Button size="sm" variant="secondary" onClick={resetFilters}>
+                        Resetează filtrele
+                      </Button>
+                    ) : undefined
+                  }
+                />
               }
             />
-          }
-        />
-      )}
+          )
+        }
+        detail={<TaskDetailPane taskId={openTaskId} onClose={() => setOpenTaskId(null)} />}
+      />
 
       <RoutePickerModal
         open={bulkPickerOpen}
@@ -445,7 +502,6 @@ function TasksScreen() {
         }}
       />
 
-      <TaskDetailDrawer taskId={openTaskId} onClose={() => setOpenTaskId(null)} />
-    </>
+    </Workbench>
   );
 }

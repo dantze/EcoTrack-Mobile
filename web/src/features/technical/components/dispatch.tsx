@@ -74,14 +74,14 @@ export function DispatchTaskCard({
     <div
       className={cx(
         'rounded-md border px-2.5 py-2 transition-colors',
-        overlay ? 'border-brand-500 bg-white shadow-lg' : 'border-border',
-        held ? 'border-brand-500 bg-brand-50' : 'bg-white',
+        overlay ? 'border-primary bg-surface shadow-lg' : 'border-border',
+        held ? 'border-primary bg-accent-50' : 'bg-surface',
         dragging && !overlay && 'opacity-40',
       )}
     >
       <div className="flex items-start gap-2">
         {position !== undefined && (
-          <span className="tabular mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-brand-700 text-[0.6875rem] font-semibold text-white">
+          <span className="tabular mt-0.5 inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-primary text-[0.6875rem] font-semibold text-primary-foreground">
             {position}
           </span>
         )}
@@ -176,7 +176,7 @@ export function DraggablePoolTask({
       className={cx(
         'rounded-md transition-shadow',
         onToggleHold ? 'cursor-pointer' : 'cursor-grab',
-        held && 'ring-2 ring-brand-500 ring-offset-1',
+        held && 'ring-2 ring-primary ring-offset-1',
       )}
     >
       <DispatchTaskCard task={task} onOpen={onOpen} dragging={isDragging} held={held} />
@@ -202,7 +202,7 @@ export function RouteDropZone({
       ref={setNodeRef}
       className={[
         'min-h-full rounded-md p-2 transition-colors',
-        isOver && !disabled ? 'bg-brand-50 ring-1 ring-brand-500/40 ring-inset' : '',
+        isOver && !disabled ? 'bg-accent-50 ring-1 ring-primary/40 ring-inset' : '',
       ]
         .filter(Boolean)
         .join(' ')}

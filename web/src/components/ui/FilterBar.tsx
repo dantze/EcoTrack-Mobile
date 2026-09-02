@@ -1,18 +1,35 @@
 /**
- * FilterBar — the strip that sits between the page header and the table.
+ * FilterBar — the strip that sits between the command bar and the table.
  *
- * Search on the left, toggle chips next to it, caller-supplied controls (a
- * Select, a date range) on the right. Chips are multi-select by default; a bar
- * with `single` behaves like a segmented filter instead.
+ * Search on the left, the active filters next to it as dismissable chips,
+ * caller-supplied controls (a Select, a date range) on the right. Chips are
+ * multi-select by default; a bar with `single` behaves like a segmented
+ * filter instead, where "dismissable" makes no sense and is therefore off.
+ *
+ * The chip row is the part that breaks on a phone: eight chips wrapping onto
+ * four lines pushes the table off screen. Below `md` it becomes one row that
+ * scrolls sideways inside itself, so the strip keeps a fixed height and the
+ * page never scrolls sideways.
  *
  * Pressing `/` anywhere on the page focuses the search box, unless the user is
- * already typing in a field.
+ * already typing in a field — hence the `/` hint in the trailing slot, which
+ * an empty, unfocused input wears the way Outlook wears its shortcut hints.
  */
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
-import { CloseIcon, SearchIcon } from './icons';
-import { cx, FOCUS_RING } from './utils';
+import { Search, X } from 'lucide-react';
+import { Badge } from '@/components/shadcn/badge';
+import { Button } from '@/components/shadcn/button';
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from '@/components/shadcn/input-group';
+import { Kbd } from '@/components/shadcn/kbd';
+import { cn } from '@/lib/utils';
+import { FOCUS_RING } from './utils';
 
 export interface FilterChip {
   id: string;
@@ -28,6 +45,12 @@ export interface SearchInputProps {
   shortcut?: boolean;
   className?: string;
   ariaLabel?: string;
+  /**
+   * Trailing hint, shown only while the box is empty and unfocused — the clear
+   * button owns that corner otherwise. Defaults to the `/` key when `shortcut`
+   * is on; pass a node for a different one, or `null` for none.
+   */
+  hint?: ReactNode;
 }
 
 export function SearchInput({
@@ -37,8 +60,10 @@ export function SearchInput({
   shortcut = true,
   className,
   ariaLabel = 'Caută',
+  hint,
 }: SearchInputProps) {
   const ref = useRef<HTMLInputElement>(null);
+  const [focused, setFocused] = useState(false);
 
   useEffect(() => {
     if (!shortcut) return;
@@ -57,15 +82,23 @@ export function SearchInput({
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [shortcut]);
 
+  const resolvedHint = hint === undefined ? (shortcut ? <Kbd>/</Kbd> : null) : hint;
+  const showHint = Boolean(resolvedHint) && !value && !focused;
+
   return (
-    <div className={cx('relative flex items-center', className ?? 'w-64')}>
-      <SearchIcon className="pointer-events-none absolute left-2.5 size-3.5 text-ink-subtle" />
-      <input
+    <InputGroup className={cn('h-8 bg-surface', className ?? 'w-64 max-w-full')}>
+      <InputGroupAddon>
+        <Search className="text-ink-subtle" />
+      </InputGroupAddon>
+
+      <InputGroupInput
         ref={ref}
         type="search"
         value={value}
         aria-label={ariaLabel}
         placeholder={placeholder}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
         onChange={(event) => onChange(event.target.value)}
         onKeyDown={(event) => {
           if (event.key === 'Escape' && value) {
@@ -73,24 +106,29 @@ export function SearchInput({
             onChange('');
           }
         }}
-        className={cx(
-          'h-7 w-full rounded-md border border-border bg-white pr-7 pl-8 text-sm text-ink',
-          'placeholder:text-ink-subtle hover:border-border-strong',
-          'focus:border-brand-500 focus:ring-2 focus:ring-brand-500/25 focus:outline-none',
-          '[&::-webkit-search-cancel-button]:hidden',
-        )}
+        className="text-sm text-ink placeholder:text-ink-subtle [&::-webkit-search-cancel-button]:hidden"
       />
-      {value && (
-        <button
-          type="button"
-          onClick={() => onChange('')}
-          aria-label="Golește căutarea"
-          className="absolute right-1.5 rounded p-0.5 text-ink-subtle transition-colors hover:bg-slate-100 hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand-500"
-        >
-          <CloseIcon className="size-3" />
-        </button>
+
+      {(value || showHint) && (
+        <InputGroupAddon align="inline-end">
+          {value ? (
+            <InputGroupButton
+              type="button"
+              size="icon-xs"
+              aria-label="Golește căutarea"
+              onClick={() => {
+                onChange('');
+                ref.current?.focus();
+              }}
+            >
+              <X />
+            </InputGroupButton>
+          ) : (
+            resolvedHint
+          )}
+        </InputGroupAddon>
       )}
-    </div>
+    </InputGroup>
   );
 }
 
@@ -103,7 +141,7 @@ export interface FilterBarProps {
   onChipToggle?: (id: string) => void;
   /** Renders chips as a single-choice segmented control. */
   single?: boolean;
-  /** Shown when anything is active; clears the whole bar. */
+  /** Shown when more than one filter is active; clears the whole bar. */
   onReset?: () => void;
   /** Extra controls, right-aligned (Select, DateInput, buttons). */
   children?: ReactNode;
@@ -122,12 +160,15 @@ export function FilterBar({
   children,
   className,
 }: FilterBarProps) {
-  const dirty = Boolean(search) || activeChipIds.length > 0;
+  // The search box counts as one filter: clearing "everything" with a single
+  // chip active is a button that undoes one click, which is noise.
+  const activeCount = activeChipIds.length + (search ? 1 : 0);
 
   return (
     <div
-      className={cx(
-        'flex shrink-0 flex-wrap items-center gap-2 border-b border-border bg-white px-5 py-2',
+      className={cn(
+        'flex shrink-0 items-center gap-2 border-b border-border bg-surface px-3 py-1.5',
+        'max-md:flex-wrap',
         className,
       )}
     >
@@ -136,16 +177,25 @@ export function FilterBar({
           value={search ?? ''}
           onChange={onSearchChange}
           placeholder={searchPlaceholder}
+          className="w-64 max-w-full max-md:w-full"
         />
       )}
 
       {chips && chips.length > 0 && (
         <div
-          className={cx('flex flex-wrap items-center gap-1', single && 'rounded-md bg-surface-sunken p-0.5')}
           role={single ? 'radiogroup' : undefined}
+          className={cn(
+            // One sideways-scrolling row on a phone, free-wrapping above it.
+            'flex min-w-0 items-center gap-1 overflow-x-auto md:flex-wrap md:overflow-visible',
+            single && 'rounded-lg bg-surface-sunken p-0.5',
+          )}
         >
           {chips.map((chip) => {
             const active = activeChipIds.includes(chip.id);
+            // A dismissable chip is one control, not two: the whole chip
+            // toggles, and the × is a label for what a click will do. Nesting
+            // a real button inside a button is invalid and unreachable by
+            // keyboard anyway.
             return (
               <button
                 key={chip.id}
@@ -154,52 +204,51 @@ export function FilterBar({
                 aria-checked={single ? active : undefined}
                 aria-pressed={single ? undefined : active}
                 onClick={() => onChipToggle?.(chip.id)}
-                className={cx(
-                  'inline-flex items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium',
-                  'transition-colors whitespace-nowrap',
-                  single
-                    ? active
-                      ? 'bg-white text-ink shadow-xs'
-                      : 'text-ink-muted hover:text-ink'
-                    : active
-                      ? 'bg-brand-700 text-white'
-                      : 'border border-border bg-white text-ink-muted hover:border-border-strong hover:text-ink',
-                  FOCUS_RING,
-                )}
+                className={cn('shrink-0 rounded-4xl', FOCUS_RING)}
               >
-                {chip.label}
-                {chip.count !== undefined && (
-                  <span
-                    className={cx(
-                      'tabular text-[0.6875rem]',
-                      active && !single ? 'text-white/70' : 'text-ink-subtle',
-                    )}
-                  >
-                    {chip.count}
-                  </span>
-                )}
+                <Badge
+                  variant={active && !single ? 'default' : single ? 'ghost' : 'outline'}
+                  className={cn(
+                    'h-6 cursor-pointer gap-1 px-2 transition-colors',
+                    single
+                      ? active
+                        ? 'rounded-md bg-surface text-ink shadow-xs'
+                        : 'rounded-md text-ink-muted hover:text-ink'
+                      : active
+                        ? ''
+                        : 'text-ink-muted hover:bg-surface-hover hover:text-ink',
+                  )}
+                >
+                  <span className="truncate">{chip.label}</span>
+                  {chip.count !== undefined && (
+                    <span className={cn('tabular', active && !single ? 'opacity-70' : 'text-ink-subtle')}>
+                      {chip.count}
+                    </span>
+                  )}
+                  {active && !single && <X aria-hidden className="opacity-70" />}
+                </Badge>
               </button>
             );
           })}
         </div>
       )}
 
-      {onReset && dirty && (
-        <button
+      {onReset && activeCount > 1 && (
+        <Button
           type="button"
+          variant="ghost"
+          size="xs"
           onClick={onReset}
-          className={cx(
-            'inline-flex items-center gap-1 rounded-md px-1.5 py-1 text-xs text-ink-muted',
-            'transition-colors hover:bg-slate-100 hover:text-ink',
-            FOCUS_RING,
-          )}
+          className="shrink-0 text-ink-muted"
         >
-          <CloseIcon className="size-3" />
-          Resetează
-        </button>
+          <X />
+          Șterge filtrele
+        </Button>
       )}
 
-      {children && <div className="ml-auto flex flex-wrap items-center gap-2">{children}</div>}
+      {children && (
+        <div className="flex flex-wrap items-center gap-2 md:ml-auto max-md:w-full">{children}</div>
+      )}
     </div>
   );
 }

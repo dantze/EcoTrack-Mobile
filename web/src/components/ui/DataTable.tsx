@@ -1,29 +1,72 @@
 /**
- * DataTable — the screen, not a widget on it.
+ * DataTable — the message list of this app, not a widget on a page.
+ *
+ * Built on the shadcn table parts (`TableHeader/Body/Row/Head/Cell`) but it
+ * owns the `<table>` element and the scroll container itself: shadcn's `Table`
+ * wraps its table in an `overflow-x-auto` div, and that div becomes the nearest
+ * scrollport — which pins `sticky top-0` to the top of the table instead of the
+ * top of the viewport, and hides the real scroll element from
+ * `@tanstack/react-virtual`. Sticky headers and virtualisation both need the
+ * scrollport to be ours.
  *
  * Layout notes that matter for a back-office grid:
  *
  * - `border-separate` (not `collapse`) so sticky header cells keep their
- *   borders while the body scrolls under them.
+ *   hairline while the body scrolls under them.
  * - `table-fixed` + a `<colgroup>`: columns keep the width the caller asked
  *   for, cells truncate instead of pushing the layout around, and columns
  *   without a width share the remainder like `1fr`.
- * - The scroll container owns both axes and is `min-w-0`, so a wide table
- *   scrolls inside itself and never widens the page.
+ * - Vertical scrolling only. A sideways-sliding table hides columns behind an
+ *   edge the user has no reason to expect; on the dispatch board it made the
+ *   route list feel like a carousel. Drop a column rather than reintroducing
+ *   `overflow-x`.
  * - Loading renders skeleton rows in the real column geometry, so nothing
  *   jumps when data lands.
  *
- * Keyboard: ↑/↓ move the row cursor, Home/End jump, Enter opens the row,
- * Space toggles its checkbox. Shift-click a checkbox to select a range.
+ * Interaction, in Outlook's dialect:
+ *   click        open the row (`onRowClick`)
+ *   ⌘/Ctrl-click toggle that row's selection, without opening it
+ *   shift-click  extend the selection from the last row touched
+ *   ↑ ↓ Home End move the row cursor · Enter opens · Space selects · ⌘A all
+ *
+ * The table is a single tab stop: exactly one row carries `tabIndex=0` and the
+ * arrows move it. The cursor index is **clamped where it is read**, never
+ * corrected in an effect — the list shrinks during render, and an effect fixes
+ * it one render too late, by which point Enter has already committed nothing
+ * (TODO-26).
+ *
+ * Below `md` none of that applies: the table is replaced by a card list, since
+ * eight columns at 390px is a horizontal scrollbar with extra steps.
  */
 
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
+import { useMediaQuery } from '@mantine/hooks';
+import { useVirtualizer } from '@tanstack/react-virtual';
+import { ArrowDownUp, Trash2 } from 'lucide-react';
+import {
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/shadcn/table';
+import { Button } from '@/components/shadcn/button';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/shadcn/dropdown-menu';
+import { Skeleton } from '@/components/shadcn/skeleton';
+import { cn } from '@/lib/utils';
 import { Checkbox } from './Checkbox';
 import { EmptyState } from './EmptyState';
 import { SortIcon } from './icons';
-import { compareValues, cx } from './utils';
-import type { Column, DataTableProps } from './types';
+import { compareValues } from './utils';
+import type { Column, DataTableProps, RowKey } from './types';
 
 export interface DataTableColumn<T> extends Column<T> {
   /** Right-aligns and applies tabular figures. Use for money, counts, ids. */
@@ -36,6 +79,20 @@ export interface DataTableColumn<T> extends Column<T> {
 }
 
 export type SortState = { key: string; dir: 'asc' | 'desc' } | null;
+
+/**
+ * Which columns survive the collapse to a card. Keys refer to `columns`;
+ * anything unknown is ignored, so a stale key degrades to the fallback rather
+ * than blanking a line.
+ */
+export interface DataTableMobileConfig {
+  /** Line one, bold — the thing the row is called. */
+  primary: string;
+  /** Line two, muted, joined with a middot. Two keys is the readable limit. */
+  secondary?: string[];
+  /** Right-aligned on line one: status, amount, date. */
+  trailing?: string;
+}
 
 export interface DataTableExtendedProps<T> extends Omit<DataTableProps<T>, 'columns'> {
   columns: DataTableColumn<T>[];
@@ -51,26 +108,24 @@ export interface DataTableExtendedProps<T> extends Omit<DataTableProps<T>, 'colu
   stickySelection?: boolean;
   /** Accessible name for the `<table>` — the page title rarely doubles as one. */
   ariaLabel?: string;
+  /** Steers the sub-`md` card list. Optional: the fallback reads the columns. */
+  mobile?: DataTableMobileConfig;
   className?: string;
 }
 
 const DENSITY = {
-  compact: { cell: 'px-3 py-1.5', head: 'px-3 py-2' },
-  comfortable: { cell: 'px-3.5 py-2.5', head: 'px-3.5 py-2.5' },
+  compact: { row: 'h-7', cell: 'px-2.5 py-0', head: 'h-8 px-2.5', px: 28 },
+  comfortable: { row: 'h-9', cell: 'px-3 py-0', head: 'h-9 px-3', px: 36 },
 } as const;
 
 const SELECT_COL_WIDTH = '2.25rem';
-const DEFAULT_COL_REM = 9;
 
-/** Rough px→rem budget per column, used only to decide when to scroll sideways. */
-function widthInRem(width?: string): number {
-  if (!width) return DEFAULT_COL_REM;
-  const value = Number.parseFloat(width);
-  if (Number.isNaN(value)) return DEFAULT_COL_REM;
-  if (width.endsWith('rem') || width.endsWith('em')) return value;
-  if (width.endsWith('px')) return value / 16;
-  return DEFAULT_COL_REM;
-}
+/**
+ * Above this many rows the DOM cost of a full render starts to show on a
+ * mid-range laptop. Below it, virtualising is a straight loss: it breaks
+ * find-in-page and Ctrl+End, for no gain nobody can measure.
+ */
+const VIRTUALIZE_ABOVE = 100;
 
 export function DataTable<T>({
   rows,
@@ -92,13 +147,24 @@ export function DataTable<T>({
   onRowDoubleClick,
   stickySelection = true,
   ariaLabel,
+  mobile,
   className,
 }: DataTableExtendedProps<T>) {
   const [sort, setSort] = useState<SortState>(initialSort);
   const [cursor, setCursor] = useState(0);
+  const [scrolled, setScrolled] = useState(false);
+
+  const scrollRef = useRef<HTMLDivElement>(null);
   const bodyRef = useRef<HTMLTableSectionElement>(null);
   const lastToggledIndex = useRef<number | null>(null);
   const shiftHeld = useRef(false);
+  /** Set when a row that should take focus is not in the DOM yet (virtualised). */
+  const pendingFocus = useRef<number | null>(null);
+
+  // `undefined` on the first render and in jsdom; the desktop table is the
+  // safe default — a phone shows a table for one frame, a desktop never shows
+  // the card list.
+  const isMobile = useMediaQuery('(max-width: 767px)') ?? false;
 
   const selectable = Boolean(selectedKeys && onSelectionChange);
   const pad = DENSITY[density];
@@ -118,10 +184,10 @@ export function DataTable<T>({
     });
   }, [rows, columns, sort]);
 
-  const minWidth = useMemo(() => {
-    const body = columns.reduce((total, column) => total + widthInRem(column.width), 0);
-    return `${body + (selectable ? 2.25 : 0)}rem`;
-  }, [columns, selectable]);
+  const sortableColumns = useMemo(() => columns.filter((column) => column.sortValue), [columns]);
+
+  // Clamped on read, in both places that consume it. See the file header.
+  const cursorIndex = sorted.length === 0 ? 0 : Math.min(Math.max(cursor, 0), sorted.length - 1);
 
   const applySort = (column: DataTableColumn<T>) => {
     if (!column.sortValue) return;
@@ -137,14 +203,42 @@ export function DataTable<T>({
     });
   };
 
+  // ---- virtualisation -----------------------------------------------------
+
+  const virtualised = sorted.length > VIRTUALIZE_ABOVE;
+  const virtualizer = useVirtualizer({
+    // A zero count keeps the hook inert below the threshold without making the
+    // hook itself conditional.
+    count: virtualised ? sorted.length : 0,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => pad.px,
+    overscan: 12,
+  });
+
+  const virtualItems = virtualizer.getVirtualItems();
+  const paddingTop = virtualItems.length > 0 ? virtualItems[0]!.start : 0;
+  const paddingBottom =
+    virtualItems.length > 0 ? virtualizer.getTotalSize() - virtualItems[virtualItems.length - 1]!.end : 0;
+
+  /** The rows actually rendered, paired with their index in `sorted`. */
+  const visible = useMemo(() => {
+    if (!virtualised) return sorted.map((row, index) => ({ row, index }));
+    return virtualItems
+      .filter((item) => sorted[item.index] !== undefined)
+      .map((item) => ({ row: sorted[item.index]!, index: item.index }));
+  }, [virtualised, sorted, virtualItems]);
+
+  const cursorRendered = visible.some((entry) => entry.index === cursorIndex);
+
   // ---- selection ----------------------------------------------------------
 
-  const allSelected =
-    selectable && sorted.length > 0 && sorted.every((row) => selectedKeys!.has(rowKey(row)));
-  const someSelected = selectable && sorted.some((row) => selectedKeys!.has(rowKey(row)));
+  const isSelected = (row: T) => Boolean(selectedKeys?.has(rowKey(row)));
+  const selectedCount = selectedKeys?.size ?? 0;
+  const allSelected = selectable && sorted.length > 0 && sorted.every(isSelected);
+  const someSelected = selectable && sorted.some(isSelected);
 
   const toggleAll = (checked: boolean) => {
-    onSelectionChange!(checked ? new Set(sorted.map(rowKey)) : new Set());
+    onSelectionChange!(checked ? new Set(sorted.map(rowKey)) : new Set<RowKey>());
     lastToggledIndex.current = null;
   };
 
@@ -153,8 +247,8 @@ export function DataTable<T>({
     const from = extendRange && lastToggledIndex.current !== null ? lastToggledIndex.current : index;
     const [start, end] = from <= index ? [from, index] : [index, from];
 
-    for (let cursorIndex = start; cursorIndex <= end; cursorIndex += 1) {
-      const row = sorted[cursorIndex];
+    for (let at = start; at <= end; at += 1) {
+      const row = sorted[at];
       if (!row) continue;
       const key = rowKey(row);
       if (checked) next.add(key);
@@ -169,18 +263,44 @@ export function DataTable<T>({
 
   const focusRow = useCallback(
     (index: number) => {
+      if (sorted.length === 0) return;
       const clamped = Math.max(0, Math.min(index, sorted.length - 1));
       setCursor(clamped);
+      if (virtualised) virtualizer.scrollToIndex(clamped, { align: 'auto' });
+
       const element = bodyRef.current?.querySelector<HTMLTableRowElement>(
         `tr[data-index="${clamped}"]`,
       );
-      element?.focus({ preventScroll: true });
-      element?.scrollIntoView({ block: 'nearest' });
+      if (element) {
+        element.focus({ preventScroll: true });
+        element.scrollIntoView({ block: 'nearest' });
+        pendingFocus.current = null;
+      } else {
+        // Virtualised and off-screen: the row does not exist yet. The effect
+        // below finishes the move once the virtualiser has rendered it.
+        pendingFocus.current = clamped;
+      }
     },
-    [sorted.length],
+    [sorted.length, virtualised, virtualizer],
   );
 
+  useEffect(() => {
+    const target = pendingFocus.current;
+    if (target === null) return;
+    const element = bodyRef.current?.querySelector<HTMLTableRowElement>(`tr[data-index="${target}"]`);
+    if (!element) return;
+    element.focus({ preventScroll: true });
+    pendingFocus.current = null;
+  });
+
   const onRowKeyDown = (event: React.KeyboardEvent, row: T, index: number) => {
+    if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'a') {
+      if (!selectable) return;
+      event.preventDefault();
+      toggleAll(true);
+      return;
+    }
+
     switch (event.key) {
       case 'ArrowDown':
         event.preventDefault();
@@ -207,7 +327,7 @@ export function DataTable<T>({
       case ' ':
         if (selectable) {
           event.preventDefault();
-          toggleRow(index, !selectedKeys!.has(rowKey(row)));
+          toggleRow(index, !isSelected(row));
         }
         break;
       default:
@@ -215,11 +335,25 @@ export function DataTable<T>({
     }
   };
 
+  /** Outlook's three-way click: plain opens, ⌘ toggles one, shift extends. */
+  const onRowMouseDownSelect = (event: React.MouseEvent, row: T, index: number): boolean => {
+    if (!selectable) return false;
+    if (event.shiftKey) {
+      toggleRow(index, true, true);
+      return true;
+    }
+    if (event.metaKey || event.ctrlKey) {
+      toggleRow(index, !isSelected(row));
+      return true;
+    }
+    return false;
+  };
+
   // ---- cells --------------------------------------------------------------
 
   const alignClass = (column: DataTableColumn<T>) => {
     const align = column.align ?? (column.numeric ? 'right' : 'left');
-    return cx(
+    return cn(
       align === 'right' && 'text-right',
       align === 'center' && 'text-center',
       align === 'left' && 'text-left',
@@ -238,41 +372,307 @@ export function DataTable<T>({
   };
 
   const showSkeleton = loading && rows.length === 0;
+  const showEmpty = !showSkeleton && sorted.length === 0;
 
-  return (
-    <div className={cx('relative flex min-h-0 min-w-0 flex-1 flex-col', className)}>
-      {selectable && selectedKeys!.size > 0 && (
-        <div className="flex shrink-0 animate-slide-up items-center gap-3 border-b border-brand-100 bg-brand-50 px-4 py-1.5">
-          <span className="tabular text-sm font-medium text-brand-700">
-            {selectedKeys!.size}{' '}
-            {selectedKeys!.size === 1 ? 'rând selectat' : 'rânduri selectate'}
-          </span>
-          <button
-            type="button"
-            onClick={() => onSelectionChange!(new Set())}
-            className="rounded px-1.5 py-0.5 text-xs text-brand-600 transition-colors hover:bg-brand-100 focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand-500"
-          >
-            Deselectează
-          </button>
-          <div className="ml-auto flex items-center gap-2">{bulkActions}</div>
+  // ---- chrome shared by both renderings -----------------------------------
+
+  const bulkBar = selectable && selectedCount > 0 && (
+    <div
+      className={cn(
+        'flex shrink-0 animate-slide-up items-center gap-3 border-b border-border',
+        'bg-surface-active px-3 py-1.5',
+      )}
+    >
+      <span className="tabular text-sm font-medium text-ink">
+        {selectedCount} {selectedCount === 1 ? 'selectat' : 'selectate'}
+      </span>
+      <Button
+        type="button"
+        variant="ghost"
+        size="xs"
+        onClick={() => onSelectionChange!(new Set<RowKey>())}
+        className="text-ink-muted"
+      >
+        Deselectează
+      </Button>
+      {bulkActions && (
+        <div className="ml-auto flex min-w-0 items-center gap-1.5">
+          {isMobile ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button type="button" variant="outline" size="xs">
+                  <Trash2 />
+                  Acțiuni
+                </Button>
+              </DropdownMenuTrigger>
+              {/* The caller's buttons keep working inside the menu; wrapping
+                  them beats letting four of them wrap onto three rows. */}
+              <DropdownMenuContent align="end" className="flex flex-col gap-1 p-1.5">
+                {bulkActions}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          ) : (
+            bulkActions
+          )}
         </div>
       )}
+    </div>
+  );
 
-      {/* Refetch over existing rows: a hairline instead of blanking the table. */}
-      {loading && rows.length > 0 && (
-        <div className="absolute inset-x-0 top-0 z-30 h-0.5 animate-pulse bg-brand-500/60" aria-hidden />
-      )}
+  const loadingHairline = loading && rows.length > 0 && (
+    // Refetch over existing rows: a hairline instead of blanking the table.
+    <div className="absolute inset-x-0 top-0 z-30 h-0.5 animate-pulse bg-primary/60" aria-hidden />
+  );
 
-      {/*
-        Vertical scrolling only. A sideways-sliding table hides columns behind
-        an edge the user has no reason to expect, and on the dispatch board it
-        made the route list feel like a carousel. Columns share the available
-        width instead; drop a column rather than reintroducing overflow-x.
-      */}
-      <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain">
+  // ---- mobile: a card list, not a squeezed table --------------------------
+
+  if (isMobile) {
+    const byKey = new Map(columns.map((column) => [column.key, column]));
+    const pick = (key?: string) => (key ? byKey.get(key) : undefined);
+
+    const primary = pick(mobile?.primary) ?? columns[0];
+    const trailing =
+      pick(mobile?.trailing) ??
+      (mobile ? undefined : columns.length > 3 ? columns[columns.length - 1] : undefined);
+    const secondary = (
+      mobile?.secondary
+        ? mobile.secondary.map(pick).filter((column): column is DataTableColumn<T> => Boolean(column))
+        : columns.filter((column) => column !== primary && column !== trailing).slice(0, 2)
+    ).slice(0, 2);
+
+    return (
+      <div className={cn('relative flex min-h-0 min-w-0 flex-1 flex-col', className)}>
+        {bulkBar}
+        {loadingHairline}
+
+        {sortableColumns.length > 0 && !showEmpty && (
+          <div className="flex shrink-0 items-center gap-2 border-b border-border bg-surface-header px-3 py-1.5">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button type="button" variant="ghost" size="xs" className="text-ink-muted">
+                  <ArrowDownUp />
+                  {sort
+                    ? (byKey.get(sort.key)?.header ?? 'Sortare')
+                    : 'Sortează'}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start">
+                <DropdownMenuLabel>Sortează după</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {sortableColumns.map((column) => (
+                  <DropdownMenuItem key={column.key} onSelect={() => applySort(column)}>
+                    {column.header}
+                    {sort?.key === column.key && (
+                      <span className="ml-auto text-ink-muted">
+                        {sort.dir === 'asc' ? '↑' : '↓'}
+                      </span>
+                    )}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            {selectable && sorted.length > 0 && (
+              <Checkbox
+                checked={Boolean(allSelected)}
+                indeterminate={Boolean(someSelected)}
+                onChange={toggleAll}
+                ariaLabel="Selectează toate rândurile"
+                className="ml-auto"
+                label={<span className="text-xs text-ink-muted">Toate</span>}
+              />
+            )}
+          </div>
+        )}
+
+        <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain">
+          {showSkeleton && (
+            <ul className="divide-y divide-border">
+              {Array.from({ length: skeletonRows }).map((_, index) => (
+                <li key={`skeleton-${index}`} className="flex min-h-11 flex-col justify-center gap-1.5 px-3 py-2">
+                  <Skeleton className="h-3 w-1/2" />
+                  <Skeleton className="h-2.5 w-3/4" />
+                </li>
+              ))}
+            </ul>
+          )}
+
+          {showEmpty &&
+            (empty ?? (
+              <EmptyState
+                size="sm"
+                title="Niciun rezultat"
+                body="Ajustează filtrele sau caută altceva."
+              />
+            ))}
+
+          {!showSkeleton && !showEmpty && (
+            <ul className="divide-y divide-border">
+              {sorted.map((row, index) => {
+                const key = rowKey(row);
+                const active = activeKey === key;
+                const checked = selectable && isSelected(row);
+                return (
+                  <li
+                    key={key}
+                    className={cn(
+                      'flex min-h-11 w-full items-center gap-2 px-3',
+                      active ? 'bg-surface-active' : checked ? 'bg-surface-hover' : 'bg-surface',
+                      active && 'shadow-[inset_2px_0_0_0_var(--primary)]',
+                      rowClassName?.(row),
+                    )}
+                  >
+                    {selectable && (
+                      <Checkbox
+                        checked={checked}
+                        onChange={(next) => toggleRow(index, next)}
+                        ariaLabel="Selectează rândul"
+                      />
+                    )}
+                    <button
+                      type="button"
+                      disabled={!onRowClick}
+                      onClick={() => onRowClick?.(row)}
+                      className={cn(
+                        'flex min-w-0 flex-1 items-center gap-3 py-2 text-left',
+                        'rounded-md focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring',
+                        'disabled:pointer-events-none',
+                      )}
+                    >
+                      <span className="flex min-w-0 flex-1 flex-col gap-0.5">
+                        <span className="clamp-1 text-sm font-semibold text-ink">
+                          {primary ? renderCell(primary, row) : null}
+                        </span>
+                        {secondary.length > 0 && (
+                          <span className="clamp-1 flex items-center gap-1.5 text-xs text-ink-muted">
+                            {secondary.map((column, position) => (
+                              <span key={column.key} className="flex min-w-0 items-center gap-1.5">
+                                {position > 0 && <span aria-hidden>·</span>}
+                                <span className="truncate">{renderCell(column, row)}</span>
+                              </span>
+                            ))}
+                          </span>
+                        )}
+                      </span>
+                      {trailing && (
+                        <span className="tabular shrink-0 text-xs text-ink-muted">
+                          {renderCell(trailing, row)}
+                        </span>
+                      )}
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ---- desktop: the table -------------------------------------------------
+
+  const renderRow = (row: T, index: number) => {
+    const key = rowKey(row);
+    const active = activeKey === key;
+    const checked = selectable && isSelected(row);
+    // Solid fills, not alpha: these also paint the sticky checkbox cell, and
+    // content must not ghost through it while scrolling sideways.
+    const rowBg = active ? 'bg-surface-active' : checked ? 'bg-surface-hover' : 'bg-surface';
+    const hoverBg = active || checked ? '' : 'group-hover/row:bg-surface-hover';
+
+    return (
+      <TableRow
+        key={key}
+        data-index={index}
+        tabIndex={index === cursorIndex ? 0 : -1}
+        aria-selected={selectable ? checked : undefined}
+        data-state={checked ? 'selected' : undefined}
+        onClick={(event) => {
+          setCursor(index);
+          if (onRowMouseDownSelect(event, row, index)) return;
+          onRowClick?.(row);
+        }}
+        onDoubleClick={() => onRowDoubleClick?.(row)}
+        onFocus={() => setCursor(index)}
+        onKeyDown={(event) => onRowKeyDown(event, row, index)}
+        className={cn(
+          'group/row border-0 transition-colors',
+          pad.row,
+          rowBg,
+          hoverBg,
+          selectable && 'select-none',
+          onRowClick && 'cursor-pointer',
+          active && '[&>td:first-child]:shadow-[inset_2px_0_0_0_var(--primary)]',
+          'focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring',
+          rowClassName?.(row),
+        )}
+      >
+        {selectable && (
+          <TableCell
+            onClick={(event) => event.stopPropagation()}
+            // mousedown lands before the checkbox change event, so this is
+            // where Shift is still observable.
+            onMouseDownCapture={(event) => {
+              shiftHeld.current = event.shiftKey;
+            }}
+            className={cn(
+              'border-b border-border align-middle',
+              pad.cell,
+              rowBg,
+              hoverBg,
+              stickySelection && 'sticky left-0 z-10',
+            )}
+          >
+            <Checkbox
+              checked={checked}
+              ariaLabel="Selectează rândul"
+              onChange={(next) => {
+                toggleRow(index, next, shiftHeld.current);
+                shiftHeld.current = false;
+              }}
+            />
+          </TableCell>
+        )}
+
+        {columns.map((column) => (
+          <TableCell
+            key={column.key}
+            className={cn(
+              'border-b border-border align-middle text-sm text-ink',
+              pad.cell,
+              alignClass(column),
+              column.wrap ? 'break-words whitespace-normal' : 'truncate',
+              column.cellClassName,
+            )}
+          >
+            {renderCell(column, row)}
+          </TableCell>
+        ))}
+      </TableRow>
+    );
+  };
+
+  return (
+    <div className={cn('relative flex min-h-0 min-w-0 flex-1 flex-col', className)}>
+      {bulkBar}
+      {loadingHairline}
+
+      <div
+        ref={scrollRef}
+        onScroll={(event) => setScrolled(event.currentTarget.scrollTop > 0)}
+        // Virtualised lists can scroll the cursor row out of the DOM, taking
+        // the table's only tab stop with it. The container then becomes the
+        // tab stop and hands focus straight back to the cursor row.
+        tabIndex={virtualised && !cursorRendered && sorted.length > 0 ? 0 : -1}
+        onFocus={(event) => {
+          if (event.target === event.currentTarget) focusRow(cursorIndex);
+        }}
+        className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain outline-none"
+      >
         <table
+          data-slot="table"
           className="w-full border-separate border-spacing-0 text-left text-sm"
-          style={{ minWidth, tableLayout: 'fixed' }}
+          style={{ tableLayout: 'fixed' }}
           aria-busy={loading || undefined}
           aria-label={ariaLabel}
         >
@@ -283,52 +683,55 @@ export function DataTable<T>({
             ))}
           </colgroup>
 
-          <thead>
-            <tr>
+          <TableHeader className="[&_tr]:border-0">
+            <TableRow className="border-0 hover:bg-transparent">
               {selectable && (
-                <th
+                <TableHead
                   scope="col"
-                  className={cx(
+                  className={cn(
                     'border-b border-border bg-surface-header',
                     pad.head,
                     stickyHeader && 'sticky top-0 z-30',
+                    stickyHeader && scrolled && 'shadow-sticky',
                     stickySelection && 'sticky left-0',
                   )}
                 >
                   <Checkbox
-                    checked={allSelected}
-                    indeterminate={someSelected}
+                    checked={Boolean(allSelected)}
+                    indeterminate={Boolean(someSelected)}
                     onChange={toggleAll}
                     ariaLabel="Selectează toate rândurile"
                   />
-                </th>
+                </TableHead>
               )}
 
               {columns.map((column) => {
                 const isSorted = sort?.key === column.key;
-                const sortable = Boolean(column.sortValue);
                 return (
-                  <th
+                  <TableHead
                     key={column.key}
                     scope="col"
                     title={column.headerTitle}
-                    aria-sort={isSorted ? (sort!.dir === 'asc' ? 'ascending' : 'descending') : undefined}
-                    className={cx(
+                    aria-sort={
+                      isSorted ? (sort!.dir === 'asc' ? 'ascending' : 'descending') : undefined
+                    }
+                    className={cn(
                       'group/th border-b border-border bg-surface-header font-semibold',
                       'text-[0.6875rem] tracking-wide whitespace-nowrap uppercase',
-                      isSorted ? 'text-brand-700' : 'text-ink-muted',
+                      isSorted ? 'text-ink' : 'text-ink-muted',
                       pad.head,
                       alignClass(column),
                       stickyHeader && 'sticky top-0 z-20',
+                      stickyHeader && scrolled && 'shadow-sticky',
                     )}
                   >
-                    {sortable ? (
+                    {column.sortValue ? (
                       <button
                         type="button"
                         onClick={() => applySort(column)}
-                        className={cx(
+                        className={cn(
                           'inline-flex max-w-full items-center gap-1 rounded-sm transition-colors hover:text-ink',
-                          'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500',
+                          'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
                           (column.align === 'right' || column.numeric) && 'flex-row-reverse',
                         )}
                       >
@@ -338,39 +741,39 @@ export function DataTable<T>({
                     ) : (
                       <span className="block truncate">{column.header}</span>
                     )}
-                  </th>
+                  </TableHead>
                 );
               })}
-            </tr>
-          </thead>
+            </TableRow>
+          </TableHeader>
 
-          <tbody ref={bodyRef}>
+          <TableBody ref={bodyRef} className="[&_tr:last-child]:border-0">
             {showSkeleton &&
               Array.from({ length: skeletonRows }).map((_, rowIndex) => (
-                <tr key={`skeleton-${rowIndex}`} className="bg-white">
+                <TableRow key={`skeleton-${rowIndex}`} className={cn('border-0 bg-surface', pad.row)}>
                   {selectable && (
-                    <td className={cx('border-b border-border/60', pad.cell)}>
-                      <span className="block size-4 animate-pulse rounded bg-slate-200/80" />
-                    </td>
+                    <TableCell className={cn('border-b border-border', pad.cell)}>
+                      <Skeleton className="size-4 rounded-[0.25rem]" />
+                    </TableCell>
                   )}
                   {columns.map((column, columnIndex) => (
-                    <td key={column.key} className={cx('border-b border-border/60', pad.cell)}>
-                      <span
-                        className="block h-3 animate-pulse rounded bg-slate-200/80"
+                    <TableCell key={column.key} className={cn('border-b border-border', pad.cell)}>
+                      <Skeleton
+                        className="h-3"
                         style={{
                           // Deterministic ragged widths read as text, not as bars.
                           width: `${[70, 45, 60, 85, 55][(rowIndex + columnIndex) % 5]}%`,
                           animationDelay: `${rowIndex * 60}ms`,
                         }}
                       />
-                    </td>
+                    </TableCell>
                   ))}
-                </tr>
+                </TableRow>
               ))}
 
-            {!showSkeleton && sorted.length === 0 && (
-              <tr>
-                <td colSpan={columnCount} className="bg-white">
+            {showEmpty && (
+              <TableRow className="border-0 hover:bg-transparent">
+                <TableCell colSpan={columnCount} className="bg-surface p-0 whitespace-normal">
                   {empty ?? (
                     <EmptyState
                       size="sm"
@@ -378,89 +781,27 @@ export function DataTable<T>({
                       body="Ajustează filtrele sau caută altceva."
                     />
                   )}
-                </td>
+                </TableCell>
+              </TableRow>
+            )}
+
+            {/* Spacer rows stand in for the rows the virtualiser skipped, so
+                the scrollbar and the sticky header behave as if all of them
+                were there. */}
+            {virtualised && paddingTop > 0 && (
+              <tr aria-hidden style={{ height: paddingTop }}>
+                <td colSpan={columnCount} />
               </tr>
             )}
 
-            {!showSkeleton &&
-              sorted.map((row, index) => {
-                const key = rowKey(row);
-                const isActive = activeKey === key;
-                const isSelected = selectable && selectedKeys!.has(key);
-                // Solid fills, not alpha: these also paint the sticky checkbox
-                // cell, and content must not ghost through it while scrolling.
-                const rowBg = isActive ? 'bg-brand-100' : isSelected ? 'bg-brand-50' : 'bg-white';
-                const hoverBg = isActive || isSelected ? '' : 'group-hover/row:bg-slate-50';
+            {!showSkeleton && !showEmpty && visible.map(({ row, index }) => renderRow(row, index))}
 
-                return (
-                  <tr
-                    key={key}
-                    data-index={index}
-                    tabIndex={index === Math.min(cursor, sorted.length - 1) ? 0 : -1}
-                    aria-selected={selectable ? isSelected : undefined}
-                    onClick={() => {
-                      setCursor(index);
-                      onRowClick?.(row);
-                    }}
-                    onDoubleClick={() => onRowDoubleClick?.(row)}
-                    onFocus={() => setCursor(index)}
-                    onKeyDown={(event) => onRowKeyDown(event, row, index)}
-                    className={cx(
-                      'group/row transition-colors',
-                      rowBg,
-                      hoverBg,
-                      onRowClick && 'cursor-pointer',
-                      isActive &&
-                        '[&>td:first-child]:shadow-[inset_2px_0_0_0_var(--color-brand-700)]',
-                      'focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-brand-500',
-                      rowClassName?.(row),
-                    )}
-                  >
-                    {selectable && (
-                      <td
-                        onClick={(event) => event.stopPropagation()}
-                        // mousedown lands before the checkbox change event, so
-                        // this is where Shift is still observable.
-                        onMouseDownCapture={(event) => {
-                          shiftHeld.current = event.shiftKey;
-                        }}
-                        className={cx(
-                          'border-b border-border/60 align-middle',
-                          pad.cell,
-                          rowBg,
-                          hoverBg,
-                          stickySelection && 'sticky left-0 z-10',
-                        )}
-                      >
-                        <Checkbox
-                          checked={isSelected}
-                          ariaLabel="Selectează rândul"
-                          onChange={(checked) => {
-                            toggleRow(index, checked, shiftHeld.current);
-                            shiftHeld.current = false;
-                          }}
-                        />
-                      </td>
-                    )}
-
-                    {columns.map((column) => (
-                      <td
-                        key={column.key}
-                        className={cx(
-                          'border-b border-border/60 align-middle text-ink',
-                          pad.cell,
-                          alignClass(column),
-                          column.wrap ? 'break-words' : 'truncate',
-                          column.cellClassName,
-                        )}
-                      >
-                        {renderCell(column, row)}
-                      </td>
-                    ))}
-                  </tr>
-                );
-              })}
-          </tbody>
+            {virtualised && paddingBottom > 0 && (
+              <tr aria-hidden style={{ height: paddingBottom }}>
+                <td colSpan={columnCount} />
+              </tr>
+            )}
+          </TableBody>
         </table>
       </div>
     </div>

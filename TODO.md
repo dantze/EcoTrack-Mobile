@@ -27,11 +27,11 @@ unless its status says otherwise.
 **Status legend:** `[ ]` not started · `[~]` in progress · `[DONE]` done ·
 `[POSTPONED]` deliberately deferred · `[?]` needs a decision first
 
-**Next free ID: TODO-58.** (Highest used is TODO-57.)
+**Next free ID: TODO-64.** (Highest used is TODO-63.)
 
 ---
 
-## Still open — 14 of 57
+## Still open — 20 of 63
 
 The whole of what is left, in one place. Everything not listed here is `[DONE]`.
 
@@ -49,6 +49,12 @@ The whole of what is left, in one place. Everything not listed here is `[DONE]`.
 - **TODO-55** `[ ]` — The bundle budget measures the mock build, not the deployed one *(G)*
 - **TODO-56** `[ ]` — An admin cannot revoke another employee's session *(A)*
 - **TODO-57** `[ ]` — Produse has no "what is still using it" dialog *(D)*
+- **TODO-58** `[ ]` — The UI rebuild stopped short on four surfaces *(J)*
+- **TODO-59** `[ ]` — The eager bundle grew from ~125 kB to ~260 kB gzip *(J)*
+- **TODO-60** `[ ]` — Mantine's full stylesheet ships for four components *(J)*
+- **TODO-61** `[ ]` — The legacy `brand-*` ramp has no dark values *(J)*
+- **TODO-62** `[ ]` — `PageHeader` and `CommandBar` are two components for one job *(J)*
+- **TODO-63** `[ ]` — The dispatch board is still drag-and-drop only *(J)*
 
 **Done, but flagged by whoever did it** — not open, but not finished-and-forgotten
 either:
@@ -2620,6 +2626,101 @@ message}`, so it would have to prefer `.message` and fall back to the raw text),
 or add an explicit allowlist of statuses whose body is known to be user-facing.
 Mobile has the same gap in its `Eșec la …` throw sites and should follow whichever
 is picked.
+
+### TODO-58 `[ ]` The UI rebuild stopped short on four surfaces
+The web UI was rebuilt on shadcn/ui + Mantine (see `.claude/skills/web-ui-shadcn`
+and `web-ui-mantine`): one token system with real dark mode, an Outlook-style
+shell (navy top bar, collapsible nav pane, `CommandBar` ribbon, `ListDetail`
+reading pane), and every screen moved onto it. Four things were planned and are
+NOT done, because the agents doing them ran out of budget mid-file:
+
+- **`OrderFormDrawer`** (957 lines) still lays its fields out by hand rather than
+  with shadcn's `Field`/`FieldGroup` composition, and has no unsaved-changes
+  guard on close. It works and it is on the new controls; it is the one form in
+  the app that does not read as sectioned.
+- **The map chrome** (`MapControls`, `MapLegend`, `HoverCard`) got the token
+  sweep but not the redesign — floating `ButtonGroup` clusters, a legend that
+  collapses to a button on mobile. Do not touch the container's inline
+  `position:absolute; inset:0` (see CLAUDE.md).
+- **`IdScanField`** has the three states but not the dragged-file/camera polish
+  the rebuild brief described.
+- **`ClientFormDrawer`** is in the same position as `OrderFormDrawer`.
+
+None of these is broken — they are the parts that are merely *fine*. Deciding
+needs nothing; it is work, not a question.
+
+### TODO-59 `[ ]` The eager bundle grew from ~125 kB to ~260 kB gzip
+Two component libraries have a floor. `MantineProvider` wraps the app (~37 kB
+gzip), the Radix primitives behind the shell's dialogs, menus, tooltips and
+sheets are on the first-paint path (~37 kB), and the shell is bigger than the
+sidebar it replaced. `BUDGET_GZIP_KB` in `.github/scripts/bundle_budget.py` was
+raised 160 → 280 deliberately, with the reasoning in a comment there.
+
+What was already done: the command palette and the shortcut overlay were pushed
+out of the eager graph (they pulled cmdk, the whole UI-kit barrel and both
+feature modules' query hooks to render something invisible until ⌘K), and
+`GLOBAL_GROUP` moved into `lib/hotkeys` so importing it no longer drags the kit
+into the shell.
+
+What is left to try, in order of expected yield: **split the `@/components/ui`
+barrel** so a screen importing `Button` stops pulling `DateInput` and through it
+`@mantine/dates`; check whether the `radix-ui` umbrella package tree-shakes as
+well as the individual `@radix-ui/react-*` packages would; and confirm whether
+the mock seed is really being dropped from the `VITE_DATA_MODE=live` build
+(measured 155 kB vs 153 kB, which is suspiciously little — see TODO-54).
+
+### TODO-60 `[ ]` Mantine's full stylesheet ships for four components
+`src/index.css` imports `@mantine/core/styles.css` (plus dates, notifications,
+spotlight, charts) into `@layer mantine`. That is ~500 kB raw / ~73 kB gzip of
+CSS for what the app actually uses out of Mantine: the date field, the combobox
+internals, and the notification host. Mantine supports per-component imports
+(`@mantine/core/styles/Input.css`, …), which would cut most of it.
+
+Not done because the safe list is not obvious — a missed import is an unstyled
+control in a corner of one screen, and there is no test that would catch it.
+Deciding it needs someone to walk the Mantine components actually rendered and
+write the list, ideally with a lint rule or a comment pinning it next to the
+imports. Keep the `layer(mantine)` wrapper on whatever replaces it: that layer
+order is what lets a Tailwind utility beat a Mantine style without `!important`.
+
+### TODO-61 `[ ]` The legacy `brand-*` ramp has no dark values
+`--brand-50 … --brand-900` are declared once, on `:root`, and NOT redefined
+under `.dark` — unlike every other token in `src/index.css`. Nothing in
+`src/features` uses them any more (they were swept to `accent-*` / `primary` /
+`surface-*` during the rebuild), and the rail deliberately stays navy in both
+themes, so this is latent rather than live.
+
+It is a trap for the next person: `bg-brand-50` still compiles, still looks
+right in light mode, and is a white slab in dark mode. Either give the ramp dark
+values, or delete the tokens and let the class stop compiling. The second is
+better and is a five-line change; it is listed here rather than done because
+deleting a token is the kind of thing that should be one commit with a reason.
+
+### TODO-62 `[ ]` `PageHeader` and `CommandBar` are two components for one job
+The kit's `PageHeader` (title / subtitle / actions) and the layout module's
+`CommandBar` (the same, plus `tools`, `tabs` and an overflow menu) now render
+the same strip, and they are styled to match by hand rather than by sharing an
+implementation. Every screen uses `CommandBar`; `PageHeader` survives for the
+frozen contract in `components/ui/types.ts` and for callers that only need a
+title row.
+
+They will drift — that is what two implementations of one strip do. The fix is
+to make `PageHeader` a thin wrapper over `CommandBar`, which is easy; what needs
+deciding first is whether `PageHeader` should stay in the frozen contract at all
+now that nothing but the kit itself renders one.
+
+### TODO-63 `[ ]` The dispatch board is still drag-and-drop only
+`RoutesPage` moves a task onto a route by dragging (`@dnd-kit`), and below `lg`
+its three columns are now tabs — which means the drag source and the drop target
+are frequently not on screen at the same time. There is a "Mută" button per
+route stop that opens a route picker, but the **unassigned queue has no
+equivalent**: a task in "Neasignate" can only be dragged.
+
+So on a phone, and for anyone driving the board from the keyboard, half the
+board's central action is unreachable. The fix is a per-task menu in the queue
+with "Trimite pe ruta…", reusing `RoutePickerModal`, which the stops column
+already does. Not done in the rebuild because the board's drag wiring was left
+untouched on purpose and this adds a second write path through it.
 
 ---
 

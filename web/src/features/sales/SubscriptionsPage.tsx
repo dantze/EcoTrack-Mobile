@@ -14,13 +14,14 @@
 import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ApiError, type SubscriptionUsage } from '@/api';
+import { Plus, RefreshCw } from 'lucide-react';
+import { CommandBar, ToolbarSeparator, Workbench } from '@/components/layout';
 import {
   Badge,
   Button,
   DataTable,
   EmptyState,
   Modal,
-  PageHeader,
   Select,
   TextArea,
   TextInput,
@@ -30,9 +31,9 @@ import {
 import { formatMoney } from '@/components/domain';
 import { SUBSCRIPTION_TYPES, type Subscription, type SubscriptionType } from '@/types/domain';
 import { includesFolded } from '@/lib/search';
-import { ErrorNotice, FilterBar, FilterField, SearchInput } from './components/FilterBar';
+import { ErrorNotice, SearchInput } from './components/FilterBar';
 import { ToggleField } from './components/fields';
-import { Toaster, errorMessage, toast } from './components/Toaster';
+import { errorMessage, toast } from './components/Toaster';
 import { useConfirm } from './components/useConfirm';
 import { SubscriptionUsageModal } from './components/SubscriptionUsageModal';
 import {
@@ -402,35 +403,37 @@ export function SubscriptionsPage() {
   const resetFilters = () => setSearch('');
 
   return (
-    <>
-      <PageHeader
+    <Workbench>
+      <CommandBar
         title="Abonamente"
         subtitle={
           subscriptionsQuery.isLoading
             ? 'Se încarcă…'
             : `${rows.length} din ${subscriptions.length} abonamente`
         }
+        tools={
+          <div className="w-44 sm:w-56 xl:w-72">
+            <SearchInput value={search} onChange={setSearch} placeholder="Nume sau descriere" />
+          </div>
+        }
         actions={
           <>
+            <Button variant="primary" size="sm" icon={<Plus aria-hidden />} onClick={openCreate}>
+              Abonament nou
+            </Button>
+            <ToolbarSeparator />
             <Button
-              variant="secondary"
+              variant="ghost"
+              size="sm"
+              icon={<RefreshCw aria-hidden />}
               loading={subscriptionsQuery.isFetching}
               onClick={() => void subscriptionsQuery.refetch()}
             >
               Reîmprospătează
             </Button>
-            <Button variant="primary" onClick={openCreate}>
-              + Abonament
-            </Button>
           </>
         }
       />
-
-      <FilterBar>
-        <FilterField label="Căutare">
-          <SearchInput value={search} onChange={setSearch} placeholder="Nume sau descriere" />
-        </FilterField>
-      </FilterBar>
 
       {subscriptionsQuery.isError ? (
         <ErrorNotice
@@ -442,6 +445,7 @@ export function SubscriptionsPage() {
           rows={rows}
           columns={columns}
           rowKey={(subscription) => subscription.id}
+          ariaLabel="Abonamente"
           initialSort={{ key: 'name', dir: 'asc' }}
           loading={subscriptionsQuery.isLoading}
           activeKey={editing?.id ?? null}
@@ -609,7 +613,6 @@ export function SubscriptionsPage() {
       )}
 
       {confirmDialog}
-      <Toaster />
-    </>
+    </Workbench>
   );
 }

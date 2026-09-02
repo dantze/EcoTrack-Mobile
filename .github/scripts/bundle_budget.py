@@ -69,11 +69,22 @@ STATIC_IMPORT_RE = re.compile(
     r"""\b(?:import|export)\s*(?:[\w$*{},\s]*?\bfrom\s*)?["']([^"']+)["']"""
 )
 
-# Roughly 25% headroom over the current ~125 kB. Tight enough to catch an
-# accidental eager import of something large, loose enough that ordinary
-# feature work does not trip it. Raise it deliberately, in a commit that says
-# what grew and why — never to make a red build green.
-BUDGET_GZIP_KB = 160.0
+# Raised from 160 kB when the web UI was rebuilt on shadcn/ui + Mantine.
+#
+# What grew, and why it is eager: MantineProvider wraps the app (~37 kB), the
+# Radix primitives behind the shell's dialogs, menus, tooltips and sheets are
+# reached on first paint (~37 kB), and the shell itself is bigger than the
+# sidebar it replaced. The palette and the shortcut help overlay were pushed
+# out of the eager graph rather than left in it, and the route screens, the
+# map and the OCR engine are still lazy.
+#
+# 280 kB is ~8% headroom over the current ~260 kB: still tight enough to catch
+# an accidental eager import of something large. It is NOT an invitation to
+# drift — TODO-59 tracks bringing it back down (per-component Mantine CSS,
+# splitting the UI-kit barrel so a screen stops pulling the date picker).
+# Raise it deliberately, in a commit that says what grew and why — never to
+# make a red build green.
+BUDGET_GZIP_KB = 280.0
 
 
 def gzip_kb(path: Path) -> float:

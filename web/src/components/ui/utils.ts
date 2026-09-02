@@ -3,52 +3,73 @@
  * and the hooks the overlays need (focus trap, scroll lock, outside click).
  *
  * Nothing here is domain-aware; it is all generic desktop-app plumbing.
+ *
+ * The class constants below describe the ONE control silhouette every form
+ * field in the app wears — shadcn's `Input` is the reference, and Mantine's
+ * date picker is dragged onto the same numbers through its Styles API. They
+ * are written in tokens (`border-input`, `ring-ring`, `bg-surface`) so light
+ * and dark mode need no `dark:` override anywhere above this file.
  */
 
 import { useCallback, useEffect, useId, useRef } from 'react';
 import { fold } from '@/lib/search';
+import { cn } from '@/lib/utils';
 
 export type ClassValue = string | false | null | undefined;
 
-export const cx = (...parts: ClassValue[]) => parts.filter(Boolean).join(' ');
+/**
+ * `cn` is the house helper (clsx + tailwind-merge). `cx` is the kit's older
+ * name for the same job and stays as an alias: ~40 call sites across the
+ * feature layer import it from '@/components/ui', and renaming them is churn
+ * with no behaviour attached. Merging beats concatenating — a caller passing
+ * `h-9` to a control that already says `h-8` should win, not collide.
+ */
+export { cn };
+export const cx = cn;
 
 /**
- * Keyboard-only focus ring. Tailwind v4 `outline-*` utilities give us a ring
- * that sits outside the element without the offset-colour dance `ring-*`
- * needs — important inside table cells where there is no room to spare.
- *
- * Uses `brand-400`, not `brand-500`: Button/IconButton render on both the
- * white content area and the dark `brand-700` sidebar, and `brand-500` drops
- * to ~2.1:1 against that sidebar (fails the 3:1 non-text contrast minimum).
- * `brand-400` clears 3:1 against both ends — white (3.8:1) and the sidebar
- * (3.9–4.7:1).
+ * Keyboard-only focus ring, drawn OUTSIDE the element so it survives inside a
+ * table cell with no room to spare. `outline-ring` is the same token shadcn's
+ * own `focus-visible:ring-ring` uses, so a kit control and a raw primitive
+ * light up identically — and because it is a token it flips with the theme.
  */
 export const FOCUS_RING =
-  'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-400';
+  'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring';
 
 /** Same idea, but hugging the element (used inside dense rows and menus). */
 export const FOCUS_RING_TIGHT =
-  'focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-brand-500';
+  'focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring';
 
-/** Text-input chrome shared by TextInput / TextArea / Select / DateInput. */
+/**
+ * Text-input chrome shared by TextInput / TextArea / Select / DateInput.
+ * Deliberately mirrors `@/components/shadcn/input` so a control the kit draws
+ * itself (the Select trigger, the Mantine date input) is indistinguishable
+ * from one that IS a shadcn `Input`.
+ */
 export const CONTROL_BASE =
-  'w-full rounded-md border bg-white text-sm text-ink transition-[color,box-shadow,border-color] ' +
-  'placeholder:text-ink-subtle focus:outline-none ' +
-  'disabled:cursor-not-allowed disabled:bg-surface-sunken disabled:text-ink-subtle';
+  'w-full min-w-0 rounded-lg border bg-surface text-sm text-ink transition-colors outline-none ' +
+  'placeholder:text-ink-subtle ' +
+  'disabled:cursor-not-allowed disabled:bg-surface-sunken disabled:text-ink-subtle disabled:opacity-70';
 
 export const CONTROL_IDLE =
-  'border-border hover:border-border-strong focus:border-brand-500 focus:ring-2 focus:ring-brand-500/25';
+  'border-input hover:border-border-strong focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50';
 
 export const CONTROL_ERROR =
-  'border-danger-500 hover:border-danger-600 focus:border-danger-600 focus:ring-2 focus:ring-danger-500/25';
+  'border-destructive hover:border-destructive focus-visible:border-destructive focus-visible:ring-3 focus-visible:ring-destructive/25';
 
+/**
+ * Two heights per size, not one. The desktop numbers (28/32px) are what makes
+ * a form read as a dense back-office tool; the mobile numbers are the 40px
+ * minimum a finger needs. `sm:` is 640px, so a 390px phone always gets the
+ * taller control and a laptop always gets the dense one.
+ */
 export const CONTROL_HEIGHT: Record<'sm' | 'md', string> = {
-  sm: 'h-7 px-2',
-  md: 'h-8 px-2.5',
+  sm: 'h-9 px-2 sm:h-7',
+  md: 'h-10 px-2.5 sm:h-8',
 };
 
 export function controlClass(error: boolean, size: 'sm' | 'md' = 'md', extra?: ClassValue) {
-  return cx(CONTROL_BASE, CONTROL_HEIGHT[size], error ? CONTROL_ERROR : CONTROL_IDLE, extra);
+  return cn(CONTROL_BASE, CONTROL_HEIGHT[size], error ? CONTROL_ERROR : CONTROL_IDLE, extra);
 }
 
 /** Stable ids for a labelled control plus its hint / error descriptions. */

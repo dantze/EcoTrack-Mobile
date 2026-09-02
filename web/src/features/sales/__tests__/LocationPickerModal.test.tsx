@@ -30,6 +30,8 @@ const fake = vi.hoisted(() => ({
   mapListeners: {} as Record<string, ((event: unknown) => void)[]>,
   /** The draggable pin, once the component has built it. */
   pin: null as null | { setLngLat(lngLat: [number, number]): unknown; fire(type: string): void },
+  /** The most recently constructed map, for markers to attach to. */
+  map: null as null | { container: HTMLElement | null },
 }));
 
 function emit(type: string, event: unknown = {}) {
@@ -49,6 +51,12 @@ function dragPin(lat: number, lng: number) {
 
 vi.mock('maplibre-gl', () => {
   class FakeMap {
+    /** The element the component handed us — markers are appended into it. */
+    container: HTMLElement | null = null;
+    constructor(options?: { container?: HTMLElement }) {
+      this.container = options?.container ?? null;
+      fake.map = this;
+    }
     dragRotate = { disable: vi.fn() };
     touchZoomRotate = { disableRotation: vi.fn() };
     keyboard = { disableRotation: vi.fn() };
@@ -85,11 +93,13 @@ vi.mock('maplibre-gl', () => {
     getLngLat() {
       return this.lngLat;
     }
-    // Real MapLibre appends the element into the map container. Here it goes
-    // to the body — close enough for the known-place badges, which the tests
-    // click as ordinary buttons.
-    addTo() {
-      if (this.element) document.body.append(this.element);
+    // Into the map container, the way real MapLibre does it — NOT into the
+    // body. The picker lives inside a dialog, and a dialog marks everything
+    // outside itself `aria-hidden`, so a badge parked on the body would be
+    // invisible to `getByRole` even though the component created it.
+    addTo(map?: { container?: HTMLElement | null }) {
+      const parent = map?.container ?? fake.map?.container ?? document.body;
+      if (this.element) parent.append(this.element);
       return this;
     }
     remove() {

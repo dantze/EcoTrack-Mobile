@@ -1,13 +1,45 @@
 /**
- * ISO date field. Stays on the native date control — it gives us the OS
- * calendar, keyboard entry, and locale-correct segment order for free, which a
- * hand-built picker would only approximate. We restyle its chrome to match the
- * other controls and keep the value strictly "YYYY-MM-DD".
+ * Date field — Mantine's `DateInput`, on our chrome.
+ *
+ * The native `<input type="date">` this replaces was cheap but wrong for the
+ * job: its calendar is OS chrome that ignores our type scale and our theme,
+ * its segment order follows the browser's locale rather than the app's, and
+ * there is no way to put "azi / mâine" presets inside it. Mantine gives a
+ * typeable field AND a themed calendar, and — the part that decided it —
+ * speaks `YYYY-MM-DD` strings natively, so the kit's value contract survives
+ * untouched. No `Date` object ever enters or leaves this component.
+ *
+ * Romanian input is the default: the field displays and accepts `DD.MM.YYYY`
+ * (what an operator types), and `dateParser` also accepts `/` and `-`
+ * separators plus a bare ISO string pasted from elsewhere.
  */
 
+import dayjs from 'dayjs';
+import customParseFormat from 'dayjs/plugin/customParseFormat';
+import 'dayjs/locale/ro';
+import { DateInput as MantineDateInput } from '@mantine/dates';
+import { CalendarDays } from 'lucide-react';
 import { describedBy, FieldShell } from './Field';
-import { controlClass, cx, useFieldIds } from './utils';
+import { cn, useFieldIds } from './utils';
 import type { DateInputProps } from './types';
+
+// dayjs parses loosely without this — "13.01.2026" and "01.13.2026" would both
+// come back as a date, and one of them is not the one that was typed.
+dayjs.extend(customParseFormat);
+dayjs.locale('ro');
+
+const TYPED_FORMATS = ['DD.MM.YYYY', 'D.M.YYYY', 'DD/MM/YYYY', 'D/M/YYYY', 'YYYY-MM-DD'];
+
+/** What the operator typed → the ISO string the app stores, or null. */
+function parseTyped(input: string): string | null {
+  const trimmed = input.trim();
+  if (!trimmed) return null;
+  for (const format of TYPED_FORMATS) {
+    const parsed = dayjs(trimmed, format, true);
+    if (parsed.isValid()) return parsed.format('YYYY-MM-DD');
+  }
+  return null;
+}
 
 export interface DateInputExtraProps {
   /** Explicit control id, so a caller can label or focus this field itself. */
@@ -16,6 +48,8 @@ export interface DateInputExtraProps {
   className?: string;
   /** Quick-set row under the field, e.g. `[{ label: 'Azi', value: today }]`. */
   presets?: { label: string; value: string }[];
+  placeholder?: string;
+  clearable?: boolean;
 }
 
 export function DateInput({
@@ -26,10 +60,14 @@ export function DateInput({
   required,
   value,
   onChange,
+  min,
+  max,
+  disabled,
   size = 'md',
   className,
   presets,
-  ...rest
+  placeholder = 'zz.ll.aaaa',
+  clearable = false,
 }: DateInputProps & DateInputExtraProps) {
   const { id, hintId, errorId } = useFieldIds(explicitId);
 
@@ -43,25 +81,47 @@ export function DateInput({
       hint={hint}
       required={required}
     >
-      <input
-        {...rest}
+      <MantineDateInput
         id={id}
-        type="date"
-        value={value ?? ''}
-        required={required}
-        onChange={(event) => onChange(event.target.value || null)}
+        value={value ?? null}
+        onChange={(next) => onChange(next ?? null)}
+        minDate={min || undefined}
+        maxDate={max || undefined}
+        disabled={disabled}
+        placeholder={placeholder}
+        valueFormat="DD.MM.YYYY"
+        dateParser={parseTyped}
+        clearable={clearable}
+        firstDayOfWeek={1}
+        weekendDays={[0, 6]}
+        popoverProps={{ withinPortal: true, shadow: 'md', position: 'bottom-start' }}
+        rightSection={<CalendarDays aria-hidden className="size-3.5 text-ink-subtle" />}
         aria-invalid={error ? true : undefined}
         aria-describedby={describedBy(hintId, errorId, hint, error)}
-        className={controlClass(
-          Boolean(error),
-          size,
-          cx(
-            'tabular [&::-webkit-calendar-picker-indicator]:cursor-pointer',
-            '[&::-webkit-calendar-picker-indicator]:opacity-50 hover:[&::-webkit-calendar-picker-indicator]:opacity-90',
+        // Mantine's own sizing is one notch taller than a shadcn control; the
+        // Styles API is how the two end up the same height in the same row.
+        classNames={{
+          input: cn(
+            'tabular rounded-lg border-input bg-surface text-sm text-ink placeholder:text-ink-subtle',
+            'focus:border-ring focus:ring-3 focus:ring-ring/50',
+            'disabled:cursor-not-allowed disabled:bg-surface-sunken disabled:text-ink-subtle',
+            size === 'sm' ? 'h-9 sm:h-7' : 'h-10 sm:h-8',
+            error && 'border-destructive focus:border-destructive focus:ring-destructive/25',
             className,
           ),
-        )}
+          section: 'text-ink-subtle',
+          calendarHeaderControl: 'text-ink hover:bg-surface-hover',
+          calendarHeaderLevel: 'text-ink font-semibold',
+          weekday: 'text-ink-subtle text-xs',
+          day: cn(
+            'text-ink rounded-md hover:bg-surface-hover',
+            'data-[selected]:bg-primary data-[selected]:text-primary-foreground',
+            'data-[today]:font-semibold data-[today]:text-primary',
+            'data-[outside]:text-ink-subtle data-[weekend]:text-ink',
+          ),
+        }}
       />
+
       {presets && presets.length > 0 && (
         <div className="flex flex-wrap gap-1 pt-0.5">
           {presets.map((preset) => (
@@ -69,11 +129,13 @@ export function DateInput({
               key={preset.label}
               type="button"
               onClick={() => onChange(preset.value)}
-              className={cx(
+              aria-pressed={value === preset.value}
+              className={cn(
                 'rounded px-1.5 py-0.5 text-xs transition-colors',
+                'focus-visible:ring-2 focus-visible:ring-ring focus-visible:outline-none',
                 value === preset.value
-                  ? 'bg-brand-50 text-brand-700'
-                  : 'text-ink-muted hover:bg-slate-100 hover:text-ink',
+                  ? 'bg-surface-active font-medium text-primary'
+                  : 'text-ink-muted hover:bg-surface-hover hover:text-ink',
               )}
             >
               {preset.label}

@@ -10,13 +10,14 @@
  */
 
 import { useMemo, useState } from 'react';
+import { RefreshCw } from 'lucide-react';
+import { CommandBar, Workbench } from '@/components/layout';
 import {
   Badge,
   Button,
   DataTable,
   Drawer,
   EmptyState,
-  PageHeader,
   Tabs,
   TextInput,
 } from '@/components/ui';
@@ -48,7 +49,6 @@ import {
   DetailRow,
   ErrorBlock,
   LocationBlock,
-  Toolbar,
 } from './components/display';
 import { FeedbackProvider, useFeedback } from './components/feedback';
 import { RoutePickerModal } from './components/pickers';
@@ -248,46 +248,62 @@ function RecurringScreen() {
   ];
 
   return (
-    <>
-      <PageHeader
+    <Workbench>
+      <CommandBar
         title="Igienizări recurente"
         subtitle={
           plansQuery.isPending
             ? 'Se încarcă…'
             : `${filtered.length} planuri · ${TAB_TITLES[scope].toLowerCase()}`
         }
-      />
-
-      <Tabs
-        items={[
-          {
-            id: 'unassigned',
-            label: TAB_TITLES.unassigned,
-            count: unassignedQuery.data?.length,
-          },
-          { id: 'active', label: TAB_TITLES.active },
-          { id: 'all', label: TAB_TITLES.all },
-        ]}
-        active={scope}
-        onChange={(id) => setScope(id as RecurringScope)}
-      />
-
-      <Toolbar>
-        <div className="w-72">
-          <TextInput
-            id={SEARCH_FIELD_ID}
-            label="Căutare"
-            placeholder="client, adresă, abonament, rută…"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
+        tools={
+          <div className="w-48 sm:w-64 xl:w-80">
+            <TextInput
+              id={SEARCH_FIELD_ID}
+              placeholder="client, adresă, abonament, rută…"
+              value={query}
+              inputSize="sm"
+              clearable
+              onClear={() => setQuery('')}
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          </div>
+        }
+        actions={
+          <>
+            <Button
+              size="sm"
+              variant="ghost"
+              icon={<RefreshCw aria-hidden />}
+              loading={plansQuery.isFetching}
+              onClick={() => void plansQuery.refetch()}
+            >
+              Reîmprospătează
+            </Button>
+            {scope === 'unassigned' && (
+              <p className="ml-2 text-xs text-ink-muted">
+                Planurile fără rută nu generează sarcini — asignează-le pentru a intra în
+                producție.
+              </p>
+            )}
+          </>
+        }
+        tabs={
+          <Tabs
+            items={[
+              {
+                id: 'unassigned',
+                label: TAB_TITLES.unassigned,
+                count: unassignedQuery.data?.length,
+              },
+              { id: 'active', label: TAB_TITLES.active },
+              { id: 'all', label: TAB_TITLES.all },
+            ]}
+            active={scope}
+            onChange={(id) => setScope(id as RecurringScope)}
           />
-        </div>
-        {scope === 'unassigned' && (
-          <p className="pb-1.5 text-xs text-ink-muted">
-            Planurile fără rută nu generează sarcini — asignează-le pentru a intra în producție.
-          </p>
-        )}
-      </Toolbar>
+        }
+      />
 
       {plansQuery.error ? (
         <ErrorBlock error={plansQuery.error} onRetry={() => void plansQuery.refetch()} />
@@ -296,6 +312,7 @@ function RecurringScreen() {
           rows={filtered}
           columns={columns}
           rowKey={(plan) => plan.id}
+          ariaLabel="Planuri de igienizare recurentă"
           initialSort={{ key: 'client', dir: 'asc' }}
           loading={plansQuery.isPending}
           activeKey={openPlan?.id ?? null}
@@ -449,6 +466,6 @@ function RecurringScreen() {
           </div>
         )}
       </Drawer>
-    </>
+    </Workbench>
   );
 }

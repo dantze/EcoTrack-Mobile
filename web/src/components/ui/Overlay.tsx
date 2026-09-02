@@ -1,41 +1,59 @@
 /**
- * Modal and Drawer.
+ * Modal and Drawer, on the shadcn `Dialog` and `Sheet`.
  *
- * Both share one shell: portal to `document.body`, scrim, focus trap, ESC to
- * close, scroll lock, and focus returned to whatever opened them. The split is
- * purely spatial — Modal centres for a decision, Drawer slides in from the
- * right for record detail so the table stays visible and in place behind it.
+ * Radix owns everything that used to be hand-written here — portal, scrim,
+ * focus trap, focus restore, Escape, scroll lock — and it owns the enter/exit
+ * animation, so neither of these needs a keyframe of its own. The kit's job is
+ * the shape: a fixed header, a body that is the only thing scrolling, and an
+ * action row pinned to the bottom edge.
+ *
+ * The split is purely spatial. Modal centres for a decision; Drawer slides in
+ * from the right for record detail, so the table stays visible behind it.
+ *
+ * **Both go full-screen below `sm`.** A 480px drawer on a 390px phone is a
+ * sliver of content next to a sliver of scrim, and the scrim is the half that
+ * takes the taps.
  *
  * Mark the field that should receive focus on open with `data-autofocus`.
  */
 
-import { useId, useRef } from 'react';
 import type { ReactNode } from 'react';
-import { createPortal } from 'react-dom';
-import { IconButton } from './Button';
-import { CloseIcon } from './icons';
-import { cx, useEscapeKey, useFocusTrap, useScrollLock } from './utils';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/shadcn/dialog';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/shadcn/sheet';
+import { cn } from '@/lib/utils';
 import type { DrawerProps, ModalProps } from './types';
 
 const MODAL_WIDTHS = {
-  sm: 'max-w-md',
-  md: 'max-w-xl',
-  lg: 'max-w-3xl',
-  xl: 'max-w-5xl',
+  sm: 'sm:max-w-md',
+  md: 'sm:max-w-xl',
+  lg: 'sm:max-w-3xl',
+  xl: 'sm:max-w-5xl',
 } as const;
 
+/**
+ * Written with the primitive's own `data-[side=right]:` prefix, not a bare
+ * `sm:`. `SheetContent` caps the right-hand sheet at `data-[side=right]:
+ * sm:max-w-sm`, and an attribute selector outranks a plain class — a bare
+ * `sm:max-w-[38rem]` loses on specificity and the drawer silently stays 24rem.
+ */
 const DRAWER_WIDTHS = {
-  md: 'w-[30rem]',
-  lg: 'w-[38rem]',
-  xl: 'w-[48rem]',
+  md: 'data-[side=right]:sm:max-w-[30rem]',
+  lg: 'data-[side=right]:sm:max-w-[38rem]',
+  xl: 'data-[side=right]:sm:max-w-[48rem]',
 } as const;
-
-/** Stacking floors, so a confirm can sit above a modal that opened it. */
-const LAYERS = { base: 'z-50', top: 'z-[70]' } as const;
 
 export interface OverlayExtraProps {
-  /** `top` stacks above another overlay — used by the confirm dialog. */
-  layer?: keyof typeof LAYERS;
+  /**
+   * Kept for the call sites that still pass it. Radix stacks portals in mount
+   * order and every overlay shares one z-index, so a confirm opened from a
+   * modal already lands on top — there is nothing left for this to do.
+   */
+  layer?: 'base' | 'top';
   /** Clicking the scrim closes by default; disable for destructive forms. */
   dismissOnBackdrop?: boolean;
   /** Extra content in the header bar, left of the close button. */
@@ -43,37 +61,52 @@ export interface OverlayExtraProps {
   className?: string;
 }
 
-function useOverlay(open: boolean, onClose: () => void) {
-  const panelRef = useRef<HTMLDivElement>(null);
-  useEscapeKey(open, onClose);
-  useScrollLock(open);
-  useFocusTrap(panelRef, open);
-  return panelRef;
+/**
+ * Radix focuses the first tabbable node on open. `data-autofocus` overrides
+ * that — the field a form actually starts in is rarely the first control, and
+ * a confirm dialog deliberately starts on Cancel.
+ */
+function autoFocus(event: Event) {
+  const panel = event.currentTarget as HTMLElement | null;
+  const target = panel?.querySelector<HTMLElement>('[data-autofocus]');
+  if (!target) return;
+  event.preventDefault();
+  target.focus({ preventScroll: true });
 }
 
-function OverlayHeader({
-  titleId,
+/** Shared header/body/footer skeleton, so the two overlays cannot drift apart. */
+function OverlayShell({
   title,
-  aside,
-  onClose,
+  titleSlot: TitleSlot,
+  headerSlot: HeaderSlot,
+  headerAside,
+  children,
+  footer,
 }: {
-  titleId: string;
   title: ReactNode;
-  aside?: ReactNode;
-  onClose: () => void;
+  titleSlot: typeof DialogTitle | typeof SheetTitle;
+  headerSlot: typeof DialogHeader | typeof SheetHeader;
+  headerAside?: ReactNode;
+  children: ReactNode;
+  footer?: ReactNode;
 }) {
   return (
-    <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border px-5 py-3">
-      <h2 id={titleId} className="min-w-0 truncate text-sm font-semibold text-ink">
-        {title}
-      </h2>
-      <div className="flex shrink-0 items-center gap-1.5">
-        {aside}
-        <IconButton label="Închide" variant="ghost" size="sm" onClick={onClose}>
-          <CloseIcon />
-        </IconButton>
-      </div>
-    </div>
+    <>
+      <HeaderSlot className="shrink-0 flex-row items-center gap-3 space-y-0 border-b border-border px-4 py-2.5 pr-12">
+        <TitleSlot className="min-w-0 flex-1 truncate text-sm font-semibold text-ink">
+          {title}
+        </TitleSlot>
+        {headerAside && <div className="flex shrink-0 items-center gap-1.5">{headerAside}</div>}
+      </HeaderSlot>
+      {/* The only scroll container: header and footer stay put, so the action
+          row is reachable without scrolling to the end of a long form. */}
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3.5">{children}</div>
+      {footer && (
+        <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border bg-surface-header px-4 py-2.5">
+          {footer}
+        </div>
+      )}
+    </>
   );
 }
 
@@ -84,49 +117,40 @@ export function Modal({
   children,
   footer,
   width = 'md',
-  layer = 'base',
   dismissOnBackdrop = true,
   headerAside,
   className,
 }: ModalProps & OverlayExtraProps) {
-  const panelRef = useOverlay(open, onClose);
-  const titleId = useId();
-
-  if (!open) return null;
-
-  return createPortal(
-    <div className={cx('fixed inset-0 overflow-y-auto', LAYERS[layer])}>
-      <div
-        className="fixed inset-0 animate-fade-in bg-brand-900/35 backdrop-blur-[1px]"
-        onClick={dismissOnBackdrop ? onClose : undefined}
-        aria-hidden
-      />
-      {/* `my-auto` centres short dialogs but still lets tall ones scroll. */}
-      <div className="relative flex min-h-full items-start justify-center p-6 sm:p-10">
-        <div
-          ref={panelRef}
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby={titleId}
-          tabIndex={-1}
-          className={cx(
-            'my-auto flex w-full animate-scale-in flex-col overflow-hidden rounded-xl',
-            'bg-white shadow-modal ring-1 ring-black/5 focus:outline-none',
-            MODAL_WIDTHS[width],
-            className,
-          )}
+  return (
+    <Dialog open={open} onOpenChange={(next) => !next && onClose()}>
+      <DialogContent
+        // Radix warns about a missing description; these dialogs are labelled
+        // by their title and describe themselves in the body.
+        aria-describedby={undefined}
+        onOpenAutoFocus={autoFocus}
+        onInteractOutside={(event) => {
+          if (!dismissOnBackdrop) event.preventDefault();
+        }}
+        className={cn(
+          'flex max-h-full flex-col gap-0 overflow-hidden bg-surface p-0 text-ink',
+          // Phone: the dialog IS the screen. Tablet up: a centred card.
+          'inset-0 top-0 left-0 h-full max-h-full w-full max-w-full translate-x-0 translate-y-0 rounded-none',
+          'sm:inset-auto sm:top-1/2 sm:left-1/2 sm:h-auto sm:max-h-[85vh] sm:-translate-x-1/2 sm:-translate-y-1/2 sm:rounded-xl',
+          MODAL_WIDTHS[width],
+          className,
+        )}
+      >
+        <OverlayShell
+          title={title}
+          titleSlot={DialogTitle}
+          headerSlot={DialogHeader}
+          headerAside={headerAside}
+          footer={footer}
         >
-          <OverlayHeader titleId={titleId} title={title} aside={headerAside} onClose={onClose} />
-          <div className="max-h-[70vh] overflow-y-auto px-5 py-4">{children}</div>
-          {footer && (
-            <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border bg-surface-sunken px-5 py-3">
-              {footer}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>,
-    document.body,
+          {children}
+        </OverlayShell>
+      </DialogContent>
+    </Dialog>
   );
 }
 
@@ -137,46 +161,38 @@ export function Drawer({
   children,
   footer,
   width = 'lg',
-  layer = 'base',
   dismissOnBackdrop = true,
   headerAside,
   className,
 }: DrawerProps & OverlayExtraProps) {
-  const panelRef = useOverlay(open, onClose);
-  const titleId = useId();
-
-  if (!open) return null;
-
-  return createPortal(
-    <div className={cx('fixed inset-0 flex justify-end', LAYERS[layer])}>
-      <div
-        className="absolute inset-0 animate-fade-in bg-brand-900/25"
-        onClick={dismissOnBackdrop ? onClose : undefined}
-        aria-hidden
-      />
-      <aside
-        ref={panelRef}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        tabIndex={-1}
-        className={cx(
-          'relative flex h-full max-w-[calc(100vw-3rem)] animate-slide-left flex-col',
-          'border-l border-border bg-white shadow-panel focus:outline-none',
+  return (
+    <Sheet open={open} onOpenChange={(next) => !next && onClose()}>
+      <SheetContent
+        side="right"
+        aria-describedby={undefined}
+        onOpenAutoFocus={autoFocus}
+        onInteractOutside={(event) => {
+          if (!dismissOnBackdrop) event.preventDefault();
+        }}
+        className={cn(
+          'flex h-full flex-col gap-0 border-l border-border bg-surface p-0 text-ink shadow-panel',
+          // Full width on a phone, then the widths the contract promises.
+          'w-full max-w-full',
           DRAWER_WIDTHS[width],
           className,
         )}
       >
-        <OverlayHeader titleId={titleId} title={title} aside={headerAside} onClose={onClose} />
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 py-4">{children}</div>
-        {footer && (
-          <div className="flex shrink-0 items-center justify-end gap-2 border-t border-border bg-surface-sunken px-5 py-3">
-            {footer}
-          </div>
-        )}
-      </aside>
-    </div>,
-    document.body,
+        <OverlayShell
+          title={title}
+          titleSlot={SheetTitle}
+          headerSlot={SheetHeader}
+          headerAside={headerAside}
+          footer={footer}
+        >
+          {children}
+        </OverlayShell>
+      </SheetContent>
+    </Sheet>
   );
 }
 
@@ -195,14 +211,19 @@ export function DetailList({
 }) {
   return (
     <dl
-      className={cx(
+      className={cn(
         'grid gap-x-6 gap-y-2.5',
-        columns === 2 ? 'grid-cols-2' : 'grid-cols-1',
+        // One column on a phone whatever the caller asked for: two 150px
+        // columns of label/value wrap into unreadable ribbons.
+        columns === 2 ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1',
         className,
       )}
     >
       {items.map((item, index) => (
-        <div key={index} className="flex min-w-0 flex-col gap-0.5 border-b border-border/70 pb-2 last:border-0">
+        <div
+          key={index}
+          className="flex min-w-0 flex-col gap-0.5 border-b border-border/70 pb-2 last:border-0"
+        >
           <dt className="text-xs text-ink-subtle">{item.label}</dt>
           <dd className="min-w-0 text-sm break-words text-ink">{item.value ?? '—'}</dd>
         </div>

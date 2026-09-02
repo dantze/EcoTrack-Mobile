@@ -141,14 +141,14 @@ export function InsertionSlot({
         className={cx(
           'flex w-full items-center gap-2 rounded-md border-2 border-dashed px-2 py-1.5 text-left transition-colors',
           isOver
-            ? 'border-brand-500 bg-brand-100'
-            : 'border-brand-300 bg-brand-50/60 hover:border-brand-500 hover:bg-brand-100',
+            ? 'border-primary bg-accent-100'
+            : 'border-accent-300 bg-accent-50/60 hover:border-primary hover:bg-accent-100',
         )}
       >
-        <span className="tabular inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-brand-600 text-[0.6875rem] font-semibold text-white">
+        <span className="tabular inline-flex size-5 shrink-0 items-center justify-center rounded-full bg-primary text-[0.6875rem] font-semibold text-primary-foreground">
           {index + 1}
         </span>
-        <span className="truncate text-xs font-medium text-brand-900">{label}</span>
+        <span className="truncate text-xs font-medium text-accent-800">{label}</span>
       </button>
     </div>
   );
@@ -204,23 +204,23 @@ export function HeldTray({ onCancel }: { onCancel: () => void }) {
   if (held.length === 0) return null;
 
   return (
-    <div className="border-b border-brand-200 bg-brand-50 px-3 py-2">
+    <div className="border-b border-accent-200 bg-accent-50 px-3 py-2">
       <div className="flex items-center justify-between gap-2">
-        <p className="text-xs font-semibold text-brand-900">
+        <p className="text-xs font-semibold text-accent-800">
           {held.length === 1 ? '1 sarcină în mână' : `${held.length} sarcini în mână`}
         </p>
         <button
           type="button"
           onClick={onCancel}
-          className="text-xs font-medium text-brand-700 underline-offset-2 hover:underline"
+          className="text-xs font-medium text-primary underline-offset-2 hover:underline"
         >
           Renunță (Esc)
         </button>
       </div>
-      <p className="mt-0.5 truncate text-xs text-brand-800">
+      <p className="mt-0.5 truncate text-xs text-accent-800">
         {held.map((task) => task.clientName?.trim() || `#${task.id}`).join(' · ')}
       </p>
-      <p className="mt-1 text-xs text-brand-700">
+      <p className="mt-1 text-xs text-primary">
         Alege poziția din lista rutei pentru a le insera.
       </p>
     </div>

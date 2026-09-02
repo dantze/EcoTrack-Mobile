@@ -28,7 +28,7 @@ export function RequireAuth() {
   if (status === 'loading') {
     return (
       <div className="flex h-screen items-center justify-center bg-surface-sunken">
-        <Spinner className="size-6 text-brand-600" />
+        <Spinner className="size-6 text-primary" />
       </div>
     );
   }

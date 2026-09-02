@@ -60,10 +60,10 @@ function DayTile({
 }) {
   const shell = cx(
     'flex min-h-[6.5rem] flex-col rounded-xl border p-2 text-left transition',
-    cell.inMonth ? 'border-border bg-white' : 'border-border/60 bg-surface-sunken/60',
+    cell.inMonth ? 'border-border bg-surface' : 'border-border/60 bg-surface-sunken/60',
     cell.isWeekend && cell.inMonth && 'bg-surface-sunken',
-    cell.isToday && 'ring-2 ring-brand-400',
-    selected && 'border-brand-500 ring-2 ring-brand-500',
+    cell.isToday && 'ring-2 ring-ring',
+    selected && 'border-primary ring-2 ring-primary',
   );
 
   const number = (
@@ -71,7 +71,7 @@ function DayTile({
       className={cx(
         'tabular text-lg leading-none font-semibold',
         cell.inMonth ? 'text-ink' : 'text-ink-subtle',
-        cell.isToday && 'text-brand-600',
+        cell.isToday && 'text-primary',
       )}
     >
       {cell.dayOfMonth}
@@ -95,13 +95,13 @@ function DayTile({
       aria-label={`${dayLabel(cell.iso)} — ${orderCountLabel(bucket.total)}`}
       className={cx(
         shell,
-        'cursor-pointer hover:-translate-y-0.5 hover:border-brand-300 hover:shadow-popover',
-        'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500',
+        'cursor-pointer hover:-translate-y-0.5 hover:border-accent-300 hover:shadow-popover',
+        'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
       )}
     >
       <span className="flex items-start justify-between gap-1">
         {number}
-        <span className="tabular inline-flex min-w-5 shrink-0 items-center justify-center rounded-full bg-brand-700 px-1.5 py-0.5 text-[0.6875rem] leading-none font-semibold text-white">
+        <span className="tabular inline-flex min-w-5 shrink-0 items-center justify-center rounded-full bg-primary px-1.5 py-0.5 text-[0.6875rem] leading-none font-semibold text-primary-foreground">
           {bucket.total}
         </span>
       </span>

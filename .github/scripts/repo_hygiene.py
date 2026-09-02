@@ -36,6 +36,12 @@ NO_CI_REQUIRED = {
     ".github",          # workflows themselves; this script is their check
     ".gitignore",
     ".claude",          # agent instructions (skills); prose, ships in no build
+    # Skills installed from upstream by `npx skills add` (shadcn/ui, Mantine).
+    # `.claude/skills/*` are symlinks INTO here, so this is the same category
+    # as `.claude`: prose and agent instructions, read by no build step. The
+    # lock file records which versions were installed.
+    ".agents",
+    "skills-lock.json",
     "deploy",           # documentation-only systemd unit + README
     "CLAUDE.md",
     "README.md",

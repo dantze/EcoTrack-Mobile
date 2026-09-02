@@ -40,7 +40,7 @@ export interface MapControlsProps {
 
 export function MapControls({ onZoomIn, onZoomOut, onFit, fitDisabled }: MapControlsProps) {
   return (
-    <div className="absolute top-3 right-3 flex flex-col overflow-hidden rounded-lg bg-white shadow-popover ring-1 ring-border ring-inset">
+    <div className="absolute top-3 right-3 flex flex-col overflow-hidden rounded-lg bg-surface shadow-popover ring-1 ring-border ring-inset">
       <IconButton
         label="Mărește"
         variant="ghost"

@@ -1,5 +1,11 @@
 /**
- * Clienți — dense table of every client, create/edit in a drawer.
+ * Clienți — the list, plus a reading pane for the selected client.
+ *
+ * A single click selects and shows the client (contact details and every order
+ * they have placed, straight out of the cache the list already filled); a
+ * double click, or Editează in the pane, opens the form drawer. That ordering
+ * matters: looking someone up to read a phone number is the common case, and
+ * it used to cost an editable form over the list.
  *
  * Deletion keeps the mobile guard: ask the backend whether the client has
  * orders and escalate the confirmation when it does.
@@ -9,12 +15,14 @@
  */
 
 import { useMemo, useRef, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Plus, RefreshCw, SlidersHorizontal, X } from 'lucide-react';
+import { CommandBar, ListDetail, ToolbarSeparator, Workbench } from '@/components/layout';
 import {
   Badge,
   Button,
   DataTable,
   EmptyState,
-  PageHeader,
   Select,
   type Column,
   type SelectOption,
@@ -23,11 +31,12 @@ import { useDeepLink, useDeepLinkOnce, useDeepLinkFlagOnce } from '@/lib/deepLin
 import { useShortcuts } from '@/lib/hotkeys';
 import { recordUse } from '@/lib/recents';
 import { type Client, clientName } from '@/types/domain';
+import { ClientDetailPane } from './components/ClientDetailPane';
 import { ClientFormDrawer } from './components/ClientFormDrawer';
 import { matchesClient } from './components/ClientPicker';
 import { ErrorNotice, FilterBar, FilterField, SearchInput } from './components/FilterBar';
 import { OrderFormDrawer } from './components/OrderFormDrawer';
-import { Toaster, errorMessage, toast } from './components/Toaster';
+import { errorMessage, toast } from './components/Toaster';
 import { useConfirm } from './components/useConfirm';
 import { useCheckClientHasOrders, useClients, useDeleteClient, useOrders } from './queries';
 
@@ -38,6 +47,9 @@ const KIND_OPTIONS: SelectOption<string>[] = [
 ];
 
 type DrawerState = { kind: 'none' } | { kind: 'create' } | { kind: 'edit'; clientId: number };
+
+/** Which client the reading pane is showing, independent of the edit drawer. */
+type Selection = number | null;
 
 function fiscalCode(client: Client): string {
   return (client.type === 'company' ? client.CUI : client.CNP) ?? '—';
@@ -53,13 +65,18 @@ export function ClientsPage() {
   const [search, setSearch] = useState('');
   const [kindFilter, setKindFilter] = useState('');
   const [drawer, setDrawer] = useState<DrawerState>({ kind: 'none' });
+  const [selectedId, setSelectedId] = useState<Selection>(null);
+  const [showFilters, setShowFilters] = useState(false);
   const [orderClient, setOrderClient] = useState<Client | null>(null);
+  const navigate = useNavigate();
   const searchRef = useRef<HTMLInputElement>(null);
 
   const clients = useMemo(() => clientsQuery.data ?? [], [clientsQuery.data]);
 
   useDeepLinkOnce('client', useDeepLink().number('client'), (clientId) => {
-    setDrawer({ kind: 'edit', clientId });
+    // The palette names a client to LOOK at; the pane is that, and the drawer
+    // one click further on. Opening straight into a form was the old shape.
+    setSelectedId(clientId);
     recordUse('client', clientId);
   });
 
@@ -106,6 +123,8 @@ export function ClientsPage() {
   const filtersActive = search !== '' || kindFilter !== '';
   const openClient =
     drawer.kind === 'edit' ? (clients.find((entry) => entry.id === drawer.clientId) ?? null) : null;
+  const selectedClient =
+    selectedId === null ? null : (clients.find((entry) => entry.id === selectedId) ?? null);
 
   const removeClient = async (client: Client) => {
     const label = clientName(client);
@@ -202,118 +221,172 @@ export function ClientsPage() {
       width: '5rem',
       align: 'right',
       render: (client) => (
-        <button
-          type="button"
-          className="text-xs font-medium text-red-600 hover:underline"
+        <Button
+          size="sm"
+          variant="ghost"
+          className="text-danger-600 hover:bg-danger-50"
           onClick={(event) => {
             event.stopPropagation();
             void removeClient(client);
           }}
         >
           Șterge
-        </button>
+        </Button>
       ),
     },
   ];
 
+  const resetFilters = () => {
+    setSearch('');
+    setKindFilter('');
+  };
+
   return (
-    <>
-      <PageHeader
+    <Workbench>
+      <CommandBar
         title="Clienți"
         subtitle={
           clientsQuery.isLoading
             ? 'Se încarcă…'
             : `${rows.length} din ${clients.length} clienți${filtersActive ? ' (filtrate)' : ''}`
         }
+        tools={
+          <>
+            <div className="hidden w-56 md:block xl:w-72">
+              <SearchInput
+                inputRef={searchRef}
+                value={search}
+                onChange={setSearch}
+                placeholder="Nume, CUI/CNP, email, telefon"
+              />
+            </div>
+            <Button
+              variant={showFilters ? 'secondary' : 'ghost'}
+              size="sm"
+              icon={<SlidersHorizontal aria-hidden />}
+              aria-expanded={showFilters}
+              onClick={() => setShowFilters((open) => !open)}
+            >
+              <span className="hidden sm:inline">Filtre</span>
+              {filtersActive && (
+                <span aria-label="filtre active" className="ml-1 size-1.5 rounded-full bg-primary" />
+              )}
+            </Button>
+          </>
+        }
         actions={
           <>
             <Button
-              variant="secondary"
+              variant="primary"
+              size="sm"
+              icon={<Plus aria-hidden />}
+              onClick={() => setDrawer({ kind: 'create' })}
+            >
+              Client nou
+            </Button>
+            <ToolbarSeparator />
+            <Button
+              variant="ghost"
+              size="sm"
+              icon={<RefreshCw aria-hidden />}
               loading={clientsQuery.isFetching}
               onClick={() => void clientsQuery.refetch()}
             >
               Reîmprospătează
             </Button>
-            <Button variant="primary" onClick={() => setDrawer({ kind: 'create' })}>
-              + Client
-            </Button>
           </>
         }
       />
 
-      <FilterBar>
-        <FilterField label="Căutare">
-          <SearchInput
-            inputRef={searchRef}
-            value={search}
-            onChange={setSearch}
-            placeholder="Nume, CUI/CNP, email, telefon"
-          />
-        </FilterField>
-        <FilterField label="Tip">
-          <div className="w-48">
-            <Select value={kindFilter} options={KIND_OPTIONS} onChange={setKindFilter} />
-          </div>
-        </FilterField>
-        {filtersActive && (
-          <Button
-            variant="ghost"
-            onClick={() => {
-              setSearch('');
-              setKindFilter('');
-            }}
-          >
-            Resetează
-          </Button>
-        )}
-      </FilterBar>
+      {showFilters && (
+        <FilterBar>
+          <FilterField label="Căutare">
+            <div className="md:hidden">
+              <SearchInput
+                value={search}
+                onChange={setSearch}
+                placeholder="Nume, CUI/CNP, email, telefon"
+              />
+            </div>
+          </FilterField>
+          <FilterField label="Tip">
+            <div className="w-48">
+              <Select value={kindFilter} options={KIND_OPTIONS} onChange={setKindFilter} size="sm" />
+            </div>
+          </FilterField>
+          {filtersActive && (
+            <Button variant="ghost" size="sm" icon={<X aria-hidden />} onClick={resetFilters}>
+              Resetează
+            </Button>
+          )}
+        </FilterBar>
+      )}
 
-      {clientsQuery.isError ? (
-        <ErrorNotice
-          message="Nu s-au putut prelua clienții."
-          onRetry={() => void clientsQuery.refetch()}
-        />
-      ) : (
-        <DataTable
-          rows={rows}
-          columns={columns}
-          rowKey={(client) => client.id}
-          initialSort={{ key: 'name', dir: 'asc' }}
-          loading={clientsQuery.isLoading}
-          activeKey={openClient?.id ?? null}
-          onRowClick={(client) => {
-            recordUse('client', client.id);
-            setDrawer({ kind: 'edit', clientId: client.id });
-          }}
-          empty={
-            <EmptyState
-              title={filtersActive ? 'Niciun client pentru filtrele curente' : 'Nu există clienți'}
-              body={
-                filtersActive
-                  ? 'Modificați căutarea sau filtrul de tip, ori resetați-le.'
-                  : 'Adăugați primul client pentru a putea crea comenzi.'
-              }
-              action={
-                filtersActive ? (
-                  <Button
-                    variant="secondary"
-                    onClick={() => {
-                      setSearch('');
-                      setKindFilter('');
-                    }}
-                  >
-                    Resetează filtrele
-                  </Button>
-                ) : (
-                  <Button variant="primary" onClick={() => setDrawer({ kind: 'create' })}>
-                    + Client
-                  </Button>
-                )
+      <ListDetail
+        storageKey="ecotrack.pane.clients"
+        selected={selectedClient !== null}
+        onCloseDetail={() => setSelectedId(null)}
+        detailTitle={selectedClient ? clientName(selectedClient) : 'Detalii client'}
+        list={
+          clientsQuery.isError ? (
+            <ErrorNotice
+              message="Nu s-au putut prelua clienții."
+              onRetry={() => void clientsQuery.refetch()}
+            />
+          ) : (
+            <DataTable
+              rows={rows}
+              columns={columns}
+              rowKey={(client) => client.id}
+              ariaLabel="Clienți"
+              initialSort={{ key: 'name', dir: 'asc' }}
+              loading={clientsQuery.isLoading}
+              activeKey={selectedClient?.id ?? null}
+              mobile={{ primary: 'name', secondary: ['phone', 'address'], trailing: 'orders' }}
+              onRowClick={(client) => {
+                recordUse('client', client.id);
+                setSelectedId(client.id);
+              }}
+              onRowDoubleClick={(client) => setDrawer({ kind: 'edit', clientId: client.id })}
+              empty={
+                <EmptyState
+                  title={
+                    filtersActive ? 'Niciun client pentru filtrele curente' : 'Nu există clienți'
+                  }
+                  body={
+                    filtersActive
+                      ? 'Modificați căutarea sau filtrul de tip, ori resetați-le.'
+                      : 'Adăugați primul client pentru a putea crea comenzi.'
+                  }
+                  action={
+                    filtersActive ? (
+                      <Button variant="secondary" onClick={resetFilters}>
+                        Resetează filtrele
+                      </Button>
+                    ) : (
+                      <Button variant="primary" onClick={() => setDrawer({ kind: 'create' })}>
+                        + Client
+                      </Button>
+                    )
+                  }
+                />
               }
             />
-          }
-        />
-      )}
+          )
+        }
+        detail={
+          selectedClient && (
+            <ClientDetailPane
+              client={selectedClient}
+              orders={ordersQuery.data ?? []}
+              onEdit={() => setDrawer({ kind: 'edit', clientId: selectedClient.id })}
+              onDelete={() => void removeClient(selectedClient)}
+              onNewOrder={() => setOrderClient(selectedClient)}
+              onOpenOrder={(order) => navigate(`/comenzi?comanda=${order.id}`)}
+            />
+          )
+        }
+      />
 
       {drawer.kind === 'create' && (
         <ClientFormDrawer
@@ -341,7 +414,6 @@ export function ClientsPage() {
       )}
 
       {confirmDialog}
-      <Toaster />
-    </>
+    </Workbench>
   );
 }

@@ -1,9 +1,12 @@
 /**
  * Comenzi — the main Sales screen.
  *
- * One dense, sortable table of every order with a filter strip on top; the
- * record detail and the create/edit form are slide-overs, so the list never
- * unmounts and the filters survive.
+ * Outlook's shape: a ribbon (`CommandBar`) over a list, and the selected
+ * record in a reading pane beside it. Clicking a row never leaves the list —
+ * on `lg+` the order opens in the right pane, below that in a Sheet — so the
+ * scroll position, the filters and the selection all survive reading a record.
+ * Only the create/edit FORM is still a slide-over, because it is a mode: you
+ * are editing, not browsing.
  *
  * **Two views, one table (TODO-21).** `Curente` holds the work still to do and
  * `Arhivă` the orders that are finished, split by `isOrderFulfilled` in
@@ -29,13 +32,14 @@
  */
 
 import { useMemo, useRef, useState } from 'react';
+import { Plus, RefreshCw, SlidersHorizontal, Trash2, X } from 'lucide-react';
+import { CommandBar, ListDetail, ToolbarSeparator, Workbench } from '@/components/layout';
 import {
   Badge,
   Button,
   DataTable,
   DateInput,
   EmptyState,
-  PageHeader,
   Select,
   Skeleton,
   Tabs,
@@ -54,9 +58,9 @@ import { useDeepLink, useDeepLinkOnce, useDeepLinkFlagOnce } from '@/lib/deepLin
 import { useShortcuts } from '@/lib/hotkeys';
 import { recordUse } from '@/lib/recents';
 import { ErrorNotice, FilterBar, FilterField, SearchInput } from './components/FilterBar';
-import { OrderDetailDrawer } from './components/OrderDetailDrawer';
+import { OrderDetailPane } from './components/OrderDetailDrawer';
 import { OrderFormDrawer } from './components/OrderFormDrawer';
-import { Toaster, errorMessage, toast } from './components/Toaster';
+import { errorMessage, toast } from './components/Toaster';
 import { useConfirm } from './components/useConfirm';
 import {
   filterOrders,
@@ -106,6 +110,7 @@ export function OrdersPage() {
   const [view, setView] = useState<View>('current');
   const [selected, setSelected] = useState<Set<RowKey>>(new Set());
   const [drawer, setDrawer] = useState<DrawerState>({ kind: 'none' });
+  const [showFilters, setShowFilters] = useState(false);
   const searchRef = useRef<HTMLInputElement>(null);
 
   const orders = useMemo(() => ordersQuery.data ?? [], [ordersQuery.data]);
@@ -302,9 +307,94 @@ export function OrdersPage() {
     },
   ];
 
+  const emptyState =
+    view === 'archive' ? (
+      <EmptyState
+        title={
+          filtersActive ? 'Nicio comandă finalizată pentru filtrele curente' : 'Arhiva este goală'
+        }
+        body={
+          filtersActive
+            ? 'Modificați filtrele sau resetați-le.'
+            : 'O comandă ajunge aici când sarcina ei este marcată finalizată.'
+        }
+        action={
+          filtersActive ? (
+            <Button variant="secondary" onClick={resetFilters}>
+              Resetează filtrele
+            </Button>
+          ) : (
+            <Button variant="secondary" onClick={() => showView('current')}>
+              Vezi comenzile curente
+            </Button>
+          )
+        }
+      />
+    ) : (
+      <EmptyState
+        title={filtersActive ? 'Nicio comandă pentru filtrele curente' : 'Nu există comenzi'}
+        body={
+          filtersActive
+            ? 'Modificați filtrele sau resetați-le.'
+            : archived.length > 0
+              ? 'Toate comenzile sunt finalizate — sunt în Arhivă.'
+              : 'Creați prima comandă pentru un client existent.'
+        }
+        action={
+          filtersActive ? (
+            <Button variant="secondary" onClick={resetFilters}>
+              Resetează filtrele
+            </Button>
+          ) : (
+            <Button variant="primary" onClick={() => setDrawer({ kind: 'create' })}>
+              + Comandă
+            </Button>
+          )
+        }
+      />
+    );
+
+  const list = ordersQuery.isError ? (
+    <ErrorNotice
+      message="Nu s-au putut prelua comenzile."
+      onRetry={() => void ordersQuery.refetch()}
+    />
+  ) : (
+    <DataTable
+      rows={rows}
+      columns={columns}
+      rowKey={(order) => order.id}
+      ariaLabel={view === 'archive' ? 'Comenzi finalizate' : 'Comenzi curente'}
+      initialSort={{ key: 'date', dir: 'desc' }}
+      loading={ordersQuery.isLoading}
+      activeKey={openOrder?.id ?? null}
+      onRowClick={(order) => openDetail(order.id)}
+      selectedKeys={selected}
+      onSelectionChange={setSelected}
+      mobile={{ primary: 'client', secondary: ['summary', 'address'], trailing: 'status' }}
+      bulkActions={
+        <Button
+          size="sm"
+          variant="danger"
+          icon={<Trash2 aria-hidden />}
+          loading={deleteOrders.isPending}
+          onClick={() =>
+            void removeOrders(
+              [...selected].map(Number),
+              `${selected.size} comenzi vor fi șterse definitiv.`,
+            )
+          }
+        >
+          Șterge selecția
+        </Button>
+      }
+      empty={emptyState}
+    />
+  );
+
   return (
-    <>
-      <PageHeader
+    <Workbench>
+      <CommandBar
         title="Comenzi"
         subtitle={
           ordersQuery.isLoading
@@ -312,161 +402,152 @@ export function OrdersPage() {
             : `${rows.length} ${view === 'archive' ? 'comenzi finalizate' : 'comenzi curente'}` +
               ` din ${orders.length} în total${filtersActive ? ' (filtrate)' : ''}`
         }
+        tools={
+          <>
+            <div className="hidden w-56 md:block xl:w-72">
+              <SearchInput
+                inputRef={searchRef}
+                value={search}
+                onChange={setSearch}
+                placeholder="Număr, client, adresă…"
+              />
+            </div>
+            <Button
+              variant={showFilters ? 'secondary' : 'ghost'}
+              size="sm"
+              icon={<SlidersHorizontal aria-hidden />}
+              aria-expanded={showFilters}
+              onClick={() => setShowFilters((open) => !open)}
+            >
+              <span className="hidden sm:inline">Filtre</span>
+              {filtersActive && (
+                <span
+                  aria-label="filtre active"
+                  className="ml-1 size-1.5 rounded-full bg-primary"
+                />
+              )}
+            </Button>
+          </>
+        }
         actions={
           <>
             <Button
-              variant="secondary"
+              variant="primary"
+              size="sm"
+              icon={<Plus aria-hidden />}
+              onClick={() => setDrawer({ kind: 'create' })}
+            >
+              Comandă nouă
+            </Button>
+            <ToolbarSeparator />
+            <Button
+              variant="ghost"
+              size="sm"
+              icon={<RefreshCw aria-hidden />}
               onClick={() => void ordersQuery.refetch()}
               loading={ordersQuery.isFetching}
             >
               Reîmprospătează
             </Button>
-            <Button variant="primary" onClick={() => setDrawer({ kind: 'create' })}>
-              + Comandă
-            </Button>
+            {selected.size > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                icon={<Trash2 aria-hidden />}
+                loading={deleteOrders.isPending}
+                onClick={() =>
+                  void removeOrders(
+                    [...selected].map(Number),
+                    `${selected.size} comenzi vor fi șterse definitiv.`,
+                  )
+                }
+              >
+                Șterge {selected.size}
+              </Button>
+            )}
           </>
+        }
+        tabs={
+          <Tabs
+            items={[
+              { id: 'current', label: VIEW_LABELS.current, count: current.length },
+              { id: 'archive', label: VIEW_LABELS.archive, count: archived.length },
+            ]}
+            active={view}
+            onChange={(id) => showView(id as View)}
+          />
         }
       />
 
-      <Tabs
-        items={[
-          { id: 'current', label: VIEW_LABELS.current, count: current.length },
-          { id: 'archive', label: VIEW_LABELS.archive, count: archived.length },
-        ]}
-        active={view}
-        onChange={(id) => showView(id as View)}
-      />
-
-      <FilterBar>
-        <FilterField label="Căutare">
-          <SearchInput
-            inputRef={searchRef}
-            value={search}
-            onChange={setSearch}
-            placeholder="Număr, client, adresă, produs"
-          />
-        </FilterField>
-        <FilterField label="Tip">
-          <div className="w-40">
-            <Select value={typeFilter} options={TYPE_OPTIONS} onChange={setTypeFilter} />
+      {/* The filter strip is opt-in. On a laptop it costs 56px of list every
+          time it is left open, and four filters out of five are set once a
+          week — so it opens on demand and announces itself in the ribbon with
+          a dot when something is actually filtering. */}
+      {showFilters && (
+        <FilterBar>
+          <FilterField label="Căutare">
+            <div className="md:hidden">
+              <SearchInput
+                value={search}
+                onChange={setSearch}
+                placeholder="Număr, client, adresă"
+              />
+            </div>
+          </FilterField>
+          <FilterField label="Tip">
+            <div className="w-40">
+              <Select value={typeFilter} options={TYPE_OPTIONS} onChange={setTypeFilter} size="sm" />
+            </div>
+          </FilterField>
+          <FilterField label="Client">
+            <div className="w-56">
+              <Select
+                value={clientFilter}
+                options={clientOptions}
+                onChange={setClientFilter}
+                searchable
+                size="sm"
+              />
+            </div>
+          </FilterField>
+          <div className="w-36">
+            <DateInput label="De la" value={dateFrom} onChange={setDateFrom} size="sm" />
           </div>
-        </FilterField>
-        <FilterField label="Client">
-          <div className="w-56">
-            <Select
-              value={clientFilter}
-              options={clientOptions}
-              onChange={setClientFilter}
-              searchable
+          <div className="w-36">
+            <DateInput
+              label="Până la"
+              value={dateTo}
+              onChange={setDateTo}
+              min={dateFrom ?? undefined}
+              size="sm"
             />
           </div>
-        </FilterField>
-        <div className="w-36">
-          <DateInput label="De la" value={dateFrom} onChange={setDateFrom} />
-        </div>
-        <div className="w-36">
-          <DateInput label="Până la" value={dateTo} onChange={setDateTo} min={dateFrom ?? undefined} />
-        </div>
-        {filtersActive && (
-          <Button variant="ghost" onClick={resetFilters}>
-            Resetează
-          </Button>
-        )}
-      </FilterBar>
-
-      {ordersQuery.isError ? (
-        <ErrorNotice
-          message="Nu s-au putut prelua comenzile."
-          onRetry={() => void ordersQuery.refetch()}
-        />
-      ) : (
-        <DataTable
-          rows={rows}
-          columns={columns}
-          rowKey={(order) => order.id}
-          initialSort={{ key: 'date', dir: 'desc' }}
-          loading={ordersQuery.isLoading}
-          activeKey={openOrder?.id ?? null}
-          onRowClick={(order) => openDetail(order.id)}
-          selectedKeys={selected}
-          onSelectionChange={setSelected}
-          bulkActions={
-            <Button
-              size="sm"
-              variant="danger"
-              loading={deleteOrders.isPending}
-              onClick={() =>
-                void removeOrders(
-                  [...selected].map(Number),
-                  `${selected.size} comenzi vor fi șterse definitiv.`,
-                )
-              }
-            >
-              Șterge selecția
+          {filtersActive && (
+            <Button variant="ghost" size="sm" icon={<X aria-hidden />} onClick={resetFilters}>
+              Resetează
             </Button>
-          }
-          empty={
-            view === 'archive' ? (
-              <EmptyState
-                title={
-                  filtersActive
-                    ? 'Nicio comandă finalizată pentru filtrele curente'
-                    : 'Arhiva este goală'
-                }
-                body={
-                  filtersActive
-                    ? 'Modificați filtrele sau resetați-le.'
-                    : 'O comandă ajunge aici când sarcina ei este marcată finalizată.'
-                }
-                action={
-                  filtersActive ? (
-                    <Button variant="secondary" onClick={resetFilters}>
-                      Resetează filtrele
-                    </Button>
-                  ) : (
-                    <Button variant="secondary" onClick={() => showView('current')}>
-                      Vezi comenzile curente
-                    </Button>
-                  )
-                }
-              />
-            ) : (
-              <EmptyState
-                title={filtersActive ? 'Nicio comandă pentru filtrele curente' : 'Nu există comenzi'}
-                body={
-                  filtersActive
-                    ? 'Modificați filtrele sau resetați-le.'
-                    : archived.length > 0
-                      ? 'Toate comenzile sunt finalizate — sunt în Arhivă.'
-                      : 'Creați prima comandă pentru un client existent.'
-                }
-                action={
-                  filtersActive ? (
-                    <Button variant="secondary" onClick={resetFilters}>
-                      Resetează filtrele
-                    </Button>
-                  ) : (
-                    <Button variant="primary" onClick={() => setDrawer({ kind: 'create' })}>
-                      + Comandă
-                    </Button>
-                  )
-                }
-              />
-            )
-          }
-        />
+          )}
+        </FilterBar>
       )}
 
-      {drawer.kind === 'detail' && openOrder && (
-        <OrderDetailDrawer
-          order={openOrder}
-          onClose={() => setDrawer({ kind: 'none' })}
-          onEdit={() => setDrawer({ kind: 'edit', orderId: openOrder.id })}
-          onDelete={() =>
-            void removeOrders([openOrder.id], `Comanda #${openOrder.number} va fi ștearsă.`)
-          }
-        />
-      )}
+      <ListDetail
+        storageKey="ecotrack.pane.orders"
+        selected={drawer.kind === 'detail' && openOrder !== null}
+        onCloseDetail={() => setDrawer({ kind: 'none' })}
+        detailTitle={openOrder ? `Comanda #${openOrder.number}` : 'Detalii comandă'}
+        list={list}
+        detail={
+          openOrder && (
+            <OrderDetailPane
+              order={openOrder}
+              onEdit={() => setDrawer({ kind: 'edit', orderId: openOrder.id })}
+              onDelete={() =>
+                void removeOrders([openOrder.id], `Comanda #${openOrder.number} va fi ștearsă.`)
+              }
+            />
+          )
+        }
+      />
 
       {drawer.kind === 'edit' && openOrder && (
         <OrderFormDrawer
@@ -481,7 +562,6 @@ export function OrdersPage() {
       )}
 
       {confirmDialog}
-      <Toaster />
-    </>
+    </Workbench>
   );
 }

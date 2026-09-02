@@ -30,6 +30,7 @@ import {
   routeLabel,
   taskDate,
 } from '../utils';
+import { PaneHeader } from '@/components/layout';
 import { AsyncPanel, DetailList, DetailRow, LocationBlock, TaskTypeBadge } from './display';
 import { RoutePickerModal } from './pickers';
 import { useFeedback } from './feedback';
@@ -39,7 +40,15 @@ export interface TaskDetailDrawerProps {
   onClose: () => void;
 }
 
-export function TaskDetailDrawer({ taskId, onClose }: TaskDetailDrawerProps) {
+/**
+ * The task record itself, with no chrome around it.
+ *
+ * Rendered twice: inside the reading pane on `lg+`, and inside a Drawer below
+ * it. One component so the two presentations cannot drift — the last time this
+ * content existed in two places, only one of them learned that status is
+ * read-only.
+ */
+function TaskDetailContent({ taskId }: { taskId: number | null }) {
   const { toast } = useFeedback();
   const [routePickerOpen, setRoutePickerOpen] = useState(false);
 
@@ -65,13 +74,7 @@ export function TaskDetailDrawer({ taskId, onClose }: TaskDetailDrawerProps) {
 
   return (
     <>
-      <Drawer
-        open={taskId !== null}
-        onClose={onClose}
-        title={task ? (task.clientName ?? 'Sarcină') : 'Sarcină'}
-        width="lg"
-      >
-        <AsyncPanel
+      <AsyncPanel
           isPending={taskQuery.isPending}
           error={taskQuery.error}
           onRetry={() => void taskQuery.refetch()}
@@ -231,8 +234,7 @@ export function TaskDetailDrawer({ taskId, onClose }: TaskDetailDrawerProps) {
               </section>
             </div>
           )}
-        </AsyncPanel>
-      </Drawer>
+      </AsyncPanel>
 
       <RoutePickerModal
         open={routePickerOpen}
@@ -259,5 +261,48 @@ export function TaskDetailDrawer({ taskId, onClose }: TaskDetailDrawerProps) {
         }}
       />
     </>
+  );
+}
+
+/**
+ * The reading pane: the task beside the list, not over it.
+ *
+ * Its title bar carries the client and the task id, because in a pane there is
+ * no dialog heading above to say which record you are looking at.
+ */
+export function TaskDetailPane({ taskId, onClose }: TaskDetailDrawerProps) {
+  const taskQuery = useTask(taskId);
+  const task = taskQuery.data ?? null;
+
+  if (taskId === null) return null;
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col">
+      <PaneHeader
+        title={task ? (task.clientName ?? 'Sarcină') : 'Sarcină'}
+        subtitle={task ? `#${task.id} · ${TASK_TYPE_LABELS[task.type]}` : undefined}
+        onClose={onClose}
+      />
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+        <TaskDetailContent taskId={taskId} />
+      </div>
+    </div>
+  );
+}
+
+/** Standalone slide-over, for a caller with no reading pane to render into. */
+export function TaskDetailDrawer({ taskId, onClose }: TaskDetailDrawerProps) {
+  const taskQuery = useTask(taskId);
+  const task = taskQuery.data ?? null;
+
+  return (
+    <Drawer
+      open={taskId !== null}
+      onClose={onClose}
+      title={task ? (task.clientName ?? 'Sarcină') : 'Sarcină'}
+      width="lg"
+    >
+      <TaskDetailContent taskId={taskId} />
+    </Drawer>
   );
 }

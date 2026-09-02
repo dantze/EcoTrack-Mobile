@@ -74,8 +74,8 @@ export function PickerRow({
       onClick={disabled ? undefined : onSelect}
       className={cx(
         'flex w-full items-center justify-between gap-3 rounded-md border px-3 py-2 text-left transition-colors',
-        active && !disabled ? 'border-brand-500 bg-brand-50' : 'border-border bg-white',
-        selected && !active && 'border-brand-300 bg-brand-50/50',
+        active && !disabled ? 'border-primary bg-accent-50' : 'border-border bg-surface',
+        selected && !active && 'border-accent-300 bg-accent-50/50',
         disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:bg-surface-sunken',
       )}
     >

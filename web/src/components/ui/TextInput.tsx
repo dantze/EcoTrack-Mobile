@@ -1,11 +1,25 @@
 /**
- * Single-line text input, with optional leading/trailing adornments (used by
- * SearchInput and by money fields that need a "RON" suffix).
+ * Single-line text input.
+ *
+ * Plain, it is a shadcn `Input` inside the kit's `FieldShell`. Given a leading
+ * icon or a trailing adornment it becomes a shadcn `InputGroup` instead —
+ * which is not the same thing as absolutely positioning an icon over an input:
+ * the group owns the border and the focus ring, so the whole control lights up
+ * as one, and the addon reserves real width rather than sitting on top of the
+ * text the operator is typing.
  */
 
 import type { ReactNode } from 'react';
+import { X } from 'lucide-react';
+import { Input } from '@/components/shadcn/input';
+import {
+  InputGroup,
+  InputGroupAddon,
+  InputGroupButton,
+  InputGroupInput,
+} from '@/components/shadcn/input-group';
 import { describedBy, FieldShell } from './Field';
-import { controlClass, cx, useFieldIds } from './utils';
+import { CONTROL_HEIGHT, cn, useFieldIds } from './utils';
 import type { TextInputProps } from './types';
 
 export interface TextInputExtraProps {
@@ -16,7 +30,22 @@ export interface TextInputExtraProps {
   inputSize?: 'sm' | 'md';
   /** Class for the outer field stack (the control itself uses `className`). */
   fieldClassName?: string;
+  /**
+   * Adds a clear button once the field has text — the search affordance most
+   * of the list screens want. Fires `onClear`, then focuses the input again so
+   * the operator can retype without reaching for the mouse.
+   */
+  clearable?: boolean;
+  onClear?: () => void;
+  /** Accessible name for that button. */
+  clearLabel?: string;
 }
+
+/** Same silhouette as `CONTROL_HEIGHT`, applied to the group's border box. */
+const GROUP_HEIGHT: Record<'sm' | 'md', string> = {
+  sm: 'h-9 sm:h-7',
+  md: 'h-10 sm:h-8',
+};
 
 export function TextInput({
   label,
@@ -28,10 +57,24 @@ export function TextInput({
   trailing,
   inputSize = 'md',
   fieldClassName,
+  clearable = false,
+  onClear,
+  clearLabel = 'Golește câmpul',
   id: explicitId,
   ...rest
 }: TextInputProps & TextInputExtraProps) {
   const { id, hintId, errorId } = useFieldIds(explicitId);
+
+  const showClear = clearable && Boolean(onClear) && String(rest.value ?? '').length > 0;
+  const grouped = Boolean(leading) || Boolean(trailing) || showClear;
+
+  const shared = {
+    ...rest,
+    id,
+    required,
+    'aria-invalid': error ? true : undefined,
+    'aria-describedby': describedBy(hintId, errorId, hint, error),
+  } as const;
 
   return (
     <FieldShell
@@ -44,30 +87,43 @@ export function TextInput({
       required={required}
       className={fieldClassName}
     >
-      <div className="relative flex items-center">
-        {leading && (
-          <span className="pointer-events-none absolute left-2.5 flex items-center text-ink-subtle [&>svg]:size-4">
-            {leading}
-          </span>
-        )}
-        <input
-          {...rest}
-          id={id}
-          required={required}
-          aria-invalid={error ? true : undefined}
-          aria-describedby={describedBy(hintId, errorId, hint, error)}
-          className={controlClass(
-            Boolean(error),
-            inputSize,
-            cx(Boolean(leading) && 'pl-8', Boolean(trailing) && 'pr-8', className),
+      {grouped ? (
+        <InputGroup
+          className={cn(
+            GROUP_HEIGHT[inputSize],
+            'bg-surface',
+            error && 'border-destructive has-[[data-slot=input-group-control]:focus-visible]:border-destructive has-[[data-slot=input-group-control]:focus-visible]:ring-destructive/25',
+          )}
+        >
+          {leading && (
+            <InputGroupAddon className="text-ink-subtle">{leading}</InputGroupAddon>
+          )}
+          <InputGroupInput {...shared} className={cn('text-sm text-ink', className)} />
+          {(trailing || showClear) && (
+            <InputGroupAddon align="inline-end" className="text-ink-subtle">
+              {showClear && (
+                <InputGroupButton
+                  size="icon-xs"
+                  aria-label={clearLabel}
+                  onClick={() => onClear?.()}
+                >
+                  <X />
+                </InputGroupButton>
+              )}
+              {trailing}
+            </InputGroupAddon>
+          )}
+        </InputGroup>
+      ) : (
+        <Input
+          {...shared}
+          className={cn(
+            CONTROL_HEIGHT[inputSize],
+            'bg-surface text-sm text-ink placeholder:text-ink-subtle',
+            className,
           )}
         />
-        {trailing && (
-          <span className="absolute right-2.5 flex items-center text-ink-subtle [&>svg]:size-4">
-            {trailing}
-          </span>
-        )}
-      </div>
+      )}
     </FieldShell>
   );
 }

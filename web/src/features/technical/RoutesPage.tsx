@@ -39,14 +39,17 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
+import { Plus, RefreshCw, SlidersHorizontal } from 'lucide-react';
+import { CommandBar, ToolbarSeparator, Workbench } from '@/components/layout';
 import {
   Button,
   DataTable,
   EmptyState,
   IconButton,
-  PageHeader,
   Select,
+  Tabs,
   TextInput,
+  cx,
 } from '@/components/ui';
 import type { Column } from '@/components/ui';
 import { weekdayLabel } from '@/components/domain';
@@ -110,6 +113,8 @@ import {
 import { DriverPickerModal, RoutePickerModal } from './components/pickers';
 import { DispatchSuggestions } from './components/suggestions';
 
+type BoardPane = 'routes' | 'stops' | 'pool';
+
 export function RoutesPage() {
   return (
     <FeedbackProvider>
@@ -136,6 +141,9 @@ function RoutesScreen() {
   const [storedRouteId, setSelectedRouteId] = useState<number | null>(null);
   const [openTaskId, setOpenTaskId] = useState<number | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+  /** Which board column is on screen below `lg`; ignored at desktop width. */
+  const [board, setBoard] = useState<BoardPane>('routes');
   const [driverPickerOpen, setDriverPickerOpen] = useState(false);
   const [recurringOpen, setRecurringOpen] = useState(false);
   // TODO-05: moving a stop off this route and onto another driver's route —
@@ -493,61 +501,130 @@ function RoutesScreen() {
   };
 
   return (
-    <>
-      <PageHeader
+    <Workbench>
+      <CommandBar
         title="Rute"
         subtitle={
           routesQuery.isPending
             ? 'Se încarcă…'
             : `${filteredRoutes.length} din ${routes.length} rute · ${unassignedTasks.length} sarcini neasignate`
         }
+        tools={
+          <>
+            <div className="hidden w-56 md:block xl:w-72">
+              <TextInput
+                id={SEARCH_FIELD_ID}
+                placeholder="rută, județ, șofer, client…  ( / )"
+                value={query}
+                inputSize="sm"
+                clearable
+                onClear={() => setQuery('')}
+                onChange={(event) => setQuery(event.target.value)}
+              />
+            </div>
+            <Button
+              variant={showFilters ? 'secondary' : 'ghost'}
+              size="sm"
+              icon={<SlidersHorizontal aria-hidden />}
+              aria-expanded={showFilters}
+              onClick={() => setShowFilters((open) => !open)}
+            >
+              <span className="hidden sm:inline">Filtre</span>
+              {filtersActive && (
+                <span aria-label="filtre active" className="ml-1 size-1.5 rounded-full bg-primary" />
+              )}
+            </Button>
+          </>
+        }
         actions={
-          <Button variant="primary" onClick={() => setCreateOpen(true)}>
-            Rută nouă
-          </Button>
+          <>
+            <Button
+              variant="primary"
+              size="sm"
+              icon={<Plus aria-hidden />}
+              onClick={() => setCreateOpen(true)}
+            >
+              Rută nouă
+            </Button>
+            <ToolbarSeparator />
+            <Button
+              variant="ghost"
+              size="sm"
+              icon={<RefreshCw aria-hidden />}
+              loading={routesQuery.isFetching}
+              onClick={() => void routesQuery.refetch()}
+            >
+              Reîmprospătează
+            </Button>
+          </>
+        }
+        tabs={
+          // The board is three columns side by side on a wide screen. Below
+          // `lg` they become one column at a time — a 390px viewport cannot
+          // show a table, a route and a queue at once, and shrinking all three
+          // gives three unusable columns instead of one good one.
+          <div className="lg:hidden">
+            <Tabs
+              items={[
+                { id: 'routes', label: 'Rute', count: filteredRoutes.length },
+                { id: 'stops', label: 'Opriri', count: routeTasks.length },
+                { id: 'pool', label: 'Neasignate', count: unassignedTasks.length },
+              ]}
+              active={board}
+              onChange={(id) => setBoard(id as BoardPane)}
+            />
+          </div>
         }
       />
 
-      <Toolbar>
-        <div className="w-44">
-          <Select
-            label="Județ"
-            value={county}
-            options={[{ value: ALL, label: 'Toate județele' }, ...COUNTY_OPTIONS]}
-            onChange={setCounty}
-          />
-        </div>
+      {showFilters && (
+        <Toolbar>
+          <div className="w-full sm:hidden">
+            <TextInput
+              label="Căutare"
+              placeholder="rută, județ, șofer, client…"
+              value={query}
+              inputSize="sm"
+              onChange={(event) => setQuery(event.target.value)}
+            />
+          </div>
+          <div className="w-44">
+            <Select
+              label="Județ"
+              value={county}
+              size="sm"
+              options={[{ value: ALL, label: 'Toate județele' }, ...COUNTY_OPTIONS]}
+              onChange={setCounty}
+            />
+          </div>
 
-        <div className="w-48">
-          <Select
-            label="Șofer"
-            value={driver}
-            options={[
-              { value: ALL, label: 'Toți șoferii' },
-              { value: NO_DRIVER, label: 'Fără șofer' },
-              ...(driversQuery.data ?? []).map((item) => ({
-                value: String(item.id),
-                label: item.fullName,
-              })),
-            ]}
-            onChange={setDriver}
-          />
-        </div>
-
-        <div className="w-56">
-          <TextInput
-            id={SEARCH_FIELD_ID}
-            label="Căutare"
-            placeholder="rută, județ, șofer, client…  ( / )"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-          />
-        </div>
-      </Toolbar>
+          <div className="w-48">
+            <Select
+              label="Șofer"
+              value={driver}
+              size="sm"
+              options={[
+                { value: ALL, label: 'Toți șoferii' },
+                { value: NO_DRIVER, label: 'Fără șofer' },
+                ...(driversQuery.data ?? []).map((item) => ({
+                  value: String(item.id),
+                  label: item.fullName,
+                })),
+              ]}
+              onChange={setDriver}
+            />
+          </div>
+        </Toolbar>
+      )}
 
       <div className="flex min-h-0 flex-1">
         {/* ---- routes ------------------------------------------------- */}
-        <div className="flex min-w-0 flex-1 flex-col border-r border-border">
+        <div
+          className={cx(
+            'min-w-0 flex-1 flex-col border-r border-border lg:flex',
+            board === 'routes' ? 'flex' : 'hidden',
+          )}
+        >
           {routesQuery.error ? (
             <ErrorBlock error={routesQuery.error} onRetry={() => void routesQuery.refetch()} />
           ) : (
@@ -596,7 +673,12 @@ function RoutesScreen() {
           onDragEnd={handleDragEnd}
           onDragCancel={() => setDraggedTask(null)}
         >
-          <section className="flex w-96 shrink-0 flex-col border-r border-border">
+          <section
+            className={cx(
+              'w-full flex-col border-r border-border lg:flex lg:w-96 lg:shrink-0',
+              board === 'stops' ? 'flex' : 'hidden',
+            )}
+          >
             <PanelHeader
               title={selectedRoute ? routeLabel(selectedRoute) : 'Nicio rută selectată'}
               subtitle={
@@ -701,7 +783,12 @@ function RoutesScreen() {
           </section>
 
           {/* ---- unassigned queue ------------------------------------ */}
-          <section className="flex w-80 shrink-0 flex-col">
+          <section
+            className={cx(
+              'w-full flex-col lg:flex lg:w-80 lg:shrink-0',
+              board === 'pool' ? 'flex' : 'hidden',
+            )}
+          >
             <PanelHeader
               title="Neasignate"
               subtitle={`${unassignedTasks.length} sarcini fără rută`}
@@ -820,6 +907,6 @@ function RoutesScreen() {
 
 
       <TaskDetailDrawer taskId={openTaskId} onClose={() => setOpenTaskId(null)} />
-    </>
+    </Workbench>
   );
 }

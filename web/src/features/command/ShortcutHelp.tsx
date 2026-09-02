@@ -8,9 +8,10 @@
  */
 
 import { Modal } from '@/components/ui';
-import { comboLabel, useActiveShortcuts, type Shortcut } from '@/lib/hotkeys';
+import { GLOBAL_GROUP, comboLabel, useActiveShortcuts, type Shortcut } from '@/lib/hotkeys';
 
-export const GLOBAL_GROUP = 'General';
+// Re-exported for the screens that already import it from here.
+export { GLOBAL_GROUP };
 
 function Keys({ combo }: { combo: string }) {
   return (

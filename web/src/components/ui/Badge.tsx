@@ -1,13 +1,19 @@
 /**
- * Status pill. Tinted fill + a hairline of the same hue: strong enough to scan
- * down a column of 200 rows, quiet enough that ten of them do not fight.
+ * Status pill, on the shadcn Badge.
+ *
+ * Two readings of the same five tones. The default is a tinted fill with a
+ * hairline of the same hue — strong enough to scan down a column of 200 rows,
+ * quiet enough that ten of them do not fight. `dot` drops the fill entirely
+ * and leaves a 6px dot beside the label, which is what a dense Outlook-style
+ * status column wants: the pill's box is chrome the row cannot spare.
  */
 
-import { cx } from './utils';
+import { Badge as ShadcnBadge } from '@/components/shadcn/badge';
+import { cn } from '@/lib/utils';
 import type { BadgeProps } from './types';
 
 const TONES: Record<NonNullable<BadgeProps['tone']>, string> = {
-  neutral: 'bg-slate-100 text-slate-700 ring-slate-200',
+  neutral: 'bg-surface-hover text-ink-muted ring-border',
   info: 'bg-info-50 text-info-700 ring-info-200',
   success: 'bg-success-50 text-success-700 ring-success-200',
   warning: 'bg-warning-50 text-warning-700 ring-warning-200',
@@ -15,7 +21,7 @@ const TONES: Record<NonNullable<BadgeProps['tone']>, string> = {
 };
 
 const DOTS: Record<NonNullable<BadgeProps['tone']>, string> = {
-  neutral: 'bg-slate-400',
+  neutral: 'bg-ink-subtle',
   info: 'bg-info-600',
   success: 'bg-success-600',
   warning: 'bg-warning-600',
@@ -23,23 +29,31 @@ const DOTS: Record<NonNullable<BadgeProps['tone']>, string> = {
 };
 
 export interface BadgeExtraProps {
-  /** Leading status dot — useful when a column carries several tones at once. */
+  /**
+   * Quiet form: a status dot plus plain label, no fill and no ring. Use it in
+   * table columns; keep the filled pill for badges that stand alone.
+   */
   dot?: boolean;
   className?: string;
 }
 
-export function Badge({ children, tone = 'neutral', dot = false, className }: BadgeProps & BadgeExtraProps) {
+export function Badge({
+  children,
+  tone = 'neutral',
+  dot = false,
+  className,
+}: BadgeProps & BadgeExtraProps) {
   return (
-    <span
-      className={cx(
-        'inline-flex max-w-full items-center gap-1.5 rounded-full px-2 py-0.5 text-xs',
-        'font-medium whitespace-nowrap ring-1 ring-inset',
-        TONES[tone],
+    <ShadcnBadge
+      variant="secondary"
+      className={cn(
+        'max-w-full gap-1.5 px-2',
+        dot ? 'bg-transparent px-0 text-ink' : cn('ring-1 ring-inset', TONES[tone]),
         className,
       )}
     >
-      {dot && <span className={cx('size-1.5 shrink-0 rounded-full', DOTS[tone])} aria-hidden />}
+      {dot && <span aria-hidden className={cn('size-1.5 shrink-0 rounded-full', DOTS[tone])} />}
       <span className="truncate">{children}</span>
-    </span>
+    </ShadcnBadge>
   );
 }

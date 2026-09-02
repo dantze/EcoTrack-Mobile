@@ -136,7 +136,7 @@ export function ClientPicker({
 
   if (selected) {
     return (
-      <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface-sunken px-3 py-2">
+      <div className="flex items-center justify-between gap-3 rounded-md border border-border bg-surface-header px-3 py-2">
         <div className="min-w-0">
           <p className="truncate text-sm font-medium text-ink">
             {clientName(selected)}{' '}
@@ -176,8 +176,8 @@ export function ClientPicker({
         role="listbox"
         aria-label="Clienți"
         className={cx(
-          'max-h-56 overflow-y-auto rounded-md border',
-          error ? 'border-red-400' : 'border-border',
+          'max-h-56 overflow-y-auto rounded-md border bg-surface',
+          error ? 'border-danger-600' : 'border-border',
         )}
       >
         {loading ? (
@@ -199,13 +199,13 @@ export function ClientPicker({
               onClick={() => pick(client)}
               className={cx(
                 'flex w-full cursor-pointer flex-col items-start border-b border-border/60 px-3 py-1.5 text-left last:border-b-0',
-                index === highlight ? 'bg-brand-50' : 'hover:bg-surface-sunken',
+                index === highlight ? 'bg-surface-active' : 'hover:bg-surface-hover',
               )}
             >
-              <span className={cx('text-sm', index === highlight ? 'text-brand-700' : 'text-ink')}>
+              <span className={cx('text-sm', index === highlight ? 'font-medium text-ink' : 'text-ink')}>
                 {splitHighlight(clientName(client), ranges).map((part, partIndex) =>
                   part.hit ? (
-                    <mark key={partIndex} className="bg-transparent font-semibold text-brand-700">
+                    <mark key={partIndex} className="bg-transparent font-semibold text-accent-600">
                       {part.text}
                     </mark>
                   ) : (
@@ -221,7 +221,7 @@ export function ClientPicker({
           ))
         )}
       </div>
-      {error && <p className="text-xs text-red-600">{error}</p>}
+      {error && <p className="text-xs text-danger-700">{error}</p>}
     </div>
   );
 }

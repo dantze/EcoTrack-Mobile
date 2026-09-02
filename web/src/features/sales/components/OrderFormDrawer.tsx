@@ -375,7 +375,7 @@ export function OrderFormDrawer({ order = null, initialClient = null, onClose }:
                 }}
                 className={`rounded px-3 py-1 text-sm font-medium transition-colors ${
                   form.orderType === type
-                    ? 'bg-brand-700 text-white'
+                    ? 'bg-primary text-primary-foreground'
                     : 'text-ink-muted hover:bg-surface-sunken'
                 }`}
               >
@@ -402,7 +402,7 @@ export function OrderFormDrawer({ order = null, initialClient = null, onClose }:
                     details: form.details,
                   });
                 }}
-                className="ml-1.5 font-medium text-brand-600 underline underline-offset-2 hover:text-brand-700"
+                className="ml-1.5 font-medium text-primary underline underline-offset-2 hover:text-primary"
               >
                 Comută pe {typeHint.label}
               </button>

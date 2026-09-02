@@ -1,15 +1,27 @@
 /**
- * User menu pinned to the bottom of the sidebar (rendered by AppShell).
+ * The account menu.
  *
- * A trigger button opens a small account modal — fullName, role badges, and
- * "Deconectare" — which can drill into "Sesiuni active", a list of the
- * devices holding a live refresh token for this account (GET /auth/sessions)
- * with per-device revoke. Built from Modal rather than a hand-rolled
- * dropdown: the overlay kit already owns focus trap / ESC / backdrop click,
- * and a sidebar-anchored popover menu is not part of the frozen ui contract.
+ * The avatar in the top-right of the global bar, exactly where a desktop mail
+ * client puts it. It opens a dropdown — identity, role badges, "Sesiuni
+ * active" and "Deconectare" — rather than the modal it used to open: a modal
+ * for a two-item menu is a full stop in the middle of a glance.
+ *
+ * "Sesiuni active" is still a Modal, and should be: it lists the devices
+ * holding a live refresh token for this account (GET /auth/sessions) with a
+ * per-device revoke, which is a task, not a glance.
  */
 
 import { useState } from 'react';
+import { LogOut, MonitorSmartphone } from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/shadcn/dropdown-menu';
 import { useAuth } from '@/auth';
 import { Badge, Button, EmptyState, Modal, Skeleton, useToast } from '@/components/ui';
 import { ROLE_LABELS } from '@/components/domain';
@@ -107,35 +119,42 @@ function SessionsPanel() {
 
 export function AccountMenu() {
   const { user, logout } = useAuth();
-  const [accountOpen, setAccountOpen] = useState(false);
   const [sessionsOpen, setSessionsOpen] = useState(false);
 
   if (!user) return null;
 
   return (
     <>
-      <button
-        type="button"
-        onClick={() => setAccountOpen(true)}
-        className="flex w-full items-center gap-2.5 rounded-md px-2 py-2 text-left transition-colors hover:bg-white/10"
-      >
-        <span className="flex size-8 shrink-0 items-center justify-center rounded-full bg-white/15 text-xs font-semibold text-white">
-          {initials(user.fullName)}
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-medium text-white">{user.fullName}</span>
-          <span className="block truncate text-xs text-white/50">{user.username}</span>
-        </span>
-      </button>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            aria-label={`Cont: ${user.fullName}`}
+            className="ml-1 flex items-center gap-2 rounded-md px-1 py-1 transition-colors hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-none"
+          >
+            <span className="grid size-7 shrink-0 place-items-center rounded-full bg-white/15 text-[0.6875rem] font-semibold text-white">
+              {initials(user.fullName)}
+            </span>
+            <span className="hidden min-w-0 text-left lg:block">
+              <span className="block max-w-36 truncate text-xs font-medium text-white">
+                {user.fullName}
+              </span>
+              <span className="block max-w-36 truncate text-[0.6875rem] text-white/60">
+                {user.roles.length > 0 ? ROLE_LABELS[user.roles[0]!] : 'Fără rol'}
+              </span>
+            </span>
+          </button>
+        </DropdownMenuTrigger>
 
-      <Modal open={accountOpen} onClose={() => setAccountOpen(false)} title="Cont" width="sm">
-        <div className="flex flex-col gap-4">
-          <div>
-            <p className="text-sm font-medium text-ink">{user.fullName}</p>
-            <p className="text-xs text-ink-subtle">{user.email ?? user.username}</p>
-          </div>
+        <DropdownMenuContent align="end" className="w-64">
+          <DropdownMenuLabel className="flex flex-col gap-0.5">
+            <span className="truncate text-sm font-medium text-ink">{user.fullName}</span>
+            <span className="truncate text-xs font-normal text-ink-subtle">
+              {user.email ?? user.username}
+            </span>
+          </DropdownMenuLabel>
 
-          <div className="flex flex-wrap gap-1.5">
+          <div className="flex flex-wrap gap-1 px-2 pb-2">
             {user.roles.length > 0 ? (
               user.roles.map((role) => (
                 <Badge key={role} tone="info">
@@ -147,24 +166,31 @@ export function AccountMenu() {
             )}
           </div>
 
-          <div className="flex flex-col gap-2 border-t border-border pt-4">
-            <Button
-              variant="secondary"
-              onClick={() => {
-                setAccountOpen(false);
-                setSessionsOpen(true);
+          <DropdownMenuSeparator />
+          <DropdownMenuGroup>
+            <DropdownMenuItem onSelect={() => setSessionsOpen(true)}>
+              <MonitorSmartphone />
+              Sesiuni active
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              variant="destructive"
+              onSelect={() => {
+                void logout();
               }}
             >
-              Sesiuni active
-            </Button>
-            <Button variant="danger" onClick={() => void logout()}>
+              <LogOut />
               Deconectare
-            </Button>
-          </div>
-        </div>
-      </Modal>
+            </DropdownMenuItem>
+          </DropdownMenuGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>
 
-      <Modal open={sessionsOpen} onClose={() => setSessionsOpen(false)} title="Sesiuni active" width="sm">
+      <Modal
+        open={sessionsOpen}
+        onClose={() => setSessionsOpen(false)}
+        title="Sesiuni active"
+        width="sm"
+      >
         <SessionsPanel />
       </Modal>
     </>

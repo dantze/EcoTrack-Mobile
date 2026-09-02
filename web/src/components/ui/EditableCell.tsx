@@ -178,15 +178,15 @@ export function EditableCell({
             event.stopPropagation();
           }}
           className={cx(
-            'h-7 w-full min-w-0 rounded border bg-white px-1.5 text-sm text-ink',
+            'h-7 w-full min-w-0 rounded border bg-surface px-1.5 text-sm text-ink',
             'focus:outline-none focus:ring-2',
             error
               ? 'border-danger-500 ring-danger-500/25'
-              : 'border-brand-500 ring-2 ring-brand-500/25',
+              : 'border-primary ring-2 ring-primary/25',
             (type === 'number' || align === 'right') && 'text-right tabular',
           )}
         />
-        {saving && <Spinner className="absolute right-2 size-3 text-brand-600" />}
+        {saving && <Spinner className="absolute right-2 size-3 text-primary" />}
         {error && (
           <span
             role="alert"
@@ -215,10 +215,10 @@ export function EditableCell({
       onDoubleClick={stop}
       className={cx(
         'group/cell -mx-1 flex w-[calc(100%+0.5rem)] items-center gap-1 rounded px-1 py-0.5 text-sm',
-        'transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-brand-500',
+        'transition-colors focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-ring',
         disabled
           ? 'cursor-default text-ink'
-          : 'cursor-text hover:bg-white hover:ring-1 hover:ring-border-strong',
+          : 'cursor-text hover:bg-surface hover:ring-1 hover:ring-border-strong',
         alignClass,
         className,
       )}

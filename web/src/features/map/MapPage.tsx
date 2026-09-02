@@ -329,8 +329,8 @@ function Chip({
       className={cx(
         'flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors',
         active
-          ? 'border-brand-500 bg-brand-50 text-ink'
-          : 'border-border bg-white text-ink-muted hover:bg-surface-sunken',
+          ? 'border-primary bg-accent-50 text-ink'
+          : 'border-border bg-surface text-ink-muted hover:bg-surface-sunken',
       )}
     >
       <span className="size-2 rounded-full" style={{ backgroundColor: color }} aria-hidden="true" />

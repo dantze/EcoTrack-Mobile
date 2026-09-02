@@ -1,10 +1,15 @@
 /**
- * Screen header. Sticks to the top of the content column and stays shallow —
- * every pixel here is a row of data the operator does not see.
+ * Screen header — the Outlook command-bar strip, in its plainest form.
+ *
+ * Sticks to the top of the content column and stays shallow: every pixel here
+ * is a row of data the operator does not see. The shell also exports a richer
+ * `CommandBar` (actions + tools + a tab row); this is the same strip for
+ * screens that only need a title and a couple of buttons, and **the two must
+ * stay visually identical** — same fill, same hairline, same heights.
  */
 
 import type { ReactNode } from 'react';
-import { cx } from './utils';
+import { cn } from '@/lib/utils';
 import type { PageHeaderProps } from './types';
 
 export interface PageHeaderExtraProps {
@@ -25,15 +30,15 @@ export function PageHeader({
 }: PageHeaderProps & PageHeaderExtraProps) {
   return (
     <header
-      className={cx(
-        'sticky top-0 z-20 shrink-0 border-b border-border bg-white/95 backdrop-blur-sm',
+      className={cn(
+        'sticky top-0 z-20 shrink-0 border-b border-border bg-surface-header',
         className,
       )}
     >
-      <div className="flex items-start justify-between gap-4 px-5 pt-3.5 pb-3">
-        <div className="min-w-0">
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-3 py-2 sm:px-4">
+        <div className="min-w-0 flex-1">
           {eyebrow && (
-            <p className="mb-0.5 text-[0.6875rem] font-semibold tracking-wide text-ink-subtle uppercase">
+            <p className="text-[0.6875rem] font-semibold tracking-wide text-ink-subtle uppercase">
               {eyebrow}
             </p>
           )}
@@ -41,12 +46,13 @@ export function PageHeader({
             {title}
           </h1>
           {subtitle && (
-            <div className="mt-0.5 truncate text-xs text-ink-muted [&_strong]:font-medium [&_strong]:text-ink">
+            <div className="truncate text-xs text-ink-muted [&_strong]:font-medium [&_strong]:text-ink">
               {subtitle}
             </div>
           )}
         </div>
-        {actions && <div className="flex shrink-0 items-center gap-2">{actions}</div>}
+        {/* Wraps onto its own line under ~480px rather than crushing the title. */}
+        {actions && <div className="flex shrink-0 items-center gap-1.5">{actions}</div>}
       </div>
       {below}
     </header>

@@ -18,7 +18,16 @@
 
 import { useMemo, useState, useSyncExternalStore } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Modal, SearchIcon, cx } from '@/components/ui';
+import {
+  Command,
+  CommandDialog,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+  CommandShortcut,
+} from '@/components/shadcn/command';
 import { ORDER_TYPE_LABELS, TASK_TYPE_LABELS, formatDate, weekdayLabel } from '@/components/domain';
 import { useAuth } from '@/auth';
 import { boost, recentIds, recordUse, recentsRevision, subscribeRecents } from '@/lib/recents';
@@ -83,7 +92,6 @@ function Palette({ open, onClose }: CommandPaletteProps) {
   const navigate = useNavigate();
   const { hasRole } = useAuth();
   const [query, setQuery] = useState('');
-  const [storedHighlight, setHighlight] = useState(0);
 
   // Re-rank as soon as a pick is recorded, so reopening the palette reflects it.
   useSyncExternalStore(subscribeRecents, recentsRevision, recentsRevision);
@@ -348,119 +356,65 @@ function Palette({ open, onClose }: CommandPaletteProps) {
     }).map(({ item, ranges }) => ({ entry: item, ranges }));
   }, [entries, query]);
 
-  // Clamped on READ rather than corrected in an effect (TODO-26). Every
-  // keystroke re-ranks `results` during render, so a stored index is stale
-  // constantly — and for that one render Enter would run `results[highlight]`,
-  // which is either undefined or, worse, a different command than the one the
-  // user can see highlighted.
-  const highlight = Math.max(0, Math.min(storedHighlight, results.length - 1));
-
   const loading =
     clientsQuery.isLoading || ordersQuery.isLoading || tasksQuery.isLoading || routesQuery.isLoading;
 
-  const onKeyDown = (event: React.KeyboardEvent) => {
-    if (event.key === 'ArrowDown') {
-      event.preventDefault();
-      setHighlight((current) => (results.length === 0 ? 0 : (current + 1) % results.length));
-    } else if (event.key === 'ArrowUp') {
-      event.preventDefault();
-      setHighlight((current) =>
-        results.length === 0 ? 0 : (current - 1 + results.length) % results.length,
-      );
-    } else if (event.key === 'Enter') {
-      event.preventDefault();
-      results[highlight]?.entry.run();
-    } else if (event.key === 'Home') {
-      event.preventDefault();
-      setHighlight(0);
-    } else if (event.key === 'End') {
-      event.preventDefault();
-      setHighlight(Math.max(0, results.length - 1));
+  // Ranked order first, grouped second: the groups are a reading aid, not a
+  // re-sort. Walking the ranked list and opening a new group whenever the kind
+  // changes keeps the best match at the top of the dialog no matter which kind
+  // it belongs to.
+  const groups = useMemo(() => {
+    const out: { kind: EntryKind; rows: { entry: Entry; ranges: MatchRange[] }[] }[] = [];
+    for (const row of results) {
+      const last = out[out.length - 1];
+      if (last && last.kind === row.entry.kind) last.rows.push(row);
+      else out.push({ kind: row.entry.kind, rows: [row] });
     }
-  };
-
-  let lastKind: EntryKind | null = null;
+    return out;
+  }, [results]);
 
   return (
-    <Modal
+    <CommandDialog
       open={open}
-      onClose={onClose}
-      width="lg"
+      onOpenChange={(next) => {
+        if (!next) onClose();
+      }}
       title="Căutare rapidă"
-      headerAside={
-        <span className="hidden text-xs text-ink-subtle sm:inline">
-          ↑↓ navighează · Enter deschide · Esc închide
-        </span>
-      }
+      description="Caută clienți, comenzi, sarcini, rute sau acțiuni"
+      className="max-w-2xl"
     >
-      <div className="relative mb-3 flex items-center">
-        <SearchIcon className="pointer-events-none absolute left-2.5 size-4 text-ink-subtle" />
-        <input
-          data-autofocus
-          type="text"
-          role="combobox"
-          aria-expanded
-          aria-controls="command-palette-list"
-          aria-activedescendant={
-            results[highlight] ? `command-palette-option-${highlight}` : undefined
-          }
-          aria-label="Caută clienți, comenzi, sarcini, rute sau acțiuni"
-          autoComplete="off"
+      {/* cmdk owns the keyboard and the aria wiring; it does NOT own the
+          ranking. `shouldFilter={false}` hands it a list already ordered by
+          `rankBy` plus the recents boost — its own substring scorer knows
+          nothing about which client this operator opened yesterday. */}
+      <Command shouldFilter={false} loop label="Căutare rapidă">
+        <CommandInput
           value={query}
-          onChange={(event) => {
-            setQuery(event.target.value);
-            // Back to the top on every keystroke: a new query means new
-            // results, and the old index pointed into a list that no longer
-            // exists. It belongs to the typing EVENT, not to an effect
-            // watching `query` (TODO-26).
-            setHighlight(0);
-          }}
-          onKeyDown={onKeyDown}
+          onValueChange={setQuery}
           placeholder="Caută client, comandă, sarcină, rută sau acțiune…"
-          className="h-10 w-full rounded-md border border-border bg-white pr-3 pl-8 text-sm text-ink outline-none focus:border-brand-500 focus:ring-2 focus:ring-brand-500/25"
+          autoFocus
         />
-      </div>
-
-      <ul id="command-palette-list" role="listbox" aria-label="Rezultate" className="min-h-[12rem]">
-        {results.length === 0 ? (
-          <li className="px-2 py-10 text-center text-sm text-ink-muted">
+        <CommandList className="max-h-[60vh] scroll-py-2">
+          <CommandEmpty>
             {loading ? 'Se încarcă datele…' : 'Niciun rezultat. Încearcă alt cuvânt.'}
-          </li>
-        ) : (
-          results.map(({ entry, ranges }, index) => {
-            const heading = entry.kind !== lastKind ? KIND_LABELS[entry.kind] : null;
-            lastKind = entry.kind;
-            return (
-              <li key={entry.id}>
-                {heading && (
-                  <p className="px-2 pt-3 pb-1 text-[0.6875rem] font-semibold tracking-wide text-ink-subtle uppercase first:pt-0">
-                    {heading}
-                  </p>
-                )}
-                <div
-                  id={`command-palette-option-${index}`}
-                  role="option"
-                  aria-selected={index === highlight}
-                  onMouseEnter={() => setHighlight(index)}
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => entry.run()}
-                  className={cx(
-                    'flex cursor-pointer items-center justify-between gap-3 rounded-md px-2 py-1.5',
-                    index === highlight ? 'bg-brand-50' : 'hover:bg-surface-sunken',
-                  )}
+          </CommandEmpty>
+
+          {groups.map((group) => (
+            <CommandGroup key={group.kind} heading={KIND_LABELS[group.kind]}>
+              {group.rows.map(({ entry, ranges }) => (
+                <CommandItem
+                  key={entry.id}
+                  value={entry.id}
+                  onSelect={() => entry.run()}
+                  className="gap-3 py-2"
                 >
-                  <span className="min-w-0">
-                    <span
-                      className={cx(
-                        'block truncate text-sm',
-                        index === highlight ? 'text-brand-700' : 'text-ink',
-                      )}
-                    >
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm text-ink">
                       {splitHighlight(entry.title, ranges).map((part, partIndex) =>
                         part.hit ? (
                           <mark
                             key={partIndex}
-                            className="bg-transparent font-semibold text-brand-700"
+                            className="bg-transparent font-semibold text-primary"
                           >
                             {part.text}
                           </mark>
@@ -475,22 +429,34 @@ function Palette({ open, onClose }: CommandPaletteProps) {
                       </span>
                     )}
                   </span>
-                  {index === highlight && (
-                    <span className="shrink-0 text-xs text-ink-subtle">Enter ↵</span>
-                  )}
-                </div>
-              </li>
-            );
-          })
-        )}
-      </ul>
+                  <CommandShortcut className="opacity-0 group-data-selected/command-item:opacity-100">
+                    ↵
+                  </CommandShortcut>
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          ))}
+        </CommandList>
 
-      {!query.trim() && (
-        <p className="mt-3 border-t border-border pt-2 text-xs text-ink-subtle">
-          Sugestiile de sus sunt înregistrările deschise recent pe acest calculator. Apasă{' '}
-          <kbd className="rounded border border-border px-1">?</kbd> pentru toate scurtăturile.
-        </p>
-      )}
-    </Modal>
+        <div className="flex items-center justify-between gap-3 border-t border-border px-3 py-2 text-xs text-ink-subtle">
+          <span className="truncate">
+            {query.trim()
+              ? `${results.length} rezultate`
+              : 'Deschise recent pe acest calculator'}
+          </span>
+          <span className="hidden shrink-0 gap-2 sm:flex">
+            <span>
+              <kbd className="rounded border border-border px-1 font-mono">↑↓</kbd> navighează
+            </span>
+            <span>
+              <kbd className="rounded border border-border px-1 font-mono">↵</kbd> deschide
+            </span>
+            <span>
+              <kbd className="rounded border border-border px-1 font-mono">esc</kbd> închide
+            </span>
+          </span>
+        </div>
+      </Command>
+    </CommandDialog>
   );
 }

@@ -322,6 +322,37 @@ disagree about which day an order belongs to.
 
 ## Web architecture
 
+**The UI runs two component libraries, on purpose.** shadcn/ui owns the chrome
+(buttons, dialogs, menus, tables, tabs, command palette, toasts) and Mantine
+owns the inputs and interaction logic shadcn does not do well (the date field,
+combobox internals, charts, and `@mantine/hooks`). They read the SAME tokens, so
+they look like one product. The split is decided, not negotiated per screen —
+the `web-ui-shadcn` and `web-ui-mantine` skills carry the rules, and the
+packaged upstream skills (`shadcn`, `mantine-combobox`, `mantine-form`,
+`mantine-custom-components`) are installed under `.agents/skills`, symlinked
+into `.claude/skills`.
+
+Three layers, and feature code only ever sees the third:
+
+| Path | What |
+|---|---|
+| `src/components/shadcn/*` | raw primitives, written by the CLI. Not edited by hand |
+| `src/components/ui/*` | **the kit** — EcoTrack's own components, contract frozen in `types.ts` |
+| `src/components/layout/*` | the Outlook shell: `AppShell`, `TopBar`, nav pane, `Workbench`, `CommandBar`, `ListDetail` |
+
+**One token system, in `src/index.css`, and dark mode is real.** Every Tailwind
+colour token is an indirection (`@theme inline`) onto a runtime CSS variable
+that changes under `.dark`, so no component writes a `dark:` colour override.
+`src/theme/ThemeProvider.tsx` owns light/dark/system and writes BOTH the `.dark`
+class (Tailwind/shadcn) and `data-mantine-color-scheme` (Mantine); an inline
+script in `index.html` stamps them before first paint. Mantine's stylesheets are
+imported into `@layer mantine`, declared below Tailwind's layers — that is what
+lets a utility class beat a Mantine style without `!important`.
+
+**The screen shape is Outlook's**: a `CommandBar` ribbon over a list, and the
+selected record in a `ListDetail` reading pane — resizable on `lg+`, a Sheet
+below it. Clicking a row never costs the operator their place in the list.
+
 **The data layer has two interchangeable implementations behind one contract.**
 `src/api/contract.ts` defines `EcoTrackApi`; both `src/api/live/` (real fetch)
 and `src/mocks/` (seeded in-memory store) satisfy it exactly. `src/api/index.ts`

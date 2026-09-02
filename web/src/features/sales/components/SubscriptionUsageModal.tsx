@@ -78,7 +78,7 @@ export function SubscriptionUsageModal({
                 <button
                   type="button"
                   onClick={() => onOpenOrder(order.id)}
-                  className="flex w-full cursor-pointer items-center justify-between gap-3 rounded-md border border-border bg-white px-3 py-2 text-left transition hover:border-brand-300 hover:shadow-card focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-500"
+                  className="flex w-full cursor-pointer items-center justify-between gap-3 rounded-md border border-border bg-surface px-3 py-2 text-left transition hover:border-accent-300 hover:shadow-card focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                 >
                   <span className="flex min-w-0 items-center gap-2 text-sm">
                     <span className="tabular shrink-0 font-semibold text-ink">#{order.number}</span>

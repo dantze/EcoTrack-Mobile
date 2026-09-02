@@ -27,7 +27,7 @@ interface PendingConfirm {
 const TOAST_TONES: Record<ToastKind, string> = {
   success: 'border-green-200 bg-green-50 text-green-800',
   error: 'border-red-200 bg-red-50 text-red-800',
-  info: 'border-border bg-white text-ink',
+  info: 'border-border bg-surface text-ink',
 };
 
 export function FeedbackProvider({ children }: { children: ReactNode }) {

@@ -48,6 +48,17 @@ export default defineConfig({
           // chunk's NAME no longer decides anything. Kept for the cache
           // boundary alone.
           tesseract: ['tesseract.js'],
+          // Mantine's core + hooks are eager (MantineProvider wraps the app in
+          // src/theme/AppProviders.tsx), so they get their own cache boundary
+          // for exactly the reason react/query do: the library changes on a
+          // version bump, the app changes every deploy.
+          //
+          // @mantine/dates, /charts, /spotlight and recharts are deliberately
+          // NOT listed — nothing in the entry imports them, so they travel with
+          // the screens that do.
+          mantine: ['@mantine/core', '@mantine/hooks'],
+          // Radix primitives behind the shadcn components. Same argument.
+          radix: ['radix-ui'],
         },
       },
     },

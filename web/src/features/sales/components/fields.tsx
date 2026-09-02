@@ -1,15 +1,24 @@
 /**
  * Form building blocks shared by the order and client drawers.
  *
- * Layout is desktop-first: a 12-column grid so a whole order fits in one
- * scannable form instead of the mobile app's four-screen wizard.
+ * A section is a real `<fieldset>` with a `<legend>` (shadcn's `FieldSet` /
+ * `FieldLegend` / `FieldGroup`), so a screen reader announces "Perioadă,
+ * grup" before the four date controls instead of reading them as one flat run
+ * of inputs. Sections are separated by hairlines rather than cards: the drawer
+ * is one form, not five stacked panels.
+ *
+ * Layout is a 12-column grid that collapses to a single column below `sm` —
+ * two date fields side by side are 90px wide on a phone, which is a worse form
+ * than a taller one.
  */
 
 import { Suspense, lazy, useState, type ReactNode } from 'react';
+import { MapPin } from 'lucide-react';
+import { FieldGroup, FieldLegend, FieldSet } from '@/components/shadcn/field';
 import {
   Autocomplete,
   Button,
-  PinIcon,
+  Checkbox,
   Select,
   TextInput,
   type AutocompleteOption,
@@ -40,11 +49,16 @@ export function FormSection({
   children: ReactNode;
 }) {
   return (
-    <section className="border-b border-border py-4 first:pt-0 last:border-b-0">
-      <h3 className="text-xs font-semibold tracking-wide text-ink-muted uppercase">{title}</h3>
+    <FieldSet className="gap-0 border-b border-border py-4 first:pt-0 last:border-b-0 last:pb-0">
+      <FieldLegend
+        variant="label"
+        className="mb-0 text-[0.6875rem] font-semibold tracking-wide text-ink-muted uppercase"
+      >
+        {title}
+      </FieldLegend>
       {description && <p className="mt-0.5 text-xs text-ink-subtle">{description}</p>}
-      <div className="mt-3">{children}</div>
-    </section>
+      <FieldGroup className="mt-3 gap-3">{children}</FieldGroup>
+    </FieldSet>
   );
 }
 
@@ -53,14 +67,18 @@ export function FormGrid({ children }: { children: ReactNode }) {
   return <div className="grid grid-cols-12 gap-x-3 gap-y-3">{children}</div>;
 }
 
+/**
+ * One cell of `FormGrid`. Every span is full width below `sm` — a 4-column
+ * field is unusable at 390px, and stacking is what a phone form wants anyway.
+ */
 const SPANS: Record<number, string> = {
-  2: 'col-span-2',
-  3: 'col-span-3',
-  4: 'col-span-4',
-  5: 'col-span-5',
-  6: 'col-span-6',
-  8: 'col-span-8',
-  9: 'col-span-9',
+  2: 'col-span-12 sm:col-span-4 lg:col-span-2',
+  3: 'col-span-12 sm:col-span-4 lg:col-span-3',
+  4: 'col-span-12 sm:col-span-6 lg:col-span-4',
+  5: 'col-span-12 sm:col-span-6 lg:col-span-5',
+  6: 'col-span-12 sm:col-span-6',
+  8: 'col-span-12 lg:col-span-8',
+  9: 'col-span-12 lg:col-span-9',
   12: 'col-span-12',
 };
 
@@ -68,7 +86,7 @@ export function Col({ span = 6, children }: { span?: number; children: ReactNode
   return <div className={SPANS[span] ?? SPANS[6]}>{children}</div>;
 }
 
-/** Checkbox-style switch that also reads well inside the grid. */
+/** Checkbox that lines up with the bottom of the labelled controls beside it. */
 export function ToggleField({
   label,
   hint,
@@ -83,17 +101,19 @@ export function ToggleField({
   disabled?: boolean;
 }) {
   return (
-    <label className="flex h-8 items-center gap-2 self-end">
-      <input
-        type="checkbox"
+    <div className="flex min-h-8 items-center gap-2 sm:self-end">
+      <Checkbox
         checked={checked}
         disabled={disabled}
-        onChange={(event) => onChange(event.target.checked)}
-        className="size-3.5 accent-brand-700"
+        onChange={onChange}
+        label={
+          <span className="flex items-baseline gap-1.5">
+            <span className="text-sm text-ink">{label}</span>
+            {hint && <span className="text-xs text-ink-subtle">{hint}</span>}
+          </span>
+        }
       />
-      <span className="text-sm text-ink">{label}</span>
-      {hint && <span className="text-xs text-ink-subtle">{hint}</span>}
-    </label>
+    </div>
   );
 }
 
@@ -129,14 +149,9 @@ export function PhoneField({
   return (
     <div className="flex items-start gap-2">
       <div className="w-24 shrink-0">
-        <Select
-          label="Prefix"
-          value={code}
-          options={PHONE_OPTIONS}
-          onChange={onCodeChange}
-        />
+        <Select label="Prefix" value={code} options={PHONE_OPTIONS} onChange={onCodeChange} />
       </div>
-      <div className="flex-1">
+      <div className="min-w-0 flex-1">
         <TextInput
           id={id}
           label={label}
@@ -212,9 +227,7 @@ export function LocationFields({
             required={required}
             value={value.address}
             error={addressError}
-            hint={
-              value.address.trim() ? undefined : 'Scrie sau alege o adresă folosită anterior'
-            }
+            hint={value.address.trim() ? undefined : 'Scrie sau alege o adresă folosită anterior'}
             placeholder="Str. Exemplu 12, București"
             options={suggestions}
             onChange={(address) => onChange({ ...value, address })}
@@ -249,7 +262,12 @@ export function LocationFields({
         />
       </Col>
       <Col span={12}>
-        <Button size="sm" icon={<PinIcon />} onClick={() => setPickerOpen(true)}>
+        <Button
+          size="sm"
+          icon={<MapPin aria-hidden />}
+          onClick={() => setPickerOpen(true)}
+          className="w-full sm:w-auto"
+        >
           {point ? 'Ajustează pe hartă' : 'Alege pe hartă'}
         </Button>
       </Col>

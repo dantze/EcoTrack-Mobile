@@ -205,7 +205,7 @@ export function ClientFormDrawer({
                 onClick={() => patch({ kind })}
                 className={`rounded px-3 py-1 text-sm font-medium transition-colors ${
                   state.kind === kind
-                    ? 'bg-brand-700 text-white'
+                    ? 'bg-primary text-primary-foreground'
                     : 'text-ink-muted hover:bg-surface-sunken'
                 }`}
               >

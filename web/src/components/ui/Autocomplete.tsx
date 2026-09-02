@@ -16,7 +16,11 @@
  *   Escape    close the list, keeping what was typed
  *   Tab       close and move on
  * The popup is portalled to `document.body` and positioned from the input, so
- * it is not clipped by a drawer's `overflow:auto`.
+ * it is not clipped by a drawer's `overflow:auto`. It is NOT a Radix popover:
+ * this is an editable combobox, the input must keep focus and keep receiving
+ * every keystroke, and a popover that moves focus into itself breaks exactly
+ * that. What the portal does have to borrow from Radix is `pointer-events`
+ * — see the note on the popup element below.
  */
 
 import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
@@ -294,7 +298,11 @@ export function Autocomplete({
               width: Math.max(rect.width, 220),
               maxHeight: rect.maxHeight,
             }}
-            className="z-[80] flex animate-scale-in flex-col overflow-y-auto rounded-lg border border-border bg-white p-1 shadow-popover"
+            // `pointer-events: auto` is load-bearing, not decoration. While a
+            // shadcn dialog or sheet is open Radix sets `pointer-events: none`
+            // on the body, and this popup is a body child — without the reset
+            // it renders correctly inside a drawer and ignores every click.
+            className="pointer-events-auto z-[80] flex animate-scale-in flex-col overflow-y-auto rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-popover"
           >
             {/* Distinct from the field's own label: both are in the a11y tree
                 at once, and two nodes answering to "Adresă" is ambiguous. */}
@@ -322,8 +330,13 @@ export function Autocomplete({
                         onMouseEnter={() => setHighlight(index)}
                         onClick={() => accept(item)}
                         className={cx(
-                          'cursor-pointer rounded px-2 py-1.5 text-sm',
-                          index === highlight ? 'bg-brand-50 text-brand-700' : 'text-ink',
+                          // 40px rows on a phone, 30px on a laptop: the same
+                          // list is a touch target in one place and a dense
+                          // dropdown in the other.
+                          'cursor-pointer rounded-md px-2 py-2.5 text-sm sm:py-1.5',
+                          index === highlight
+                            ? 'bg-surface-active text-ink'
+                            : 'text-ink hover:bg-surface-hover',
                         )}
                       >
                         <span className="block truncate">
@@ -331,7 +344,7 @@ export function Autocomplete({
                             part.hit ? (
                               <mark
                                 key={partIndex}
-                                className="bg-transparent font-semibold text-brand-700"
+                                className="bg-transparent font-semibold text-primary"
                               >
                                 {part.text}
                               </mark>

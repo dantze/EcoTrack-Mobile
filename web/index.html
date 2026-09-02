@@ -3,8 +3,34 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="color-scheme" content="light dark" />
+    <meta name="theme-color" content="#16283c" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#0f1419" media="(prefers-color-scheme: dark)" />
     <title>EcoTrack</title>
+    <!--
+      Pre-paint theme. Reads the same key src/theme/ThemeProvider.tsx writes and
+      stamps <html> before the first frame, so a dark-mode user never gets a
+      white flash while the bundle boots. Deliberately tiny and dependency-free.
+    -->
+    <script>
+      (function () {
+        try {
+          var pref = localStorage.getItem('ecotrack.theme.v1') || 'system';
+          var dark =
+            pref === 'dark' ||
+            (pref === 'system' &&
+              window.matchMedia &&
+              window.matchMedia('(prefers-color-scheme: dark)').matches);
+          var root = document.documentElement;
+          root.classList.toggle('dark', dark);
+          root.dataset.mantineColorScheme = dark ? 'dark' : 'light';
+          root.style.colorScheme = dark ? 'dark' : 'light';
+        } catch (e) {
+          /* storage blocked — light mode is a fine default */
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -22,6 +22,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/shadcn/dropdown-menu';
+import { Avatar, AvatarFallback } from '@/components/shadcn/avatar';
 import { useAuth } from '@/auth';
 import { Badge, Button, EmptyState, Modal, Skeleton, useToast } from '@/components/ui';
 import { ROLE_LABELS } from '@/components/domain';
@@ -130,16 +131,22 @@ export function AccountMenu() {
           <button
             type="button"
             aria-label={`Cont: ${user.fullName}`}
-            className="ml-1 flex items-center gap-2 rounded-md px-1 py-1 transition-colors hover:bg-white/10 focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-none"
+            className="ml-1 flex items-center gap-2 rounded-md px-1 py-1 transition-colors hover:bg-sidebar-accent focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-none"
           >
-            <span className="grid size-7 shrink-0 place-items-center rounded-full bg-white/15 text-[0.6875rem] font-semibold text-white">
-              {initials(user.fullName)}
-            </span>
+            {/* The account button Outlook parks in the top-right corner. The
+                fallback is the only layer that ever renders today — there is no
+                avatar image in the system — but going through the primitive is
+                what makes adding one later a one-line change. */}
+            <Avatar className="size-7 shrink-0">
+              <AvatarFallback className="bg-sidebar-accent text-[0.6875rem] font-semibold text-sidebar-foreground">
+                {initials(user.fullName)}
+              </AvatarFallback>
+            </Avatar>
             <span className="hidden min-w-0 text-left lg:block">
-              <span className="block max-w-36 truncate text-xs font-medium text-white">
+              <span className="block max-w-36 truncate text-xs font-medium text-sidebar-foreground">
                 {user.fullName}
               </span>
-              <span className="block max-w-36 truncate text-[0.6875rem] text-white/60">
+              <span className="block max-w-36 truncate text-[0.6875rem] text-sidebar-foreground/60">
                 {user.roles.length > 0 ? ROLE_LABELS[user.roles[0]!] : 'Fără rol'}
               </span>
             </span>

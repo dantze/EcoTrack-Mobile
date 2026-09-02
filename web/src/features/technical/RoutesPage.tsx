@@ -458,7 +458,7 @@ function RoutesScreen() {
           className={
             route.employee
               ? 'truncate text-left underline-offset-2 hover:underline'
-              : 'truncate text-left text-amber-700 underline-offset-2 hover:underline'
+              : 'truncate text-left text-warning-700 underline-offset-2 hover:underline'
           }
           onClick={(event) => {
             event.stopPropagation();

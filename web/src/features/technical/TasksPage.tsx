@@ -218,7 +218,7 @@ function TasksScreen() {
         task.route ? (
           <span className="truncate">{routeLabel(task.route)}</span>
         ) : (
-          <span className="text-amber-700">Neasignată</span>
+          <span className="text-warning-700">Neasignată</span>
         ),
     },
     {

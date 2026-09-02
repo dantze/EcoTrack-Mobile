@@ -23,7 +23,10 @@
 
 import { useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Badge, Button, DateInput, EmptyState, PageHeader, Select, TextInput, cx } from '@/components/ui';
+import { Badge, Button, DateInput, EmptyState, Select, TextInput, cx } from '@/components/ui';
+import { CommandBar, PaneHeader, ToolbarGroup, Workbench } from '@/components/layout';
+import { Toggle } from '@/components/shadcn/toggle';
+import { ToggleGroup, ToggleGroupItem } from '@/components/shadcn/toggle-group';
 import { ORDER_TYPE_LABELS } from '@/components/domain';
 import { useDeepLink, useDeepLinkOnce } from '@/lib/deepLink';
 import { useShortcuts } from '@/lib/hotkeys';
@@ -160,10 +163,16 @@ export function MapPage() {
     filters.from !== null ||
     filters.to !== null;
 
+  // The two layer switches are a segmented toggle rather than two buttons
+  // that flip variant: a ribbon states a mode by keeping it pressed, and
+  // aria-pressed says out loud what "the blue one is on" only implied.
+  const layers = [showHeatmap ? 'heatmap' : null, showRoutes ? 'routes' : null].filter(
+    (layer): layer is string => layer !== null,
+  );
+
   return (
-    <>
-      <PageHeader
-        eyebrow="Operațional"
+    <Workbench>
+      <CommandBar
         title="Hartă"
         subtitle={
           loading
@@ -172,60 +181,74 @@ export function MapPage() {
               (isTech ? ` · ${data.stats.routes.count} rute` : '')
         }
         actions={
-          <div className="flex items-center gap-1.5">
-            <Select
-              aria-label="Colorează după"
-              value={colorBy}
-              options={[
-                { value: 'lifecycle', label: 'După stare' },
-                { value: 'orderType', label: 'După tip' },
-              ]}
-              onChange={(value) => setColorBy(value as 'orderType' | 'lifecycle')}
-            />
-            <Button
+          <ToolbarGroup>
+            <ToggleGroup
+              type="multiple"
               size="sm"
-              variant={showHeatmap ? 'primary' : 'secondary'}
-              onClick={() => setShowHeatmap((current) => !current)}
+              variant="outline"
+              value={layers}
+              onValueChange={(next: string[]) => {
+                setShowHeatmap(next.includes('heatmap'));
+                if (isTech) setShowRoutes(next.includes('routes'));
+              }}
+              aria-label="Straturi hartă"
             >
-              Densitate
-            </Button>
-            {isTech && (
-              <Button
-                size="sm"
-                variant={showRoutes ? 'primary' : 'secondary'}
-                onClick={() => setShowRoutes((current) => !current)}
-              >
-                Trasee
-              </Button>
-            )}
-          </div>
+              <ToggleGroupItem value="heatmap">Densitate</ToggleGroupItem>
+              {isTech && <ToggleGroupItem value="routes">Trasee</ToggleGroupItem>}
+            </ToggleGroup>
+          </ToolbarGroup>
+        }
+        tools={
+          <Select
+            aria-label="Colorează după"
+            value={colorBy}
+            options={[
+              { value: 'lifecycle', label: 'După stare' },
+              { value: 'orderType', label: 'După tip' },
+            ]}
+            onChange={(value) => setColorBy(value as 'orderType' | 'lifecycle')}
+          />
         }
       />
 
       <div className="flex min-h-0 flex-1">
-        <aside className="flex w-80 shrink-0 flex-col overflow-y-auto border-r border-border bg-surface-sunken">
-          <FilterPanel
-            filters={filters}
-            filtersActive={filtersActive}
-            countyOptions={countyOptions}
-            onPatch={patch}
-            onReset={() => setFilters(EMPTY_FILTERS)}
-            onToggleType={(type) => patch({ orderTypes: toggleIn(filters.orderTypes, type) })}
-            onToggleLifecycle={(life) => patch({ lifecycles: toggleIn(filters.lifecycles, life) })}
+        {/* A pane, not a page section: the same surface, hairline and header
+            height as the reading pane every other screen puts here. Hidden
+            below md, where the map itself is all there is room for. */}
+        <aside className="hidden w-72 shrink-0 flex-col border-r border-border bg-surface md:flex xl:w-80">
+          <PaneHeader
+            title="Filtre"
+            subtitle={filtersActive ? 'Filtre active' : 'Toate comenzile'}
+            actions={
+              filtersActive ? (
+                <Button variant="ghost" size="sm" onClick={() => setFilters(EMPTY_FILTERS)}>
+                  Resetează
+                </Button>
+              ) : undefined
+            }
           />
-
-          {selected ? (
-            <SelectedPanel
-              point={selected}
-              onClose={() => setSelectedPointId(null)}
-              onOpenOrder={() => {
-                recordUse('order', selected.orderId);
-                navigate(`/comenzi?comanda=${selected.orderId}`);
-              }}
+          <div className="min-h-0 flex-1 overflow-y-auto">
+            <FilterPanel
+              filters={filters}
+              countyOptions={countyOptions}
+              onPatch={patch}
+              onToggleType={(type) => patch({ orderTypes: toggleIn(filters.orderTypes, type) })}
+              onToggleLifecycle={(life) => patch({ lifecycles: toggleIn(filters.lifecycles, life) })}
             />
-          ) : (
-            <StatsPanel stats={data.stats} showRoutes={isTech} />
-          )}
+
+            {selected ? (
+              <SelectedPanel
+                point={selected}
+                onClose={() => setSelectedPointId(null)}
+                onOpenOrder={() => {
+                  recordUse('order', selected.orderId);
+                  navigate(`/comenzi?comanda=${selected.orderId}`);
+                }}
+              />
+            ) : (
+              <StatsPanel stats={data.stats} showRoutes={isTech} />
+            )}
+          </div>
         </aside>
 
         <div className="relative min-w-0 flex-1">
@@ -262,7 +285,7 @@ export function MapPage() {
           )}
         </div>
       </div>
-    </>
+    </Workbench>
   );
 }
 
@@ -322,37 +345,33 @@ function Chip({
   onClick: () => void;
 }) {
   return (
-    <button
-      type="button"
-      aria-pressed={active}
-      onClick={onClick}
+    <Toggle
+      size="sm"
+      pressed={active}
+      onPressedChange={onClick}
       className={cx(
-        'flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors',
+        'h-7 gap-1.5 rounded-full border px-2.5 text-xs font-normal',
         active
-          ? 'border-primary bg-accent-50 text-ink'
-          : 'border-border bg-surface text-ink-muted hover:bg-surface-sunken',
+          ? 'border-primary bg-accent-50 text-ink data-[state=on]:bg-accent-50 data-[state=on]:text-ink'
+          : 'border-border bg-surface text-ink-muted hover:bg-surface-hover',
       )}
     >
       <span className="size-2 rounded-full" style={{ backgroundColor: color }} aria-hidden="true" />
       {label}
-    </button>
+    </Toggle>
   );
 }
 
 function FilterPanel({
   filters,
-  filtersActive,
   countyOptions,
   onPatch,
-  onReset,
   onToggleType,
   onToggleLifecycle,
 }: {
   filters: MapFilters;
-  filtersActive: boolean;
   countyOptions: { value: string; label: string }[];
   onPatch: (next: Partial<MapFilters>) => void;
-  onReset: () => void;
   onToggleType: (type: OrderTypeTag) => void;
   onToggleLifecycle: (life: Lifecycle) => void;
 }) {
@@ -416,13 +435,8 @@ function FilterPanel({
         </div>
       </PanelSection>
 
-      {filtersActive && (
-        <div className="px-4 py-3">
-          <Button variant="secondary" size="sm" className="w-full" onClick={onReset}>
-            Resetează filtrele
-          </Button>
-        </div>
-      )}
+      {/* No reset button here: the pane header carries it now, where it is
+          visible without scrolling past six filter sections to find it. */}
     </>
   );
 }
@@ -460,11 +474,11 @@ function StatsPanel({ stats, showRoutes }: { stats: MapStats; showRoutes: boolea
   return (
     <>
       {stats.dropped > 0 && (
-        <div className="border-b border-amber-200 bg-amber-50 px-4 py-3">
-          <p className="text-xs font-medium text-amber-900">
+        <div className="border-b border-warning-200 bg-warning-50 px-4 py-3">
+          <p className="text-xs font-medium text-warning-700">
             {stats.dropped} comenzi fără coordonate
           </p>
-          <p className="mt-0.5 text-xs text-amber-800">
+          <p className="mt-0.5 text-xs text-warning-700">
             {Math.round(stats.droppedRatio * 100)}% din toate comenzile nu pot fi afișate, indiferent
             de filtre. Harta nu este completă.
           </p>

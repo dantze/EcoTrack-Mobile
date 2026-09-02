@@ -376,7 +376,7 @@ export function OrderFormDrawer({ order = null, initialClient = null, onClose }:
                 className={`rounded px-3 py-1 text-sm font-medium transition-colors ${
                   form.orderType === type
                     ? 'bg-primary text-primary-foreground'
-                    : 'text-ink-muted hover:bg-surface-sunken'
+                    : 'text-ink-muted hover:bg-surface-hover'
                 }`}
               >
                 {ORDER_TYPE_LABELS[type]}
@@ -571,7 +571,7 @@ function AmplasareFields({
           )}
           {totalPrice !== null && (
             <Col span={12}>
-              <p className="text-sm text-green-700">
+              <p className="text-sm text-success-700">
                 Preț total: <span className="font-semibold">{formatMoney(totalPrice)}</span>
               </p>
             </Col>
@@ -712,7 +712,7 @@ function RidicareFields({
               <Spinner />
             </div>
           ) : groupsError ? (
-            <p className="text-sm text-red-600">Nu s-au putut încărca amplasările clientului.</p>
+            <p className="text-sm text-danger-600">Nu s-au putut încărca amplasările clientului.</p>
           ) : groups.length === 0 ? (
             <p className="text-sm text-ink-muted italic">
               Acest client nu are pachete active la locații cunoscute.
@@ -726,7 +726,7 @@ function RidicareFields({
                   <div
                     key={group.key}
                     className={`flex items-center justify-between gap-3 border-b border-border/60 px-3 py-2 last:border-b-0 ${
-                      chosen > 0 ? 'bg-red-50' : ''
+                      chosen > 0 ? 'bg-danger-50' : ''
                     }`}
                   >
                     <div className="min-w-0">
@@ -738,14 +738,14 @@ function RidicareFields({
                         Disponibil:{' '}
                         <span
                           className={
-                            remaining > 0 ? 'font-semibold text-green-700' : 'font-semibold text-red-600'
+                            remaining > 0 ? 'font-semibold text-success-700' : 'font-semibold text-danger-600'
                           }
                         >
                           {remaining}
                         </span>{' '}
                         / {group.availableCount}
                         {group.pendingPickupCount > 0 && (
-                          <span className="text-red-600">
+                          <span className="text-danger-600">
                             {` (-${group.pendingPickupCount} urmează să fie ridicate)`}
                           </span>
                         )}
@@ -772,7 +772,7 @@ function RidicareFields({
             </div>
           )}
           {errors.pickupSelection && (
-            <p className="mt-1.5 text-xs text-red-600">{errors.pickupSelection}</p>
+            <p className="mt-1.5 text-xs text-danger-600">{errors.pickupSelection}</p>
           )}
         </FormSection>
       )}

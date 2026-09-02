@@ -388,7 +388,7 @@ export function SubscriptionsPage() {
           </Button>
           <button
             type="button"
-            className="px-1.5 text-xs font-medium text-red-600 hover:underline"
+            className="px-1.5 text-xs font-medium text-danger-600 hover:underline"
             onClick={() => void remove(subscription)}
           >
             Șterge

@@ -492,7 +492,7 @@ function PickerBody({
                 aria-selected={index === highlighted}
                 className={cx(
                   'cursor-pointer px-3 py-1.5',
-                  index === highlighted ? 'bg-accent-50' : 'hover:bg-surface-sunken',
+                  index === highlighted ? 'bg-accent-50' : 'hover:bg-surface-hover',
                 )}
                 onMouseEnter={() => setHighlighted(index)}
                 // `onMouseDown` rather than `onClick`: the input's blur would

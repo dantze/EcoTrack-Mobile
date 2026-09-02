@@ -6,6 +6,7 @@
  */
 
 import { Badge } from '@/components/ui';
+import type { BadgeProps } from '@/components/ui';
 import type { OrderTypeTag, Role, TaskStatus, TaskType } from '@/types/domain';
 import { type Client, clientName } from '@/types/domain';
 
@@ -80,9 +81,38 @@ export function TaskStatusBadge({ status }: { status: TaskStatus }) {
   return <Badge tone={tone}>{TASK_STATUS_LABELS[status]}</Badge>;
 }
 
+/**
+ * One tone per kind of work, whichever name it goes by.
+ *
+ * An order type and a task type are the same three things — `mapOrderTypeToTaskType`
+ * on the backend is the identity — so they must be the same colour. They were
+ * not: Comenzi drew Amplasare blue while the dispatch board drew it green, and
+ * Ridicare was quiet grey on one screen and amber on the other, which is the
+ * colour this app uses for "in progress" and "fără șofer". A dispatcher moving
+ * between the two screens was reading two different legends.
+ *
+ * Keyed off one object so the next person cannot half-change it.
+ */
+const WORK_TONES = {
+  placement: 'info',
+  pickup: 'neutral',
+  sanitation: 'success',
+} as const;
+
+export const ORDER_TYPE_TONES: Record<OrderTypeTag, BadgeProps['tone']> = {
+  Amplasari: WORK_TONES.placement,
+  Ridicari: WORK_TONES.pickup,
+  Igienizari: WORK_TONES.sanitation,
+};
+
+export const TASK_TYPE_TONES: Record<TaskType, BadgeProps['tone']> = {
+  PLACEMENT: WORK_TONES.placement,
+  PICKUP: WORK_TONES.pickup,
+  SANITIZATION: WORK_TONES.sanitation,
+};
+
 export function OrderTypeBadge({ type }: { type: OrderTypeTag }) {
-  const tone = type === 'Amplasari' ? 'info' : type === 'Ridicari' ? 'neutral' : 'success';
-  return <Badge tone={tone}>{ORDER_TYPE_LABELS[type]}</Badge>;
+  return <Badge tone={ORDER_TYPE_TONES[type]}>{ORDER_TYPE_LABELS[type]}</Badge>;
 }
 
 /** Client name plus a quiet marker for company vs individual. */

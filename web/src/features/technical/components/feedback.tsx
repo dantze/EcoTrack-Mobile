@@ -25,8 +25,8 @@ interface PendingConfirm {
 }
 
 const TOAST_TONES: Record<ToastKind, string> = {
-  success: 'border-green-200 bg-green-50 text-green-800',
-  error: 'border-red-200 bg-red-50 text-red-800',
+  success: 'border-success-200 bg-success-50 text-success-700',
+  error: 'border-danger-200 bg-danger-50 text-danger-700',
   info: 'border-border bg-surface text-ink',
 };
 

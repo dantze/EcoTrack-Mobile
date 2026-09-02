@@ -8,6 +8,7 @@
  */
 
 import { Modal } from '@/components/ui';
+import { Kbd, KbdGroup } from '@/components/shadcn/kbd';
 import { GLOBAL_GROUP, comboLabel, useActiveShortcuts, type Shortcut } from '@/lib/hotkeys';
 
 // Re-exported for the screens that already import it from here.
@@ -15,18 +16,16 @@ export { GLOBAL_GROUP };
 
 function Keys({ combo }: { combo: string }) {
   return (
-    <span className="flex shrink-0 items-center gap-1">
+    <KbdGroup className="shrink-0">
       {comboLabel(combo)
         .split(' , ')
         .map((chunk, index) => (
           <span key={index} className="flex items-center gap-1">
             {index > 0 && <span className="text-xs text-ink-subtle">apoi</span>}
-            <kbd className="rounded border border-border bg-surface-sunken px-1.5 py-0.5 font-mono text-xs text-ink">
-              {chunk}
-            </kbd>
+            <Kbd>{chunk}</Kbd>
           </span>
         ))}
-    </span>
+    </KbdGroup>
   );
 }
 

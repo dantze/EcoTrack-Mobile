@@ -206,7 +206,7 @@ export function ClientFormDrawer({
                 className={`rounded px-3 py-1 text-sm font-medium transition-colors ${
                   state.kind === kind
                     ? 'bg-primary text-primary-foreground'
-                    : 'text-ink-muted hover:bg-surface-sunken'
+                    : 'text-ink-muted hover:bg-surface-hover'
                 }`}
               >
                 {kind === 'company' ? 'Persoană juridică' : 'Persoană fizică'}

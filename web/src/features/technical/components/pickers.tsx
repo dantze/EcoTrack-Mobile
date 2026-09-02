@@ -76,7 +76,7 @@ export function PickerRow({
         'flex w-full items-center justify-between gap-3 rounded-md border px-3 py-2 text-left transition-colors',
         active && !disabled ? 'border-primary bg-accent-50' : 'border-border bg-surface',
         selected && !active && 'border-accent-300 bg-accent-50/50',
-        disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:bg-surface-sunken',
+        disabled ? 'cursor-not-allowed opacity-50' : 'cursor-pointer hover:bg-surface-hover',
       )}
     >
       <span className="min-w-0">

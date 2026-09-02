@@ -9,17 +9,11 @@
 import type { ReactNode } from 'react';
 import { CircleAlert } from 'lucide-react';
 import { Badge, Button, EmptyState, Spinner } from '@/components/ui';
-import { TASK_TYPE_LABELS, formatDate } from '@/components/domain';
+import { TASK_TYPE_LABELS, TASK_TYPE_TONES, formatDate } from '@/components/domain';
 import { parseCoordinates } from '@/types/domain';
 import type { RecurringIgienizare, Task, TaskStatus, TaskType } from '@/types/domain';
 import { errorMessage, formatTime, frequencyLabel } from '../utils';
 import type { Progress } from '../utils';
-
-const TASK_TYPE_TONES: Record<TaskType, 'info' | 'warning' | 'success'> = {
-  PLACEMENT: 'success',
-  PICKUP: 'warning',
-  SANITIZATION: 'info',
-};
 
 export function TaskTypeBadge({ type }: { type: TaskType }) {
   return <Badge tone={TASK_TYPE_TONES[type]}>{TASK_TYPE_LABELS[type]}</Badge>;

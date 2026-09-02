@@ -48,7 +48,7 @@ export function TopBar({
         >
           ET
         </span>
-        <span className="hidden text-sm font-semibold tracking-tight text-white sm:inline">
+        <span className="hidden text-sm font-semibold tracking-tight text-sidebar-foreground sm:inline">
           EcoTrack
         </span>
       </div>
@@ -60,15 +60,16 @@ export function TopBar({
           onClick={onOpenPalette}
           aria-label="Căutare rapidă"
           className={cn(
-            'flex h-8 w-full max-w-xl items-center gap-2 rounded-md border border-white/10 bg-white/10 px-2.5',
-            'text-left text-sm text-white/70 transition-colors',
-            'hover:border-white/20 hover:bg-white/15 hover:text-white',
+            'flex h-8 w-full max-w-xl items-center gap-2 rounded-md px-2.5',
+            'border border-sidebar-border bg-sidebar-accent',
+            'text-left text-sm text-sidebar-foreground/70 transition-colors',
+            'hover:bg-sidebar-accent-foreground/15 hover:text-sidebar-accent-foreground',
             'focus-visible:ring-2 focus-visible:ring-sidebar-ring focus-visible:outline-none',
           )}
         >
           <Search className="size-3.5 shrink-0" aria-hidden />
           <span className="min-w-0 flex-1 truncate">Caută clienți, comenzi, sarcini…</span>
-          <kbd className="hidden shrink-0 rounded border border-white/25 px-1 font-mono text-[0.625rem] text-white/60 sm:inline">
+          <kbd className="hidden shrink-0 rounded border border-sidebar-border px-1 font-mono text-[0.625rem] text-sidebar-foreground/60 sm:inline">
             {comboLabel('mod+k')}
           </kbd>
         </button>
@@ -78,7 +79,12 @@ export function TopBar({
         {DATA_MODE === 'mock' && (
           <Badge
             variant="outline"
-            className="mr-1 hidden border-warning-600/40 bg-warning-600/15 text-[0.6875rem] text-warning-200 md:inline-flex"
+            // `text-warning-600`, not `-200`: the semantic ramps INVERT between
+            // themes — 50/100/200 are fills and 600/700 are text — so a fill
+            // shade used as text is a dark-brown label on a dark amber pill in
+            // dark mode. 600 is the one step that stays legible on the rail,
+            // which is navy in both themes.
+            className="mr-1 hidden border-warning-600/40 bg-warning-600/15 text-[0.6875rem] text-warning-600 md:inline-flex"
           >
             date demo
           </Badge>

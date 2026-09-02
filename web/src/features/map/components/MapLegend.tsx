@@ -27,7 +27,7 @@ export function MapLegend({ colorBy, showHeatmap, showRoutes, hasRoutes }: MapLe
       : LIFECYCLES.map((life: Lifecycle) => ({ key: life, label: LIFECYCLE_LABEL[life], color: LIFECYCLE_COLOR[life] }));
 
   return (
-    <div className="absolute bottom-3 left-3 flex max-w-56 flex-col gap-2 rounded-lg bg-white/95 p-3 text-xs shadow-popover ring-1 ring-border ring-inset backdrop-blur-sm">
+    <div className="absolute bottom-3 left-3 flex max-w-56 flex-col gap-2 rounded-lg bg-surface/95 p-3 text-xs shadow-popover ring-1 ring-border ring-inset backdrop-blur-sm">
       <ul className="flex flex-col gap-1">
         {entries.map((entry) => (
           <li key={entry.key} className="flex items-center gap-1.5 text-ink-muted">

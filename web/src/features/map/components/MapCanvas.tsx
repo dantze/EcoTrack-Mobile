@@ -87,6 +87,51 @@ function emptyBoundsEqual(a: MapBounds | null, b: MapBounds | null): boolean {
   return a.west === b.west && a.south === b.south && a.east === b.east && a.north === b.north;
 }
 
+/**
+ * Run `apply` against the live map as soon as the style can accept it.
+ *
+ * `map.isStyleLoaded()` is a RACE, not a state: it is false while the style
+ * is still parsing, and the load event that flips `ready` fires before it
+ * settles. Every sync effect below used to read it as a precondition and
+ * `return` when it was false — and because their dependencies (the projected
+ * GeoJSON, a filter flag) do not change again on their own, the update was
+ * dropped for good. On a cold load with slow tiles that meant a map with no
+ * orders on it: the stats rail said 120, the canvas showed none, and the
+ * points only appeared once the operator touched a filter and forced the
+ * effect to run a second time.
+ *
+ * So: apply now if we can, otherwise subscribe and apply on the first
+ * `styledata` that reports a loaded style. Returned as a cleanup so an
+ * unmount — or a newer value arriving first — unsubscribes.
+ */
+function whenStyleReady(map: MapLibreMap, apply: () => void): () => void {
+  if (map.isStyleLoaded()) {
+    apply();
+    return () => {};
+  }
+
+  // `idle` as well as `styledata`, and this is the half that actually saves it:
+  // `styledata` only fires when the style CHANGES, and by this point it already
+  // has — the sources and layers were added inside the load handler, before
+  // `ready` flipped. Waiting on it alone can therefore wait forever. `idle`
+  // fires once the map has finished rendering everything it was asked for,
+  // which is exactly the moment the update can land.
+  let done = false;
+  const attempt = () => {
+    if (done || !map.isStyleLoaded()) return;
+    done = true;
+    map.off('idle', attempt);
+    map.off('styledata', attempt);
+    apply();
+  };
+  map.on('idle', attempt);
+  map.on('styledata', attempt);
+  return () => {
+    map.off('idle', attempt);
+    map.off('styledata', attempt);
+  };
+}
+
 export function MapCanvas({
   points,
   routes,
@@ -320,41 +365,53 @@ export function MapCanvas({
   // ── Colour, independent of the source: a `setPaintProperty` swap, not a rebuild. ──
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !ready || !map.isStyleLoaded()) return;
-    map.setPaintProperty(LAYER_POINT, 'circle-color', styleValue(pointColorExpression(colorBy)));
+    if (!map || !ready) return;
+    return whenStyleReady(map, () => {
+      map.setPaintProperty(LAYER_POINT, 'circle-color', styleValue(pointColorExpression(colorBy)));
+    });
   }, [colorBy, ready]);
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !ready || !map.isStyleLoaded()) return;
-    map.setLayoutProperty(LAYER_HEATMAP, 'visibility', showHeatmap ? 'visible' : 'none');
+    if (!map || !ready) return;
+    return whenStyleReady(map, () => {
+      map.setLayoutProperty(LAYER_HEATMAP, 'visibility', showHeatmap ? 'visible' : 'none');
+    });
   }, [showHeatmap, ready]);
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !ready || !map.isStyleLoaded()) return;
-    const visibility = showRoutes ? 'visible' : 'none';
-    for (const layerId of ROUTE_LAYERS) map.setLayoutProperty(layerId, 'visibility', visibility);
+    if (!map || !ready) return;
+    return whenStyleReady(map, () => {
+      const visibility = showRoutes ? 'visible' : 'none';
+      for (const layerId of ROUTE_LAYERS) map.setLayoutProperty(layerId, 'visibility', visibility);
+    });
   }, [showRoutes, ready]);
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !ready || !map.isStyleLoaded()) return;
-    map.getSource<GeoJSONSource>(SOURCE_POINTS)?.setData(pointsGeoJSON);
-    map.getSource<GeoJSONSource>(SOURCE_HEAT)?.setData(pointsGeoJSON);
+    if (!map || !ready) return;
+    return whenStyleReady(map, () => {
+      map.getSource<GeoJSONSource>(SOURCE_POINTS)?.setData(pointsGeoJSON);
+      map.getSource<GeoJSONSource>(SOURCE_HEAT)?.setData(pointsGeoJSON);
+    });
   }, [pointsGeoJSON, ready]);
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !ready || !map.isStyleLoaded()) return;
-    map.getSource<GeoJSONSource>(SOURCE_ROUTES)?.setData(routeLinesGeoJSON);
-    map.getSource<GeoJSONSource>(SOURCE_STOPS)?.setData(routeStopsGeoJSON);
+    if (!map || !ready) return;
+    return whenStyleReady(map, () => {
+      map.getSource<GeoJSONSource>(SOURCE_ROUTES)?.setData(routeLinesGeoJSON);
+      map.getSource<GeoJSONSource>(SOURCE_STOPS)?.setData(routeStopsGeoJSON);
+    });
   }, [routeLinesGeoJSON, routeStopsGeoJSON, ready]);
 
   useEffect(() => {
     const map = mapRef.current;
-    if (!map || !ready || !map.isStyleLoaded()) return;
-    map.getSource<GeoJSONSource>(SOURCE_SELECTED)?.setData(selectedGeoJSON);
+    if (!map || !ready) return;
+    return whenStyleReady(map, () => {
+      map.getSource<GeoJSONSource>(SOURCE_SELECTED)?.setData(selectedGeoJSON);
+    });
   }, [selectedGeoJSON, ready]);
 
   // `bounds` gets a fresh object from `data.ts` on every recompute even when
@@ -423,7 +480,7 @@ export function MapCanvas({
 
       {ready && !failed && !hasPoints && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center p-6">
-          <div className="pointer-events-auto rounded-lg bg-white/95 shadow-popover ring-1 ring-border ring-inset">
+          <div className="pointer-events-auto rounded-lg bg-surface/95 shadow-popover ring-1 ring-border ring-inset">
             <EmptyState
               size="sm"
               title="Nicio comandă de afișat pe hartă"

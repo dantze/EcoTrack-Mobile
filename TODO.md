@@ -2642,6 +2642,16 @@ NOT done, because the agents doing them ran out of budget mid-file:
   sweep but not the redesign — floating `ButtonGroup` clusters, a legend that
   collapses to a button on mobile. Do not touch the container's inline
   `position:absolute; inset:0` (see CLAUDE.md).
+
+  *Update — the screen around it is done, the floating chrome is not.* `MapPage`
+  was the last screen still framed by `PageHeader` + a bare fragment; it is now
+  `Workbench` + `CommandBar` like every other screen, its two layer switches are
+  one `ToggleGroup` (pressed state instead of two buttons flipping variant), and
+  the filter rail is a real pane with a `PaneHeader` and its own scroll
+  container, hidden below `md`. The token sweep had in fact **missed**
+  `MapCanvas` and `MapLegend`: both floated `bg-white/95` cards, which is a
+  white sheet over a dark map in dark mode. Fixed to `bg-surface/95`. What is
+  still open here is only the redesign this bullet describes.
 - **`IdScanField`** has the three states but not the dragged-file/camera polish
   the rebuild brief described.
 - **`ClientFormDrawer`** is in the same position as `OrderFormDrawer`.
@@ -2709,6 +2719,15 @@ to make `PageHeader` a thin wrapper over `CommandBar`, which is easy; what needs
 deciding first is whether `PageHeader` should stay in the frozen contract at all
 now that nothing but the kit itself renders one.
 
+*Update: "every screen uses `CommandBar`" is now literally true.* `MapPage` was
+the last caller of `PageHeader` and moved to `CommandBar` with the rest of the
+map work in TODO-58, so `PageHeader` is exported by the kit and rendered by
+nobody. Deliberately left in place rather than deleted: `PageHeaderProps` lives
+in `components/ui/types.ts`, which is the frozen contract, and removing an
+export from it is exactly the decision this item exists to make. It is a smaller
+question now — the answer is "delete it or make it a wrapper", with no caller to
+migrate either way.
+
 ### TODO-63 `[ ]` The dispatch board is still drag-and-drop only
 `RoutesPage` moves a task onto a route by dragging (`@dnd-kit`), and below `lg`
 its three columns are now tabs — which means the drag source and the drop target
@@ -2721,6 +2740,81 @@ board's central action is unreachable. The fix is a per-task menu in the queue
 with "Trimite pe ruta…", reusing `RoutePickerModal`, which the stops column
 already does. Not done in the rebuild because the board's drag wiring was left
 untouched on purpose and this adds a second write path through it.
+
+### TODO-64 `[ ]` Two `/comenzi` tests time out under the full web suite
+Found while doing the map work, and **not caused by it** — verified by stashing
+the change and re-running: the same two fail either way, and both pass when
+their files are run alone.
+
+`screensSmoke > renders '/comenzi'` and `bootNavigation > stays on /comenzi`
+hit vitest's 5000 ms default. Comenzi is the heaviest screen to boot — the whole
+shell, the orders list, and then `useOrderTaskStatuses` fanning out **one
+request per order** (TODO-43) — so under a fully parallel suite on a loaded
+machine it is the one that crosses the line. On a quiet machine the same suite
+is green, which is why this has not been seen in CI.
+
+That makes it the same shape as TODO-31 on the backend: a test that passes or
+fails on how busy the machine is teaches everyone to re-run rather than read.
+
+Needs deciding, and they are not equivalent: raise `testTimeout` for these two
+(honest, hides nothing, but a slower boot then goes unnoticed); or make the
+smoke test mount `/comenzi` with a smaller seeded dataset; or fix TODO-43, which
+removes the fan-out that makes this screen slow in the first place and is the
+only option that makes the app faster rather than the test looser.
+
+### TODO-66 `[ ]` The map tiles stay light in dark mode
+Found during a browser pass over every screen in both themes. `MAP_STYLE_URL`
+points at one OpenFreeMap style, so in dark mode a bright white-and-green map
+sits inside an otherwise dark app, framed by dark chrome. The overlays on top of
+it are correct now — the legend and hover card were `bg-white/95` and were swept
+to `bg-surface/95` — which is what makes the mismatch obvious: a dark card on a
+light map.
+
+Not fixed here because it is a product choice, not a bug in the code: it needs a
+second style URL (OpenFreeMap publishes dark variants), a decision about whether
+the map follows the app theme or stays light on purpose — a light basemap is
+easier to read outdoors and the pin colours were picked against it — and a
+re-check of every pin, route line and heatmap ramp against the darker ground.
+`MapCanvas` already rebuilds on `retryKey`, so switching styles has a hook.
+
+### TODO-67 `[ ]` Confirm the map's cold-load fix against a live tile server
+The bug is fixed and the mechanism is understood; what is missing is one look at
+it working.
+
+**What was wrong:** every `setData` / `setPaintProperty` effect in `MapCanvas`
+was guarded by `if (!map || !ready || !map.isStyleLoaded()) return;`.
+`isStyleLoaded()` is a race rather than a state — it is false while the style is
+still settling, and the `load` event that flips `ready` fires before it. Their
+dependencies (the projected GeoJSON, a filter flag) do not change again on their
+own, so a guard that failed once dropped the update **for good**: the stats rail
+said 120 orders and the canvas had none. Confirmed live — the points appeared the
+instant a filter chip was clicked, which is nothing but the effect running a
+second time.
+
+**The fix** is `whenStyleReady()`: apply now if the style can take it, otherwise
+apply on the first `idle` or `styledata` that reports a loaded style. `idle` is
+the load-bearing half — `styledata` only fires when the style *changes*, and by
+that point it already had.
+
+**Why it is still open:** OpenFreeMap stopped serving tiles part-way through
+verifying (repeated reloads from one IP), so the last look at the fixed screen
+was a blank canvas that proves nothing either way. It typechecks, lints and the
+suite is green. Someone should open `/harta` on a cold cache and confirm the pins
+are there *without* touching a filter — and ideally the same on a throttled
+connection, which is the case that produced the bug.
+
+### TODO-65 `[ ]` `web/`'s dependencies were declared but never installed
+Found when the UI work would not typecheck: `lucide-react`, `@mantine/*`,
+`class-variance-authority` and the rest of the rebuild's packages were in
+`package.json` **and** in `package-lock.json`, but `web/node_modules` did not
+have them — so `npm run dev`, `build`, `typecheck` and `lint` all failed on the
+same "Cannot find module 'lucide-react'". `npm ci` fixed it and changed no
+tracked file.
+
+Nothing is wrong in the repo; this is a note for the next person who clones or
+pulls the rebuild and finds every import red. Worth deciding whether it earns a
+line in `README.md` next to the other setup steps, since the same trap is one
+`git pull` away for anyone who had `web/node_modules` from before the rebuild.
 
 ---
 

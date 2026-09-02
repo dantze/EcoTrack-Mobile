@@ -19,6 +19,8 @@
 import type { ReactNode } from 'react';
 import { MantineProvider } from '@mantine/core';
 import { ModalsProvider } from '@mantine/modals';
+import { DatesProvider } from '@mantine/dates';
+import 'dayjs/locale/ro';
 import { Notifications } from '@mantine/notifications';
 import { DirectionProvider } from '@/components/shadcn/direction';
 import { TooltipProvider } from '@/components/shadcn/tooltip';
@@ -41,6 +43,13 @@ function Themed({ children }: { children: ReactNode }) {
       getRootElement={() => document.documentElement}
     >
       <ModalsProvider>
+        {/* Romanian dates app-wide. dayjs.locale('ro') in the kit's DateInput
+            sets the GLOBAL dayjs locale, which is not where Mantine reads
+            from — its calendars take the locale from this provider, so
+            without it every date popup said "September 2026" and "Mo Tu We"
+            inside an otherwise Romanian app. Monday-first and a Sat/Sun
+            weekend live here too, so a new date field cannot forget them. */}
+        <DatesProvider settings={{ locale: 'ro', firstDayOfWeek: 1, weekendDays: [0, 6] }}>
         <DirectionProvider dir="ltr">
           <TooltipProvider delayDuration={400} skipDelayDuration={200}>
             {children}
@@ -52,6 +61,7 @@ function Themed({ children }: { children: ReactNode }) {
             <Toaster />
           </TooltipProvider>
         </DirectionProvider>
+        </DatesProvider>
       </ModalsProvider>
     </MantineProvider>
   );

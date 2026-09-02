@@ -76,7 +76,24 @@ public class OrderService {
             igi.setSubscription(plan);
         }
 
-        return orderRepository.save(order);
+        Order saved = orderRepository.save(order);
+
+        // The human-facing order number, which NOTHING assigned before this.
+        // `number` is a primitive long, so every order created through the app
+        // was saved as 0 and the Comenzi table showed "#0" for all of them —
+        // invisible in mock mode, where the seed makes numbers up. It also made
+        // `findLiveBySubscriptionId`'s `ORDER BY o.number ASC` an arbitrary
+        // ordering over a column of zeroes.
+        //
+        // The id is the number: unique by construction, needs no MAX(number)+1
+        // read that two concurrent creates could both win (the very race
+        // TODO-39 is about), and it is already the number the URL shows. The
+        // entity is managed inside this @Transactional, so the assignment
+        // flushes on commit without a second save().
+        if (saved.getNumber() == 0 && saved.getId() != null) {
+            saved.setNumber(saved.getId());
+        }
+        return saved;
     }
 
     public List<Order> getOrdersByClient(Long clientId) {

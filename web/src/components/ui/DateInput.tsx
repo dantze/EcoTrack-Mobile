@@ -94,7 +94,24 @@ export function DateInput({
         clearable={clearable}
         firstDayOfWeek={1}
         weekendDays={[0, 6]}
-        popoverProps={{ withinPortal: true, shadow: 'md', position: 'bottom-start' }}
+        // NOT `withinPortal` — the calendar must render inside the DOM subtree
+        // it belongs to, and this is a correctness fix rather than a styling
+        // preference.
+        //
+        // Every drawer and dialog in the kit is a Radix `Dialog`/`Sheet` in
+        // modal mode, and Radix enforces that by putting `pointer-events: none`
+        // on <body> while one is open — only its own subtree stays clickable. A
+        // portalled dropdown is mounted on <body>, OUTSIDE that subtree, so it
+        // inherited `pointer-events: none`: the calendar rendered, the day cells
+        // could not be clicked, the click fell through to the backdrop and
+        // dismissed the popover, and the field stayed empty. That made every
+        // date in a drawer unsettable — an order could not be saved at all —
+        // while a typed date still worked, which is why it read as a mystery.
+        //
+        // Rendering in place costs the portal's escape from `overflow` clipping;
+        // Mantine flips the dropdown above the field when there is no room
+        // below, which is what the drawer's scroll container needs anyway.
+        popoverProps={{ withinPortal: false, shadow: 'md', position: 'bottom-start' }}
         rightSection={<CalendarDays aria-hidden className="size-3.5 text-ink-subtle" />}
         aria-invalid={error ? true : undefined}
         aria-describedby={describedBy(hintId, errorId, hint, error)}

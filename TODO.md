@@ -2921,6 +2921,66 @@ smoke test mount `/comenzi` with a smaller seeded dataset; or fix TODO-43, which
 removes the fan-out that makes this screen slow in the first place and is the
 only option that makes the app faster rather than the test looser.
 
+### TODO-68 `[DONE]` Three bugs only a live backend could show
+The web had never actually been run against the Spring backend — mock mode is
+the default and every test uses it. Booting both and driving the real UI found
+three things at once, none of which any test could have caught.
+
+**1. Every date field in a drawer was dead.** Clicking a day in the calendar did
+nothing: the field stayed empty and the order form answered "Selectați perioada
+de amplasare", so **an order could not be created at all**. Typing a date worked,
+which is what made it look like a mystery instead of a broken control.
+
+The kit's Drawer/Modal are Radix `Sheet`/`Dialog` in modal mode, and Radix
+enforces modality by setting `pointer-events: none` on `<body>` while one is
+open — only its own subtree stays interactive. `DateInput` passed
+`popoverProps={{ withinPortal: true }}`, mounting the calendar on `<body>`,
+OUTSIDE that subtree, so every day cell inherited `pointer-events: none`. The
+click fell through to the backdrop, which dismissed the popover. Confirmed in the
+browser before fixing: `getComputedStyle(body).pointerEvents === 'none'` and the
+same on the day cell. Now `withinPortal: false`, so the calendar renders inside
+the dialog that owns it.
+
+*Note for whoever adds the next Mantine dropdown inside a dialog* — Combobox,
+MultiSelect, Spotlight all have the same prop and the same trap.
+
+**2. Every order created through the app was `#0`.** `Order.number` is a
+primitive `long` and **nothing ever assigned it** — there is a constructor that
+takes one and no caller anywhere. Mock mode invents numbers in its seed, so the
+Comenzi table looked right in every screenshot ever taken of it. It also made
+`findLiveBySubscriptionId`'s `ORDER BY o.number ASC` an ordering over a column of
+zeroes. `OrderService.createOrder` now assigns `number = id` after save: unique
+by construction, no `MAX(number)+1` read for two concurrent creates to race
+(TODO-39's shape), and the entity is managed inside the existing `@Transactional`
+so it flushes without a second `save()`. A caller-supplied number still wins.
+
+**3. Every date popup was in English.** "September 2026", "Mo Tu We Th Fr Sa Su",
+inside an app that is Romanian everywhere else. `DateInput` calls
+`dayjs.locale('ro')`, but that sets the GLOBAL dayjs locale and Mantine reads
+from `DatesProvider`, which was not mounted. Added to `AppProviders` with
+`locale: 'ro'`, `firstDayOfWeek: 1` and a Sat/Sun weekend, so a new date field
+cannot forget them.
+
+**Verified end to end against a real server:** fresh H2, first-run setup code
+from the log, enrolment through the UI, then products, clients, routes,
+employees, tasks and recurring plans all reading 200 with no CORS or normalise
+errors; a client created; an order created and rendered as **#33** with the date
+picked from the calendar. Backend **302 tests**; web typecheck, lint, build and
+**458 tests** green (the one failure is TODO-64's known `/comenzi` timeout).
+
+### TODO-69 `[ ]` Orders created before the numbering fix are still `#0`
+TODO-68 numbers orders from now on. It does not touch rows that already exist,
+so any database written before it has orders whose `number` is 0 — they all
+render as "#0" on Comenzi and sort arbitrarily under
+`findLiveBySubscriptionId`'s `ORDER BY o.number`.
+
+Nobody is running this in production yet, so the cheap answer is to drop the dev
+H2 file and start clean, and that is what makes this a `[ ]` rather than work
+already done. If any database is worth keeping by the time this is read, it
+needs a one-off `UPDATE orders SET number = id WHERE number = 0` — and there is
+no migration tool in this repo (`ddl-auto=update`, see *Known gaps*), so decide
+where such a statement is supposed to live before writing it.
+
 ### TODO-66 `[ ]` The map tiles stay light in dark mode
 Found during a browser pass over every screen in both themes. `MAP_STYLE_URL`
 points at one OpenFreeMap style, so in dark mode a bright white-and-green map

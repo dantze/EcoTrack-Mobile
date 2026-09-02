@@ -81,6 +81,51 @@ class OrderServiceTest {
     }
 
     // -----------------------------------------------------------------------
+    // TEST 1b — createOrder gives the order a human-facing number
+    // -----------------------------------------------------------------------
+    // Found by driving the real UI against a real backend: nothing assigned
+    // `number`, it is a primitive long, and so every order ever created through
+    // the app was #0 on the Comenzi table. Mock mode invents numbers in its
+    // seed, which is exactly why no screen and no test noticed.
+    @Test
+    void createOrder_shouldNumberTheOrder() {
+        AmplasareOrder order = new AmplasareOrder();
+        order.setOrderType("Amplasari");
+
+        when(clientRepository.findById(1L)).thenReturn(Optional.of(mockClient));
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> {
+            Order saved = inv.getArgument(0);
+            saved.setId(4242L);
+            return saved;
+        });
+
+        Order result = orderService.createOrder(1L, order);
+
+        assertThat(result.getNumber())
+                .as("an order the operator can refer to, not #0")
+                .isEqualTo(4242L);
+    }
+
+    // -----------------------------------------------------------------------
+    // TEST 1c — an explicit number survives
+    // -----------------------------------------------------------------------
+    @Test
+    void createOrder_shouldKeepANumberTheCallerSupplied() {
+        AmplasareOrder order = new AmplasareOrder();
+        order.setOrderType("Amplasari");
+        order.setNumber(77L);
+
+        when(clientRepository.findById(1L)).thenReturn(Optional.of(mockClient));
+        when(orderRepository.save(any(Order.class))).thenAnswer(inv -> {
+            Order saved = inv.getArgument(0);
+            saved.setId(4242L);
+            return saved;
+        });
+
+        assertThat(orderService.createOrder(1L, order).getNumber()).isEqualTo(77L);
+    }
+
+    // -----------------------------------------------------------------------
     // TEST 2 — createOrder links subscription for IgienizareOrder
     // -----------------------------------------------------------------------
     @Test

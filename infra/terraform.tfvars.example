@@ -1,0 +1,102 @@
+# =============================================================================
+# terraform.tfvars.example — copy to terraform.tfvars and fill in
+# =============================================================================
+#
+#   cd infra
+#   cp terraform.tfvars.example terraform.tfvars
+#
+# terraform.tfvars is gitignored. This template is not, so keep every real
+# value out of it.
+#
+# You do NOT need to fill in the whole file. Only gcp_project_id and
+# vercel_api_token have no default; everything else is commented out at the
+# value Terraform would use anyway.
+#
+# CI does not read this file at all — the workflow exports TF_VAR_* from GitHub
+# secrets so nothing secret is ever written to the runner's disk.
+
+# --- Required ----------------------------------------------------------------
+
+# The GCP project id, not its display name. Found under the project picker in
+# the console, or with: gcloud projects list
+gcp_project_id = "REPLACE-ME-my-gcp-project-id"
+
+# Create at https://vercel.com/account/tokens
+vercel_api_token = "REPLACE-ME-vercel-token"
+
+# --- Naming and location -----------------------------------------------------
+
+# project_name = "ecotrack"
+# environment  = "prod"
+
+# europe-west1 = Belgium. europe-central2 = Warsaw, closer to Romania; check it
+# carries Cloud Run and Cloud SQL before switching.
+# gcp_region = "europe-west1"
+# gcp_zone   = "europe-west1-b"
+
+# --- Database ----------------------------------------------------------------
+
+# db_name = "ecotrack"
+# db_user = "ecotrack"
+
+# LEAVE db_password UNSET. Terraform generates one, writes it to Secret Manager
+# and never prints it. Read it back with:
+#   gcloud secrets versions access latest --secret="$(terraform output -raw database_password_secret_id)"
+# db_password = ""
+
+# db-f1-micro is shared-core and carries no SLA. Fine for a first deploy, wrong
+# for real traffic.
+# db_tier              = "db-f1-micro"
+# db_availability_type = "ZONAL"
+# db_deletion_protection = true
+
+# --- Backend -----------------------------------------------------------------
+
+# 0 = scale to zero. Cheap, but a cold JVM makes the first request slow.
+# backend_min_instances = 0
+# backend_max_instances = 4
+# backend_cpu    = "1"
+# backend_memory = "1Gi"
+
+# Non-secret env for the container. ECOTRACK_CORS_ALLOWED_ORIGINS is computed
+# from the Vercel project name and any custom domains; setting it here overrides
+# that.
+# backend_env = {
+#   ECOTRACK_SECURITY_ENFORCE = "true"
+#   DO_SPACES_BUCKET          = "my-bucket"
+#   DO_SPACES_REGION          = "fra1"
+# }
+
+# Secret env. Each key becomes its own Secret Manager secret, readable only by
+# the Cloud Run runtime service account. Anything you put here is in your local
+# state file too, so prefer TF_VAR_backend_secrets from your shell.
+# backend_secrets = {
+#   DO_SPACES_ACCESS_KEY = "..."
+#   DO_SPACES_SECRET_KEY = "..."
+#   ECOTRACK_SETUP_CODE  = "..."
+# }
+
+# --- Frontend ----------------------------------------------------------------
+
+# vercel_project_name = "ecotrack-web"
+
+# Personal account: leave empty. Team: team_xxxxxxxx
+# vercel_team_id = ""
+
+# Connect the repo so Vercel builds on push. Empty = unconnected project, which
+# CI can still deploy to.
+# vercel_git_repository    = "dantze/Dami-Prod-EcoTrack"
+# vercel_production_branch = "main"
+
+# DNS must point at Vercel separately; Terraform only claims the domain.
+# web_custom_domains = ["app.example.ro"]
+
+# --- CI identity -------------------------------------------------------------
+
+# true writes a NEVER-EXPIRING service-account key into terraform.tfstate in
+# plaintext. Use it once to bootstrap GCP_CREDENTIALS_JSON, then prefer
+# Workload Identity Federation (infra/README.md).
+# create_deployer_key = false
+
+# Roles the deployer needs ONLY if you want CI to run `terraform apply` itself.
+# deployer_extra_roles = []

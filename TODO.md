@@ -3038,6 +3038,54 @@ pulls the rebuild and finds every import red. Worth deciding whether it earns a
 line in `README.md` next to the other setup steps, since the same trap is one
 `git pull` away for anyone who had `web/node_modules` from before the rebuild.
 
+
+### TODO-71 `[ ]` A second deploy target exists in `infra/` and is wired to nothing
+Scaffolded on request: Terraform for GCP (Cloud Run + Cloud SQL Postgres +
+Artifact Registry + Secret Manager + a least-privilege IAM pair) and Vercel (the
+`web/` SPA), plus `.github/workflows/deploy-cloud.yml`.
+
+`terraform fmt`, `init -backend=false` and `validate` all pass locally against
+the real provider schemas — google 6.50.0, vercel 3.17.0, random 3.9.0, resolved
+by Terraform 1.15.8 and pinned in `infra/.terraform.lock.hcl` for
+windows/linux/darwin. So the configuration is syntactically and schema-correct.
+**Nothing has been applied**, which is a different claim: there is no GCP
+project and no Vercel account, so no resource has ever been created and no
+`plan` has ever run against a real API.
+
+`deploy.yml` (VPS + Caddy) is untouched and is still the live deployment. The
+new workflow deliberately took a different filename rather than replacing it.
+
+**What has to be decided before any of it is trusted:**
+
+- **Is this replacing the VPS or sitting beside it?** Two live deployments mean
+  two databases and two truths about the same customers. If it replaces, there
+  is a data migration (H2/Postgres dump → Cloud SQL) that nothing here covers.
+- **State is local.** `infra/providers.tf` has no `backend` block, so the
+  workflow's `apply` would start from empty state on every run and fail on the
+  second. A GCS bucket must exist and be wired in first; the workflow prints a
+  warning until it is.
+- **The identity that runs `terraform apply` in CI needs near-owner rights**,
+  which is a strictly bigger grant than the deployer service account Terraform
+  creates. `infra/README.md` lays out three options; none is chosen.
+- **CORS becomes load-bearing.** On the VPS, Caddy serves the SPA and the API
+  from one origin, so the browser never makes a cross-origin call. Split across
+  Cloud Run and Vercel it does. `main.tf` computes
+  `ECOTRACK_CORS_ALLOWED_ORIGINS` from the Vercel project name, which is a
+  guess at the deterministic `*.vercel.app` alias — a custom domain or a renamed
+  project silently breaks the frontend while the backend stays healthy.
+- **Task photos still go to DigitalOcean Spaces.** Nothing GCS-shaped is
+  scaffolded; the `DO_SPACES_*` values would have to be passed through
+  `backend_env` / `backend_secrets`, which means the "GCP deployment" still
+  depends on a DigitalOcean bucket.
+- **`mobile/` is not covered.** It ships through EAS and would need
+  `EXPO_PUBLIC_API_BASE_URL` repointed at the Cloud Run URL — and the hardcoded
+  `http://146.190.224.202:8080/api` fallback in `constants/ApiConfig.ts` is
+  still what installed builds fall back to.
+
+Also unresolved: no monitoring or alerting, no rate limiting in front of Cloud
+Run, and `db-f1-micro` is shared-core with no SLA, so the default tier is a
+first-deploy choice rather than a production one.
+
 ---
 
 ## Appendix — current state (context)
@@ -3050,5 +3098,7 @@ line in `README.md` next to the other setup steps, since the same trap is one
 - **Mobile:** enrollment shipped (TODO-19) — **the app can authenticate again**.
   Sales and Technical sections still present; TODO-33 plans to remove them.
 - **Deploy:** `deploy.yml` (backend + web to VPS, one domain via Caddy) and
-  `deploy-mobile.yml` (EAS OTA + builds). See `DEPLOYMENT.md`.
+  `deploy-mobile.yml` (EAS OTA + builds). See `DEPLOYMENT.md`. `infra/` plus
+  `deploy-cloud.yml` scaffold a second, **unused** target (Cloud Run + Cloud SQL
+  + Vercel) that has never been run — TODO-71.
 - **No users and no server exist yet**, so nothing here needs a migration path.

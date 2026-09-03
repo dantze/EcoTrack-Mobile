@@ -23,6 +23,19 @@ on purpose and runs on every PR; it is the only check that covers files no
 project workflow watches. `audit.yml` is scheduled, not a PR gate. See the
 `verify` skill for which checks a given diff actually needs.
 
+**`infra/` is a SECOND deploy target that has never been run.** Terraform for
+GCP (Cloud Run + Cloud SQL + Artifact Registry + Secret Manager) and Vercel,
+driven by `.github/workflows/deploy-cloud.yml`, with `ci-infra.yml` as its
+path-filtered gate (`terraform fmt` + `validate`, no credentials needed). There
+is no GCP project and no Vercel account yet, so none of it has been applied.
+`deploy.yml` — VPS, docker compose, Caddy — is still the live deployment, and
+the two are unrelated. The one difference that reaches application code: on the
+VPS the SPA and the API share an origin, so CORS is inert; split across Cloud
+Run and Vercel it is not, which is why `main.tf` sets
+`ECOTRACK_CORS_ALLOWED_ORIGINS`. TODO-71 lists what must be decided first —
+starting with the fact that Terraform state is local, so the workflow's `apply`
+would fail on its second run.
+
 ## Commands
 
 Always run these from the project subdirectory, not the repo root.

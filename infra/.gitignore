@@ -1,0 +1,27 @@
+# Terraform working files. Nothing in here belongs in git.
+
+# State. It is LOCAL (no backend block in providers.tf) and it contains every
+# value Terraform has ever read or generated - including the database password
+# and, if create_deployer_key is on, a service-account private key. Committing
+# it publishes them.
+*.tfstate
+*.tfstate.*
+.terraform.tfstate.lock.info
+
+# Provider plugins and module cache - hundreds of MB, re-fetched by `init`.
+.terraform/
+
+# Real variable values. terraform.tfvars.example is the committed template;
+# terraform.tfvars is yours and holds the Vercel token.
+*.tfvars
+*.tfvars.json
+!*.tfvars.example
+
+# Saved plans embed variable values, secrets included.
+*.tfplan
+tfplan
+crash.log
+crash.*.log
+
+# .terraform.lock.hcl is deliberately NOT ignored: it pins provider versions
+# and hashes, so CI resolves exactly what you resolved.

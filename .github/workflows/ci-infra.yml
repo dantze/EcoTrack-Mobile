@@ -1,0 +1,104 @@
+name: CI Infra
+
+# PATH FILTERING IS LOAD-BEARING — see the note in ci-backend.yml.
+#
+# The fourth ci-*.yml, and it exists for the same reason as the other three:
+# repo-hygiene.yml fails any changed path that no `paths:` filter watches, so
+# `infra/` without this file would be a directory that ships Terraform nobody
+# checks. It is also the only check `infra/` gets — deploy-cloud.yml runs plan
+# and apply, but that needs real GCP and Vercel credentials, so it cannot be a
+# pull-request gate.
+on:
+  pull_request:
+    paths:
+      - 'infra/**'
+      - '.github/workflows/ci-infra.yml'
+  push:
+    branches: [main]
+    paths:
+      - 'infra/**'
+      - '.github/workflows/ci-infra.yml'
+  # deploy-cloud.yml can call this as a gate once infra/ is live.
+  workflow_call:
+
+concurrency:
+  group: ci-infra-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    working-directory: infra
+
+jobs:
+  validate:
+    name: Format and validate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: '1.15.8'
+          terraform_wrapper: false
+
+      - name: Terraform fmt
+        run: terraform fmt -check -recursive -diff
+
+      # -backend=false is what makes this runnable with NO credentials: it
+      # downloads the providers so their schemas can be checked, without
+      # touching state or contacting GCP or Vercel. `validate` then catches the
+      # things that actually break an apply — a misspelled attribute, a wrong
+      # type, a reference to a resource that does not exist.
+      - name: Terraform init
+        run: terraform init -backend=false -input=false
+
+      - name: Terraform validate
+        run: terraform validate -no-color
+
+      # Every variable holding a credential must be marked sensitive, or its
+      # value is printed in plan output and in the Actions log. Cheap to check,
+      # and the failure mode is a token in a public log.
+      - name: Sensitive variables are marked sensitive
+        run: |
+          MISSING=0
+          for NAME in gcp_credentials_json vercel_api_token db_password backend_secrets; do
+            # Pull the variable block and check for `sensitive = true` in it.
+            BLOCK=$(awk -v v="variable \"$NAME\"" '
+              index($0, v) == 1 { inblock = 1 }
+              inblock { print }
+              inblock && /^}/ { inblock = 0 }
+            ' variables.tf)
+            if [ -z "$BLOCK" ]; then
+              echo "::error file=infra/variables.tf::variable \"$NAME\" is missing."
+              MISSING=1
+            elif ! echo "$BLOCK" | grep -q 'sensitive *= *true'; then
+              echo "::error file=infra/variables.tf::variable \"$NAME\" holds a credential but is not marked sensitive = true; its value would be printed in plan output."
+              MISSING=1
+            fi
+          done
+          exit $MISSING
+
+      # The scaffold's promise is that nothing sensitive is hardcoded. A literal
+      # project id or token in a .tf file is the one regression that would make
+      # the whole directory unsafe to publish.
+      - name: No hardcoded credentials
+        run: |
+          # Any credential-shaped ATTRIBUTE assigned a literal string. A var or
+          # a local reference is unquoted (`password = local.db_password`), so
+          # this fires only on the thing it is meant to catch.
+          if grep -nE '^[[:space:]]*(credentials|api_token|password|secret_data|private_key|token|project|project_id|team)[[:space:]]*=[[:space:]]*"' ./*.tf; then
+            echo "::error file=infra/variables.tf::a .tf file assigns a literal to a credential attribute. Move it to a variable — see the rule at the top of variables.tf."
+            exit 1
+          fi
+
+          if grep -nE '(AIza[0-9A-Za-z_-]{35}|-----BEGIN [A-Z ]*PRIVATE KEY-----)' ./*.tf; then
+            echo "::error file=infra/::a .tf file contains key material."
+            exit 1
+          fi
+
+          echo "No literal credentials found."

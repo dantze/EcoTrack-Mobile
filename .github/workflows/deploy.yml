@@ -99,7 +99,7 @@ jobs:
 
       - name: Deploy Docker stack to VPS
         if: steps.gate.outputs.enabled == 'true'
-        uses: appleboy/ssh-action@v1.0.3
+        uses: appleboy/ssh-action@v1.2.5
         env:
           DB_NAME: ${{ secrets.DB_NAME }}
           DB_USER: ${{ secrets.DB_USER }}

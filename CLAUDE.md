@@ -544,11 +544,16 @@ Same rule as the map, in the other direction: `src/lib/geocoding.ts` keeps our
 bearer token off someone else's host; this keeps someone else's host out of our
 scanner.
 
-**One follow-up is still open.** The `individual.id_photo_url` column survives
-on purpose — it is the only record of the keys of objects already in Spaces, so
-they must be drained before the column can go (TODO-45). The objects sit under
-the prefix **`persoane fizice/`**; `DEPLOYMENT.md` has both the purge endpoint
-and a bucket check that needs no running server.
+**That follow-up is closed** (TODO-45). `Individual.idPhotoUrl`,
+`IndividualRepository` and the `/api/admin/id-photos` purge endpoint are
+deleted: the owner confirmed no photos were ever uploaded, and no committed
+database ever held a stored URL. **One thing was deliberately kept — the
+prefix.** ID photos were written under **`persoane fizice/`**, with the space,
+and `DEPLOYMENT.md` still carries it with a keys-only `aws s3 ls`. That is what
+makes a stray object findable now that nothing in the database points at one; it
+is the safety net that made deleting the column acceptable. The database COLUMN
+still exists — `ddl-auto=update` never drops — and the manual DDL is in
+`DEPLOYMENT.md` too.
 
 **Task photos are private objects, served as presigned URLs** (TODO-46).
 `PhotoService.uploadPhoto` writes `ObjectCannedACL.PRIVATE`, and
@@ -623,12 +628,11 @@ Deliberate or unresolved; do not assume these are safe.
   `deploy-mobile.yml` runs `build-production`, installed builds keep the old
   binary — including its Sales and Technical screens, which still talk to a
   backend that will happily serve an office role.
-- **`individual.id_photo_url` outlives the feature that filled it.** ID photos
-  are no longer stored (TODO-14), but the column is kept until
-  `DELETE /api/admin/id-photos` has drained the objects it points at on every
-  environment — it is the only record of their keys. It is `@JsonIgnore`d, so
-  nothing reads it but the purge. Drop it, and `AdminIdPhotoController` with
-  it, per TODO-45.
+- **The `individual.id_photo_url` COLUMN outlives the field that mapped it.**
+  The Java side is gone (TODO-45) but `ddl-auto=update` never drops, so the
+  column sits in H2 and in Postgres like the orphaned `intake_message` /
+  `order_draft` tables above. Nothing reads or writes it. `DEPLOYMENT.md` has
+  the `ALTER TABLE` and the bucket check to run first.
 - `mobile/constants/ApiConfig.ts` reads `EXPO_PUBLIC_API_BASE_URL` and falls
   back to the old hardcoded `http://146.190.224.202:8080/api`. The fallback is
   load-bearing for installed builds; compose still publishes 8080 for them.

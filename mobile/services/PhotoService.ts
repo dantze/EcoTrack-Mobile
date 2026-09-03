@@ -8,10 +8,12 @@ export const PhotoService = {
 
     // uploadIdPhoto / deleteIdPhoto / getAllPhotos lived here (TODO-14).
     //
-    // The first two called POST and DELETE /{clientId}/idPhoto, which no
-    // longer exist: EcoTrack does not store photographs of identity documents
-    // any more. Scanning moved to the web app with the rest of Sales (TODO-33),
-    // where it also reads the card in the browser and keeps nothing.
+    // The first two called POST and DELETE on the client's ID photo route,
+    // which no longer exists: EcoTrack does not store photographs of identity
+    // documents any more. Scanning moved to the web app with the rest of Sales
+    // (TODO-33), where it also reads the card in the browser and keeps nothing.
+    // The objects those uploads created have since been drained and the column
+    // that recorded them is gone (TODO-45).
     //
     // getAllPhotos called GET /api/photos, which listed the ENTIRE bucket to
     // any authenticated employee - while ID photos were stored, that was one

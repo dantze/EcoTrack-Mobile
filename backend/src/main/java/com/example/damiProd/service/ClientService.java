@@ -83,7 +83,6 @@ public class ClientService {
     }
 
     public void deleteClient(Long id) {
-        deleteClientIdPhoto(id);
         clientRepository.deleteById(id);
     }
 
@@ -115,28 +114,11 @@ public class ClientService {
             orderRepository.delete(order);
         }
         orderRepository.flush();
-        // Delete client's ID photo from Digital Ocean Spaces
-        deleteClientIdPhoto(id);
+        // deleteClientIdPhoto(id) was called here and above, deleting the
+        // client's stored identity document from Spaces before the row that
+        // referenced it went. Nothing stores one any more (TODO-14) and the
+        // legacy objects are drained (TODO-45), so there is nothing to delete.
+        // Task photos above are a different thing and still cascade.
         clientRepository.deleteById(id);
-    }
-
-    /**
-     * Deletes the ID photo of an Individual client from Digital Ocean Spaces.
-     *
-     * <p>An ID photo is personal data, so a failure here is louder than a task
-     * photo's: the client row is deleted immediately after, and with it the only
-     * link between that person and the object still sitting in the bucket
-     * (TODO-25, and see TODO-14 on why those photos must not linger at all).
-     */
-    private void deleteClientIdPhoto(Long clientId) {
-        clientRepository.findById(clientId).ifPresent(client -> {
-            if (client instanceof Individual individual) {
-                String photoUrl = individual.getIdPhotoUrl();
-                if (photoUrl != null && !photoUrl.isEmpty() && !photoService.deletePhoto(photoUrl)) {
-                    log.error("Orphaned ID photo {} for client {} — personal data left in storage "
-                            + "with the row that referenced it now gone", photoUrl, clientId);
-                }
-            }
-        });
     }
 }

@@ -137,34 +137,11 @@ class AuthorizationMatrixTest {
                 .andExpect(status().isForbidden());
     }
 
-    /**
-     * The legacy ID-photo purge (TODO-14) needs no matcher row of its own - it
-     * sits under /api/admin/** and inherits ADMIN. That is exactly why it is
-     * asserted here: it deletes personal data in bulk and its protection is
-     * entirely inherited, so nothing about the endpoint itself would fail if the
-     * path were ever moved out from under the admin prefix.
-     */
-    @Test
-    void onlyAdmin_mayPurgeLegacyIdPhotos() throws Exception {
-        mockMvc.perform(delete("/api/admin/id-photos")
-                        .header("Authorization", "Bearer " + driverToken))
-                .andExpect(status().isForbidden());
-
-        mockMvc.perform(delete("/api/admin/id-photos")
-                        .header("Authorization", "Bearer " + salesToken))
-                .andExpect(status().isForbidden());
-
-        mockMvc.perform(get("/api/admin/id-photos")
-                        .header("Authorization", "Bearer " + salesToken))
-                .andExpect(status().isForbidden());
-
-        // Admin reaches the handler. Nothing is stored in a fresh test database,
-        // so this is a no-op purge that reports zero - which is the assertion:
-        // it got past the filter chain.
-        mockMvc.perform(get("/api/admin/id-photos")
-                        .header("Authorization", "Bearer " + adminToken))
-                .andExpect(status().isOk());
-    }
+    // onlyAdmin_mayPurgeLegacyIdPhotos covered DELETE/GET /api/admin/id-photos,
+    // the one-time drain of the ID photos EcoTrack used to store. The drain is
+    // done and the endpoint is deleted (TODO-45). The property it asserted -
+    // that a path under /api/admin/** inherits ADMIN with no matcher row of its
+    // own - is still covered by the other cases in this class.
 
     // ---------------------------------------------------------------------
     // Business writes: office staff only.

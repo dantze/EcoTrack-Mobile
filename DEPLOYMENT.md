@@ -141,58 +141,55 @@ docker compose up -d --build
 ```
 → `https://localhost` (self-signed warning expected).
 
-## Draining the legacy ID photos (one time, per environment)
+## Legacy ID photos — drained, and how to check anyway
 
-EcoTrack no longer stores photographs of identity documents (TODO-14). The
-upload endpoints are deleted, but **objects uploaded by earlier builds are still
-in Spaces**, and `individual.id_photo_url` is the only record of their keys.
-They were written with a public-read ACL, so each one is a working
-unauthenticated URL to a scan of someone's identity card.
+EcoTrack no longer stores photographs of identity documents (TODO-14), and as of
+TODO-45 nothing records that it once did: `Individual.idPhotoUrl`,
+`IndividualRepository` and the `/api/admin/id-photos` purge endpoint are all
+deleted. The owner confirmed no photos were ever uploaded — the app has not left
+development — and no committed database ever held a single stored URL.
 
-This is an operator step on purpose — a deploy must not delete production data
-as a side effect of somebody merging. Run it as ADMIN after the release lands:
-
-```bash
-# how many are left, and whose (ids only, never the URLs)
-curl -H "Authorization: Bearer $ADMIN_TOKEN" https://<domain>/api/admin/id-photos
-
-# delete the objects and clear the column
-curl -X DELETE -H "Authorization: Bearer $ADMIN_TOKEN" https://<domain>/api/admin/id-photos
-```
-
-Repeat the DELETE until `failed` is 0 and the GET reports `remaining: 0`. A row
-whose object could not be deleted **keeps** its URL so the next run retries it —
-that is deliberate, because clearing it would destroy the last reference to an
-object still holding personal data.
-
-Once every environment reports zero, the column, `AdminIdPhotoController` and
-this section all go (TODO-45).
-
-### If there is no running server to ask
-
-The purge above needs a deployed app, and as of writing the deploy has never
-succeeded (TODO-32). That does **not** mean there is nothing to drain: earlier
-builds ran against the old `146.190.224.202` droplet, and the column is only a
-record of keys — the objects outlive it.
-
-Check the bucket directly instead. It needs the Spaces keys and nothing else:
+**One thing survives that deletion on purpose: the prefix.** ID photos were
+written under **`persoane fizice/`, with the space** — recovered from
+`PhotosController.clientIdsFolderName` before that class was deleted, and never
+written down anywhere else. It is kept here because it is what makes the check
+below possible now that the column is gone: an object can still be found by
+prefix even though nothing in the database points at it. Task photos live under
+a different prefix and must be left alone.
 
 ```bash
 # DigitalOcean Spaces is S3-compatible; use the region endpoint from .env.
+# Needs the Spaces keys and nothing else — no running server.
 aws s3 ls "s3://$DO_SPACES_BUCKET/persoane fizice/" \
     --endpoint-url "https://$DO_SPACES_REGION.digitaloceanspaces.com" \
     --recursive --human-readable --summarize
 ```
 
-**`persoane fizice/` — with the space — is the prefix ID photos were written
-under**, from `PhotosController.clientIdsFolderName` before that class was
-deleted. Task photos are a different prefix and must be left alone.
+Expected: nothing. **If it ever lists objects**, they are scans of identity
+documents written with a public-read ACL — a working unauthenticated URL each —
+and nothing in the application can find or delete them any more. Delete them
+with the keys directly:
 
-If that lists nothing, there is nothing to drain and TODO-45's step 1 is
-satisfied *for that bucket*; record which bucket was checked. If it lists
-objects, delete them (`aws s3 rm` with the same `--endpoint-url`, or the purge
-endpoint once a server exists) before dropping the column — dropping it first
-strands them permanently.
+```bash
+aws s3 rm "s3://$DO_SPACES_BUCKET/persoane fizice/" \
+    --endpoint-url "https://$DO_SPACES_REGION.digitaloceanspaces.com" --recursive
+```
+
+### Dropping the column
+
+`ddl-auto=update` never drops anything, so `individual.id_photo_url` outlives
+the field that mapped it — in H2 and in Postgres, exactly like the orphaned
+`intake_message` / `order_draft` tables from TODO-15. Nothing reads it and
+nothing writes it, so this is tidiness rather than a fix. Per environment:
+
+```sql
+ALTER TABLE individual DROP COLUMN id_photo_url;
+```
+
+The local H2 file is `backend/data/damiprod`; on the VPS, `docker compose exec
+-T postgres psql -U "$DB_USER" -d "$DB_NAME"`. Run the bucket check above first
+if it has not been run for that environment — the column is the last thing that
+would have told you which objects existed.
 
 ## Task photos are private (one-time ACL fix for old objects)
 

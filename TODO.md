@@ -36,7 +36,6 @@ unless its status says otherwise.
 The whole of what is left, in one place. Everything not listed here is `[DONE]`.
 
 - **TODO-17** `[POSTPONED]` — All other AI ideas *(F)*
-- **TODO-45** `[ ]` — Drop `individual.id_photo_url` once every environment is drained *(E)*
 - **TODO-72** `[ ]` — Installed phones need a rebuild, and the Maps key needs revoking *(G)*
 - **TODO-74** `[ ]` — `DataLoader` seeds every test context, and no test asks it to *(J)*
 - **TODO-75** `[ ]` — The web bundle falls back to the dead droplet, over plain HTTP *(G)*
@@ -120,7 +119,7 @@ full text lives further down.
 | TODO-42 | `[DONE]` | C | `/tasks/order/{id}/exists` is not row-scoped |
 | TODO-43 | `[DONE]` | C | Comenzi asks for one order's task status per order |
 | TODO-44 | `[DONE]` | G | `doc_claims.py` resolved paths with the OS separator |
-| TODO-45 | **`[ ]`** | E | Drop `individual.id_photo_url` once every environment is drained |
+| TODO-45 | `[DONE]` | E | Drop `individual.id_photo_url` once every environment is drained |
 | TODO-46 | `[DONE]` | E | Task photos are still uploaded with a public-read ACL |
 | TODO-47 | `[DONE]` | G | `bundle_budget.py` counts lazy chunks named `index-*` as eager |
 | TODO-48 | **`[ ]`** | G | `bootNavigation.test.tsx` fails on Node 24 |
@@ -1654,7 +1653,7 @@ change and not what this item asked for.
   check, the MRZ regexes are linear, and no user string reaches `innerHTML`.
   **The scan is still owed.**
 
-### TODO-45 `[ ]` Drop `individual.id_photo_url` once every environment is drained
+### TODO-45 `[DONE]` Drop `individual.id_photo_url` once every environment is drained
 TODO-14 stopped storing ID photos but deliberately kept the column, because it
 is the only remaining record of the keys of objects already in Spaces. Dropping
 it before deleting them would strand personal data in a bucket that nothing knows
@@ -1699,6 +1698,79 @@ did not is exactly the assumption this item exists to forbid.
 **So the remaining work is one decision by whoever holds the Spaces keys:** run
 the `aws s3 ls` above, note which bucket was checked, and either delete what it
 lists or confirm it is empty. Steps 2 and 3 are then mechanical and safe.
+
+**Done. Step 1 confirmed by the owner, steps 2 and 3 carried out — and one thing
+was kept back that this item did not anticipate, because it is what makes the
+irreversible half safe.**
+
+**Step 1 — the confirmation, and what it rests on.** The owner confirmed no
+photos were ever uploaded: the app has not left development. That is a statement
+rather than a bucket listing, so here is the corroboration gathered before
+asking, which is the part worth keeping:
+
+*Every committed H2 database has the column and not one stored URL.* Three
+versions were extracted from git history — the largest, `c756579` (106 KB),
+`8469873` (94 KB) and the last one before `e9f15d4` untracked the file — and
+scanned for readable strings. All three carry `"ID_PHOTO_URL" CHARACTER
+VARYING(255)` in the schema and **zero** occurrences of `digitaloceanspaces`,
+`persoane fizice`, `poze cabine` or even a bare `http://`.
+
+*And that absence means something,* which is the half a naive scan gets wrong:
+row VALUES are readable in those same files — coordinates, ISO dates, phone
+numbers, `Amplasari`, `Strada Fabricii 115, Cluj-Napoca, România`. So the
+missing URLs are missing, not compressed out of reach. No photo of any kind was
+ever uploaded from the developer database — task photos included.
+
+*What that does not cover,* stated plainly because it is the residual risk: the
+old `146.190.224.202` droplet had its own database, which was never committed.
+The S3 client is built lazily and `spaces.*` default to empty strings, so the
+app boots without credentials and "the droplet ran" implies nothing either way.
+Installed mobile builds pointed at that droplet and mobile's `CreateClient` was
+the screen that uploaded ID photos, so *if* that droplet had `DO_SPACES_*` set,
+objects could exist. The owner's answer is what closes that gap.
+
+**The hedge, and why it changes the risk calculus.** When this item was written,
+the column was *the only* record of those object keys — which is what made
+dropping it irreversible in the bad sense. It is not any more: this item itself
+recovered the prefix (`persoane fizice/`, with the space) from
+`PhotosController.clientIdsFolderName` in `e55eb41~1`, and `DEPLOYMENT.md`
+carries a keys-only `aws s3 ls` against it. **So the prefix was deliberately
+NOT deleted with the rest of the section.** An object can still be found by
+prefix listing even though nothing in the database points at one, which turns
+"strand personal data forever" back into "run one command". That is the
+difference between doing this now and waiting for a bucket listing nobody can
+produce.
+
+**Step 2 — deleted:** `Individual.idPhotoUrl` and its `@JsonIgnore` import,
+`IndividualRepository` (whole file — its javadoc said "nothing else should
+acquire a dependency on it", and nothing had), `AdminIdPhotoController` and
+`AdminIdPhotoControllerTest` (whole files), the `onlyAdmin_mayPurgeLegacyIdPhotos`
+case in `AuthorizationMatrixTest`, the `idPhotoUrl` assertions in
+`ClientJsonSubTypesTest`, and `ClientService.deleteClientIdPhoto` with both its
+call sites in `deleteClient` / `deleteClientCascade`.
+
+Two things checked rather than assumed while doing it: `PhotoService.deletePhoto`
+stays — it is also how the task-photo cascade deletes objects — and
+`ClientService` still needs its `Individual` import and its `photoService` field
+for that cascade, so neither became dead.
+
+The matrix case was the one worth pausing on. It asserted that a path under
+`/api/admin/**` inherits ADMIN with no matcher row of its own; that property
+survives, covered by the other cases in the class, so what went was the example
+and not the guarantee. A comment in its place says so.
+
+**Step 3 — NOT run, and it cannot be.** `ddl-auto=update` never drops, so the
+`individual.id_photo_url` COLUMN outlives the field. There is no environment to
+run it against and no migration tool to carry it, so it is written down instead:
+`DEPLOYMENT.md` has the `ALTER TABLE individual DROP COLUMN id_photo_url` with
+where to run it for H2 and for Postgres, and CLAUDE.md's Known gaps now names
+the column rather than the field. Nothing reads or writes it, so this is
+tidiness, not correctness — the same standing as the orphaned `intake_message` /
+`order_draft` tables from TODO-15.
+
+**Verified**: `./gradlew build` green, 309 tests (was 314 — the five removed are
+`AdminIdPhotoControllerTest`'s four plus the matrix case), and every backticked
+path in CLAUDE.md and the skills still resolves.
 
 ### TODO-46 `[DONE]` Task photos are still uploaded with a public-read ACL
 `PhotoService.uploadPhoto` sets `ObjectCannedACL.PUBLIC_READ`, so every object it

@@ -36,10 +36,10 @@ unless its status says otherwise.
 The whole of what is left, in one place. Everything not listed here is `[DONE]`.
 
 - **TODO-17** `[POSTPONED]` — All other AI ideas *(F)*
-- **TODO-32** `[ ]` — Deploy fails at the SSH step — the VPS is unreachable *(G)*
 - **TODO-45** `[ ]` — Drop `individual.id_photo_url` once every environment is drained *(E)*
 - **TODO-72** `[ ]` — Installed phones need a rebuild, and the Maps key needs revoking *(G)*
 - **TODO-74** `[ ]` — `DataLoader` seeds every test context, and no test asks it to *(J)*
+- **TODO-75** `[ ]` — The web bundle falls back to the dead droplet, over plain HTTP *(G)*
 - **TODO-73** `[ ]` — `AccessRequestsPage` paints with tokens that do not exist *(J)*
 - **TODO-48** `[ ]` — `bootNavigation.test.tsx` fails on Node 24 *(G)*
 - **TODO-50** `[ ]` — Nothing checks that the index at the top of TODO.md is true *(G)*
@@ -107,7 +107,7 @@ full text lives further down.
 | TODO-29 | `[DONE]` | G | Nothing validates the docker-compose files |
 | TODO-30 | `[DONE]` | A | There is no recovery path when the last admin loses their session |
 | TODO-31 | `[DONE]` | J | The backend test suite shares one database across classes |
-| TODO-32 | **`[ ]`** | G | Deploy fails at the SSH step — the VPS is unreachable |
+| TODO-32 | `[DONE]` | G | Deploy fails at the SSH step — the VPS is unreachable |
 | TODO-33 | `[DONE]` | H | Make the web app responsive, and move Sales + Technical out of mobile |
 | TODO-34 | `[DONE]` | C | `/tasks/order/{id}/exists` returns one task, but the guard rolls up all of them |
 | TODO-35 | `[DONE]` | H | Role changes on the web never reach the phone |
@@ -149,6 +149,7 @@ full text lives further down.
 | TODO-72 | **`[ ]`** | G | Installed phones need a rebuild, and the Maps key needs revoking |
 | TODO-73 | **`[ ]`** | J | `AccessRequestsPage` paints with tokens that do not exist |
 | TODO-74 | **`[ ]`** | J | `DataLoader` seeds every test context, and no test asks it to |
+| TODO-75 | **`[ ]`** | G | The web bundle falls back to the dead droplet, over plain HTTP |
 
 ---
 
@@ -2020,7 +2021,7 @@ these files are deliberately covered by the unfiltered workflow instead. The
 comment there no longer says "covered, partially" — it now says what actually
 runs.
 
-### TODO-32 `[ ]` Deploy fails at the SSH step — the VPS is unreachable
+### TODO-32 `[DONE]` Deploy fails at the SSH step — the VPS is unreachable
 Found on the push of TODO-22 (`a95825b`). **Not a test failure**, though it reads
 like one: both gates (`verify-backend`, `verify-web`) went green — the `deploy`
 job `needs:` them, so it only started because they passed — and then died on its
@@ -2063,6 +2064,80 @@ Options, none chosen:
 Decide after establishing whether a VPS is meant to exist right now. If one is
 provisioned, this closes by fixing the host/firewall/secret and nothing in the
 repo changes.
+
+**Done — the first option, plus half of the second, because they compose.**
+
+**The fact was established first, and it is the one the repo already implied:
+there is no VPS.** Confirmed by the owner. Nothing here could settle it —
+`SERVER_IP` and `DOMAIN_NAME` are secrets, `gh` is not installed on this
+machine, and every URL in `DEPLOYMENT.md` is still a `<domain>` placeholder. So
+the question was asked rather than guessed: gating a deploy that actually works
+would have stopped production silently, which is the one outcome worse than a
+red `main`.
+
+**The gate is on the STEP, not the job.** `if: vars.DEPLOY_ENABLED == 'true'` on
+the job would have worked, but a skipped job is a job that is not there, and the
+absence of a deploy is exactly the thing that should be loud while it is
+switched off. Instead the job runs, a first step decides, and the SSH step is
+conditional on its output — so every push gets a green *Deploy stack* job whose
+log carries a `::warning::` saying no server is configured, that the gates
+passed, and which repository variable turns it back on.
+
+**`workflow_dispatch` deliberately bypasses the variable.** That folds in the
+second option from the list above — "deploying is a deliberate button press
+until a server exists" — without paying its cost, which was losing the `push:`
+trigger and with it the gates. Pressing *Run workflow* attempts the SSH whatever
+the variable says, and fails loudly if the host is wrong. That is the correct
+behaviour when what you are testing IS the host.
+
+A repository **variable**, not a secret, for a mechanical reason as well as a
+sensitivity one: `vars` can be read in an `if:` and `secrets` cannot, which is
+why the obvious `if: secrets.SERVER_IP != ''` is not available and would need a
+wrapper job to launder the secret into an output.
+
+The value is passed into the shell through `env:` rather than spliced in with
+`${{ }}`. Not because a repository variable is attacker-controlled — it is not —
+but because `deploy-mobile.yml` states that rule for the commit message next
+door, and a workflow that follows its own convention only sometimes is worse
+than one that does not have it.
+
+**Verified**: all nine workflow files parse (the check `repo-hygiene.yml` runs,
+re-run here with a real YAML parser since this machine has no `python3` — see
+TODO-68), the `deploy` job has the gate step and the conditional SSH step, both
+triggers survive, and the gate's shell was run through all five branches:
+unset/push and `false`/push skip; `true`/push, unset/dispatch and
+`true`/dispatch deploy.
+
+**`DEPLOYMENT.md` carries the reversal**, since that is where someone will look:
+a note under Triggers saying the deploy is off and how to turn it on,
+`DEPLOY_ENABLED` in the Variables block, and — new — the diagnosis this item
+worked out in the first place, written into the VPS section so it is not
+re-derived from scratch: an `i/o timeout` is a DROP (missing host, powered-off
+host, firewall) while `connection refused` is an answering host with no sshd on
+22, and `***` in the log means the secret has a value.
+
+**`deploy-cloud.yml` was checked and needed nothing.** It triggers on push for
+`backend/**`, `web/**`, `shared/**` and `infra/**` — an overlapping set, so it
+would have undone this fix by turning `main` red on the same commits. It does
+not: it already opens with a `preflight` job that checks whether its GCP and
+Vercel secrets are present and gates every later job on the answer, so an
+unconfigured repo skips it. TODO-71's "never been run" is a statement about
+credentials, not about noise.
+
+That shape was considered here and does not fit, which is worth writing down
+because it is the obvious first idea: a preflight keying on `secrets.SERVER_IP`
+would not skip anything, because `SERVER_IP` **is** set — GitHub printed `***`
+for it, which it only does for a secret with a value. The secret is fine; the
+machine is missing, and no secret-presence check can express that. Hence an
+explicit switch rather than an inferred one. (deploy-cloud's comment also
+independently confirms the mechanical half: it says it has to be a job rather
+than a job-level `if:` precisely because `secrets` is unavailable there.)
+
+**Nothing about the repo asserts a server exists**, so the appendix line "No
+users and no server exist yet" stands and is still true.
+
+*Found while doing this and left alone: the web bundle's dead-droplet fallback —
+TODO-75.*
 
 ### TODO-40 `[DONE]` Three cross-cutting guard scripts
 Cross-project facts that no toolchain checks, because the values are duplicated
@@ -3250,6 +3325,42 @@ line in `README.md` next to the other setup steps, since the same trap is one
 
 
 
+
+
+### TODO-75 `[ ]` The web bundle falls back to the dead droplet, over plain HTTP
+`web/src/lib/config.ts` ends with
+
+```ts
+export const API_BASE_URL: string =
+  import.meta.env.VITE_API_BASE_URL ?? 'http://146.190.224.202:8080/api';
+```
+
+That droplet is gone — it is the same host TODO-32 is about, and `mobile/.env.example`
+already describes it as "a droplet that no longer answers".
+
+It is latent rather than live: `web/Dockerfile` sets `VITE_API_BASE_URL=/api`
+explicitly, so the production bundle never reaches the fallback, and in mock
+mode the value is unused. It fires only in a live-mode build that forgot the
+variable — and then it is worse than a plain failure, because the page is served
+over HTTPS and the fallback is `http://`, so the browser blocks it as mixed
+content and the app fails with a console error rather than a network one.
+
+The fix is one line: default to `'/api'`. Same-origin is what the deployment
+actually is (Caddy serves the SPA and proxies `/api` on one domain), so a
+relative default cannot be wrong there, and a live build outside that setup would
+fail against its own origin — a much easier thing to diagnose than a stranger's
+IP appearing in the network tab.
+
+Not done inside TODO-32 because that item is about the deploy workflow and this
+is application code; folding a behaviour change into a workflow diff hides it.
+
+**Mobile's identical-looking fallback is NOT the same case and must not be
+"fixed" alongside it.** `mobile/constants/ApiConfig.ts` keeps the bare IP
+deliberately: it is what already-installed builds resolve to, and Expo inlines
+`EXPO_PUBLIC_*` at build time so those binaries cannot be repointed without a
+rebuild (see the Known gaps section of CLAUDE.md, and TODO-72).
+
+*Found while doing TODO-32.*
 
 ### TODO-74 `[ ]` `DataLoader` seeds every test context, and no test asks it to
 Found while doing TODO-31, which had to establish what was actually in a test

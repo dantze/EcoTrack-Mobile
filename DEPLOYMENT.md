@@ -4,11 +4,25 @@
 
 | Change | Do this | Result |
 |---|---|---|
-| `backend/**` or `web/**` | merge to `main` | VPS rebuilds stack, live over HTTPS |
+| `backend/**` or `web/**` | merge to `main` | VPS rebuilds stack, live over HTTPS — **only while `DEPLOY_ENABLED=true`** |
 | `mobile/**` (JS only) | merge to `main` | OTA — apps update on next launch |
 | `mobile/**` (native) | Actions → Deploy Mobile → `build-production` | Play Store bundle |
 
 All gated on CI. Red tests = no deploy.
+
+> **The stack deploy is switched OFF right now** (TODO-32). There is no VPS, and
+> every push touching `backend/**`, `web/**`, `docker-compose.yml` or the
+> `Caddyfile` was failing at the SSH step and turning `main` red — which is how
+> a team learns to ignore a red `main`, taking the two CI gates in the same run
+> down with it. The gates still run on every push; only the SSH step is skipped,
+> and the run says so with a warning annotation.
+>
+> **To turn it back on:** Settings → Secrets and variables → Actions →
+> *Variables* → `DEPLOY_ENABLED` = `true`. Nothing else changes.
+> **To deploy once without turning it on** — testing a fresh server, say —
+> Actions → Deploy → *Run workflow*. A manual run ignores the variable
+> deliberately, so it will attempt the SSH and fail loudly if the host is wrong,
+> which is exactly what you want when you are checking one.
 
 Native = new native module, SDK bump, plugin/permission change, or `expo.version`
 bump. An OTA cannot carry those.
@@ -34,11 +48,26 @@ the only map and the only address lookup the mobile app had.
 
 **Variables** (optional; defaults shown):
 ```
+DEPLOY_ENABLED=       # unset. Set to "true" once a VPS exists — see Triggers
 VITE_DATA_MODE=live   VITE_API_BASE_URL=/api
 EXPO_PUBLIC_API_BASE_URL=https://<domain>/api
 ```
 
+A variable rather than a secret on purpose: it is not sensitive, and `vars` can
+be read in a workflow `if:` where `secrets` cannot — which is what lets the
+gate live in the workflow instead of in a wrapper job.
+
 **3. VPS** — needs only Docker + git. First deploy clones the repo itself.
+Then set `DEPLOY_ENABLED=true`, or the stack deploy stays skipped.
+
+**If the deploy fails at the SSH step**, the error text narrows it before you
+start guessing. `dial tcp ***:22: i/o timeout` means the packets were DROPPED —
+no host, a powered-off host, or a firewall DROP — so check, in order: the
+droplet exists and is running, the cloud firewall and `ufw` allow inbound 22,
+and `SERVER_IP` is not stale after a rebuild. A wrong-but-alive machine answers
+`connection refused` in milliseconds instead, which points at sshd rather than
+the network (`deploy.yml` sets no `port:`, so it expects 22). `***` in the log
+means the secret HAS a value; an empty secret prints as nothing.
 
 **Optional secret:** `ECOTRACK_SETUP_CODE` — see *First enrolment* below.
 

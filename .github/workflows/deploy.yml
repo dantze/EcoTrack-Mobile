@@ -45,6 +45,34 @@ jobs:
     name: Verify web
     uses: ./.github/workflows/ci-web.yml
 
+  # The deploy itself is GATED, and the gate is on the step rather than the job
+  # (TODO-32).
+  #
+  # There is no VPS. Every push touching backend/, web/, docker-compose.yml or
+  # the Caddyfile ran this job, and it died on its first action with
+  # `dial tcp ***:22: i/o timeout` - packets dropped, so: no host, a host that
+  # is off, or a firewall DROP. That turned main red on a schedule, which
+  # trains everyone to ignore a red main. The expensive part is that the two
+  # gates that DO mean something, verify-backend and verify-web, are in this
+  # same workflow run and go unread with it.
+  #
+  # So: `DEPLOY_ENABLED` (a repository VARIABLE, not a secret - it is not
+  # sensitive and `vars` is readable in `if:`, which `secrets` is not). Set it
+  # to `true` when a server exists and pushes deploy again. Until then the job
+  # runs, stays green, and says in the log why it did nothing.
+  #
+  # deploy-cloud.yml solves the same problem with a `preflight` job that checks
+  # whether its secrets are present - and that shape does NOT work here. The
+  # secrets ARE present: GitHub printed `***` for the host, which it only does
+  # for a secret with a value. What is missing is the machine, and no secret can
+  # say that. Hence an explicit switch rather than an inferred one.
+  #
+  # Two things this deliberately does NOT do:
+  #   - it does not drop the `push:` trigger. The gates must keep running on
+  #     every push; only the SSH step is conditional.
+  #   - it does not gate `workflow_dispatch`. Pressing "Run workflow" is a
+  #     deliberate act and should attempt the deploy whatever the variable says
+  #     - including failing loudly, which is how you test a new server.
   deploy:
     name: Deploy stack
     needs: [verify-backend, verify-web]
@@ -52,7 +80,25 @@ jobs:
     timeout-minutes: 30
 
     steps:
+      - name: Is deploying enabled?
+        id: gate
+        # Through env, never spliced into the script with ${{ }} - same rule as
+        # the commit message in deploy-mobile.yml, applied for consistency
+        # rather than because a repo variable is attacker-controlled.
+        env:
+          DEPLOY_ENABLED: ${{ vars.DEPLOY_ENABLED }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          if [ "$DEPLOY_ENABLED" = "true" ] || [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            echo "enabled=true" >> "$GITHUB_OUTPUT"
+            echo "Deploying: DEPLOY_ENABLED='$DEPLOY_ENABLED', event '$EVENT_NAME'."
+          else
+            echo "enabled=false" >> "$GITHUB_OUTPUT"
+            echo "::warning title=Deploy skipped::No server is configured. The backend and web gates ran and passed; only the SSH step was skipped. Set the repository variable DEPLOY_ENABLED=true (Settings -> Secrets and variables -> Actions -> Variables) once a VPS exists, or use Run workflow to deploy once regardless. See TODO-32."
+          fi
+
       - name: Deploy Docker stack to VPS
+        if: steps.gate.outputs.enabled == 'true'
         uses: appleboy/ssh-action@v1.0.3
         env:
           DB_NAME: ${{ secrets.DB_NAME }}

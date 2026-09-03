@@ -32,7 +32,7 @@ import { formatMoney } from '@/components/domain';
 import { SUBSCRIPTION_TYPES, type Subscription, type SubscriptionType } from '@/types/domain';
 import { includesFolded } from '@/lib/search';
 import { ErrorNotice, SearchInput } from './components/FilterBar';
-import { ToggleField } from './components/fields';
+import { Col, FormGrid, ToggleField } from './components/fields';
 import { errorMessage, toast } from './components/Toaster';
 import { useConfirm } from './components/useConfirm';
 import { SubscriptionUsageModal } from './components/SubscriptionUsageModal';
@@ -446,6 +446,7 @@ export function SubscriptionsPage() {
           columns={columns}
           rowKey={(subscription) => subscription.id}
           ariaLabel="Abonamente"
+          mobile={{ primary: 'name', secondary: ['type', 'visits'], trailing: 'price', actions: 'actions' }}
           initialSort={{ key: 'name', dir: 'asc' }}
           loading={subscriptionsQuery.isLoading}
           activeKey={editing?.id ?? null}
@@ -491,8 +492,8 @@ export function SubscriptionsPage() {
         }
       >
         {draft && (
-          <div className="grid grid-cols-12 gap-3">
-            <div className="col-span-8">
+          <FormGrid>
+            <Col span={8}>
               <TextInput
                 id="name"
                 label="Nume abonament"
@@ -502,8 +503,8 @@ export function SubscriptionsPage() {
                 placeholder="Ex: Igienizare lunară"
                 onChange={(event) => setDraft({ ...draft, name: event.target.value })}
               />
-            </div>
-            <div className="col-span-4">
+            </Col>
+            <Col span={4}>
               <TextInput
                 id="price"
                 label="Preț (RON)"
@@ -515,16 +516,16 @@ export function SubscriptionsPage() {
                   setDraft({ ...draft, price: event.target.value.replace(/[^\d.,]/g, '') })
                 }
               />
-            </div>
-            <div className="col-span-12">
+            </Col>
+            <Col span={12}>
               <TextArea
                 label="Descriere"
                 value={draft.description}
                 placeholder="Opțional"
                 onChange={(event) => setDraft({ ...draft, description: event.target.value })}
               />
-            </div>
-            <div className="col-span-6">
+            </Col>
+            <Col span={6}>
               <Select
                 label="Tip"
                 required
@@ -534,18 +535,18 @@ export function SubscriptionsPage() {
                   setDraft({ ...draft, type: value === 'RECURRING' ? 'RECURRING' : 'ONE_TIME' })
                 }
               />
-            </div>
-            <div className="col-span-6">
+            </Col>
+            <Col span={6}>
               <ToggleField
                 label="Activ"
                 checked={draft.isActive}
                 onChange={(isActive) => setDraft({ ...draft, isActive })}
               />
-            </div>
+            </Col>
 
             {draft.type === 'RECURRING' && (
               <>
-                <div className="col-span-4">
+                <Col span={4}>
                   <TextInput
                     id="visitsPerMonth"
                     label="Vizite pe lună"
@@ -560,8 +561,8 @@ export function SubscriptionsPage() {
                       })
                     }
                   />
-                </div>
-                <div className="col-span-4">
+                </Col>
+                <Col span={4}>
                   <TextInput
                     label="Durată (luni)"
                     inputMode="numeric"
@@ -574,8 +575,8 @@ export function SubscriptionsPage() {
                       })
                     }
                   />
-                </div>
-                <div className="col-span-4">
+                </Col>
+                <Col span={4}>
                   <ToggleField
                     label="Nedeterminat"
                     checked={draft.isIndefinite}
@@ -587,10 +588,10 @@ export function SubscriptionsPage() {
                       })
                     }
                   />
-                </div>
+                </Col>
               </>
             )}
-          </div>
+          </FormGrid>
         )}
       </Modal>
 

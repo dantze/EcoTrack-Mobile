@@ -1,8 +1,10 @@
 /**
  * Map picker for an order's location (TODO-10).
  *
- * The desktop counterpart of `mobile/app/Sales/OrderTypes/OrderComponents/
- * LocationPicker.tsx`. Interaction model: **click anywhere on the map to drop
+ * The only order location picker there is. It had a counterpart in mobile,
+ * which TODO-33 deleted along with the rest of the Sales section — office
+ * staff use this app on their phone. Interaction model: **click anywhere on
+ * the map to drop
  * the pin, drag the pin to fine-tune it.** The pin is a real marker pinned to
  * the ground, not a crosshair fixed to the middle of the viewport — panning the
  * map moves the view, not the point, so the operator can look around without

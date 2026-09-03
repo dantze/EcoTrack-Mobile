@@ -100,7 +100,7 @@ function TaskDetailContent({ taskId }: { taskId: number | null }) {
                 (TaskAccessPolicy restricts PATCH /tasks/{id}/status to the
                 assigned driver).
               */}
-              <div className="grid grid-cols-2 gap-3 rounded-md border border-border bg-surface-sunken p-3">
+              <div className="grid grid-cols-1 gap-3 rounded-md border border-border bg-surface-sunken p-3 sm:grid-cols-2">
                 <DateInput
                   label="Dată programată"
                   hint="Serverul fixează ora la 08:00."
@@ -212,7 +212,7 @@ function TaskDetailContent({ taskId }: { taskId: number | null }) {
                   onRetry={() => void photosQuery.refetch()}
                   loadingLabel="Se încarcă pozele…"
                 >
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                     {(photosQuery.data ?? []).map((photo) => (
                       <a
                         key={photo.id}

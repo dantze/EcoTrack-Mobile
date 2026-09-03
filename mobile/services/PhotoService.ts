@@ -10,7 +10,8 @@ export const PhotoService = {
     //
     // The first two called POST and DELETE /{clientId}/idPhoto, which no
     // longer exist: EcoTrack does not store photographs of identity documents
-    // any more. IdScanService reads the card on this phone and keeps nothing.
+    // any more. Scanning moved to the web app with the rest of Sales (TODO-33),
+    // where it also reads the card in the browser and keeps nothing.
     //
     // getAllPhotos called GET /api/photos, which listed the ENTIRE bucket to
     // any authenticated employee - while ID photos were stored, that was one

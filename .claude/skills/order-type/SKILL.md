@@ -1,13 +1,13 @@
 ---
 name: order-type
-description: Use when adding, renaming or removing an Order subtype (currently Amplasari / Ridicari / Igienizari) anywhere in the monorepo, or when changing the fields on one. The discriminator is duplicated across backend, web and mobile with no shared source of truth, so the change spans all three projects at once — this lists every file that must move together and what breaks if one is missed.
+description: Use when adding, renaming or removing an Order subtype (currently Amplasari / Ridicari / Igienizari) anywhere in the monorepo, or when changing the fields on one. The discriminator is duplicated between backend and web with no shared source of truth, so the change spans both projects at once — this lists every file that must move together and what breaks if one is missed, and why mobile is deliberately not one of them.
 ---
 
 # Adding or changing an Order subtype
 
 `Order` uses JPA `InheritanceType.JOINED` with a Jackson `orderType`
 discriminator. The three type names — `"Amplasari"`, `"Ridicari"`,
-`"Igienizari"` — are **string literals duplicated in all three projects**.
+`"Igienizari"` — are **string literals duplicated in the backend and in web**.
 Nothing generates them from a shared schema, and nothing fails at build time
 when they drift.
 
@@ -16,8 +16,10 @@ Failure modes when a file is missed:
 - missing `@JsonSubTypes` entry → Jackson throws at **runtime**, on first
   deserialisation of that type
 - missing web literal → mostly a compile error, if you widen `ORDER_TYPES` first
-- missing mobile literal → **silent**: the type falls through switches and
-  renders as blank or "unknown", with no type error anywhere
+
+There used to be a third copy, in mobile, and it was the dangerous one: nothing
+there was typed against the union, so a missed arm rendered blank with no error
+anywhere. TODO-33 deleted it. See **Mobile** below — the absence is checked.
 
 ## Backend
 
@@ -78,40 +80,24 @@ type is a data change with no migration path; treat it as a separate decision.
    new type silently produces no suggestions until handled.
 4. **`api/live/normalize.ts`** and the mocks — see the `web-data-layer` skill.
 
-## Mobile
+## Mobile — nothing to do, and that is now enforced
 
-**This is the project most likely to be left behind, and the only one where
-being left behind is silent.** There is no `ORDER_TYPES` constant and no
-exhaustive `Record`, so nothing here fails at compile time. Grep first and treat
-the hit list as the work list — there are well over a hundred occurrences:
+**An order type is a TWO-place edit: backend and web.** It used to be three,
+and mobile was the place most likely to be left behind and the only one where
+being left behind was silent — no `ORDER_TYPES` constant, no exhaustive
+`Record`, so a missed arm rendered a blank card instead of failing to compile.
 
-```bash
-grep -rn "Amplasari\|Ridicari\|Igienizari" mobile/ --include="*.ts" --include="*.tsx"
-```
+TODO-33 deleted mobile's Sales and Technical sections. The driver app reads
+`task.type`, which is the task's own type and not the order discriminator, so
+it never sees an `orderType` value at all. Mobile's own union declaration, the
+local copy in its order filter modal, and the per-type screens went with them.
 
-The ones that always need editing:
-
-- **`mobile/types/OrderTypes.ts`** — the shape, independently declared:
-  ```ts
-  export type Order = AmplasareOrder | RidicareOrder | IgienizareOrder;
-  export const isAmplasare  = (o: Order): o is AmplasareOrder  => o.orderType === 'Amplasari';
-  export const isRidicari   = (o: Order): o is RidicareOrder   => o.orderType === 'Ridicari';
-  export const isIgienizari = (o: Order): o is IgienizareOrder => o.orderType === 'Igienizari';
-  ```
-  Add the member, the union arm, and the guard. (Note the guard names are
-  `isRidicari` / `isIgienizari`, not the singular forms web uses.)
-- **`mobile/utils/orderUtils.ts`** — `getDateInfo`, `getLocationText`,
-  `getActionText`, `getOrderTypeLabel` all branch on the type. A missing branch
-  is what produces a card with a blank date or address.
-- **`mobile/modals/OrderFilterModal.tsx`** — a local `ORDER_TYPES` array of
-  `{ value, label }` pairs (labels are the singular Romanian forms:
-  `Amplasare`, `Ridicare`, `Igienizare`).
-- **`mobile/app/Sales/OrderDetails.tsx`** — a bare
-  `["Amplasari", "Ridicari", "Igienizari"]` plus a `switch` rendering one of
-  `app/Sales/OrderTypes/{Amplasari,Ridicari,Igienizari}.tsx`; a new type needs a
-  screen of its own there.
-- **`mobile/types/__tests__/OrderTypes.test.ts`** — the mobile counterpart of
-  `OrderJsonSubTypesTest`. Extend it; it is the only automated guard on this side.
+`.github/scripts/cross_project_invariants.py` now asserts the ABSENCE:
+mobile naming any order type in code fails repo-hygiene. So if you are here
+because you are adding a screen to mobile that needs to know about order types
+— **that is the thing the deletion was for.** Put it in `web/`, which is
+responsive and is what office staff use on their phones. If there is a real
+reason it must be native, remove the check and record why in `TODO.md`.
 
 ## Conventions
 
@@ -119,12 +105,14 @@ The ones that always need editing:
   (`"Amplasari"`, not `"Amplasări"` — the existing values are unaccented).
 - User-facing labels are Romanian; identifiers and comments English.
 
-## Verify — all three, because the change spans all three
+## Verify — both, because the change spans both
 
 ```bash
 cd backend && ./gradlew build
 cd web     && npm run lint && npm run typecheck && npm run test:run && npm run build
-cd mobile  && npm run lint && npm run typecheck && npm run test:run
 ```
 
-A green backend proves nothing about the clients here. See the `verify` skill.
+A green backend proves nothing about the client here. See the `verify` skill.
+
+Mobile is not in the list, and repo-hygiene is what keeps that honest: it fails
+if mobile starts naming order types again.

@@ -21,10 +21,13 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
  *
  * CLAUDE.md calls this out as a cross-cutting contract: the discriminator
  * names here ("Amplasari" / "Ridicari" / "Igienizari") are duplicated in
- * {@code web/src/features/sales/orderModel.ts} and
- * {@code mobile/types/OrderTypes.ts}. If someone renames a subtype or the
- * {@code orderType} property, these tests fail before the clients silently
- * start receiving objects they cannot dispatch on.
+ * {@code web/src/features/sales/orderModel.ts}. If someone renames a subtype
+ * or the {@code orderType} property, these tests fail before the client
+ * silently starts receiving objects it cannot dispatch on.
+ *
+ * There was a third copy, in mobile, until TODO-33 deleted the Sales and
+ * Technical sections that held it. Order types are a two-place edit now, and
+ * repo-hygiene fails if mobile starts naming them again.
  *
  * The mapper is the one Spring Boot actually builds for the app, not a bare
  * {@code new ObjectMapper()}, so the assertions describe the wire format the

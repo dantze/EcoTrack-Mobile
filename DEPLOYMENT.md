@@ -25,8 +25,12 @@ DB_NAME  DB_USER  DB_PASS
 DO_SPACES_ACCESS_KEY  DO_SPACES_SECRET_KEY  DO_SPACES_BUCKET  DO_SPACES_REGION
 ECOTRACK_SECURITY_ENFORCE  ECOTRACK_CORS_ALLOWED_ORIGINS
 EXPO_TOKEN                       # expo.dev → Account → Access tokens
-EXPO_PUBLIC_GOOGLE_MAPS_API_KEY
 ```
+
+`EXPO_PUBLIC_GOOGLE_MAPS_API_KEY` is no longer used and can be deleted from
+the repository secrets — and **revoked in the Google Cloud console**, which is
+the half that stops it billing. TODO-33 deleted the Sales section, and with it
+the only map and the only address lookup the mobile app had.
 
 **Variables** (optional; defaults shown):
 ```

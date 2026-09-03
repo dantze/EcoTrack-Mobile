@@ -65,6 +65,18 @@ export default function Index() {
                         fullName: user.fullName,
                     });
                     setGate({ kind: 'redirect', href: `/RoleSelection?${params.toString()}` });
+                } else if (destination.kind === 'office') {
+                    // SALES / TECH and nothing else. A real session for a real
+                    // employee whose screens now live on the web (TODO-33), so
+                    // it is KEPT: dropping it would loop them through an
+                    // admin-approved enrollment on every launch to be told the
+                    // same thing, and it would cost them their place the day
+                    // they are also made a driver.
+                    const params = new URLSearchParams({
+                        roles: destination.roles.join(','),
+                        fullName: user.fullName,
+                    });
+                    setGate({ kind: 'redirect', href: `/office?${params.toString()}` });
                 } else {
                     // A stored session with no role this app can open is not a
                     // session worth keeping.

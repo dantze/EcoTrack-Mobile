@@ -137,6 +137,18 @@ const Enrollment = () => {
                             fullName: session.user.fullName,
                         },
                     });
+                } else if (destination.kind === 'office') {
+                    // Approved as SALES or TECH: a correct approval for an app
+                    // that no longer has those screens (TODO-33). The session
+                    // is good and is kept — office staff use the web app, and
+                    // the signpost says so.
+                    router.replace({
+                        pathname: '/office',
+                        params: {
+                            roles: destination.roles.join(','),
+                            fullName: session.user.fullName,
+                        },
+                    });
                 } else {
                     // Approved into a role this app has no screens for. Holding a
                     // session that can open nothing is worse than none, so drop it.

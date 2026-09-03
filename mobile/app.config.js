@@ -35,11 +35,6 @@ module.exports = {
                 foregroundImage: "./assets/images/adaptive-icon.png",
                 backgroundColor: "#ffffff"
             },
-            config: {
-                googleMaps: {
-                    apiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY
-                }
-            },
             googleServicesFile: "./google-services.json",
             edgeToEdgeEnabled: true,
             predictiveBackGestureEnabled: false,
@@ -59,7 +54,9 @@ module.exports = {
             }]
         ],
         extra: {
-            googleMapsApiKey: process.env.EXPO_PUBLIC_GOOGLE_MAPS_API_KEY,
+            // EXPO_PUBLIC_GOOGLE_MAPS_API_KEY is gone with the Sales section
+            // that needed it (TODO-33): no screen here renders a map or looks
+            // up an address any more.
             eas: {
                 projectId: "b68f1933-d3e1-4cdb-a5e3-31a0540679b2"
             }

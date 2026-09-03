@@ -632,6 +632,10 @@ function RoutesScreen() {
               rows={filteredRoutes}
               columns={columns}
               rowKey={(route) => route.id}
+              // 'driver' is deliberately absent: its cell is a button that
+              // opens the picker, and a button inside the card's own button is
+              // invalid markup. A phone changes the driver from the board.
+              mobile={{ primary: 'name', secondary: ['day'], trailing: 'progress', actions: 'actions' }}
               initialSort={{ key: 'day', dir: 'asc' }}
               loading={routesQuery.isPending}
               activeKey={selectedRouteId}

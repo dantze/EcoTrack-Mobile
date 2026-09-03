@@ -23,8 +23,11 @@
 
 import { useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useMediaQuery } from '@mantine/hooks';
+import { SlidersHorizontal } from 'lucide-react';
 import { Badge, Button, DateInput, EmptyState, Select, TextInput, cx } from '@/components/ui';
 import { CommandBar, PaneHeader, ToolbarGroup, Workbench } from '@/components/layout';
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/shadcn/sheet';
 import { Toggle } from '@/components/shadcn/toggle';
 import { ToggleGroup, ToggleGroupItem } from '@/components/shadcn/toggle-group';
 import { ORDER_TYPE_LABELS } from '@/components/domain';
@@ -67,6 +70,13 @@ export function MapPage() {
   const [showRoutes, setShowRoutes] = useState(isTech);
   const [selectedPointId, setSelectedPointId] = useState<string | null>(null);
 
+  // Below md there is no room for the aside, so the same panels move into a
+  // bottom sheet the ribbon opens. `undefined` on the first render (and in
+  // jsdom) counts as the wide case: a laptop must not flash a control it does
+  // not need, and the tests then exercise the aside.
+  const isWide = useMediaQuery('(min-width: 768px)', true, { getInitialValueInEffect: false });
+  const [panelOpen, setPanelOpen] = useState(false);
+
   // Reads are open to any authenticated employee (see the role matrix in
   // SecurityConfig), and the whole point of this screen is the cross-module
   // view — a dispatcher looking at sales orders is the use case, not a leak.
@@ -100,8 +110,19 @@ export function MapPage() {
     [data.points, selectedPointId],
   );
 
+  /**
+   * Selecting a pin has to lead somewhere at every width. On a wide screen the
+   * aside is already open and selection alone is enough; below md the detail
+   * lives in the sheet, so a tap that only sets state is a dead tap — which is
+   * exactly what a phone used to get here.
+   */
+  const selectPoint = (pointId: string | null) => {
+    setSelectedPointId(pointId);
+    if (pointId !== null && !isWide) setPanelOpen(true);
+  };
+
   useDeepLinkOnce('comanda', useDeepLink().number('comanda'), (orderId) => {
-    setSelectedPointId(`order:${orderId}`);
+    selectPoint(`order:${orderId}`);
     recordUse('order', orderId);
   });
 
@@ -170,6 +191,31 @@ export function MapPage() {
     (layer): layer is string => layer !== null,
   );
 
+  const panelBody = (
+    <>
+      <FilterPanel
+        filters={filters}
+        countyOptions={countyOptions}
+        onPatch={patch}
+        onToggleType={(type) => patch({ orderTypes: toggleIn(filters.orderTypes, type) })}
+        onToggleLifecycle={(life) => patch({ lifecycles: toggleIn(filters.lifecycles, life) })}
+      />
+
+      {selected ? (
+        <SelectedPanel
+          point={selected}
+          onClose={() => setSelectedPointId(null)}
+          onOpenOrder={() => {
+            recordUse('order', selected.orderId);
+            navigate(`/comenzi?comanda=${selected.orderId}`);
+          }}
+        />
+      ) : (
+        <StatsPanel stats={data.stats} showRoutes={isTech} />
+      )}
+    </>
+  );
+
   return (
     <Workbench>
       <CommandBar
@@ -199,15 +245,32 @@ export function MapPage() {
           </ToolbarGroup>
         }
         tools={
-          <Select
-            aria-label="Colorează după"
-            value={colorBy}
-            options={[
-              { value: 'lifecycle', label: 'După stare' },
-              { value: 'orderType', label: 'După tip' },
-            ]}
-            onChange={(value) => setColorBy(value as 'orderType' | 'lifecycle')}
-          />
+          <>
+            <Select
+              aria-label="Colorează după"
+              value={colorBy}
+              options={[
+                { value: 'lifecycle', label: 'După stare' },
+                { value: 'orderType', label: 'După tip' },
+              ]}
+              onChange={(value) => setColorBy(value as 'orderType' | 'lifecycle')}
+            />
+            {/* The only way into the filters, the statistics and the selected
+                order below md, where the aside is hidden. */}
+            <Button
+              variant={filtersActive ? 'secondary' : 'ghost'}
+              size="sm"
+              className="md:hidden"
+              icon={<SlidersHorizontal aria-hidden />}
+              aria-expanded={panelOpen}
+              aria-label="Filtre, statistici și comanda selectată"
+              onClick={() => setPanelOpen(true)}
+            >
+              {filtersActive && (
+                <span aria-label="filtre active" className="size-1.5 rounded-full bg-primary" />
+              )}
+            </Button>
+          </>
         }
       />
 
@@ -227,28 +290,12 @@ export function MapPage() {
               ) : undefined
             }
           />
-          <div className="min-h-0 flex-1 overflow-y-auto">
-            <FilterPanel
-              filters={filters}
-              countyOptions={countyOptions}
-              onPatch={patch}
-              onToggleType={(type) => patch({ orderTypes: toggleIn(filters.orderTypes, type) })}
-              onToggleLifecycle={(life) => patch({ lifecycles: toggleIn(filters.lifecycles, life) })}
-            />
-
-            {selected ? (
-              <SelectedPanel
-                point={selected}
-                onClose={() => setSelectedPointId(null)}
-                onOpenOrder={() => {
-                  recordUse('order', selected.orderId);
-                  navigate(`/comenzi?comanda=${selected.orderId}`);
-                }}
-              />
-            ) : (
-              <StatsPanel stats={data.stats} showRoutes={isTech} />
-            )}
-          </div>
+          {/* Only one copy of the panel exists at a time. The aside is hidden
+              with a class rather than unmounted, so rendering it here as well
+              while the sheet is open would put TWO elements with id
+              "map-search" in the document — and the "/" shortcut reaches for
+              that id with getElementById. */}
+          <div className="min-h-0 flex-1 overflow-y-auto">{isWide ? panelBody : null}</div>
         </aside>
 
         <div className="relative min-w-0 flex-1">
@@ -279,12 +326,36 @@ export function MapPage() {
               showHeatmap={showHeatmap}
               showRoutes={showRoutes}
               selectedPointId={selectedPointId}
-              onSelectPoint={setSelectedPointId}
+              onSelectPoint={selectPoint}
               bounds={bounds}
             />
           )}
         </div>
       </div>
+
+      {/* The aside, below md. A bottom sheet rather than a side one because the
+          map is the screen here: sliding the panel up over the lower half
+          leaves the pins visible, and a phone user picking filters wants to
+          watch them take effect. */}
+      <Sheet open={panelOpen && !isWide} onOpenChange={setPanelOpen}>
+        <SheetContent
+          side="bottom"
+          className="flex max-h-[85vh] flex-col gap-0 bg-surface p-0"
+          aria-describedby={undefined}
+        >
+          <SheetHeader className="shrink-0 flex-row items-center gap-3 space-y-0 border-b border-border px-4 py-2.5 pr-12">
+            <SheetTitle className="min-w-0 flex-1 truncate text-sm font-semibold text-ink">
+              {selected ? 'Comandă selectată' : 'Filtre și statistici'}
+            </SheetTitle>
+            {filtersActive && (
+              <Button variant="ghost" size="sm" onClick={() => setFilters(EMPTY_FILTERS)}>
+                Resetează
+              </Button>
+            )}
+          </SheetHeader>
+          <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">{panelBody}</div>
+        </SheetContent>
+      </Sheet>
     </Workbench>
   );
 }

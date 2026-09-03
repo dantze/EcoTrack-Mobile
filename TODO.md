@@ -38,8 +38,9 @@ The whole of what is left, in one place. Everything not listed here is `[DONE]`.
 - **TODO-17** `[POSTPONED]` — All other AI ideas *(F)*
 - **TODO-31** `[ ]` — The backend test suite shares one database across classes *(J)*
 - **TODO-32** `[ ]` — Deploy fails at the SSH step — the VPS is unreachable *(G)*
-- **TODO-33** `[ ]` — Make the web app responsive, and move Sales + Technical out of mobile *(H)*
 - **TODO-45** `[ ]` — Drop `individual.id_photo_url` once every environment is drained *(E)*
+- **TODO-72** `[ ]` — Installed phones need a rebuild, and the Maps key needs revoking *(G)*
+- **TODO-73** `[ ]` — `AccessRequestsPage` paints with tokens that do not exist *(J)*
 - **TODO-48** `[ ]` — `bootNavigation.test.tsx` fails on Node 24 *(G)*
 - **TODO-50** `[ ]` — Nothing checks that the index at the top of TODO.md is true *(G)*
 - **TODO-51** `[ ]` — The web app throws away the server's Romanian refusal text *(J)*
@@ -107,7 +108,7 @@ full text lives further down.
 | TODO-30 | `[DONE]` | A | There is no recovery path when the last admin loses their session |
 | TODO-31 | **`[ ]`** | J | The backend test suite shares one database across classes |
 | TODO-32 | **`[ ]`** | G | Deploy fails at the SSH step — the VPS is unreachable |
-| TODO-33 | **`[ ]`** | H | Make the web app responsive, and move Sales + Technical out of mobile |
+| TODO-33 | `[DONE]` | H | Make the web app responsive, and move Sales + Technical out of mobile |
 | TODO-34 | `[DONE]` | C | `/tasks/order/{id}/exists` returns one task, but the guard rolls up all of them |
 | TODO-35 | `[DONE]` | H | Role changes on the web never reach the phone |
 | TODO-36 | `[DONE]` | A | First-run setup code is only printed to the server log |
@@ -145,6 +146,8 @@ full text lives further down.
 | TODO-68 | **`[ ]`** | G | This machine cannot run the backend suite or the hygiene guards |
 | TODO-69 | `[DONE]` | J | Three bugs only a live backend could show |
 | TODO-70 | **`[ ]`** | J | Orders created before the numbering fix are still `#0` |
+| TODO-72 | **`[ ]`** | G | Installed phones need a rebuild, and the Maps key needs revoking |
+| TODO-73 | **`[ ]`** | J | `AccessRequestsPage` paints with tokens that do not exist |
 
 ---
 
@@ -2073,7 +2076,11 @@ one failure does not hide the others.
   two untyped local copies; web `TASK_STATUSES` must match the backend enum
   except for a declared backend-only set (`CANCELLED`). Verified by temporarily
   adding a fourth order type: it named all four files that must follow. Absent
-  mobile files are *skipped, not failed*, so TODO-33 can delete them.
+  mobile files are *skipped, not failed*, so TODO-33 can delete them. **TODO-33
+  has since landed**, and the mobile half of that check was replaced by its
+  inverse: the script now fails if mobile names an order type at all, and
+  separately declares mobile's entire API surface so a new call there fails
+  until SecurityConfig has a row for it.
 - **`doc_claims.py`** — every backticked path in `CLAUDE.md` and the skills, and
   every path in a Java/TS comment, must resolve (understanding `@/` aliases,
   `./` relatives and `/.../` elisions). Pinned claims must match
@@ -2397,6 +2404,20 @@ Gradle-capable JVM to launch, so it only helps machines that have 17+ but not 21
 The Python half has no repo-side workaround short of rewriting five guard scripts
 in Node.
 
+**Half of this is fixed: the JDK half.** Re-checked while doing TODO-33 on
+2026-09-03 — `java -version` is now `openjdk 21.0.12.1 LTS (Microsoft build)`,
+and `cd backend && ./gradlew build --no-daemon` runs the whole suite green in
+about 50 seconds. The paragraph above describing a Java 8 JVM is out of date;
+backend changes no longer have to be left to CI.
+
+**`python3` is still the Store alias stub**, so `repo_hygiene.py`,
+`cross_project_invariants.py`, `doc_claims.py`, `dead_config.py` and
+`bundle_budget.py` still cannot be run here — which matters more since TODO-33,
+because it put two new checks into `cross_project_invariants.py` (mobile must
+not name an order type; mobile's API surface is a closed list) whose logic was
+verified by re-implementing the scan in Node against the real tree, not by
+running the script. `winget install Python.Python.3.12` is the whole fix.
+
 ---
 
 ## H. Mobile
@@ -2439,7 +2460,7 @@ Mobile: lint 0 errors, typecheck clean, **83 tests** (was 59).
 **Unverified, and not claimed otherwise:** no end-to-end request→approve→claim
 round trip against a running backend, and no render check on a device.
 
-### TODO-33 `[ ]` Make the web app responsive, and move Sales + Technical out of mobile
+### TODO-33 `[DONE]` Make the web app responsive, and move Sales + Technical out of mobile
 Two halves of one decision: **the phone stops being a second full app and
 becomes a browser**, except for the driver flow.
 
@@ -2469,6 +2490,123 @@ truth). One implementation is simpler, and the web one is more complete.
   (the script already *skips* absent mobile files rather than failing).
 - Do the responsive work **before** deleting the mobile screens, so office staff
   are never left without a usable phone surface.
+
+**Done, in that order.** The responsive work landed first, as the text below
+required, because deleting the phone's office screens is only safe once there
+is somewhere else for office staff to go.
+
+**1. Responsive web — what was actually left.** Most of it had already arrived
+with the shadcn/Mantine rebuild: `AppShell` puts the nav pane in a Sheet below
+`lg`, `ListDetail` swaps the resizable split for a Sheet, `DataTable` replaces
+the table with a card list below `md` (so the TODO-04 `overflow-x-hidden` note
+no longer bites — there is no table to scroll), `Modal` and `Drawer` go
+full-screen below `sm`, `CalendarPage` renders an agenda instead of a
+seven-column grid, and `RoutesPage` switches its three-pane board one pane at a
+time. What was left were the holes that rebuild did not reach:
+
+- **Hartă had no phone experience at all.** Its filters, its statistics and —
+  the part that mattered — the selected order lived in an `aside` that is
+  `hidden md:flex`. Tapping a pin on a phone set the selection and drew
+  nothing: no address, no "Deschide comanda", no way to filter. The same panel
+  now also renders in a bottom sheet, opened from the ribbon or by selecting a
+  point. A bottom sheet rather than a side one because the map is the screen
+  here — the pins stay visible above it while filters take effect.
+  `features/map/__tests__/mobilePanel.test.tsx` covers both presentations.
+- **The card list nested controls inside the card's own button.** The card
+  wrapped the whole row in a `<button>`, and a control inside a button is
+  invalid markup whose clicks the outer button eats. Two ways that bit:
+  `DataTable`'s fallback handed the last column to the `trailing` slot, and on
+  five screens that column is `{ key: 'actions', header: '' }` rendering
+  Buttons or a Select — on Angajați the role Select and the delete were the
+  only two things the screen does, and neither was reachable from a phone. And
+  Produse swaps its name, description and price cells for text inputs while a
+  row is being edited, so tapping a product on a phone produced a card of
+  inputs nobody could type into.
+
+  Two changes, because they are two different problems. `DataTableMobileConfig`
+  gained an `actions` slot — a key or a list of them, since Angajați spreads
+  its controls over two columns — rendered BESIDE the card rather than inside
+  it, and the fallback now reads an unheadered last column as actions rather
+  than as a value. And the open-the-row control became a **stretched button
+  underneath the content** instead of a wrapper around it: the text stack is
+  `pointer-events-none` so a tap falls through to it, while anything a cell
+  rendered that is itself a control takes its own taps back. The button gets
+  its accessible name from the primary cell with `aria-labelledby`, so a list
+  of cards is not a list of identically-named "open" buttons.
+  `components/ui/__tests__/DataTable.test.tsx` gained four cases at 390px:
+  cards instead of a table, a cell's control is clickable and does NOT fire
+  `onRowClick`, the card still opens on a tap, and no button anywhere contains
+  another control.
+- **Two grids and one skeleton assumed width.** The Abonamente form was the last
+  place hand-writing `grid-cols-12` with unconditional spans, so an 8/4 pair
+  stayed an 8/4 pair at 390px — it uses `FormGrid`/`Col` like every other form
+  now. `RouteFormModal` and `TaskDetailDrawer` each wrapped a single control in
+  `grid-cols-2`, making it half-width at every size. The calendar's loading
+  skeleton drew 35 cells in seven columns even when the view that was about to
+  land was the agenda.
+- **Touch targets.** `sm` buttons are 28px and `icon-sm` ones 28px square. One
+  rule in `index.css` under `@media (pointer: coarse)` raises them to 2.5rem —
+  the size the kit's inputs already use on a phone (`h-10 sm:h-8`). The BOX
+  grows rather than an invisible overlay around it: toolbar buttons sit 4px
+  apart, and an overlay big enough to matter steals its neighbour's taps.
+  `pointer: coarse` rather than a width breakpoint, because a narrow laptop
+  window is still a mouse.
+
+**2. Mobile is the driver app now.** `app/Sales/**`, `app/Technical/**` and the
+27 files only they used are deleted: every modal, the card/form/list components,
+`ClientService` / `ProductService` / `SubscriptionService` /
+`RecurringIgienizareService` / `IdScanService` / `OrderLockService`, the order-type
+union and its tests, and `utils/{mrz,orderUtils,validation,formatters}.ts`. The
+surviving services were pruned to the calls the driver screens make — TaskService
+went from fourteen methods to five, RouteService from eight to one.
+
+**The consequence that needed a decision, not just deletion: what happens to a
+SALES-only device.** `destinationForRoles` previously answered `kind: 'none'`
+for any role it had no screen for, and the boot gate responds to 'none' by
+dropping the session. Applied to a salesperson that is a loop: enroll, wait for
+an admin, be told there is nothing here, lose the session, repeat on next
+launch. So there is a fourth destination, `kind: 'office'`, and `app/office.tsx`
+— a signpost to the web app that KEEPS the session, because the session is
+valid, the person is who they say they are, and the day they are also made a
+driver the gate should let them straight in with no re-enrollment. It offers
+Deconectare, because a shared phone has to be releasable.
+
+`RoleSelection` lost its Vânzări and Tehnic cards. That screen is now only ever
+reached by an ADMIN+DRIVER account, so its two remaining cards had to stop being
+the same destination: Șofer opens this person's own routes, Administrator the
+picker for anyone's. Both pointed at the picker before, which was invisible
+while three other hats were on offer.
+
+**The two consequences the text above listed, both handled:**
+
+- **SecurityConfig's "the only writes the driver app makes" is a checked fact
+  now.** `cross_project_invariants.py` declares mobile's ENTIRE API surface —
+  fourteen paths — and fails repo-hygiene on a fifteenth. Paths rather than
+  verbs, because a mobile call's method is not always next to its path
+  (`EnrollmentService` builds the RequestInit in a `jsonBody()` helper), and a
+  path allowlist is the stronger property anyway: it pins the reads too, and no
+  verb can be aimed at a path that is not on the list.
+- **The order-type duplication is gone, and the script asserts its absence.**
+  The old check compared mobile's copy of the union against the backend and
+  skipped when the file was missing. It now fails if mobile names an order type
+  in code at all — because the point of the deletion was that an order type
+  stopped being a three-place edit, and a well-meaning new mobile screen would
+  silently undo that: nothing there is typed against the union, so a stale copy
+  renders blank rather than failing to compile. Comments are stripped before
+  matching, so a comment explaining the rule does not trip it. The `order-type`
+  skill now says the same thing where someone will read it.
+
+**Also removed, because they were only Sales and Technical's:**
+`react-native-maps`, `@react-native-ml-kit/text-recognition`,
+`react-native-calendars`, `react-native-draggable-flatlist`,
+`@react-native-community/datetimepicker` and `expo-location` from
+`package.json` (lock file regenerated — `npm ci` fails on a stale one), and the
+Google Maps key from `app.config.js`, `deploy-mobile.yml` and `DEPLOYMENT.md`.
+`expo-constants` and `react-native-gesture-handler` were left alone: nothing in
+this app imports them directly, but expo-router and react-navigation do.
+
+**Two follow-ups this leaves, both recorded: TODO-72 and TODO-73.**
+
 
 ### TODO-35 `[DONE]` Role changes on the web never reach the phone
 The mobile app stores `user.roles` at claim time and never refetches. An admin
@@ -3039,6 +3177,49 @@ line in `README.md` next to the other setup steps, since the same trap is one
 `git pull` away for anyone who had `web/node_modules` from before the rebuild.
 
 
+
+### TODO-72 `[ ]` Installed phones need a rebuild, and the Maps key needs revoking
+Two things TODO-33 could not do from inside the repository.
+
+**1. `eas update` cannot ship this.** TODO-33 removed native modules
+(`react-native-maps`, ML Kit text recognition, the calendar and draggable-list
+packages) and changed `app.config.js`. OTA updates carry JS and assets only, so
+until `deploy-mobile.yml` is run with `build-production` and the new binary is
+installed, an existing install keeps its old one — Sales and Technical screens
+included. Those screens still work against the live backend, because the backend
+authorizes by role and an office role is still an office role; they are simply a
+second, now-unmaintained implementation of screens that moved to the web.
+Nothing is unsafe about that, but it is a divergence with a date on it.
+
+**2. `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY` is no longer read by anything.** It has
+been removed from `app.config.js`, `deploy-mobile.yml` and the secret list in
+`DEPLOYMENT.md`. Deleting the repository secret is one click; **revoking the key
+in the Google Cloud console is the half that stops it billing**, and that is
+outside this repo. Note that an installed old binary still carries the key baked
+in (`EXPO_PUBLIC_*` is inlined at build time), so revoking it breaks the map on
+those installs — which is fine and is the same event as (1), but do them in that
+order, or knowingly not.
+
+*Found while doing TODO-33.*
+
+### TODO-73 `[ ]` `AccessRequestsPage` paints with tokens that do not exist
+`web/src/features/admin/AccessRequestsPage.tsx` uses `text-content` and
+`text-content-muted` in four places. Neither is defined — `src/index.css` has no
+`--content` variable and no `@theme` entry for one — so the classes compile to
+nothing and those lines inherit whatever colour is above them. The kit's tokens
+are `text-ink` / `text-ink-muted`; this is the only file in `src/` still using
+the old names, so it is a leftover from the token rename in the UI rebuild.
+
+Nothing crashes and the page is readable, which is why it survived: the
+inherited colour happens to be close. Fixing it is a four-token substitution.
+
+Not done as part of TODO-33 because it is a colour bug, not a responsive one,
+and folding an unrelated fix into that diff would hide it. Related: TODO-58
+lists the surfaces the UI rebuild stopped short on, and this is plausibly a
+fifth.
+
+*Found while auditing every screen at phone width for TODO-33.*
+
 ### TODO-71 `[ ]` A second deploy target exists in `infra/` and is wired to nothing
 Scaffolded on request: Terraform for GCP (Cloud Run + Cloud SQL Postgres +
 Artifact Registry + Secret Manager + a least-privilege IAM pair) and Vercel (the
@@ -3096,7 +3277,9 @@ first-deploy choice rather than a production one.
 - **Web:** enrollment flow shipped (TODO-01), Comenzi has the Curente/Arhivă
   split (TODO-21) and the Calendar (TODO-12).
 - **Mobile:** enrollment shipped (TODO-19) — **the app can authenticate again**.
-  Sales and Technical sections still present; TODO-33 plans to remove them.
+  Sales and Technical are gone (TODO-33): the phone is the driver experience,
+  office staff use the responsive web app. Installed builds still carry the old
+  screens until a rebuild — TODO-72.
 - **Deploy:** `deploy.yml` (backend + web to VPS, one domain via Caddy) and
   `deploy-mobile.yml` (EAS OTA + builds). See `DEPLOYMENT.md`. `infra/` plus
   `deploy-cloud.yml` scaffold a second, **unused** target (Cloud Run + Cloud SQL

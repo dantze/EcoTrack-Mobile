@@ -313,6 +313,12 @@ function RecurringScreen() {
           columns={columns}
           rowKey={(plan) => plan.id}
           ariaLabel="Planuri de igienizare recurentă"
+          mobile={{
+            primary: 'client',
+            secondary: ['address', 'frequency'],
+            trailing: 'active',
+            actions: 'actions',
+          }}
           initialSort={{ key: 'client', dir: 'asc' }}
           loading={plansQuery.isPending}
           activeKey={openPlan?.id ?? null}

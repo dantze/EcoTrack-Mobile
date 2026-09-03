@@ -4,32 +4,33 @@ import { useRouter, useLocalSearchParams } from 'expo-router';
 import { AuthService } from '../services/AuthService';
 import { Ionicons } from '@expo/vector-icons';
 
+/**
+ * The hats this app can still wear.
+ *
+ * SALES and TECH are gone with their sections (TODO-33) — office staff use the
+ * responsive web app. `destinationForRoles` no longer counts those roles, so
+ * a SALES+DRIVER employee is not asked to choose at all: there is one thing
+ * they can do here, and they go straight to it.
+ *
+ * ADMIN has no screens of its own either — administration is a web job. What
+ * an admin holding the phone wants is to look at a driver's day, which is what
+ * DriverSelection does. Without this row an ADMIN+DRIVER account (the first
+ * person to enroll, most likely) would see a one-card picker.
+ *
+ * That combination is now the ONLY one that reaches this screen, so the two
+ * cards have to differ: Șofer opens this person's own routes, Administrator
+ * opens the picker for anyone's. Both used to point at the picker, which was
+ * invisible while three other hats were on offer and would now be the whole
+ * screen.
+ */
 const ROLE_CONFIG = {
     DRIVER: {
         title: 'Șofer',
-        subtitle: 'Rute și livrări',
+        subtitle: 'Rutele mele',
         icon: 'car-outline' as const,
-        route: '/Driver/DriverSelection',
+        route: '/Driver/DriverRoutes',
         color: '#4CAF50',
     },
-    SALES: {
-        title: 'Vânzări',
-        subtitle: 'Comenzi și clienți',
-        icon: 'cart-outline' as const,
-        route: '/Sales/Menu',
-        color: '#2196F3',
-    },
-    TECH: {
-        title: 'Tehnic',
-        subtitle: 'Intervenții și service',
-        icon: 'construct-outline' as const,
-        route: '/Technical/Menu',
-        color: '#FF9800',
-    },
-    // ADMIN has no screens of its own here — administration is a web job. What
-    // an admin holding the phone wants is to look at a driver's day, which is
-    // what DriverSelection does. Without this row an ADMIN+DRIVER account
-    // (the first person to enroll, most likely) would see a one-card picker.
     ADMIN: {
         title: 'Administrator',
         subtitle: 'Rutele oricărui șofer',

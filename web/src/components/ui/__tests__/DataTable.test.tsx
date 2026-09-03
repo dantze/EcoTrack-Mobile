@@ -288,3 +288,76 @@ describe('DataTable selection', () => {
     expect(screen.getByRole('button', { name: 'Șterge selecția' })).toBeInTheDocument();
   });
 });
+
+/**
+ * The card list below `md` (TODO-33).
+ *
+ * A phone gets cards instead of a table, and the thing that keeps going wrong
+ * there is CONTROLS: a cell is free to render a Button, a Select or — on
+ * Produse, mid-edit — a text input, and for a while the card wrapped the whole
+ * row in its own `<button>`. A control inside a button is invalid markup whose
+ * clicks the outer button eats, so the two screens where the row's only actions
+ * live in a cell had no actions at all on a phone.
+ *
+ * These tests are about reachability, not layout: can the user work the
+ * controls, and does tapping the text still open the row.
+ */
+describe('DataTable — the card list on a phone', () => {
+  const WITH_CONTROLS: DataTableColumn<Row>[] = [
+    { key: 'name', header: 'Nume', render: (row) => row.name },
+    { key: 'quantity', header: 'Cantitate', render: (row) => row.quantity ?? '—' },
+    {
+      key: 'actions',
+      header: '',
+      render: (row) => (
+        <button type="button" onClick={() => document.body.setAttribute('data-deleted', row.name)}>
+          Șterge {row.name}
+        </button>
+      ),
+    },
+  ];
+
+  function renderCards(props: Partial<React.ComponentProps<typeof DataTable<Row>>> = {}) {
+    window.innerWidth = 390;
+    return renderTable(props);
+  }
+
+  it('renders one card per row instead of a table', () => {
+    renderCards();
+    expect(screen.queryByRole('table')).toBeNull();
+    for (const row of ROWS) expect(screen.getByText(row.name)).toBeInTheDocument();
+  });
+
+  it('lets the user work a control a cell rendered', async () => {
+    const user = userEvent.setup();
+    const onRowClick = vi.fn();
+    renderCards({ columns: WITH_CONTROLS, onRowClick });
+
+    await user.click(screen.getByRole('button', { name: 'Șterge Beta' }));
+
+    expect(document.body.getAttribute('data-deleted')).toBe('Beta');
+    // The row's own button must not have eaten it.
+    expect(onRowClick).not.toHaveBeenCalled();
+    document.body.removeAttribute('data-deleted');
+  });
+
+  it('still opens the row when the card itself is tapped', async () => {
+    const user = userEvent.setup();
+    const onRowClick = vi.fn();
+    renderCards({ columns: WITH_CONTROLS, onRowClick });
+
+    // The card's own control announces itself with the row's name, which is
+    // what stops a list of cards being a list of identical "open" buttons.
+    await user.click(screen.getByRole('button', { name: 'Beta' }));
+
+    expect(onRowClick).toHaveBeenCalledTimes(1);
+    expect(onRowClick.mock.calls[0][0]).toMatchObject({ name: 'Beta' });
+  });
+
+  it('never nests a control inside the card button', () => {
+    renderCards({ columns: WITH_CONTROLS, onRowClick: vi.fn() });
+    for (const button of screen.getAllByRole('button')) {
+      expect(button.querySelector('button, input, select, textarea, a')).toBeNull();
+    }
+  });
+});

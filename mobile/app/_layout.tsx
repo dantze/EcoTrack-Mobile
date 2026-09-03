@@ -57,8 +57,9 @@ export default function RootLayout() {
       <Stack.Screen name="index" />
       <Stack.Screen name="enrollment" />
       <Stack.Screen name="Driver" />
-      <Stack.Screen name="Sales" />
-      <Stack.Screen name="Technical" />
+      {/* Sales and Technical were deleted (TODO-33); `office` is the signpost
+          an employee holding only those roles lands on. */}
+      <Stack.Screen name="office" />
     </Stack>
   );
 }

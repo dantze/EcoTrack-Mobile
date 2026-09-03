@@ -1,11 +1,10 @@
 /**
  * Sales form validation.
  *
- * These rules were ported 1:1 from `mobile/utils/validation.ts` and
- * `mobile/utils/formatters.ts` so the desktop app rejects exactly the input the
- * field crew's app rejects. That "1:1" claim is the thing worth testing: if it
- * drifts, a client record created on one device fails validation on the other
- * and nobody finds out until support does.
+ * These rules were ported 1:1 from the mobile app, whose copies TODO-33
+ * deleted. What is worth testing is no longer that two implementations agree —
+ * there is one — but that this one still behaves the way the crew learned it
+ * does. The behaviour is the contract now, and these cases are its statement.
  *
  * The Romanian message wording is asserted too — it is user-facing copy, and
  * the phone/decimal handling encodes local conventions (comma decimals,

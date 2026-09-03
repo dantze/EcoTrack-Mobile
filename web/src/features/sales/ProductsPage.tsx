@@ -406,6 +406,7 @@ export function ProductsPage() {
           columns={columns}
           rowKey={(product) => product.id}
           ariaLabel="Catalog de produse"
+          mobile={{ primary: 'name', secondary: ['description'], trailing: 'price', actions: 'actions' }}
           initialSort={{ key: 'name', dir: 'asc' }}
           loading={productsQuery.isLoading}
           activeKey={editingId}

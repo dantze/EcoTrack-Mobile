@@ -597,6 +597,43 @@ body {
   border-color: var(--border-color);
 }
 
+/* ───────────────────────────────────────────────────────────────────────────
+   Touch targets (TODO-33)
+
+   The ribbon is sized for a mouse: `sm` buttons are 28px tall and `icon-sm`
+   ones 28px square, which is right on a laptop and too small to hit reliably
+   with a thumb. 2.5rem is the size this app already uses for a touched
+   control — the kit's inputs are `h-10 sm:h-8` — so the buttons match it
+   rather than inventing a second number.
+
+   The box grows rather than an invisible overlay around it. An overlay big
+   enough to matter overlaps its neighbours (toolbar buttons sit 4px apart)
+   and quietly steals their taps, which is a worse bug than a small button.
+   Every ribbon here already scrolls horizontally, so taller controls cost
+   nothing but the room they take.
+
+   Deliberately `pointer: coarse` rather than a width breakpoint: a narrow
+   laptop window is still a mouse, and a 10" tablet is still a finger.
+   ─────────────────────────────────────────────────────────────────────────── */
+
+@media (pointer: coarse) {
+  [data-slot='button'],
+  [data-slot='toggle'],
+  [data-slot='toggle-group-item'] {
+    min-height: 2.5rem;
+  }
+
+  /* Square controls need the width too, or an icon button stays a 28px column
+     with 40px of height around it. */
+  [data-slot='button'].size-6,
+  [data-slot='button'].size-7,
+  [data-slot='button'].size-8,
+  [data-slot='toggle'],
+  [data-slot='toggle-group-item'] {
+    min-width: 2.5rem;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

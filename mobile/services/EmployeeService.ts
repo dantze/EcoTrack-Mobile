@@ -14,45 +14,12 @@ export interface Employee {
 }
 
 /**
- * Obține toți angajații
- */
-export const getAllEmployees = async (): Promise<Employee[]> => {
-    const response = await apiFetch('/employees');
-    if (!response.ok) {
-        throw new Error('Eroare la încărcarea angajaților');
-    }
-    return response.json();
-};
-
-/**
- * Obține un angajat după ID
- */
-export const getEmployeeById = async (id: number): Promise<Employee> => {
-    const response = await apiFetch(`/employees/${id}`);
-    if (!response.ok) {
-        throw new Error('Angajatul nu a fost găsit');
-    }
-    return response.json();
-};
-
-/**
  * Obține toți șoferii (angajați cu rolul DRIVER)
  */
 export const getAllDrivers = async (): Promise<Employee[]> => {
     const response = await apiFetch('/employees/drivers');
     if (!response.ok) {
         throw new Error('Eroare la încărcarea șoferilor');
-    }
-    return response.json();
-};
-
-/**
- * Obține angajații cu un anumit rol
- */
-export const getEmployeesByRole = async (roleName: string): Promise<Employee[]> => {
-    const response = await apiFetch(`/employees/role/${roleName}`);
-    if (!response.ok) {
-        throw new Error('Eroare la încărcarea angajaților');
     }
     return response.json();
 };

@@ -215,6 +215,13 @@ public class SecurityConfig {
                     // ---- Field work -----------------------------------------------------
                     // The only two writes the driver app performs (see mobile/app/Driver/*):
                     // marking a task done and attaching its photos.
+                    //
+                    // Since TODO-33 that is a checked fact rather than a claim. Mobile is
+                    // the driver experience and nothing else - its Sales and Technical
+                    // sections were deleted - and its whole API surface is declared in
+                    // .github/scripts/cross_project_invariants.py, which runs on every PR.
+                    // A new mobile call fails there until it is declared, and if it is a
+                    // write it needs a row HERE, above the office catch-alls below.
                     .requestMatchers(HttpMethod.PATCH, "/api/tasks/*/status")
                     .hasAnyRole(DRIVER, SALES, TECH, ADMIN)
                     .requestMatchers(HttpMethod.POST, "/api/tasks/*/photos")

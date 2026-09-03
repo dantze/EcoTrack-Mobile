@@ -11,7 +11,7 @@ tool — each has its own dependencies and is built from its own directory.
 |---|---|---|
 | `backend/` | Spring Boot 3.5, Java 21, Gradle, JPA | `deploy.yml` → SSH to a VPS, docker compose |
 | `web/` | React 19, Vite 6, Tailwind 4, TanStack Query, React Router 7 | `deploy.yml` — same stack, same domain as the backend |
-| `mobile/` | Expo ~54 / React Native 0.81, expo-router | `deploy-mobile.yml` → EAS Update (OTA) / EAS Build |
+| `mobile/` | Expo ~54 / React Native 0.81, expo-router. **Drivers only** (TODO-33) | `deploy-mobile.yml` → EAS Update (OTA) / EAS Build |
 
 **See `DEPLOYMENT.md`** for triggers, required secrets and the runbook. The
 backend and web deploy together because Caddy serves both from one domain.
@@ -134,7 +134,18 @@ Every lifetime, the session cap and the enrollment rate limit are
 `ecotrack.security.*` / `ecotrack.enrollment.*` properties in
 `application.properties` — read them there rather than hardcoding a number.
 
-**All three projects can now get a session** (TODO-19). `web/` has
+**The phone is a driver device, not a second full app** (TODO-33). `mobile/`
+has the driver experience and nothing else: my routes, my tasks, status
+changes, photo upload. Sales and Technical were deleted from it — every
+order-type change used to be written twice, and the web implementation is the
+more complete of the two. Office staff use the responsive web app on the same
+phone. An employee holding only SALES or TECH lands on `mobile/app/office.tsx`,
+a signpost to the web app that **keeps the session**: `destinationForRoles`
+reports `kind: 'office'` rather than `kind: 'none'`, because 'none' drops the
+session and would loop a salesperson through an admin-approved enrollment on
+every launch to be told the same thing.
+
+**Both projects can get a session** (TODO-19). `web/` has
 `features/auth/EnrollmentPage.tsx`; `mobile/` has `app/enrollment.tsx` plus
 `services/EnrollmentService.ts`, and its password login is deleted. Token
 plumbing is shared in spirit across both: `services/tokenStore.ts` holds the
@@ -201,7 +212,10 @@ Two companion knobs sit next to it, both **independent of `enforce`**:
   authenticated; `/api/admin/**` and employee writes need `ADMIN`;
   `PATCH /api/tasks/*/status` and `POST /api/tasks/*/photos` accept
   `DRIVER`/`SALES`/`TECH`/`ADMIN` (those two are the only writes the driver app
-  makes — **a new mobile write needs a new row, above the catch-alls**); other
+  makes — **a new mobile write needs a new row, above the catch-alls**. Since
+  TODO-33 that is checked, not merely stated: mobile's ENTIRE API surface is
+  declared in `.github/scripts/cross_project_invariants.py` and a new call
+  fails repo-hygiene until it is added there); other
   `/api/**` writes need `SALES`/`TECH`/`ADMIN`; `/api/**` reads need any
   authenticated employee; everything else is `denyAll()`.
   Authentication alone is not authorization: before this matrix existed, any
@@ -227,15 +241,18 @@ The role matrix answers "which VERBS may this role use". It does not answer
 - `GET /api/tasks/mine` and `/api/tasks/mine/date/{date}` take the employee from
   the access token. **The driver app must use these** — passing an id from the
   client is what allowed one driver to read another's day.
-- `/api/tasks/employee/{id}` still exists for the office overview (and for
-  `Technical/ChangeDriver`), and returns 403 when a driver asks for an id that
-  is not their own.
+- `/api/tasks/employee/{id}` still exists for the office overview, and returns
+  403 when a driver asks for an id that is not their own. Mobile still calls it
+  from one place after TODO-33 — an ADMIN using `Driver/DriverSelection` to look
+  at a chosen driver's day — which the policy allows because office staff are
+  unrestricted.
 - `GET /api/tasks/order/{id}/exists` is **office-only** (TODO-42). It summarises
   one order's task — id, route, schedule, status — and the order id is the only
   thing needed to aim at it, so an unguarded read let a driver walk the id space.
   It is `requireOfficeRole` rather than a row-scoped rule because no driver screen
-  asks the question: every caller is an office screen in `web/features/sales` or
-  `mobile/app/{Sales,Technical}`.
+  asks the question: every caller is an office screen in `web/src/features/sales`
+  or `web/src/features/technical`. Mobile had callers too until TODO-33 deleted
+  those sections, and now cannot reach it at all.
 - `GET /api/tasks/order-status?ids=…` is the **batch** form of that read
   (TODO-43), and carries the **same** `requireOfficeRole` for the same reason
   (TODO-52) — unguarded it would be strictly worse, since one request would
@@ -428,8 +445,10 @@ refresh-and-retry.
 OpenFreeMap (`MAP_STYLE_URL` in `features/map/components/mapStyle.ts`) and
 address search/reverse geocoding from Photon (`src/lib/geocoding.ts`); neither
 is keyed, and neither goes through `http.ts`, because that would attach our
-bearer token to someone else's host. Same rule and same reason as
-`LocationPicker` in `mobile/` (Google Places). MapLibre is ~250 kB gzipped, so
+bearer token to someone else's host. Mobile's Google Places call was the other
+instance of the same rule and went with the Sales section (TODO-33) — the rule
+outlives it, because the next third-party call will land here. MapLibre is
+~250 kB gzipped, so
 everything that imports it must stay behind a dynamic import — `/harta` via the
 route table, the order location picker via `React.lazy` in
 `sales/components/fields.tsx`.
@@ -486,16 +505,17 @@ say what. Refusing costs two fields of typing; a false accept writes a wrong CNP
 into a client record nobody re-reads. **Do not "improve" this by accepting
 partial reads.**
 
-The parser exists twice — `web/src/features/sales/idScan/mrz.ts` and
-`mobile/utils/mrz.ts`, byte-identical below their doc comments — because the two
-projects cannot import each other. `shared/id-mrz-cases.json` is what pins that
-they still agree; both suites read it. Same arrangement as the fulfilment rule.
+The parser lives once, in `web/src/features/sales/idScan/mrz.ts`. It existed
+twice — a byte-identical copy in mobile, pinned to it by
+`shared/id-mrz-cases.json` because the two projects cannot import each other —
+until TODO-33 deleted the mobile Sales section. The fixture stays and is still
+where a case is added; it now has one reader rather than two.
 
 **2. The image never leaves the device and is never stored** (TODO-14). Web runs
-tesseract.js in the browser; mobile uses ML Kit / Vision on-device. Nothing about
-an identity document is uploaded, so `PhotosController`, both
-`/{clientId}/idPhoto` routes and `GET /api/photos` are gone, and `idPhotoUrl` is
-off the wire.
+tesseract.js in the browser. Nothing about an identity document is uploaded, so
+`PhotosController`, both `/{clientId}/idPhoto` routes and `GET /api/photos` are
+gone, and `idPhotoUrl` is off the wire. The scanner was on-device on the phone
+too, via ML Kit, and that dependency went with the screen.
 
 Holding rule 2 requires one non-obvious thing: **tesseract.js defaults
 `workerPath`, `corePath` and `langPath` to jsDelivr.** Unset, they would put a
@@ -581,8 +601,13 @@ Deliberate or unresolved; do not assume these are safe.
   Postgres. Nothing in the code references them. Drop them by hand if the dead
   columns bother you. **Do not resurrect the feature:** AI work is postponed
   (TODO-17) and the only sanctioned future use is autofill.
-- **`mobile/services/OrderLockService.ts` is a stub** that always reports a
-  successful lock.
+- **Installed phones need a REBUILD, not an OTA update, to pick up TODO-33.**
+  It removed native modules (`react-native-maps`, ML Kit text recognition, the
+  calendar and draggable-list packages) and the Google Maps key from
+  `mobile/app.config.js`. `eas update` cannot ship a native change, so until
+  `deploy-mobile.yml` runs `build-production`, installed builds keep the old
+  binary — including its Sales and Technical screens, which still talk to a
+  backend that will happily serve an office role.
 - **`individual.id_photo_url` outlives the feature that filled it.** ID photos
   are no longer stored (TODO-14), but the column is kept until
   `DELETE /api/admin/id-photos` has drained the objects it points at on every

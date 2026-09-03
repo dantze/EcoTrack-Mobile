@@ -48,7 +48,8 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      # Node-environment Vitest over the pure modules only (utils/, types/).
+      # Node-environment Vitest over the pure modules only — utils/ and the
+      # services whose native dependencies are fully mocked away.
       # See mobile/vitest.config.ts for why this is not jest-expo.
       - name: Test
         run: npm run test:run

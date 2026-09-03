@@ -234,11 +234,19 @@ export function CalendarPage() {
                 onRetry={() => void ordersQuery.refetch()}
               />
             ) : ordersQuery.isLoading ? (
-              <div className="grid grid-cols-7 gap-2">
-                {Array.from({ length: 35 }, (_, index) => (
-                  <Skeleton key={index} className="h-[6.5rem] rounded-xl" />
-                ))}
-              </div>
+              view === 'agenda' ? (
+                <div className="flex flex-col gap-2">
+                  {Array.from({ length: 8 }, (_, index) => (
+                    <Skeleton key={index} className="h-16 rounded-xl" />
+                  ))}
+                </div>
+              ) : (
+                <div className="grid grid-cols-7 gap-2">
+                  {Array.from({ length: 35 }, (_, index) => (
+                    <Skeleton key={index} className="h-[6.5rem] rounded-xl" />
+                  ))}
+                </div>
+              )
             ) : view === 'agenda' ? (
               <MonthAgenda
                 cells={cells}

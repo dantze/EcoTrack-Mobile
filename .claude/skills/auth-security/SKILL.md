@@ -56,10 +56,17 @@ There is no password and no Google sign-in — `/api/auth/login` and
    owns it permanently — there is no password path back in. Covered by
    `SecurityTests/EnrollmentBootstrapCodeTest`.
 
-`web/` implements this in `features/auth/EnrollmentPage.tsx`.
-**`mobile/` does not** — `services/AuthService.login` still posts to the deleted
-`/api/auth/login`, so the mobile app cannot authenticate at all until TODO-19
-ships. Its token plumbing is finished and correct; only the way in is missing.
+Both clients implement it: `web/src/features/auth/EnrollmentPage.tsx` and
+`mobile/app/enrollment.tsx` with `mobile/services/EnrollmentService.ts`
+(TODO-19). The paragraph that used to stand here said mobile could not
+authenticate at all — it was written before TODO-19 shipped and outlived it.
+
+**A device holding a revoked token must still reach these screens.**
+`BearerTokenAuthenticationFilter` rejects any token it cannot validate and runs
+before authorization, so it fires on the `permitAll` enrollment endpoints too.
+Mobile's `apiFetch` therefore takes `{ anonymous: true }` and all three
+enrollment calls use it; a test asserts it. A new unauthenticated endpoint needs
+the same treatment.
 
 ## Changing a lifetime, a limit or a mode
 
@@ -130,10 +137,16 @@ cd backend && ./gradlew build     # once, before pushing
   itself is single-flight on both sides — `AuthProvider.runRefresh` in web,
   `refreshInFlight` in mobile — because rotation makes parallel refreshes
   invalidate each other.
-- **Don't send the bearer token to a third-party host.** Map tiles (OpenFreeMap),
-  Photon geocoding in `web`, and the Google Places call in mobile's
-  `app/Sales/OrderTypes/OrderComponents/LocationPicker.tsx`
-  deliberately bypass the wrapper. Routing them through it leaks the token.
+- **Don't send the bearer token to a third-party host.** Map tiles (OpenFreeMap)
+  and Photon geocoding in `web/src/lib/geocoding.ts` deliberately bypass the
+  wrapper. Routing them through it leaks the token. Mobile's Google Places call
+  was the other instance and went with the Sales section (TODO-33); the rule
+  outlives it, because the next third-party call will land in `web`.
+- **Don't add a write to the driver app without a matrix row.** Since TODO-33
+  mobile is the driver experience and nothing else, and its ENTIRE API surface
+  is listed in `.github/scripts/cross_project_invariants.py`. A new mobile call
+  fails repo-hygiene until it is declared there — and if it is a write, until
+  `SecurityConfig` has a matcher row for it above the catch-alls.
 - **Don't rely on the last-admin lockout guard.** It exists only in
   `web/src/features/admin/EmployeesPage.tsx`. The backend has no equivalent
   check, so an API caller can demote the last ADMIN and lock everyone out of

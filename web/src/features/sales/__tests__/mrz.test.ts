@@ -5,13 +5,15 @@ import { checkDigit, cnpControlDigit, isValidCnp, parseMrz } from '../idScan/mrz
 /**
  * The golden fixture (TODO-13).
  *
- * The accept/reject rule is written twice — here and in `mobile/utils/mrz.ts` —
- * in two projects that cannot import each other. `shared/id-mrz-cases.json` is
- * what pins that they still AGREE, and `mobile/utils/mrz.test.ts` reads the very
- * same file. A case added there fails whichever side does not follow it.
+ * The accept/reject rule is stated as data in `shared/id-mrz-cases.json` and
+ * read from there rather than written out as assertions here. It used to be
+ * implemented twice — here and in mobile, two projects that cannot import each
+ * other — and the fixture was what pinned that the two agreed. TODO-33 deleted
+ * the mobile copy, so the fixture now has one reader.
  *
- * Same shape as `fulfilment.test.ts` and for the same reason: a duplicated rule
- * with no shared code needs a shared fixture or it silently drifts.
+ * It stays a fixture anyway: a case is a case, and adding one here should not
+ * mean writing a test. `fulfilment.test.ts` has the same shape and still has
+ * the second reader this one lost.
  */
 interface GoldenCase {
   name: string;

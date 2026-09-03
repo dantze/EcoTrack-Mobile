@@ -44,6 +44,18 @@ def read(rel: str) -> str | None:
     return path.read_text(encoding="utf-8")
 
 
+def strip_comments(src: str) -> str:
+    """TypeScript source with // and /* */ removed. Crude — it does not know
+    about strings containing "//" — which is the safe direction here: it can
+    only hide a match, never invent one, and prose is what it must ignore."""
+    return re.sub(r"//[^\n]*|/\*.*?\*/", "", src, flags=re.S)
+
+
+def quoted(literal: str) -> str:
+    """Matches `literal` as a quoted TS string, in any of the three quotes."""
+    return "['\"`]" + re.escape(literal) + "['\"`]"
+
+
 def check(label: str, expected, actual, source: str) -> None:
     if expected == actual:
         return
@@ -91,25 +103,21 @@ def order_types_web() -> list[str] | None:
     return re.findall(r"'([^']+)'", match.group(1))
 
 
-def order_types_mobile() -> list[str] | None:
-    """Mobile declares the union independently, one `orderType:` literal per arm."""
-    src = read("mobile/types/OrderTypes.ts")
-    if src is None:
-        # TODO-22 removes mobile's Sales section; the shared type may go with
-        # it. A deleted file is a valid end state, not a failure.
-        notes.append("mobile/types/OrderTypes.ts absent — skipped (expected once TODO-22 lands)")
-        return None
-    return re.findall(r"orderType:\s*'([^']+)'", src)
-
-
-# Mobile has no single ORDER_TYPES constant — it has local copies, none typed
-# against the union, so nothing there fails at compile time. The `order-type`
-# skill calls mobile "the project most likely to be left behind"; these are the
-# copies it names. Each is optional: TODO-22 deletes the screens holding them.
-MOBILE_LOCAL_COPIES = [
-    ("mobile/modals/OrderFilterModal.tsx", r"value:\s*'([^']+)'"),
-    ("mobile/app/Sales/OrderDetails.tsx", r'"(Amplasari|Ridicari|Igienizari)"'),
-]
+# Order types used to be declared a THIRD time, in mobile: its own union type
+# plus two untyped local copies in the Sales screens. TODO-33 deleted the Sales
+# and Technical sections — office work belongs to the web app now — so the
+# duplication is down to backend + web.
+#
+# What replaces the old comparison is its inverse. The point of deleting those
+# screens was that an order type stopped being a three-place edit, and a
+# well-meaning new mobile screen would silently undo that: nothing in mobile is
+# typed against the union, so a copy that falls behind renders blank rather
+# than failing to compile. So instead of checking mobile's copy agrees, this
+# checks there is no copy.
+#
+# Comments are stripped before matching, on purpose: a comment saying mobile no
+# longer knows about order types is the thing this check wants to stay true.
+MOBILE_ORDER_TYPE_EXEMPT = ("mobile/node_modules/",)
 
 backend_types = order_types_backend()
 
@@ -121,27 +129,25 @@ if backend_types:
     if web_types is not None:
         check("order types", backend_types, web_types, "web/src/types/domain.ts")
 
-    mobile_types = order_types_mobile()
-    if mobile_types is not None:
-        check("order types", backend_types, mobile_types, "mobile/types/OrderTypes.ts")
-
-    for rel, pattern in MOBILE_LOCAL_COPIES:
-        src = read(rel)
-        if src is None:
-            notes.append(f"{rel} absent — skipped (expected once TODO-22 lands)")
+    # Mobile must not name an order type at all (TODO-33).
+    offenders: list[str] = []
+    for path in sorted((ROOT / "mobile").glob("**/*.ts*")):
+        rel = path.relative_to(ROOT).as_posix()
+        if any(rel.startswith(prefix) for prefix in MOBILE_ORDER_TYPE_EXEMPT):
             continue
-        found = re.findall(pattern, src)
-        # Filter to values that look like order types, so an unrelated `value:`
-        # in the same file does not produce a false failure.
-        found = {v for v in found if v in set(backend_types) or v.endswith(("ari", "uri"))}
-        if not found:
-            notes.append(f"{rel}: no order-type literals found — pattern may need updating")
-            continue
-        # These are scattered usages, not a canonical declaration, so a type may
-        # legitimately appear many times or in any order. Completeness is the
-        # property that matters: a type the backend has and this file never
-        # mentions is one the screen silently cannot handle.
-        check("order types", set(backend_types), found, rel)
+        code = strip_comments(path.read_text(encoding="utf-8", errors="replace"))
+        named = sorted(t for t in backend_types if re.search(quoted(t), code))
+        if named:
+            offenders.append(f"{rel}: {named}")
+    if offenders:
+        failures.append(
+            "mobile names order types again — "
+            + "; ".join(offenders)
+            + ". TODO-33 removed Sales and Technical from mobile so that an order type is "
+            "declared in two places and not three. Nothing in mobile is typed against the "
+            "union, so a copy that falls behind renders blank instead of failing to compile. "
+            "Put the screen in web/, or delete this check and record the decision."
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -196,6 +202,102 @@ if backend_statuses and web_statuses:
             f"reject it on a status write"
         )
 
+
+# ---------------------------------------------------------------------------
+# The driver app's API surface
+# ---------------------------------------------------------------------------
+#
+# SecurityConfig's role matrix carries this sentence:
+#
+#     PATCH /api/tasks/*/status and POST /api/tasks/*/photos accept
+#     DRIVER/SALES/TECH/ADMIN (those two are the only writes the driver app
+#     makes — a new mobile write needs a new row, above the catch-alls)
+#
+# Until TODO-33 that was a comment describing an intention, and mobile made
+# fourteen other calls besides. With Sales and Technical deleted it is true,
+# and this is what keeps it true: mobile's whole API surface is listed here,
+# so a new call fails CI with the sentence it just falsified.
+#
+# The check is over PATHS, not verbs, because a mobile call's method is not
+# always next to its path — `EnrollmentService` builds the whole RequestInit
+# in a `jsonBody()` helper. A path allowlist is the stronger property anyway:
+# it pins the reads too, and no verb can be used against a path that is not
+# here.
+#
+# **When a driver screen legitimately needs a new endpoint**: add it below,
+# and if it is a write, add the matching row to SecurityConfig's matrix ABOVE
+# the catch-alls and update that sentence. That is the point of failing here.
+MOBILE_API_PATHS = {
+    # reads
+    "/auth/me",
+    "/employees/drivers",
+    "/enrollment/status",
+    "/orders/{}",
+    "/routes/employee/{}",
+    "/tasks/{}",
+    "/tasks/{}/photos",
+    "/tasks/employee/{}/date/{}",
+    "/tasks/mine/date/{}",
+    # writes — the two the sentence above is about…
+    "/tasks/{}/status",
+    # (POST /tasks/{}/photos shares its path with the read, listed above)
+    # …plus the session plumbing, which is not "the driver app" doing
+    # anything: getting a session, keeping it alive, and giving it back.
+    "/auth/logout",
+    "/auth/refresh",
+    "/enrollment/claim",
+    "/enrollment/request",
+}
+
+# Paths that look like API paths and are not: expo-router destinations.
+# Every other route in this app starts with an uppercase segment (/Driver/…,
+# /RoleSelection), which the lowercase-first-segment rule below already skips.
+MOBILE_LOCAL_ROUTES = {"/", "/enrollment", "/office"}
+
+# A quoted path whose first segment is lowercase: '/tasks/mine', or the
+# template literal `/orders/${id}` with its placeholder still in it.
+API_PATH_RE = re.compile(r"""['"`](/[a-z][^'"`\s]*)['"`]""")
+
+
+def mobile_api_paths() -> set[str] | None:
+    mobile = ROOT / "mobile"
+    if not mobile.is_dir():
+        notes.append("mobile/ absent — API surface check skipped")
+        return None
+    found: set[str] = set()
+    for path in sorted(mobile.glob("**/*.ts*")):
+        rel = path.relative_to(ROOT).as_posix()
+        if "node_modules/" in rel or "__tests__/" in rel:
+            continue
+        code = strip_comments(path.read_text(encoding="utf-8", errors="replace"))
+        for raw in API_PATH_RE.findall(code):
+            # A template placeholder is one path parameter, whatever its name,
+            # and a query string is not part of the path — the boot gate builds
+            # "/office?roles=…" and that is a local route, not an endpoint.
+            normalised = re.sub(r"\$\{[^}]*\}", "{}", raw).split("?", 1)[0]
+            if normalised in MOBILE_LOCAL_ROUTES:
+                continue
+            found.add(normalised)
+    return found
+
+
+actual_paths = mobile_api_paths()
+if actual_paths is not None:
+    added = sorted(actual_paths - MOBILE_API_PATHS)
+    gone = sorted(MOBILE_API_PATHS - actual_paths)
+    if added:
+        failures.append(
+            f"mobile calls API paths that are not in its declared surface: {added}. "
+            "The driver app is meant to make two writes and a handful of reads "
+            "(TODO-33). If this is a real driver need, add it to MOBILE_API_PATHS "
+            "here — and if it is a write, add its row to SecurityConfig's matrix "
+            "above the catch-alls and fix the sentence there that says those two "
+            "are the only ones."
+        )
+    if gone:
+        notes.append(
+            f"mobile no longer calls {gone} — drop them from MOBILE_API_PATHS here"
+        )
 
 # ---------------------------------------------------------------------------
 

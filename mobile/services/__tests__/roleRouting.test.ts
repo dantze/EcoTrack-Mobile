@@ -11,8 +11,6 @@ describe('destinationForRoles', () => {
             kind: 'screen',
             path: '/Driver/DriverRoutes',
         });
-        expect(destinationForRoles(['SALES'])).toEqual({ kind: 'screen', path: '/Sales/Menu' });
-        expect(destinationForRoles(['TECH'])).toEqual({ kind: 'screen', path: '/Technical/Menu' });
     });
 
     // The first person to enroll is auto-granted ADMIN and nothing else, so
@@ -24,11 +22,37 @@ describe('destinationForRoles', () => {
         });
     });
 
-    it('asks which hat when there is more than one role', () => {
-        expect(destinationForRoles(['DRIVER', 'SALES'])).toEqual({
+    it('asks which hat when there is more than one role this app serves', () => {
+        expect(destinationForRoles(['DRIVER', 'ADMIN'])).toEqual({
             kind: 'roleSelection',
-            roles: ['DRIVER', 'SALES'],
+            roles: ['DRIVER', 'ADMIN'],
         });
+    });
+
+    /**
+     * TODO-33 deleted the Sales and Technical sections. SALES and TECH are
+     * still real roles the backend grants — they just have no screens here, so
+     * they must not count towards the picker and must not look like a broken
+     * session either.
+     */
+    it('does not offer a hat for a role whose section moved to the web', () => {
+        expect(destinationForRoles(['DRIVER', 'SALES'])).toEqual({
+            kind: 'screen',
+            path: '/Driver/DriverRoutes',
+        });
+        expect(destinationForRoles(['SALES'])).toEqual({ kind: 'office', roles: ['SALES'] });
+        expect(destinationForRoles(['TECH', 'sales'])).toEqual({
+            kind: 'office',
+            roles: ['TECH', 'SALES'],
+        });
+    });
+
+    it('separates "office only" from "no usable role", because one keeps the session', () => {
+        // 'none' drops the session and sends the device back to enrollment,
+        // which needs an admin. Doing that to a salesperson on every launch is
+        // the bug the 'office' branch exists to avoid.
+        expect(destinationForRoles(['SALES']).kind).toBe('office');
+        expect(destinationForRoles(['WAREHOUSE']).kind).toBe('none');
     });
 
     it('is case-insensitive, matching what the backend may send', () => {

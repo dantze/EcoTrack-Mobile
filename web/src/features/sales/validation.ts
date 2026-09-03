@@ -1,16 +1,16 @@
 /**
  * Form validation for the Sales module.
  *
- * Ported 1:1 from the mobile app so the desktop rewrite rejects exactly the
- * same input:
- *   - mobile/utils/validation.ts   (isValidEmail, isValidPhoneDigits)
- *   - mobile/utils/formatters.ts   (validateRequired / PositiveNumber / PositiveInt)
- * Messages stay in Romanian and keep the original wording.
+ * Ported 1:1 from the mobile app, which is where these rules and their exact
+ * Romanian wording came from. The originals were deleted with the mobile
+ * Sales section (TODO-33), so this is the only copy now — the wording is kept
+ * because it is what users have been reading, not because a second
+ * implementation still has to match it.
  */
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-/** Basic XX@XX.XX pattern, same as the mobile app. */
+/** Basic XX@XX.XX pattern, inherited from the mobile app. */
 export function isValidEmail(email: string): boolean {
   return EMAIL_REGEX.test(email.trim());
 }

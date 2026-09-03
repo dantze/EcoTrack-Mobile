@@ -5,9 +5,12 @@ import { defineConfig } from 'vitest/config';
  *
  * `jest-expo` is deliberately not used. It pulls a full React Native preset and
  * transform chain, and the logic in this app worth unit-testing imports nothing
- * from react-native: `utils/*` and `types/OrderTypes.ts` are plain TypeScript,
- * so they run with no transform at all. Screens are covered by
- * `npm run typecheck` and, for the API layer, by the backend suite.
+ * from react-native: `utils/dateUtils.ts` is plain TypeScript, so it runs with
+ * no transform at all. Screens are covered by `npm run typecheck` and, for the
+ * API layer, by the backend suite.
+ *
+ * `types/` stays in the glob but is empty since TODO-33: the order-type union
+ * lived there, and order types are now declared once, in `web/`.
  *
  * `services/` is in scope too, but ONLY for tests that mock every native
  * dependency away with a `vi.mock` factory — a factory means the real module is
@@ -25,11 +28,10 @@ export default defineConfig({
     include: ['{utils,types,constants,services}/**/*.test.ts'],
 
     // Pinned, because the code under test is timezone-sensitive and would
-    // otherwise pass locally and fail in CI. `orderUtils.getDateInfo` parses
-    // 'YYYY-MM-DD' with `new Date(s)`, which JavaScript reads as UTC midnight,
-    // then reads it back with the *local* `getDate()`/`getMonth()`. West of UTC
-    // that shifts every bare date one day earlier. GitHub runners are UTC;
-    // the users are in Romania. See the note in orderUtils.test.ts.
+    // otherwise pass locally and fail in CI. `dateUtils.toDateString` formats
+    // with `toISOString()`, which is UTC: at 23:30 in Bucharest it already
+    // reports tomorrow's date. GitHub runners are UTC; the users are in
+    // Romania. See the note in dateUtils.test.ts.
     env: { TZ: 'Europe/Bucharest' },
   },
 });

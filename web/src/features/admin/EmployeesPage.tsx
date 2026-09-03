@@ -134,6 +134,11 @@ export function EmployeesPage() {
           rows={filtered}
           ariaLabel="Angajați"
           rowKey={(employee) => employee.id}
+          // Both controls go in the actions slot, beside the card rather than
+          // inside its button: the role Select and the delete are the only two
+          // things this screen does, so a phone that cannot reach them cannot
+          // administer anything.
+          mobile={{ primary: 'name', secondary: ['roles'], actions: ['change', 'actions'] }}
           columns={[
             {
               key: 'name',

@@ -27,11 +27,12 @@
  * record — a field nobody re-reads, on a person, under GDPR. The costs are not
  * comparable, so this fails safe.
  *
- * `shared/id-mrz-cases.json` states that rule once and is read by this
- * project's test and by `mobile/utils/mrz.test.ts`. **The same parser exists at
- * `mobile/utils/mrz.ts`** — two projects, no shared code, no way to import each
- * other; the fixture is what pins that they still agree. Change the rule here
- * and the mobile suite fails, which is the point.
+ * `shared/id-mrz-cases.json` states that rule once, and this parser is now its
+ * only reader. There used to be a byte-identical copy in mobile, kept honest
+ * by that shared fixture; TODO-33 deleted the mobile Sales section and the
+ * copy with it, so the rule lives in one place again. The fixture stays: it is
+ * still where a case is added, and the accept/reject decision is worth stating
+ * as data rather than as assertions scattered through a test.
  *
  * Nothing in this file touches the network. That is the other half of the
  * design: see `ocr.ts` for why the image never leaves the device, and TODO-14

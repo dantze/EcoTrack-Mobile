@@ -36,10 +36,14 @@
  * (TODO-26).
  *
  * Below `md` none of that applies: the table is replaced by a card list, since
- * eight columns at 390px is a horizontal scrollbar with extra steps.
+ * eight columns at 390px is a horizontal scrollbar with extra steps. A card is
+ * one button (open the row) plus, beside it, the columns named by
+ * `mobile.actions` — controls have to live OUTSIDE that button, and every
+ * screen with an action column must say which one it is or accept the
+ * unheadered-last-column guess.
  */
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 import { useMediaQuery } from '@mantine/hooks';
 import { useVirtualizer } from '@tanstack/react-virtual';
@@ -92,6 +96,16 @@ export interface DataTableMobileConfig {
   secondary?: string[];
   /** Right-aligned on line one: status, amount, date. */
   trailing?: string;
+  /**
+   * The row's controls. Rendered NEXT TO the card's open-the-row button, not
+   * inside it — a column whose cell is a Button or a Select cannot go in
+   * `primary`/`secondary`/`trailing`, because those live inside that button
+   * and nesting interactive elements is invalid markup that swallows the tap.
+   *
+   * A list, because a screen may spread its controls over more than one column
+   * (Angajați has the role Select and the delete button in two).
+   */
+  actions?: string | string[];
 }
 
 export interface DataTableExtendedProps<T> extends Omit<DataTableProps<T>, 'columns'> {
@@ -165,6 +179,7 @@ export function DataTable<T>({
   // safe default — a phone shows a table for one frame, a desktop never shows
   // the card list.
   const isMobile = useMediaQuery('(max-width: 767px)') ?? false;
+  const cardIdBase = useId();
 
   const selectable = Boolean(selectedKeys && onSelectionChange);
   const pad = DENSITY[density];
@@ -431,13 +446,42 @@ export function DataTable<T>({
     const pick = (key?: string) => (key ? byKey.get(key) : undefined);
 
     const primary = pick(mobile?.primary) ?? columns[0];
+
+    /**
+     * An unheadered trailing column is a control column by this app's own
+     * convention — `{ key: 'actions', header: '' }` on five screens — and the
+     * fallback used to hand it to `trailing`, i.e. into the row button. So a
+     * phone got Șterge / Editează / a role Select nested inside the control
+     * that opens the record. Unlabelled last column means actions unless the
+     * caller says otherwise.
+     */
+    const lastColumn = columns.length > 1 ? columns[columns.length - 1] : undefined;
+    const fallbackActions =
+      lastColumn && !lastColumn.header && lastColumn !== primary ? lastColumn : undefined;
+
+    const declaredActions =
+      mobile?.actions === undefined
+        ? undefined
+        : (Array.isArray(mobile.actions) ? mobile.actions : [mobile.actions])
+            .map(pick)
+            .filter((column): column is DataTableColumn<T> => Boolean(column));
+    const actions =
+      declaredActions ?? (mobile ? [] : fallbackActions ? [fallbackActions] : []);
+    const isAction = (column: DataTableColumn<T>) => actions.includes(column);
+
     const trailing =
       pick(mobile?.trailing) ??
-      (mobile ? undefined : columns.length > 3 ? columns[columns.length - 1] : undefined);
+      (mobile
+        ? undefined
+        : columns.length > 3
+          ? columns.filter((column) => column !== primary && !isAction(column)).at(-1)
+          : undefined);
     const secondary = (
       mobile?.secondary
         ? mobile.secondary.map(pick).filter((column): column is DataTableColumn<T> => Boolean(column))
-        : columns.filter((column) => column !== primary && column !== trailing).slice(0, 2)
+        : columns
+            .filter((column) => column !== primary && column !== trailing && !isAction(column))
+            .slice(0, 2)
     ).slice(0, 2);
 
     return (
@@ -515,31 +559,54 @@ export function DataTable<T>({
                   <li
                     key={key}
                     className={cn(
-                      'flex min-h-11 w-full items-center gap-2 px-3',
+                      'relative flex min-h-11 w-full items-center gap-2 px-3',
                       active ? 'bg-surface-active' : checked ? 'bg-surface-hover' : 'bg-surface',
                       active && 'shadow-[inset_2px_0_0_0_var(--primary)]',
                       rowClassName?.(row),
                     )}
                   >
                     {selectable && (
-                      <Checkbox
-                        checked={checked}
-                        onChange={(next) => toggleRow(index, next)}
-                        ariaLabel="Selectează rândul"
+                      <span className="relative">
+                        <Checkbox
+                          checked={checked}
+                          onChange={(next) => toggleRow(index, next)}
+                          ariaLabel="Selectează rândul"
+                        />
+                      </span>
+                    )}
+                    {/* The open-the-row control is a stretched button UNDER the
+                        content, not a wrapper around it. A cell is free to
+                        render a control — Produse swaps its name, description
+                        and price cells for inputs while a row is being edited —
+                        and a control nested inside a button is invalid markup
+                        that swallows the tap. It takes its accessible name from
+                        the primary cell, so rows still announce themselves. */}
+                    {onRowClick && (
+                      <button
+                        type="button"
+                        onClick={() => onRowClick(row)}
+                        aria-labelledby={`${cardIdBase}-${key}-primary`}
+                        className={cn(
+                          'absolute inset-0 rounded-md',
+                          'focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring',
+                        )}
                       />
                     )}
-                    <button
-                      type="button"
-                      disabled={!onRowClick}
-                      onClick={() => onRowClick?.(row)}
+                    {/* Inert to taps so they reach the button beneath, except
+                        for anything a cell rendered that is itself a control. */}
+                    <span
                       className={cn(
-                        'flex min-w-0 flex-1 items-center gap-3 py-2 text-left',
-                        'rounded-md focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring',
-                        'disabled:pointer-events-none',
+                        'pointer-events-none relative flex min-w-0 flex-1 items-center gap-3 py-2 text-left',
+                        '[&_a]:pointer-events-auto [&_button]:pointer-events-auto',
+                        '[&_input]:pointer-events-auto [&_select]:pointer-events-auto',
+                        '[&_textarea]:pointer-events-auto [&_[role=combobox]]:pointer-events-auto',
                       )}
                     >
                       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
-                        <span className="clamp-1 text-sm font-semibold text-ink">
+                        <span
+                          id={`${cardIdBase}-${key}-primary`}
+                          className="clamp-1 text-sm font-semibold text-ink"
+                        >
                           {primary ? renderCell(primary, row) : null}
                         </span>
                         {secondary.length > 0 && (
@@ -558,7 +625,14 @@ export function DataTable<T>({
                           {renderCell(trailing, row)}
                         </span>
                       )}
-                    </button>
+                    </span>
+                    {actions.length > 0 && (
+                      <span className="relative flex shrink-0 items-center gap-1">
+                        {actions.map((column) => (
+                          <span key={column.key}>{renderCell(column, row)}</span>
+                        ))}
+                      </span>
+                    )}
                   </li>
                 );
               })}

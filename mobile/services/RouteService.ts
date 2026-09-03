@@ -1,4 +1,4 @@
-import { apiFetch } from './http';
+import { apiError, apiFetch } from './http';
 
 export interface Route {
     id: number;
@@ -21,7 +21,7 @@ export const RouteService = {
     getRoutesByEmployeeId: async (employeeId: number): Promise<Route[]> => {
         const response = await apiFetch(`/routes/employee/${employeeId}`);
         if (!response.ok) {
-            throw new Error('Eșec la preluarea rutelor șoferului');
+            throw await apiError(response, 'Eșec la preluarea rutelor șoferului');
         }
         return await response.json();
     },

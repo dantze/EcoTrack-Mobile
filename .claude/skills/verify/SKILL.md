@@ -87,7 +87,7 @@ python3 -m pip install --quiet pyyaml
 git diff --name-only origin/main... | python3 .github/scripts/repo_hygiene.py
 ```
 
-Plus three cross-cutting guards in the same workflow, which compare one project
+Plus four cross-cutting guards in the same workflow, which compare one project
 against another (or code against prose) and therefore cannot live behind a
 `paths:` filter:
 
@@ -95,6 +95,7 @@ against another (or code against prose) and therefore cannot live behind a
 python3 .github/scripts/cross_project_invariants.py   # order types + task statuses, all 3 projects
 python3 .github/scripts/doc_claims.py                 # doc/comment paths resolve; pinned claims hold
 python3 .github/scripts/dead_config.py                # ecotrack.* keys nothing reads
+python3 .github/scripts/todo_index.py                 # TODO.md's index matches the items below it
 ```
 
 `repo_hygiene.py` exists precisely to cover changes that fall outside all three
@@ -118,6 +119,13 @@ entry to `.github/repo-hygiene-allow.txt` **with a reason** — not to silence i
   longer defines the thing is the exact bug that motivated it.
 - *dead config* — config outlives the feature it configured, and a stale key
   reads as a supported feature to the next person.
+- *TODO.md index* — the *Index* table and *Still open* list at the top of a
+  3500-line backlog are the only way to see it without reading all of it, and
+  they are maintained by hand. **Changing an item's status is two edits**, and
+  the guard exists because the second one kept being missed: it had drifted in
+  three places at once, including a *Next free ID* line four IDs behind, which
+  is how an ID gets reused. Every failure message says exactly what line to add
+  or fix.
 
 Failing one of these means a fact is now duplicated inconsistently. **Fix the
 disagreement, don't relax the check** — and if a difference is genuinely

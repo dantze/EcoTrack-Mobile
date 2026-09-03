@@ -86,7 +86,17 @@ const jsonBody = (body: unknown): RequestInit => ({
     body: JSON.stringify(body),
 });
 
-/** The backend's error bodies are `{ "message": "…" }`, already in Romanian. */
+/**
+ * The backend's error bodies are `{ "message": "…" }`, already in Romanian.
+ *
+ * Deliberately NOT `apiError` / `messageFromBody` from `http.ts` (TODO-51).
+ * That one allowlists 400/404/409, because everywhere else in the API the other
+ * statuses carry English boilerplate. `EnrollmentController` is the exception:
+ * it writes its OWN Romanian body for 403 ("Cod de configurare invalid"), 429
+ * ("Prea multe cereri…") and 410 ("Cererea a expirat…"), and those are the
+ * refusals this screen exists to explain. Routing them through the allowlist
+ * would silently replace all three with a fallback.
+ */
 const messageFrom = async (response: Response, fallback: string): Promise<string> => {
     try {
         const data = await response.json();

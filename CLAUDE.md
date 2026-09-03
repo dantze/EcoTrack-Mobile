@@ -456,6 +456,23 @@ survive a reload, in versioned `localStorage` keys.
 A 401 from anything other than `/auth/**` triggers exactly one silent
 refresh-and-retry.
 
+**The server's refusal text is shown to the operator, but only for 400/404/409**
+(TODO-51). `serverMessage()` in `src/api/http.ts` is the one place that decides:
+it prefers `.message` out of the four-key envelope `GlobalExceptionHandler`
+builds, falls back to the raw body, and returns `null` for anything it cannot
+vouch for. The allowlist is the point — those three statuses are the ones whose
+message comes from a domain exception and is therefore Romanian and written to
+be read, while **401/403 are generic on purpose** (echoing them would tell an
+unauthorized caller which rule stopped them) and 413/5xx are English
+boilerplate. Both `errorMessage` helpers — `features/technical/utils.ts` and
+`features/sales/components/Toaster.tsx` — ask it first and phrase the fallback
+themselves; a third copy of the rule on a screen is what this replaced.
+`mobile/services/http.ts` carries a deliberate copy (`messageFromBody` /
+`apiError`) because the projects cannot import each other, and says so.
+`EnrollmentService` is the documented exception on both sides: the enrollment
+endpoints write their own Romanian bodies for 403/410/429, outside the
+allowlist.
+
 **Third-party map calls bypass `@/api` on purpose.** Map tiles come from
 OpenFreeMap (`MAP_STYLE_URL` in `features/map/components/mapStyle.ts`) and
 address search/reverse geocoding from Photon (`src/lib/geocoding.ts`); neither
@@ -586,6 +603,13 @@ has the one-time fix.
   renaming them is a migration, not a cleanup.
 - `TODO.md` items keep their id forever. Never delete or cross one out — mark it
   `[DONE]` and leave the text intact, and append new ideas with the next free id.
+  **Adding an item or changing its status is TWO edits** — the item, and its row
+  in the *Index* table (plus the *Still open* list if the status crossed that
+  line). `.github/scripts/todo_index.py` checks that on every PR from
+  `repo-hygiene.yml` (TODO-50), because the second edit kept being missed and a
+  drifted index is followed confidently — including a stale *Next free ID* line,
+  which is how an id gets reused. Take the next free id from the items, not from
+  that line.
 - **Anything found open goes into `TODO.md`, always — this is a standing rule.**
   A loose end noticed while doing something else (a gap, a stale comment, a
   cleanup deferred, a thing declined as out of scope, a follow-up handed over by

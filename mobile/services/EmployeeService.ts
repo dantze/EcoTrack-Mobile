@@ -1,4 +1,4 @@
-import { apiFetch } from './http';
+import { apiError, apiFetch } from './http';
 
 export interface EmployeeRole {
     id: number;
@@ -19,7 +19,7 @@ export interface Employee {
 export const getAllDrivers = async (): Promise<Employee[]> => {
     const response = await apiFetch('/employees/drivers');
     if (!response.ok) {
-        throw new Error('Eroare la încărcarea șoferilor');
+        throw await apiError(response, 'Eroare la încărcarea șoferilor');
     }
     return response.json();
 };

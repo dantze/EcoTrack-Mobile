@@ -167,3 +167,84 @@ export const apiFetch = async (
 
     return fetch(url, withAuthHeader(init, newAccessToken));
 };
+
+// ---------------------------------------------------------------------------
+// The server's own words (TODO-51)
+// ---------------------------------------------------------------------------
+
+/**
+ * Statuses whose response body is known to carry text written for the driver.
+ *
+ * The same allowlist, and the same reasoning, as `serverMessage` in
+ * `web/src/api/http.ts` — 401/403 are generic ON PURPOSE so an unauthorized
+ * caller is not told which rule stopped them, 413 and 5xx are English
+ * boilerplate, and what is left is the set whose message comes from a domain
+ * exception. **The two copies are deliberate**: the projects cannot import each
+ * other (CLAUDE.md, Conventions), and this is a dozen lines rather than a
+ * parser worth pinning to a shared fixture. Change one and change the other.
+ */
+const USER_FACING_STATUSES = new Set([400, 404, 409]);
+
+/** Verbatim from the backend's `GlobalExceptionHandler`; English, not for the driver. */
+const GENERIC_SERVER_MESSAGES = new Set([
+    'Request validation failed. Check field details.',
+    'Malformed request body.',
+    'Request could not be processed.',
+]);
+
+/** Longer than any refusal the backend writes; anything past it is not prose. */
+const MAX_SERVER_MESSAGE = 400;
+
+/**
+ * The backend's user-facing Romanian text for a failed response, or `null`.
+ *
+ * `body` is the raw response text. It is normally the four-key envelope
+ * `GlobalExceptionHandler.body()` builds — `{timestamp, status, error, message}`
+ * — so `.message` is preferred and the raw text is used only when the body is
+ * not that envelope.
+ */
+export const messageFromBody = (status: number, body: string): string | null => {
+    if (!USER_FACING_STATUSES.has(status)) return null;
+
+    const text = body?.trim();
+    if (!text) return null;
+
+    let message = text;
+    if (text.startsWith('{')) {
+        let parsed: unknown;
+        try {
+            parsed = JSON.parse(text);
+        } catch {
+            // An envelope we cannot read is not a message we can show.
+            return null;
+        }
+        const candidate = (parsed as { message?: unknown } | null)?.message;
+        if (typeof candidate !== 'string' || !candidate.trim()) return null;
+        message = candidate.trim();
+    }
+
+    // A proxy's HTML error page, or a stack trace, is not something to show.
+    if (message.startsWith('<') || message.length > MAX_SERVER_MESSAGE) return null;
+    if (GENERIC_SERVER_MESSAGES.has(message)) return null;
+
+    return message;
+};
+
+/**
+ * The error to throw for a failed response: the server's own sentence when it
+ * wrote one, and `fallback` otherwise.
+ *
+ * CONSUMES the response body, so a caller that also wants to read it must use
+ * `messageFromBody` on text it read itself — `PhotoService` is the one that does.
+ * A body that cannot be read at all is not a reason to lose the failure, so the
+ * read is guarded and falls back like any other unusable body.
+ */
+export const apiError = async (response: Response, fallback: string): Promise<Error> => {
+    let body = '';
+    try {
+        body = await response.text();
+    } catch {
+        /* fall back below */
+    }
+    return new Error(messageFromBody(response.status, body) ?? fallback);
+};

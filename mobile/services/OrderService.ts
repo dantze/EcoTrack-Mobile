@@ -1,4 +1,4 @@
-import { apiFetch } from './http';
+import { apiError, apiFetch } from './http';
 
 /**
  * One read, for one screen: TaskDetails shows the order behind the task the
@@ -9,7 +9,7 @@ export const OrderService = {
     getOrderById: async (id: number) => {
         try {
             const response = await apiFetch(`/orders/${id}`);
-            if (!response.ok) throw new Error('Eșec la preluarea detaliilor comenzii');
+            if (!response.ok) throw await apiError(response, 'Eșec la preluarea detaliilor comenzii');
             return await response.json();
         } catch (error) {
             console.error('Error fetching order details:', error);

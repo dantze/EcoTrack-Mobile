@@ -12,10 +12,33 @@
  * the Sales module's phrasing rule for an unknown thrown value.
  */
 
+import { ApiError, serverMessage } from '@/api';
+
 export { toast } from '@/components/ui';
 
-/** Turns an unknown thrown value into a Romanian message for the toast. */
+/**
+ * Turns an unknown thrown value into a Romanian message for the toast.
+ *
+ * **The server's own words win** (TODO-51). `ApiError.message` is the request
+ * line — "DELETE /subscriptions/3 failed with 409" — so the old rule pasted an
+ * English technical string after a Romanian fallback, for exactly the refusals
+ * that were written to be read: the insufficient-quantity 409, the retired-plan
+ * 409, and `SubscriptionService.blockedMessage`, which goes to the trouble of
+ * agreeing in Romanian ("1 comandă" vs "24 de comenzi"). That last one was
+ * visible only because `SubscriptionsPage` special-cases 409 on that one
+ * screen; `serverMessage` is where the rule belongs instead.
+ *
+ * The server message is shown ALONE, without `fallback` in front of it: these
+ * sentences already name what failed, and "Nu s-a putut șterge abonamentul:
+ * Abonamentul „X” nu poate fi șters, 3 comenzi îl folosesc." says it twice.
+ *
+ * A `MockApiError` is a plain `Error` whose message IS the user-facing text, so
+ * mock mode keeps falling through to the last branch and reads as it always did.
+ */
 export function errorMessage(error: unknown, fallback: string): string {
+  const fromServer = serverMessage(error);
+  if (fromServer) return fromServer;
+  if (error instanceof ApiError) return `${fallback} (cod ${error.status}).`;
   if (error instanceof Error && error.message) return `${fallback}: ${error.message}`;
   return fallback;
 }

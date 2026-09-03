@@ -5,7 +5,7 @@
  * here — this file is only for dispatch-specific derivations.
  */
 
-import { ApiError } from '@/api';
+import { ApiError, serverMessage } from '@/api';
 import type { Employee, Route, Task } from '@/types/domain';
 import { FREQUENCY_LABELS } from './constants';
 
@@ -140,9 +140,20 @@ export const ADMIN_FORBIDDEN_MESSAGE =
   'Operațiunile pe angajați necesită drepturi de administrator. ' +
   'Contul tău nu are drepturile necesare, așa că serverul a refuzat cererea.';
 
-/** A Romanian, user-facing message for any thrown value. */
+/**
+ * A Romanian, user-facing message for any thrown value.
+ *
+ * **The server's own words win** (TODO-51). Every refusal that matters here —
+ * the retired-plan 409, the insufficient-quantity 409, the "N comenzi still use
+ * this plan" 409 — is a Romanian sentence the backend went to the trouble of
+ * writing, and this function used to answer all of them with "Cererea a eșuat
+ * (cod 409)". `serverMessage` is the single place that decides which bodies are
+ * fit to show; the branches below are what is left when it declines.
+ */
 export function errorMessage(error: unknown): string {
   if (isAdminAuthError(error)) return ADMIN_FORBIDDEN_MESSAGE;
+  const fromServer = serverMessage(error);
+  if (fromServer) return fromServer;
   if (error instanceof ApiError) {
     if (error.status === 404) return 'Resursa nu a fost găsită pe server.';
     if (error.status >= 500) return 'Serverul a returnat o eroare. Încearcă din nou.';

@@ -27,22 +27,21 @@ unless its status says otherwise.
 **Status legend:** `[ ]` not started · `[~]` in progress · `[DONE]` done ·
 `[POSTPONED]` deliberately deferred · `[?]` needs a decision first
 
-**Next free ID: TODO-71.** (Highest used is TODO-70.)
+**Next free ID: TODO-76.** (Highest used is TODO-75.)
 
 ---
 
-## Still open — 24 of 70
+## Still open — 23 of 75
 
 The whole of what is left, in one place. Everything not listed here is `[DONE]`.
 
 - **TODO-17** `[POSTPONED]` — All other AI ideas *(F)*
+- **TODO-71** `[ ]` — A second deploy target exists in `infra/` and is wired to nothing *(G)*
 - **TODO-72** `[ ]` — Installed phones need a rebuild, and the Maps key needs revoking *(G)*
 - **TODO-74** `[ ]` — `DataLoader` seeds every test context, and no test asks it to *(J)*
 - **TODO-75** `[ ]` — The web bundle falls back to the dead droplet, over plain HTTP *(G)*
 - **TODO-73** `[ ]` — `AccessRequestsPage` paints with tokens that do not exist *(J)*
 - **TODO-48** `[ ]` — `bootNavigation.test.tsx` fails on Node 24 *(G)*
-- **TODO-50** `[ ]` — Nothing checks that the index at the top of TODO.md is true *(G)*
-- **TODO-51** `[ ]` — The web app throws away the server's Romanian refusal text *(J)*
 - **TODO-53** `[ ]` — `CredentialRow.username` in the web mock is write-only *(A)*
 - **TODO-54** `[ ]` — The live production build still ships the mock seed database *(G)*
 - **TODO-55** `[ ]` — The bundle budget measures the mock build, not the deployed one *(G)*
@@ -124,8 +123,8 @@ full text lives further down.
 | TODO-47 | `[DONE]` | G | `bundle_budget.py` counts lazy chunks named `index-*` as eager |
 | TODO-48 | **`[ ]`** | G | `bootNavigation.test.tsx` fails on Node 24 |
 | TODO-49 | `[DONE]` | G | CLAUDE.md's Known gaps still says mobile cannot authenticate |
-| TODO-50 | **`[ ]`** | G | Nothing checks that the index at the top of TODO.md is true |
-| TODO-51 | **`[ ]`** | J | The web app throws away the server's Romanian refusal text |
+| TODO-50 | `[DONE]` | G | Nothing checks that the index at the top of TODO.md is true |
+| TODO-51 | `[DONE]` | J | The web app throws away the server's Romanian refusal text |
 | TODO-52 | `[DONE]` | C | The batch order-status endpoint in TODO-43 needs TODO-42's guard |
 | TODO-53 | **`[ ]`** | A | `CredentialRow.username` in the web mock is write-only |
 | TODO-54 | **`[ ]`** | G | The live production build still ships the mock seed database |
@@ -145,6 +144,7 @@ full text lives further down.
 | TODO-68 | **`[ ]`** | G | This machine cannot run the backend suite or the hygiene guards |
 | TODO-69 | `[DONE]` | J | Three bugs only a live backend could show |
 | TODO-70 | **`[ ]`** | J | Orders created before the numbering fix are still `#0` |
+| TODO-71 | **`[ ]`** | G | A second deploy target exists in `infra/` and is wired to nothing |
 | TODO-72 | **`[ ]`** | G | Installed phones need a rebuild, and the Maps key needs revoking |
 | TODO-73 | **`[ ]`** | J | `AccessRequestsPage` paints with tokens that do not exist |
 | TODO-74 | **`[ ]`** | J | `DataLoader` seeds every test context, and no test asks it to |
@@ -2473,7 +2473,7 @@ the number comparable to what the Dockerfile produces.
 
 ---
 
-### TODO-50 `[ ]` Nothing checks that the index at the top of TODO.md is true
+### TODO-50 `[DONE]` Nothing checks that the index at the top of TODO.md is true
 Found while reorganising this file (the pass that also closed TODO-49). The
 *Index* and *Still open* lists near the top are now the only way to see the
 backlog without reading 1900 lines — which makes them a new thing that can be
@@ -2520,6 +2520,58 @@ failed to write their item down. Every one of the ten is present, in its section
 with its full text. Only the three hand-maintained summaries were missed — which
 is the argument for checking them mechanically rather than for trying harder.
 
+**Done — `.github/scripts/todo_index.py`, a fourth guard beside `doc_claims.py`.**
+Chosen over folding it into `repo_hygiene.py` for the reason this item already
+gives: it is a different question about the same file, and `repo_hygiene.py` is
+about "what has no workflow watching it", which this is not. It runs from
+`repo-hygiene.yml` with `if: always()` like the other three, so a PR that breaks
+two guards hears about both in one run, and under no `paths:` filter — a stale
+index is exactly what a project-filtered run would miss. The `verify` skill's
+"three cross-cutting guards" is now four.
+
+It asserts what this item asked for: every `### TODO-NN` heading is unique;
+the index lists every ID exactly once and no others; each row's status and title
+match its heading verbatim; each row's letter is the `## X.` section the item
+actually sits in; the *Still open* list is exactly the non-`[DONE]` set; and the
+two counters — `Still open — N of M` and *Next free ID* — agree with the items.
+
+**It failed on the file it was written against** — eight findings across the
+three drifts below, which is the third time this one item has had to record one:
+
+- **TODO-71 had no index row and no *Still open* entry.** The `infra/` item,
+  written by the Terraform pass. CLAUDE.md points at it by number, so a reader
+  following that pointer to the index would have found nothing there.
+- **TODO-72 and TODO-75 were indexed under G but sat at the end of J.** Both are
+  repo/CI items; whoever wrote them appended to the end of the file rather than
+  to the end of their section, and the index recorded the intent.
+- **"Still open — 24 of 70" for 25 open of 75**, and **"Next free ID: TODO-71"
+  when TODO-71 through TODO-75 already existed.** That is the same near-miss
+  this item records for TODO-64, four IDs later and undetected until a script
+  looked — which is the whole argument.
+
+Repaired in the same pass: TODO-71, TODO-72 and TODO-75 moved into section G
+where the index already filed two of them, the missing row and bullet added,
+both counters corrected.
+
+Two decisions inside the script worth knowing before extending it:
+
+- **"Open" is "the status does not start with DONE"**, so `[POSTPONED]`, `[~]`
+  and `[?]` are open and `[DONE — needs your eyes]` is not. That second form is
+  why the *Done, but flagged by whoever did it* list is checked too: it is
+  exactly the qualified-`[DONE]` set, and it is the same kind of hand-maintained
+  summary sitting one line further down.
+- **A row's section letter is checked against where the item SITS**, not against
+  the *Sections* table. Either repair satisfies it — move the item or change the
+  letter — and the failure message says so, because which one is right is a
+  judgement about the item's topic that a script has no business making.
+
+*Not run on this machine:* `python3` is still the Store alias stub (TODO-68). The
+logic was exercised by a line-by-line Node port — against TODO.md before the
+repair (where it produced the eight findings above), after it (clean), and
+against eleven deliberately mutated copies, at least one per check, every one of
+which it rejected with the intended message. The Python itself first executes in
+CI, so treat its first run there as the real one.
+
 ### TODO-68 `[ ]` This machine cannot run the backend suite or the hygiene guards
 Found while doing TODO-35/57, and recorded because it puts an asterisk on "the
 tests pass" for every backend change made here.
@@ -2565,6 +2617,112 @@ because it put two new checks into `cross_project_invariants.py` (mobile must
 not name an order type; mobile's API surface is a closed list) whose logic was
 verified by re-implementing the scan in Node against the real tree, not by
 running the script. `winget install Python.Python.3.12` is the whole fix.
+
+### TODO-71 `[ ]` A second deploy target exists in `infra/` and is wired to nothing
+Scaffolded on request: Terraform for GCP (Cloud Run + Cloud SQL Postgres +
+Artifact Registry + Secret Manager + a least-privilege IAM pair) and Vercel (the
+`web/` SPA), plus `.github/workflows/deploy-cloud.yml`.
+
+`terraform fmt`, `init -backend=false` and `validate` all pass locally against
+the real provider schemas — google 6.50.0, vercel 3.17.0, random 3.9.0, resolved
+by Terraform 1.15.8 and pinned in `infra/.terraform.lock.hcl` for
+windows/linux/darwin. So the configuration is syntactically and schema-correct.
+**Nothing has been applied**, which is a different claim: there is no GCP
+project and no Vercel account, so no resource has ever been created and no
+`plan` has ever run against a real API.
+
+`deploy.yml` (VPS + Caddy) is untouched and is still the live deployment. The
+new workflow deliberately took a different filename rather than replacing it.
+
+**What has to be decided before any of it is trusted:**
+
+- **Is this replacing the VPS or sitting beside it?** Two live deployments mean
+  two databases and two truths about the same customers. If it replaces, there
+  is a data migration (H2/Postgres dump → Cloud SQL) that nothing here covers.
+- **State is local.** `infra/providers.tf` has no `backend` block, so the
+  workflow's `apply` would start from empty state on every run and fail on the
+  second. A GCS bucket must exist and be wired in first; the workflow prints a
+  warning until it is.
+- **The identity that runs `terraform apply` in CI needs near-owner rights**,
+  which is a strictly bigger grant than the deployer service account Terraform
+  creates. `infra/README.md` lays out three options; none is chosen.
+- **CORS becomes load-bearing.** On the VPS, Caddy serves the SPA and the API
+  from one origin, so the browser never makes a cross-origin call. Split across
+  Cloud Run and Vercel it does. `main.tf` computes
+  `ECOTRACK_CORS_ALLOWED_ORIGINS` from the Vercel project name, which is a
+  guess at the deterministic `*.vercel.app` alias — a custom domain or a renamed
+  project silently breaks the frontend while the backend stays healthy.
+- **Task photos still go to DigitalOcean Spaces.** Nothing GCS-shaped is
+  scaffolded; the `DO_SPACES_*` values would have to be passed through
+  `backend_env` / `backend_secrets`, which means the "GCP deployment" still
+  depends on a DigitalOcean bucket.
+- **`mobile/` is not covered.** It ships through EAS and would need
+  `EXPO_PUBLIC_API_BASE_URL` repointed at the Cloud Run URL — and the hardcoded
+  `http://146.190.224.202:8080/api` fallback in `constants/ApiConfig.ts` is
+  still what installed builds fall back to.
+
+Also unresolved: no monitoring or alerting, no rate limiting in front of Cloud
+Run, and `db-f1-micro` is shared-core with no SLA, so the default tier is a
+first-deploy choice rather than a production one.
+
+### TODO-72 `[ ]` Installed phones need a rebuild, and the Maps key needs revoking
+Two things TODO-33 could not do from inside the repository.
+
+**1. `eas update` cannot ship this.** TODO-33 removed native modules
+(`react-native-maps`, ML Kit text recognition, the calendar and draggable-list
+packages) and changed `app.config.js`. OTA updates carry JS and assets only, so
+until `deploy-mobile.yml` is run with `build-production` and the new binary is
+installed, an existing install keeps its old one — Sales and Technical screens
+included. Those screens still work against the live backend, because the backend
+authorizes by role and an office role is still an office role; they are simply a
+second, now-unmaintained implementation of screens that moved to the web.
+Nothing is unsafe about that, but it is a divergence with a date on it.
+
+**2. `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY` is no longer read by anything.** It has
+been removed from `app.config.js`, `deploy-mobile.yml` and the secret list in
+`DEPLOYMENT.md`. Deleting the repository secret is one click; **revoking the key
+in the Google Cloud console is the half that stops it billing**, and that is
+outside this repo. Note that an installed old binary still carries the key baked
+in (`EXPO_PUBLIC_*` is inlined at build time), so revoking it breaks the map on
+those installs — which is fine and is the same event as (1), but do them in that
+order, or knowingly not.
+
+*Found while doing TODO-33.*
+
+### TODO-75 `[ ]` The web bundle falls back to the dead droplet, over plain HTTP
+`web/src/lib/config.ts` ends with
+
+```ts
+export const API_BASE_URL: string =
+  import.meta.env.VITE_API_BASE_URL ?? 'http://146.190.224.202:8080/api';
+```
+
+That droplet is gone — it is the same host TODO-32 is about, and `mobile/.env.example`
+already describes it as "a droplet that no longer answers".
+
+It is latent rather than live: `web/Dockerfile` sets `VITE_API_BASE_URL=/api`
+explicitly, so the production bundle never reaches the fallback, and in mock
+mode the value is unused. It fires only in a live-mode build that forgot the
+variable — and then it is worse than a plain failure, because the page is served
+over HTTPS and the fallback is `http://`, so the browser blocks it as mixed
+content and the app fails with a console error rather than a network one.
+
+The fix is one line: default to `'/api'`. Same-origin is what the deployment
+actually is (Caddy serves the SPA and proxies `/api` on one domain), so a
+relative default cannot be wrong there, and a live build outside that setup would
+fail against its own origin — a much easier thing to diagnose than a stranger's
+IP appearing in the network tab.
+
+Not done inside TODO-32 because that item is about the deploy workflow and this
+is application code; folding a behaviour change into a workflow diff hides it.
+
+**Mobile's identical-looking fallback is NOT the same case and must not be
+"fixed" alongside it.** `mobile/constants/ApiConfig.ts` keeps the bare IP
+deliberately: it is what already-installed builds resolve to, and Expo inlines
+`EXPO_PUBLIC_*` at build time so those binaries cannot be repointed without a
+rebuild (see the Known gaps section of CLAUDE.md, and TODO-72).
+
+*Found while doing TODO-32.*
 
 ---
 
@@ -3119,7 +3277,7 @@ why nothing had to move. Whether to actually disable it is TODO-74.
 Part 1 (the clock-granularity races) was already fixed and is unchanged.
 Verified: `./gradlew build` green, 44s.
 
-### TODO-51 `[ ]` The web app throws away the server's Romanian refusal text
+### TODO-51 `[DONE]` The web app throws away the server's Romanian refusal text
 Found while doing TODO-39, which adds a third backend 409 whose whole value is
 its message.
 
@@ -3145,6 +3303,71 @@ message}`, so it would have to prefer `.message` and fall back to the raw text),
 or add an explicit allowlist of statuses whose body is known to be user-facing.
 Mobile has the same gap in its `Eșec la …` throw sites and should follow whichever
 is picked.
+
+**Done — `serverMessage()` in `web/src/api/http.ts`, exported from `@/api`.**
+Of the two options this item offered, the **allowlist** won, because "surface
+`ApiError.body` whenever it is non-empty" is not actually the simpler of the
+two once you read `GlobalExceptionHandler`: several of its handlers answer with
+deliberately generic **English** prose, and putting that in a Romanian toast is
+worse than the status code it would replace. 401 and 403 are the sharp case —
+they are generic *on purpose*, so an unauthorized caller is not told which rule
+stopped them, and echoing them would undo that.
+
+So `serverMessage` returns the backend's text only for **400 / 404 / 409**,
+which is exactly the set whose message comes from a domain exception:
+`IllegalArgumentException`, `ResourceNotFoundException` ("Ruta nu a fost
+găsită"), `IllegalStateException` (the TODO-39 retired-plan refusal,
+`SubscriptionService.blockedMessage`) and `InsufficientQuantityException`. It
+prefers `.message` out of the four-key envelope `GlobalExceptionHandler.body()`
+builds and falls back to the raw text, and it returns `null` — rather than
+guessing — for an empty body, an envelope it cannot parse, a proxy's HTML error
+page, anything over 400 characters, and the three English strings Spring itself
+raises on a 400 ("Malformed request body.", "Request validation failed. Check
+field details.", "Request could not be processed."), which are listed in the
+file so the next generic handler is added there and not to a screen.
+
+**Both `errorMessage`s were fixed, not just the one this item named.**
+`features/technical/utils.ts` was the one described here. The second,
+`features/sales/components/Toaster.tsx`, was worse and unmentioned: it renders
+`` `${fallback}: ${error.message}` ``, and `ApiError.message` is the request
+line — so ~20 Sales call sites showed the operator *"Nu s-a putut șterge
+abonamentul: DELETE /subscriptions/3 failed with 409"*. It now asks
+`serverMessage` first, and falls back to `` `${fallback} (cod ${status}).` ``
+rather than pasting English at a Romanian sentence. A `MockApiError` is a plain
+`Error` whose message already IS the user-facing text, so mock mode reads as it
+always did.
+
+The server sentence is shown **alone**, without the fallback in front of it:
+these refusals already name what failed, and "Nu s-a putut șterge abonamentul:
+Abonamentul „X" nu poate fi șters, 3 comenzi îl folosesc." says it twice.
+`SubscriptionsPage`'s 409 special case stays — it does something else, re-reading
+the usage so the blockers dialog is not stale — but it is no longer the only way
+`blockedMessage` reaches a human.
+
+**Mobile followed, as this item said it should.** `messageFromBody(status, body)`
+and `apiError(response, fallback)` in `mobile/services/http.ts` carry the same
+allowlist and the same reasoning, and every `Eșec la …` throw site in
+`TaskService`, `RouteService`, `OrderService`, `EmployeeService` and
+`PhotoService` now goes through them. Two things there are deliberate:
+
+- **The copy is deliberate.** The projects cannot import each other (CLAUDE.md,
+  *Conventions*), and this is a dozen lines rather than a parser worth pinning to
+  a `shared/` fixture the way `id-mrz-cases.json` pins the MRZ reader. Both
+  copies say so and name the other.
+- **`EnrollmentService` keeps its own, broader `messageFrom`.** It was already
+  doing the right thing, and `EnrollmentController` is the one place that writes
+  its OWN Romanian body outside the allowlist — 403 "Cod de configurare
+  invalid", 429 "Prea multe cereri…", 410 "Cererea a expirat…". Routing it
+  through `messageFromBody` would have silently replaced all three with a
+  fallback, so a comment there now says why it must not be "unified".
+
+`PhotoService.uploadTaskPhotos` was reading `response.json()` *before* checking
+the status, so a refusal whose body was not JSON threw a parse error instead of
+the failure, and one whose body was JSON had already been consumed. It reads the
+body once, as text, now.
+
+Covered by `web/src/api/__tests__/serverMessage.test.ts` (14 cases, including
+both `errorMessage`s) and `mobile/services/__tests__/serverMessage.test.ts` (9).
 
 ### TODO-58 `[ ]` The UI rebuild stopped short on four surfaces
 The web UI was rebuilt on shadcn/ui + Mantine (see `.claude/skills/web-ui-shadcn`
@@ -3395,45 +3618,6 @@ pulls the rebuild and finds every import red. Worth deciding whether it earns a
 line in `README.md` next to the other setup steps, since the same trap is one
 `git pull` away for anyone who had `web/node_modules` from before the rebuild.
 
-
-
-
-
-### TODO-75 `[ ]` The web bundle falls back to the dead droplet, over plain HTTP
-`web/src/lib/config.ts` ends with
-
-```ts
-export const API_BASE_URL: string =
-  import.meta.env.VITE_API_BASE_URL ?? 'http://146.190.224.202:8080/api';
-```
-
-That droplet is gone — it is the same host TODO-32 is about, and `mobile/.env.example`
-already describes it as "a droplet that no longer answers".
-
-It is latent rather than live: `web/Dockerfile` sets `VITE_API_BASE_URL=/api`
-explicitly, so the production bundle never reaches the fallback, and in mock
-mode the value is unused. It fires only in a live-mode build that forgot the
-variable — and then it is worse than a plain failure, because the page is served
-over HTTPS and the fallback is `http://`, so the browser blocks it as mixed
-content and the app fails with a console error rather than a network one.
-
-The fix is one line: default to `'/api'`. Same-origin is what the deployment
-actually is (Caddy serves the SPA and proxies `/api` on one domain), so a
-relative default cannot be wrong there, and a live build outside that setup would
-fail against its own origin — a much easier thing to diagnose than a stranger's
-IP appearing in the network tab.
-
-Not done inside TODO-32 because that item is about the deploy workflow and this
-is application code; folding a behaviour change into a workflow diff hides it.
-
-**Mobile's identical-looking fallback is NOT the same case and must not be
-"fixed" alongside it.** `mobile/constants/ApiConfig.ts` keeps the bare IP
-deliberately: it is what already-installed builds resolve to, and Expo inlines
-`EXPO_PUBLIC_*` at build time so those binaries cannot be repointed without a
-rebuild (see the Known gaps section of CLAUDE.md, and TODO-72).
-
-*Found while doing TODO-32.*
-
 ### TODO-74 `[ ]` `DataLoader` seeds every test context, and no test asks it to
 Found while doing TODO-31, which had to establish what was actually in a test
 database before it could isolate them.
@@ -3461,30 +3645,6 @@ it should not ride along with an unrelated change.
 
 *Found while doing TODO-31.*
 
-### TODO-72 `[ ]` Installed phones need a rebuild, and the Maps key needs revoking
-Two things TODO-33 could not do from inside the repository.
-
-**1. `eas update` cannot ship this.** TODO-33 removed native modules
-(`react-native-maps`, ML Kit text recognition, the calendar and draggable-list
-packages) and changed `app.config.js`. OTA updates carry JS and assets only, so
-until `deploy-mobile.yml` is run with `build-production` and the new binary is
-installed, an existing install keeps its old one — Sales and Technical screens
-included. Those screens still work against the live backend, because the backend
-authorizes by role and an office role is still an office role; they are simply a
-second, now-unmaintained implementation of screens that moved to the web.
-Nothing is unsafe about that, but it is a divergence with a date on it.
-
-**2. `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY` is no longer read by anything.** It has
-been removed from `app.config.js`, `deploy-mobile.yml` and the secret list in
-`DEPLOYMENT.md`. Deleting the repository secret is one click; **revoking the key
-in the Google Cloud console is the half that stops it billing**, and that is
-outside this repo. Note that an installed old binary still carries the key baked
-in (`EXPO_PUBLIC_*` is inlined at build time), so revoking it breaks the map on
-those installs — which is fine and is the same event as (1), but do them in that
-order, or knowingly not.
-
-*Found while doing TODO-33.*
-
 ### TODO-73 `[ ]` `AccessRequestsPage` paints with tokens that do not exist
 `web/src/features/admin/AccessRequestsPage.tsx` uses `text-content` and
 `text-content-muted` in four places. Neither is defined — `src/index.css` has no
@@ -3502,53 +3662,6 @@ lists the surfaces the UI rebuild stopped short on, and this is plausibly a
 fifth.
 
 *Found while auditing every screen at phone width for TODO-33.*
-
-### TODO-71 `[ ]` A second deploy target exists in `infra/` and is wired to nothing
-Scaffolded on request: Terraform for GCP (Cloud Run + Cloud SQL Postgres +
-Artifact Registry + Secret Manager + a least-privilege IAM pair) and Vercel (the
-`web/` SPA), plus `.github/workflows/deploy-cloud.yml`.
-
-`terraform fmt`, `init -backend=false` and `validate` all pass locally against
-the real provider schemas — google 6.50.0, vercel 3.17.0, random 3.9.0, resolved
-by Terraform 1.15.8 and pinned in `infra/.terraform.lock.hcl` for
-windows/linux/darwin. So the configuration is syntactically and schema-correct.
-**Nothing has been applied**, which is a different claim: there is no GCP
-project and no Vercel account, so no resource has ever been created and no
-`plan` has ever run against a real API.
-
-`deploy.yml` (VPS + Caddy) is untouched and is still the live deployment. The
-new workflow deliberately took a different filename rather than replacing it.
-
-**What has to be decided before any of it is trusted:**
-
-- **Is this replacing the VPS or sitting beside it?** Two live deployments mean
-  two databases and two truths about the same customers. If it replaces, there
-  is a data migration (H2/Postgres dump → Cloud SQL) that nothing here covers.
-- **State is local.** `infra/providers.tf` has no `backend` block, so the
-  workflow's `apply` would start from empty state on every run and fail on the
-  second. A GCS bucket must exist and be wired in first; the workflow prints a
-  warning until it is.
-- **The identity that runs `terraform apply` in CI needs near-owner rights**,
-  which is a strictly bigger grant than the deployer service account Terraform
-  creates. `infra/README.md` lays out three options; none is chosen.
-- **CORS becomes load-bearing.** On the VPS, Caddy serves the SPA and the API
-  from one origin, so the browser never makes a cross-origin call. Split across
-  Cloud Run and Vercel it does. `main.tf` computes
-  `ECOTRACK_CORS_ALLOWED_ORIGINS` from the Vercel project name, which is a
-  guess at the deterministic `*.vercel.app` alias — a custom domain or a renamed
-  project silently breaks the frontend while the backend stays healthy.
-- **Task photos still go to DigitalOcean Spaces.** Nothing GCS-shaped is
-  scaffolded; the `DO_SPACES_*` values would have to be passed through
-  `backend_env` / `backend_secrets`, which means the "GCP deployment" still
-  depends on a DigitalOcean bucket.
-- **`mobile/` is not covered.** It ships through EAS and would need
-  `EXPO_PUBLIC_API_BASE_URL` repointed at the Cloud Run URL — and the hardcoded
-  `http://146.190.224.202:8080/api` fallback in `constants/ApiConfig.ts` is
-  still what installed builds fall back to.
-
-Also unresolved: no monitoring or alerting, no rate limiting in front of Cloud
-Run, and `db-f1-micro` is shared-core with no SLA, so the default tier is a
-first-deploy choice rather than a production one.
 
 ---
 

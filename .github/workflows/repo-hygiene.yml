@@ -65,10 +65,13 @@ jobs:
       - name: Hygiene checks
         run: python3 .github/scripts/repo_hygiene.py --changed-files changed.txt
 
-      # The three cross-cutting checks below all belong here rather than in a
+      # The four cross-cutting checks below all belong here rather than in a
       # per-project CI file: each compares facts across projects, or between
       # code and prose, so running them under a `paths:` filter would mean a
-      # PR touching one side never checks it against the other.
+      # PR touching one side never checks it against the other. The fourth
+      # compares prose with prose inside one file — TODO.md's hand-maintained
+      # index against the items it claims to list — and a `paths:` filter is
+      # exactly what would miss a stale index (TODO-50).
       #
       # `if: always()` so one failure does not hide the others — a PR that
       # broke two of them should learn about both in one run.
@@ -83,6 +86,10 @@ jobs:
       - name: Dead configuration
         if: always()
         run: python3 .github/scripts/dead_config.py
+
+      - name: TODO.md index
+        if: always()
+        run: python3 .github/scripts/todo_index.py
 
       - name: Validate workflow YAML
         if: always()

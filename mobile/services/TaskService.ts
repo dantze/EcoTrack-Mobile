@@ -1,4 +1,4 @@
-import { apiFetch } from './http';
+import { apiError, apiFetch } from './http';
 
 export interface Task {
     id: number;
@@ -36,7 +36,7 @@ export const TaskService = {
      */
     getTaskById: async (id: number): Promise<Task> => {
         const response = await apiFetch(`/tasks/${id}`);
-        if (!response.ok) throw new Error('Sarcina nu a fost găsită');
+        if (!response.ok) throw await apiError(response, 'Sarcina nu a fost găsită');
         return await response.json();
     },
 
@@ -51,7 +51,7 @@ export const TaskService = {
      */
     getMyTasksByDate: async (date: string): Promise<Task[]> => {
         const response = await apiFetch(`/tasks/mine/date/${date}`);
-        if (!response.ok) throw new Error('Eșec la preluarea sarcinilor angajatului');
+        if (!response.ok) throw await apiError(response, 'Eșec la preluarea sarcinilor angajatului');
         return await response.json();
     },
 
@@ -66,7 +66,7 @@ export const TaskService = {
      */
     getTasksByEmployeeAndDate: async (employeeId: number, date: string): Promise<Task[]> => {
         const response = await apiFetch(`/tasks/employee/${employeeId}/date/${date}`);
-        if (!response.ok) throw new Error('Eșec la preluarea sarcinilor angajatului');
+        if (!response.ok) throw await apiError(response, 'Eșec la preluarea sarcinilor angajatului');
         return await response.json();
     },
 
@@ -81,7 +81,7 @@ export const TaskService = {
             },
             body: JSON.stringify({ status }),
         });
-        if (!response.ok) throw new Error('Eșec la actualizarea stării sarcinii');
+        if (!response.ok) throw await apiError(response, 'Eșec la actualizarea stării sarcinii');
         return await response.json();
     },
 
@@ -96,7 +96,7 @@ export const TaskService = {
      */
     getTaskPhotos: async (taskId: number): Promise<string[]> => {
         const response = await apiFetch(`/tasks/${taskId}/photos`);
-        if (!response.ok) throw new Error('Eșec la preluarea pozelor sarcinii');
+        if (!response.ok) throw await apiError(response, 'Eșec la preluarea pozelor sarcinii');
         return await response.json();
     },
 };

@@ -1,4 +1,4 @@
-import { apiFetch } from './http';
+import { apiFetch, messageFromBody } from './http';
 
 /**
  * PhotoService handles all photo-related communication with the backend.
@@ -49,13 +49,19 @@ export const PhotoService = {
             body: formData,
         });
 
-        const responseData = await response.json();
-        console.log(`[PhotoService] Task photos upload response:`, responseData);
+        // Read the body ONCE, as text. `response.json()` was called before the
+        // status was checked, so a refusal whose body is not JSON — a proxy's
+        // error page — threw a parse error instead of the failure, and a
+        // refusal whose body IS JSON had already been consumed by the time
+        // anyone wanted its message (TODO-51).
+        const responseText = await response.text();
+        console.log(`[PhotoService] Task photos upload response:`, responseText);
 
         if (!response.ok) {
-            throw new Error('Eșec la încărcarea pozelor sarcinii');
+            const message = messageFromBody(response.status, responseText);
+            throw new Error(message ?? 'Eșec la încărcarea pozelor sarcinii');
         }
 
-        return responseData;
+        return JSON.parse(responseText);
     },
 };

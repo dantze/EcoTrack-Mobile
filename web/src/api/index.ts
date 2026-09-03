@@ -18,7 +18,7 @@ export const api: EcoTrackApi = IS_MOCK ? mockApi : liveApi;
 
 export { DATA_MODE };
 export * from './contract';
-export { ApiError } from './http';
+export { ApiError, serverMessage } from './http';
 
 /**
  * The device id mock mode enrolls with on boot, so `AuthProvider` can drive the

@@ -45,7 +45,13 @@ NO_CI_REQUIRED = {
     "deploy",           # documentation-only systemd unit + README
     "CLAUDE.md",
     "README.md",
-    "TODO.md",          # the backlog; prose, ships in no build
+    # The backlog. Prose, and it ships in no build - but "no CI workflow"
+    # stopped being true of it: repo-hygiene.yml's "TODO.md index" step runs
+    # todo_index.py on every PR, holding the hand-maintained Index and
+    # 'Still open' list at the top of the file to the items below it (TODO-50).
+    # Same shape as the compose-file exemption below: exempt from the ci-*.yml
+    # requirement because it is covered by a check with no `paths:` filter.
+    "TODO.md",
     "DEPLOYMENT.md",    # the runbook; prose, ships in no build
     ".env.example",     # a template of NAMES only; read by nothing at build time
     # The compose files ARE load-bearing - deploy.yml watches docker-compose.yml

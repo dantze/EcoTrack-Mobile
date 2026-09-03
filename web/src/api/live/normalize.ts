@@ -34,6 +34,7 @@ import type {
   TaskStatus,
   TaskType,
 } from '@/types/domain';
+import type { SessionDevice } from '../contract';
 
 // ---------------------------------------------------------------------------
 // Scalar coercion
@@ -487,6 +488,29 @@ export function normalizeRecurring(raw: RawRecurring, relations: Relations = {})
  * GET /tasks/{id}/photos returns `List<String>` — bare URLs, no ids. Synthesise
  * stable-per-response ids from the position so the UI has React keys.
  */
+/**
+ * One row of GET /auth/sessions or GET /admin/employees/{id}/sessions — the
+ * same `SessionResponse` DTO from either, which is why this lives here rather
+ * than in auth.ts (TODO-56).
+ */
+export interface RawSessionDevice {
+  id: number | string;
+  device?: string | null;
+  createdAt?: string | null;
+  lastUsedAt?: string | null;
+  current?: boolean;
+}
+
+export function normalizeSessionDevice(raw: RawSessionDevice): SessionDevice {
+  return {
+    id: String(raw.id),
+    device: raw.device ?? 'Dispozitiv necunoscut',
+    createdAt: raw.createdAt ?? '',
+    lastUsedAt: raw.lastUsedAt ?? '',
+    current: raw.current ?? false,
+  };
+}
+
 export function normalizePhotoUrls(urls: unknown): TaskPhoto[] {
   if (!Array.isArray(urls)) return [];
   return urls

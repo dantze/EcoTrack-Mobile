@@ -1,12 +1,16 @@
 package com.example.damiProd.controller;
 
+import com.example.damiProd.config.EmployeePrincipal;
 import com.example.damiProd.dto.CreateEmployeeRequest;
 import com.example.damiProd.dto.EmployeeResponse;
+import com.example.damiProd.dto.SessionResponse;
 import com.example.damiProd.service.AdminService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -80,6 +84,64 @@ public class AdminController {
             return ResponseEntity.ok(Map.of("message", "Employee deleted successfully"));
         }
         return ResponseEntity.notFound().build();
+    }
+
+    // ==================== SESSION ENDPOINTS (TODO-56) ====================
+
+    // Somebody ELSE's devices. The self-scoped equivalents live on
+    // /api/auth/sessions and stay self-scoped: AuthController passes the
+    // caller's own employee id, these pass the one in the URL.
+    //
+    // No SecurityConfig row is needed for any of the three - /api/admin/**
+    // already requires ADMIN and is matched ABOVE the office-staff DELETE
+    // catch-all, so a SALES token gets 403 here without anything being added.
+    // AuthorizationMatrixTest asserts that rather than assuming it.
+
+    /**
+     * GET /api/admin/employees/{id}/sessions - the devices holding a live
+     * refresh token for that employee, newest use first.
+     */
+    @GetMapping("/employees/{id}/sessions")
+    public ResponseEntity<List<SessionResponse>> listSessions(@PathVariable Long id,
+            @AuthenticationPrincipal EmployeePrincipal principal) {
+        return ResponseEntity.ok(adminService.listSessions(id, callerSessionId(principal)));
+    }
+
+    /**
+     * DELETE /api/admin/employees/{id}/sessions/{sessionId} - revoke one device.
+     * 404 when that session is not that employee's.
+     */
+    @DeleteMapping("/employees/{id}/sessions/{sessionId}")
+    public ResponseEntity<Void> revokeSession(@PathVariable Long id, @PathVariable Long sessionId) {
+        return adminService.revokeSession(id, sessionId)
+                ? ResponseEntity.noContent().build()
+                : ResponseEntity.notFound().build();
+    }
+
+    /**
+     * DELETE /api/admin/employees/{id}/sessions - revoke every device, except
+     * the caller's own if the admin is looking at themselves (see
+     * AdminService#revokeAllSessions).
+     *
+     * Answers with the count because the screen says "3 sesiuni au fost
+     * revocate", and because 0 is a meaningful answer: the phone was already
+     * dead.
+     */
+    @DeleteMapping("/employees/{id}/sessions")
+    public ResponseEntity<Map<String, Integer>> revokeAllSessions(@PathVariable Long id,
+            @AuthenticationPrincipal EmployeePrincipal principal) {
+        int revoked = adminService.revokeAllSessions(id, callerSessionId(principal));
+        return ResponseEntity.ok(Map.of("revoked", revoked));
+    }
+
+    /**
+     * Null when nobody is authenticated, which happens only while
+     * {@code ecotrack.security.enforce=false} leaves /api/** open. Nothing is
+     * then marked as the current device and nothing is spared, which is the
+     * right answer for a caller the app cannot identify.
+     */
+    private static Long callerSessionId(EmployeePrincipal principal) {
+        return principal == null ? null : principal.getSessionId();
     }
 
     // ==================== ROLE ENDPOINTS ====================

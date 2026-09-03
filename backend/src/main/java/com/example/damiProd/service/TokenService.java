@@ -51,6 +51,16 @@ public class TokenService {
      */
     private static final int MAX_RETIRED_TOKEN_HASHES = 10;
 
+    /**
+     * What goes in {@code session.revoked_reason}. The row outlives the session
+     * by {@code ecotrack.security.session-retention-days}, so this is the only
+     * record of WHY a device stopped working - and "the owner pressed
+     * Deconectare" and "an admin revoked a lost phone" (TODO-56) are the two
+     * answers someone will actually be asking between.
+     */
+    public static final String REVOKED_BY_USER = "REVOKED_BY_USER";
+    public static final String REVOKED_BY_ADMIN = "REVOKED_BY_ADMIN";
+
     private final SessionRepository sessionRepository;
     private final SecureRandom secureRandom = new SecureRandom();
 
@@ -254,10 +264,23 @@ public class TokenService {
     /** Revokes one session belonging to the given employee. Returns false if not found/not theirs. */
     @Transactional
     public boolean revokeSession(Long employeeId, Long sessionId) {
+        return revokeSession(employeeId, sessionId, REVOKED_BY_USER);
+    }
+
+    /**
+     * Same, with the reason recorded on the row.
+     *
+     * The employee id is not decoration: it is the scoping check. Passing the
+     * OWNER's id (not the caller's) is what lets an admin revoke somebody else's
+     * device (TODO-56) while {@link com.example.damiProd.controller.AuthController}
+     * keeps passing the caller's own and therefore stays self-scoped.
+     */
+    @Transactional
+    public boolean revokeSession(Long employeeId, Long sessionId, String reason) {
         return sessionRepository.findByIdAndEmployeeId(sessionId, employeeId)
                 .map(session -> {
                     session.setRevokedAt(Instant.now());
-                    session.setRevokedReason("REVOKED_BY_USER");
+                    session.setRevokedReason(reason);
                     sessionRepository.save(session);
                     return true;
                 })
@@ -267,14 +290,7 @@ public class TokenService {
     /** Revokes every active session for the employee except the current one. */
     @Transactional
     public void revokeAllOtherSessions(Long employeeId, Long currentSessionId) {
-        Instant now = Instant.now();
-        for (Session session : sessionRepository.findByEmployeeIdAndRevokedAtIsNullOrderByLastUsedAtDesc(employeeId)) {
-            if (!session.getId().equals(currentSessionId)) {
-                session.setRevokedAt(now);
-                session.setRevokedReason("REVOKED_BY_USER");
-                sessionRepository.save(session);
-            }
-        }
+        revokeAllSessionsExcept(employeeId, currentSessionId, REVOKED_BY_USER);
     }
 
     /**
@@ -285,9 +301,29 @@ public class TokenService {
      */
     @Transactional
     public int revokeAllSessions(Long employeeId, String reason) {
+        return revokeAllSessionsExcept(employeeId, null, reason);
+    }
+
+    /**
+     * Revokes every active session an employee has except one, and says how many
+     * it revoked.
+     *
+     * The single implementation behind the three methods above. {@code
+     * exceptSessionId} is null for "all of them", and a session id for "all but
+     * this device" - which is what "log out my other devices" means, and also
+     * what stops an admin cleaning up their OWN row from signing themselves out
+     * mid-task (TODO-56). Sparing it is only ever observable when the caller and
+     * the owner are the same person; when an admin targets someone else, the
+     * caller's session id belongs to a different employee and matches nothing.
+     */
+    @Transactional
+    public int revokeAllSessionsExcept(Long employeeId, Long exceptSessionId, String reason) {
         Instant now = Instant.now();
         int revoked = 0;
         for (Session session : sessionRepository.findByEmployeeIdAndRevokedAtIsNullOrderByLastUsedAtDesc(employeeId)) {
+            if (session.getId().equals(exceptSessionId)) {
+                continue;
+            }
             session.setRevokedAt(now);
             session.setRevokedReason(reason);
             sessionRepository.save(session);

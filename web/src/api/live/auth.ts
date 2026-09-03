@@ -13,7 +13,7 @@
 
 import type { AuthApi, AuthTokens, SessionDevice } from '../contract';
 import type { AuthUser, Role } from '@/types/domain';
-import { num, optStr } from './normalize';
+import { normalizeSessionDevice, num, optStr, type RawSessionDevice } from './normalize';
 import { request } from '../http';
 
 interface RawAuthUser {
@@ -32,13 +32,6 @@ interface RawTokens {
   expiresIn: number;
 }
 
-interface RawSessionDevice {
-  id: number | string;
-  device?: string | null;
-  createdAt?: string | null;
-  lastUsedAt?: string | null;
-  current?: boolean;
-}
 
 function normalizeAuthUser(raw: RawAuthUser): AuthUser {
   return {
@@ -52,15 +45,6 @@ function normalizeAuthUser(raw: RawAuthUser): AuthUser {
   };
 }
 
-function normalizeSessionDevice(raw: RawSessionDevice): SessionDevice {
-  return {
-    id: String(raw.id),
-    device: raw.device ?? 'Dispozitiv necunoscut',
-    createdAt: raw.createdAt ?? '',
-    lastUsedAt: raw.lastUsedAt ?? '',
-    current: raw.current ?? false,
-  };
-}
 
 export const authApi: AuthApi = {
   async refresh(refreshToken: string): Promise<AuthTokens> {

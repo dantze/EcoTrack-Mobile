@@ -27,15 +27,16 @@ unless its status says otherwise.
 **Status legend:** `[ ]` not started · `[~]` in progress · `[DONE]` done ·
 `[POSTPONED]` deliberately deferred · `[?]` needs a decision first
 
-**Next free ID: TODO-76.** (Highest used is TODO-75.)
+**Next free ID: TODO-77.** (Highest used is TODO-76.)
 
 ---
 
-## Still open — 23 of 75
+## Still open — 23 of 76
 
 The whole of what is left, in one place. Everything not listed here is `[DONE]`.
 
 - **TODO-17** `[POSTPONED]` — All other AI ideas *(F)*
+- **TODO-76** `[ ]` — `AdminController` answers in three shapes, none of them the app's *(A)*
 - **TODO-71** `[ ]` — A second deploy target exists in `infra/` and is wired to nothing *(G)*
 - **TODO-72** `[ ]` — Installed phones need a rebuild, and the Maps key needs revoking *(G)*
 - **TODO-74** `[ ]` — `DataLoader` seeds every test context, and no test asks it to *(J)*
@@ -45,7 +46,6 @@ The whole of what is left, in one place. Everything not listed here is `[DONE]`.
 - **TODO-53** `[ ]` — `CredentialRow.username` in the web mock is write-only *(A)*
 - **TODO-54** `[ ]` — The live production build still ships the mock seed database *(G)*
 - **TODO-55** `[ ]` — The bundle budget measures the mock build, not the deployed one *(G)*
-- **TODO-56** `[ ]` — An admin cannot revoke another employee's session *(A)*
 - **TODO-58** `[ ]` — The UI rebuild stopped short on four surfaces *(J)*
 - **TODO-59** `[ ]` — The eager bundle grew from ~125 kB to ~260 kB gzip *(J)*
 - **TODO-60** `[ ]` — Mantine's full stylesheet ships for four components *(J)*
@@ -129,7 +129,7 @@ full text lives further down.
 | TODO-53 | **`[ ]`** | A | `CredentialRow.username` in the web mock is write-only |
 | TODO-54 | **`[ ]`** | G | The live production build still ships the mock seed database |
 | TODO-55 | **`[ ]`** | G | The bundle budget measures the mock build, not the deployed one |
-| TODO-56 | **`[ ]`** | A | An admin cannot revoke another employee's session |
+| TODO-56 | `[DONE]` | A | An admin cannot revoke another employee's session |
 | TODO-57 | `[DONE]` | D | Produse has no "what is still using it" dialog |
 | TODO-58 | **`[ ]`** | J | The UI rebuild stopped short on four surfaces |
 | TODO-59 | **`[ ]`** | J | The eager bundle grew from ~125 kB to ~260 kB gzip |
@@ -149,6 +149,7 @@ full text lives further down.
 | TODO-73 | **`[ ]`** | J | `AccessRequestsPage` paints with tokens that do not exist |
 | TODO-74 | **`[ ]`** | J | `DataLoader` seeds every test context, and no test asks it to |
 | TODO-75 | **`[ ]`** | G | The web bundle falls back to the dead droplet, over plain HTTP |
+| TODO-76 | **`[ ]`** | A | `AdminController` answers in three shapes, none of them the app's |
 
 ---
 
@@ -554,7 +555,7 @@ enrolment* section (both routes, with the `openssl rand` line and the
 `docker compose logs | grep` recipe) and a *Recovering when no admin can sign in*
 section for TODO-30. That is where someone will look at 2am, not this file.
 
-### TODO-56 `[ ]` An admin cannot revoke another employee's session
+### TODO-56 `[DONE]` An admin cannot revoke another employee's session
 Found while doing TODO-27, writing the sentence that item asked for about what
 bounds a year-long refresh token. The obvious answer — "an admin revokes the lost
 device" — is not implemented, so the draft comment claimed a capability the code
@@ -583,6 +584,83 @@ Overlaps **TODO-30** (recovery when the last admin loses their session) and the
 session list the owner asked for there — build them together, since both want an
 admin-facing view of somebody else's sessions.
 
+**Done — three endpoints under `/api/admin/employees/{id}/sessions`**, exactly
+the shape this item sketched: `GET` to list, `DELETE .../{sessionId}` for one
+device, `DELETE` for all of them. A lost phone now has an answer that is not
+"change their role for its side effect", "delete them", or "wait a year".
+
+**The matcher row this item predicted turned out not to be needed**, and that is
+worth knowing rather than glossing: `/api/admin/**` is already `hasRole(ADMIN)`
+and is matched ABOVE the office-staff write catch-alls, so a SALES token is
+refused all three — including the two DELETEs it would otherwise be allowed by
+`DELETE /api/** -> OFFICE`. `AuthorizationMatrixTest` now asserts that instead of
+assuming it, which is the same property the deleted `/api/admin/id-photos` case
+used to cover.
+
+**The design question — see the labels, or revoke blind — resolved to see
+them.** An employee may hold up to `ecotrack.security.max-sessions-per-user`
+devices, and picking the stolen one out of that list *is* the task; a blind
+"revoke everything" is the blunt lever this item was written to replace. So the
+admin gets the same `SessionResponse` the owner already gets: device label,
+created, last used. The "or IPs" half of the question is moot — the app has
+never stored one, and `Session` has no column for it. What an admin can see is a
+User-Agent string and two timestamps, on an account they could already delete
+outright.
+
+Three decisions inside it:
+
+- **The bulk revoke spares the CALLER's own current session.** Only ever
+  observable when an admin runs it on themselves; when they target someone else
+  the caller's session id belongs to a different employee and matches nothing.
+  Signing yourself out mid-task is not what the button meant, and for the last
+  admin it walks straight into TODO-30's lockout. This is not a refusal —
+  TODO-22 settled that an admin who may not log out is worse than the lockout,
+  and both Deconectare and the per-session DELETE still end that session
+  deliberately. It is the same "every device but this one" rule
+  `DELETE /api/auth/sessions` already had.
+- **The employee id in the URL is the scoping check, not decoration.**
+  `TokenService.revokeSession` looks the session up by session id AND employee
+  id, so aiming a real session id at the wrong employee is a 404 and revokes
+  nothing. Same reasoning as `/api/tasks/employee/{id}`: an id from the client
+  is not an authorisation.
+- **An unknown employee is a 404, never an empty list.** "This person has no
+  devices" and "there is no such person" are different answers, and a typo that
+  reads as the first is how an admin concludes a lost phone is already dead.
+
+`TokenService` grew reason-carrying variants rather than a second copy of the
+loop: `revokeSession(employeeId, sessionId, reason)` and
+`revokeAllSessionsExcept(employeeId, exceptSessionId, reason)`, with
+`revokeSession/2`, `revokeAllOtherSessions` and `revokeAllSessions` delegating to
+them. The reason matters because the session row outlives the session by
+`ecotrack.security.session-retention-days`, so `revoked_reason` is the only
+record of why a device stopped working — and "the owner pressed Deconectare"
+(`REVOKED_BY_USER`) versus "an admin revoked a lost phone" (`REVOKED_BY_ADMIN`)
+is the question someone will actually be asking.
+
+**Web:** `EmployeesApi` gained `listSessions` / `revokeSession` /
+`revokeAllSessions` in `contract.ts`, live and mock both implement them, and
+`features/admin/EmployeeSessionsModal.tsx` is a per-row "Sesiuni" dialog on
+Angajați — device list with a per-device *Revocă* and a confirmed *Revocă toate
+sesiunile*. Mounted only while a row is selected, with the query `enabled` on the
+same condition, so a roster of ten people does not fetch ten device lists.
+`normalizeSessionDevice` moved from `live/auth.ts` into `live/normalize.ts`,
+since two endpoints now answer with the same DTO, and `formatDateTime` moved
+into `components/domain.tsx` for the same reason. **Mobile is untouched** and
+should be: it is the driver app (TODO-33), office staff use the responsive web.
+
+**Overlap with TODO-30**, which this item said to build together: TODO-30 shipped
+first and its half — the lockout recovery code — is unrelated machinery. What was
+shared is exactly this admin-facing view of somebody else's sessions, which is
+now here.
+
+Covered by `SecurityTests/AdminSessionRevocationTest` (9 cases against the real
+filter chain, including that the revoked device's token actually stops
+authenticating while the other keeps working), two new `AuthorizationMatrixTest`
+cases, and four in `web/src/mocks/__tests__/contract.test.ts`. Backend suite 320
+green; `AdminSessionRevocationTest` is `@Transactional` and has to be — it shares
+a cached context, and therefore a database, with `LastAdminGuardTest`, which
+asserts things about the whole employee table.
+
 ### TODO-53 `[ ]` `CredentialRow.username` in the web mock is write-only
 Found while doing TODO-28. With `password` gone, the row carries `employeeId`,
 `username` and `email` — and `username` is written in three places
@@ -599,6 +677,39 @@ dead plumbing, one field smaller, and deleting it also removes the `if
 Needs deciding: drop `username` and let the row be `{ employeeId, email }` — at
 which point "CredentialRow" is a misnomer for what is really an employee-email
 side table and probably wants renaming — or keep it as a debugging affordance.
+
+### TODO-76 `[ ]` `AdminController` answers in three shapes, none of them the app's
+Found while doing TODO-56, adding session endpoints next to the existing ones.
+`GlobalExceptionHandler.body()` builds one envelope for the whole API —
+`{timestamp, status, error, message}` — and `AdminController` predates it and
+hand-rolls its own instead, differently per method:
+
+- `createEmployee` catches `RuntimeException` and answers `400 {"error": msg}` —
+  no `message` key at all;
+- `deleteEmployee` answers `200 {"message": "Employee deleted successfully"}` —
+  English, in an app whose user-facing strings are Romanian, and nothing reads it;
+- `getEmployeeById` / `updateEmployee` answer a bare `404` with no body.
+
+It stopped being cosmetic with TODO-51. The web app now surfaces the server's own
+Romanian text by reading `.message` out of that envelope, so
+`createEmployee`'s `{"error": ...}` returns `null` from `serverMessage` and
+"Username already exists: X" — the one message that method exists to produce —
+is replaced by the screen's generic fallback. The new session endpoints
+deliberately went the other way and throw `ResourceNotFoundException`, so the
+same controller now has a fourth shape that IS the standard one.
+
+Needs deciding, and it is one decision: let `GlobalExceptionHandler` own all of
+it — `createEmployee` throws `IllegalArgumentException` (already mapped to 400)
+instead of catching, the two `notFound()`s become `ResourceNotFoundException`
+with Romanian text, and `deleteEmployee` returns `204` — versus leaving the
+shapes alone because `web/src/api/live/employees.ts` currently tolerates them.
+The first is right, and nothing in the backend suite blocks it — there is no
+`AdminControllerTest`, and `LastAdminGuardTest`'s two 409s already come from
+`GlobalExceptionHandler` (they are `IllegalStateException`s) so they are
+unaffected. What it does touch is the web client: `remove()` in
+`web/src/api/live/employees.ts` carries a comment pinning the
+200-with-`{message}` answer, and `create()` would want a test proving the
+duplicate-username message now reaches the toast.
 
 ---
 

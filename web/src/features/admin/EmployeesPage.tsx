@@ -10,11 +10,17 @@
  *   - The last remaining admin cannot be demoted or deleted. With no password
  *     anywhere in the system, zero admins means nobody can ever approve an
  *     access request again and the instance is unrecoverable.
+ *   - "Sesiuni" opens that person's DEVICES, and ends them (TODO-56). It is the
+ *     only place in the app that can: everything under `/api/auth` is scoped to
+ *     the caller, so before this a lost phone meant changing the owner's role
+ *     for its side effect, deleting them, or waiting out a year-long refresh
+ *     token.
  *
  * It replaces the old Tehnic → Șoferi screen, which was a driver-only roster.
  */
 
 import { useMemo, useState } from 'react';
+import { MonitorSmartphone } from 'lucide-react';
 import { CommandBar, Workbench } from '@/components/layout';
 import {
   Badge,
@@ -30,6 +36,7 @@ import {
 import { ROLE_LABELS } from '@/components/domain';
 import type { Employee, Role } from '@/types/domain';
 import { useAuth } from '@/auth';
+import { EmployeeSessionsModal } from './EmployeeSessionsModal';
 import { useAllEmployees, useRemoveEmployee, useSetEmployeeRoles } from './queries';
 
 const ASSIGNABLE: Role[] = ['DRIVER', 'SALES', 'TECH', 'ADMIN'];
@@ -43,6 +50,7 @@ export function EmployeesPage() {
   const confirm = useConfirm();
 
   const [query, setQuery] = useState('');
+  const [sessionsFor, setSessionsFor] = useState<Employee | null>(null);
   const employees = useMemo(() => data ?? [], [data]);
 
   const adminCount = useMemo(
@@ -134,10 +142,10 @@ export function EmployeesPage() {
           rows={filtered}
           ariaLabel="Angajați"
           rowKey={(employee) => employee.id}
-          // Both controls go in the actions slot, beside the card rather than
-          // inside its button: the role Select and the delete are the only two
-          // things this screen does, so a phone that cannot reach them cannot
-          // administer anything.
+          // Every control goes in the actions slot, beside the card rather than
+          // inside its button: the role Select, the sessions dialog and the
+          // delete are all this screen does, so a phone that cannot reach them
+          // cannot administer anything.
           mobile={{ primary: 'name', secondary: ['roles'], actions: ['change', 'actions'] }}
           columns={[
             {
@@ -180,18 +188,30 @@ export function EmployeesPage() {
               key: 'actions',
               header: '',
               render: (employee) => (
-                <IconButton
-                  label="Șterge angajatul"
-                  disabled={employee.id === user?.id || isLastAdmin(employee)}
-                  onClick={() => void remove(employee)}
-                >
-                  ✕
-                </IconButton>
+                <div className="flex items-center gap-1">
+                  <IconButton
+                    label={`Sesiunile lui ${employee.fullName}`}
+                    onClick={() => setSessionsFor(employee)}
+                  >
+                    <MonitorSmartphone className="size-4" />
+                  </IconButton>
+                  <IconButton
+                    label="Șterge angajatul"
+                    disabled={employee.id === user?.id || isLastAdmin(employee)}
+                    onClick={() => void remove(employee)}
+                  >
+                    ✕
+                  </IconButton>
+                </div>
               ),
             },
           ]}
         />
       )}
+
+      {/* Mounted only while a row is selected — a dialog resets by not being
+          mounted (CLAUDE.md, local-state rules). */}
+      <EmployeeSessionsModal employee={sessionsFor} onClose={() => setSessionsFor(null)} />
     </Workbench>
   );
 }

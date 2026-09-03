@@ -100,8 +100,36 @@ code logged at startup while `ecotrack.enrollment.require-setup-code=true` — s
 whoever opens a fresh server owns it permanently, with no password path back in.
 
 What survives under `/api/auth`: `refresh`, `logout`, `me`, `sessions`,
-`DELETE /sessions/{id}`, `DELETE /sessions`. All of them are **self-scoped** —
-an admin cannot list or revoke someone else's sessions from anywhere (TODO-56).
+`DELETE /sessions/{id}`, `DELETE /sessions`. **All of them are self-scoped**,
+and that is permanent: `AuthController` passes `principal.getEmployee().getId()`
+into `AuthService`, never an id from the client.
+
+**Somebody else's devices live under `/api/admin` instead** (TODO-56).
+`GET /api/admin/employees/{id}/sessions`,
+`DELETE /api/admin/employees/{id}/sessions/{sessionId}` and
+`DELETE /api/admin/employees/{id}/sessions` are how a lost phone is dealt with;
+before they existed an admin's only levers were changing the person's role (for
+its side effect), deleting them, or waiting out
+`ecotrack.security.refresh-token-ttl-days`. Three things about them:
+
+- **No `SecurityConfig` row was needed.** `/api/admin/**` already requires ADMIN
+  and is matched above the office-staff write catch-alls, so a SALES token is
+  refused all three. `AuthorizationMatrixTest` asserts that rather than assuming
+  it — the same property the deleted id-photo endpoint used to cover.
+- **The bulk revoke spares the CALLER's current session**, which only ever
+  matters when an admin runs it on themselves: signing yourself out mid-task is
+  never what the button meant, and for the last admin it walks into TODO-30's
+  lockout. Not a refusal — TODO-22 settled that an admin who may not log out is
+  worse than the lockout — and the per-session delete still ends it deliberately.
+- **The employee id in the URL is the scoping check**, not decoration:
+  `TokenService.revokeSession(employeeId, sessionId, reason)` looks the session
+  up by both, so an id belonging to somebody else is a 404. `revoked_reason`
+  records `REVOKED_BY_ADMIN` rather than `REVOKED_BY_USER`, because the session
+  row outlives the session and that is the only record of why a device died.
+
+An admin sees the same fields the owner sees — device label, created, last used.
+There is no IP either way; the app has never stored one. `AdminSessionRevocationTest`
+covers all of it against the real filter chain.
 
 **Losing every admin session is recoverable (TODO-30).** The last admin pressing
 Deconectare used to be permanent: nobody could approve a request, and the

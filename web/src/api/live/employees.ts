@@ -12,10 +12,15 @@
  *     silently creates an employee with no roles at all.
  */
 
-import type { CreateEmployeeInput, EmployeesApi } from '../contract';
+import type { CreateEmployeeInput, EmployeesApi, SessionDevice } from '../contract';
 import type { Employee, Role } from '@/types/domain';
 import { request } from '../http';
-import { normalizeEmployee, type RawEmployee } from './normalize';
+import {
+  normalizeEmployee,
+  normalizeSessionDevice,
+  type RawEmployee,
+  type RawSessionDevice,
+} from './normalize';
 
 interface CreateEmployeeBody {
   username?: string;
@@ -90,5 +95,30 @@ export const employeesApi: EmployeesApi = {
   async remove(id: number): Promise<void> {
     // Answers 200 with {message}, not 204 — request() tolerates both.
     await request<void>(`/admin/employees/${id}`, { method: 'DELETE' });
+  },
+
+  // Somebody else's devices (TODO-56). Everything under `api.auth` is scoped to
+  // the caller, so these three are the only way an admin ends a lost phone's
+  // session without changing the person's role or deleting them outright.
+
+  async listSessions(employeeId: number): Promise<SessionDevice[]> {
+    const raw = await request<RawSessionDevice[]>(`/admin/employees/${employeeId}/sessions`);
+    return (raw ?? []).map(normalizeSessionDevice);
+  },
+
+  async revokeSession(employeeId: number, sessionId: string): Promise<void> {
+    await request<void>(
+      `/admin/employees/${employeeId}/sessions/${encodeURIComponent(sessionId)}`,
+      { method: 'DELETE' },
+    );
+  },
+
+  async revokeAllSessions(employeeId: number): Promise<number> {
+    // Answers 200 `{revoked: n}` rather than 204: 0 is a meaningful answer —
+    // the device was already dead — and the screen names the number.
+    const raw = await request<{ revoked?: number }>(`/admin/employees/${employeeId}/sessions`, {
+      method: 'DELETE',
+    });
+    return raw?.revoked ?? 0;
   },
 };

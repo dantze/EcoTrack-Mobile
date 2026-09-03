@@ -4,6 +4,8 @@ import com.example.damiProd.domain.Employee;
 import com.example.damiProd.domain.EmployeeRole;
 import com.example.damiProd.dto.CreateEmployeeRequest;
 import com.example.damiProd.dto.EmployeeResponse;
+import com.example.damiProd.dto.SessionResponse;
+import com.example.damiProd.exception.ResourceNotFoundException;
 import com.example.damiProd.repository.EmployeeRepository;
 import com.example.damiProd.repository.EmployeeRoleRepository;
 import org.slf4j.Logger;
@@ -223,6 +225,82 @@ public class AdminService {
     private static boolean containsAdmin(Set<EmployeeRole> roles) {
         return roles != null && roles.stream()
                 .anyMatch(role -> ADMIN_ROLE.equalsIgnoreCase(role.getRoleName()));
+    }
+
+    // ==================== SESSIONS (TODO-56) ====================
+
+    /**
+     * The devices holding a live refresh token for one employee.
+     *
+     * Until this existed an admin could not revoke anyone else's session at all:
+     * /api/auth/sessions is self-scoped, so a lost driver phone left only blunt
+     * levers - change the person's role (which revokes as a SIDE EFFECT and also
+     * changes what they may do), delete them, or wait out
+     * {@code ecotrack.security.refresh-token-ttl-days}, which is a year.
+     *
+     * <p><b>The admin sees the same fields the owner sees</b> - device label,
+     * created, last used - and that is the answer to "should an admin see
+     * another employee's devices at all". Revoking blind is not a real option:
+     * an employee may hold up to {@code ecotrack.security.max-sessions-per-user}
+     * sessions, and picking the stolen phone out of ten identical rows needs the
+     * label and the last-used time. There is no IP to leak either way; the app
+     * has never stored one. What an admin gets is strictly a User-Agent string
+     * and two timestamps, on an account they can already delete outright.
+     *
+     * <p>{@code callerSessionId} marks the "acest dispozitiv" row, so it is only
+     * ever meaningful when an admin looks at their OWN id.
+     */
+    public List<SessionResponse> listSessions(Long employeeId, Long callerSessionId) {
+        Employee employee = requireEmployee(employeeId);
+        return tokenService.listActiveSessions(employee.getId()).stream()
+                .map(session -> SessionResponse.fromEntity(session,
+                        session.getId().equals(callerSessionId)))
+                .collect(Collectors.toList());
+    }
+
+    /**
+     * Revokes one of that employee's devices. False when the session does not
+     * exist or belongs to somebody else - the employee id is the scoping check,
+     * not decoration.
+     */
+    @Transactional
+    public boolean revokeSession(Long employeeId, Long sessionId) {
+        requireEmployee(employeeId);
+        return tokenService.revokeSession(employeeId, sessionId, TokenService.REVOKED_BY_ADMIN);
+    }
+
+    /**
+     * Revokes every device that employee has, and says how many.
+     *
+     * <p><b>Except the caller's own current session</b>, which only ever matters
+     * when an admin runs this on themselves: signing yourself out mid-task is
+     * never what the button meant, and for the LAST admin it would walk straight
+     * into TODO-30's lockout. It is not a refusal - TODO-22 settled that an admin
+     * who may not log out is worse than the lockout, and Deconectare and
+     * {@code DELETE /api/admin/employees/{id}/sessions/{sessionId}} both still
+     * end that session deliberately. This is the same "every device but this
+     * one" rule {@code DELETE /api/auth/sessions} already has.
+     */
+    @Transactional
+    public int revokeAllSessions(Long employeeId, Long callerSessionId) {
+        requireEmployee(employeeId);
+        int revoked = tokenService.revokeAllSessionsExcept(employeeId, callerSessionId,
+                TokenService.REVOKED_BY_ADMIN);
+        if (revoked > 0) {
+            log.info("Admin revoked {} session(s) for employee id={}", revoked, employeeId);
+        }
+        return revoked;
+    }
+
+    /**
+     * 404 rather than an empty list for an unknown id: "this person has no
+     * devices" and "there is no such person" are different answers, and a typo
+     * that reads as the first is how an admin concludes a lost phone is already
+     * dead.
+     */
+    private Employee requireEmployee(Long employeeId) {
+        return employeeRepository.findById(employeeId)
+                .orElseThrow(() -> new ResourceNotFoundException("Angajatul nu a fost găsit"));
     }
 
     /**

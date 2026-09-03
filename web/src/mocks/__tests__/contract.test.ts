@@ -246,6 +246,49 @@ describe('seeded reads', () => {
     for (const driver of drivers) expect(driver.roles).toContain('DRIVER');
   });
 
+  // --- Somebody else's devices (TODO-56) -----------------------------------
+
+  it("lists another employee's sessions and revokes one of them", async () => {
+    const [employee] = await api.employees.list();
+    const before = await api.employees.listSessions(employee!.id);
+    expect(before.length).toBeGreaterThan(0);
+
+    await api.employees.revokeSession(employee!.id, before[0]!.id);
+
+    const after = await api.employees.listSessions(employee!.id);
+    expect(after.map((session) => session.id)).not.toContain(before[0]!.id);
+    expect(after).toHaveLength(before.length - 1);
+  });
+
+  it('revokeAllSessions() reports how many it signed out and leaves none behind', async () => {
+    const employee = (await api.employees.list()).at(-1)!;
+    const before = await api.employees.listSessions(employee.id);
+
+    const revoked = await api.employees.revokeAllSessions(employee.id);
+
+    expect(revoked).toBe(before.length);
+    expect(await api.employees.listSessions(employee.id)).toHaveLength(0);
+    // 0 is a meaningful answer, not a failure: the devices were already dead.
+    expect(await api.employees.revokeAllSessions(employee.id)).toBe(0);
+  });
+
+  it('scopes a session revoke to the employee in the URL, not just the session id', async () => {
+    const [owner, other] = await api.employees.list();
+    const sessions = await api.employees.listSessions(owner!.id);
+
+    await expect(
+      api.employees.revokeSession(other!.id, sessions[0]!.id),
+    ).rejects.toMatchObject({ status: 404 });
+    expect(await api.employees.listSessions(owner!.id)).toHaveLength(sessions.length);
+  });
+
+  it('404s on an unknown employee rather than reporting no devices', async () => {
+    // "This person has no devices" and "there is no such person" are different
+    // answers, and the first is how an admin concludes a lost phone is dead.
+    await expect(api.employees.listSessions(999_999)).rejects.toMatchObject({ status: 404 });
+    await expect(api.employees.revokeAllSessions(999_999)).rejects.toMatchObject({ status: 404 });
+  });
+
   it('subscriptions.list() hides retired plans that listAll() still returns', async () => {
     const [active, all] = await Promise.all([
       api.subscriptions.list(),

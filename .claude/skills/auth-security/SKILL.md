@@ -85,6 +85,29 @@ Tokens themselves are opaque, not JWTs: `TokenService` mints 32 `SecureRandom`
 bytes and persists only the SHA-256 hash in `Session`. Nothing about a token can
 be read back out of it — a "decode the token" plan is a wrong turn.
 
+## Ending somebody else's session
+
+`/api/auth/**` is **self-scoped and stays that way**: `AuthController` passes
+`principal.getEmployee().getId()`, never an id from the client. An admin dealing
+with a lost phone uses `/api/admin/employees/{id}/sessions` instead — `GET` to
+list, `DELETE .../{sessionId}` for one device, `DELETE` for all of them
+(TODO-56). No `SecurityConfig` row was needed: `/api/admin/**` already requires
+ADMIN and is matched above the write catch-alls.
+
+Two rules if you touch it:
+
+- **The employee id is the scoping check.** `TokenService.revokeSession(employeeId,
+  sessionId, reason)` looks the session up by BOTH, so a session id belonging to
+  someone else is a 404. Pass the OWNER's id, never the caller's.
+- **The bulk revoke spares the caller's own current session**
+  (`revokeAllSessionsExcept`), which only matters when an admin runs it on
+  themselves — otherwise it is TODO-30's lockout one click away. Use
+  `revokeAllSessions(employeeId, reason)` where you really do mean every device,
+  as `AdminService.updateEmployee` does on a role change.
+
+`revoked_reason` distinguishes them (`REVOKED_BY_USER` / `REVOKED_BY_ADMIN`) and
+is the only record of why a device died once the session row is pruned.
+
 ## Adding or renaming a role
 
 Role names are duplicated with no shared source of truth. All four move together:
@@ -111,6 +134,8 @@ security assertions belong:
 | `TaskScopingTest` | `TaskAccessPolicy`, row-level |
 | `EnrollmentFlowTest` | request → approve → claim |
 | `EnrollmentBootstrapCodeTest` | first-user-becomes-admin and the setup code |
+| `AdminSessionRevocationTest` | an admin listing and revoking somebody else's devices |
+| `LastAdminGuardTest` | the demote/delete guard on the last admin |
 
 ```bash
 cd backend && ./gradlew test --tests "com.example.damiProd.SecurityTests.*"

@@ -229,6 +229,46 @@ class AuthorizationMatrixTest {
                 .andExpect(status().isNoContent());
     }
 
+    /**
+     * The admin session endpoints (TODO-56) have NO matcher row of their own -
+     * they inherit ADMIN from /api/admin/**, which is matched above the
+     * office-staff DELETE catch-all. That is the property being asserted here:
+     * a SALES token is refused all three, including the DELETEs it would
+     * otherwise be allowed by `DELETE /api/** -> OFFICE`.
+     */
+    @Test
+    void nonAdmins_cannotReachAnotherEmployeesSessions() throws Exception {
+        long targetId = seed("authz_target", "DRIVER").getId();
+
+        for (String token : new String[] { driverToken, salesToken }) {
+            mockMvc.perform(get("/api/admin/employees/" + targetId + "/sessions")
+                            .header("Authorization", "Bearer " + token))
+                    .andExpect(status().isForbidden());
+
+            mockMvc.perform(delete("/api/admin/employees/" + targetId + "/sessions")
+                            .header("Authorization", "Bearer " + token))
+                    .andExpect(status().isForbidden());
+
+            mockMvc.perform(delete("/api/admin/employees/" + targetId + "/sessions/1")
+                            .header("Authorization", "Bearer " + token))
+                    .andExpect(status().isForbidden());
+        }
+    }
+
+    @Test
+    void admin_mayReadAndRevokeAnotherEmployeesSessions() throws Exception {
+        Employee target = seed("authz_revocable", "DRIVER");
+        mintToken(target);
+
+        mockMvc.perform(get("/api/admin/employees/" + target.getId() + "/sessions")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk());
+
+        mockMvc.perform(delete("/api/admin/employees/" + target.getId() + "/sessions")
+                        .header("Authorization", "Bearer " + adminToken))
+                .andExpect(status().isOk());
+    }
+
     @Test
     void admin_mayDoEverything() throws Exception {
         mockMvc.perform(get("/api/admin/employees").header("Authorization", "Bearer " + adminToken))

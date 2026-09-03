@@ -882,6 +882,52 @@ const employeesApi: EcoTrackApi['employees'] = {
       const credentialIndex = db.credentials.findIndex((row) => row.employeeId === id);
       if (credentialIndex !== -1) db.credentials.splice(credentialIndex, 1);
     }),
+
+  // Somebody else's devices (TODO-56). The mock does not model roles on the
+  // caller, so it cannot refuse a non-admin the way SecurityConfig does — the
+  // same gap every other /admin/** mock has. What it does model is the part the
+  // screen depends on: a 404 for an unknown employee, `current` true only for
+  // the caller's own device, and the bulk revoke sparing it.
+
+  listSessions: (employeeId) =>
+    respond((): SessionDevice[] => {
+      if (!db.employees.some((entry) => entry.id === employeeId)) notFound('Employee', employeeId);
+      const mine = readRefreshToken();
+      return db.authSessions
+        .filter((row) => row.employeeId === employeeId && !row.revoked)
+        .map((row) => ({
+          id: String(row.id),
+          device: row.device,
+          createdAt: row.createdAt,
+          lastUsedAt: row.lastUsedAt,
+          current: row.refreshToken === mine,
+        }));
+    }),
+
+  revokeSession: (employeeId, sessionId) =>
+    respond(() => {
+      if (!db.employees.some((entry) => entry.id === employeeId)) notFound('Employee', employeeId);
+      // The employee id is the scoping check, not decoration: a session id that
+      // belongs to somebody else is a 404, exactly as on the server.
+      const row = db.authSessions.find(
+        (s) => String(s.id) === sessionId && s.employeeId === employeeId,
+      );
+      if (!row) throw new MockApiError('Sesiunea nu a fost găsită', 404);
+      row.revoked = true;
+    }),
+
+  revokeAllSessions: (employeeId) =>
+    respond((): number => {
+      if (!db.employees.some((entry) => entry.id === employeeId)) notFound('Employee', employeeId);
+      const mine = readRefreshToken();
+      let revoked = 0;
+      for (const row of db.authSessions) {
+        if (row.employeeId !== employeeId || row.revoked || row.refreshToken === mine) continue;
+        row.revoked = true;
+        revoked += 1;
+      }
+      return revoked;
+    }),
 };
 
 // ---------------------------------------------------------------------------

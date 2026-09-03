@@ -149,6 +149,25 @@ export function formatDate(iso: string | null | undefined): string {
   return Number.isNaN(parsed.getTime()) ? '—' : dateFormatter.format(parsed);
 }
 
+const dateTimeFormatter = new Intl.DateTimeFormat('ro-RO', {
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+});
+
+/**
+ * Date AND time. Sessions are the only thing that needs the clock: "activ
+ * ultima dată 14:32" is how the right device gets picked out of ten, in both
+ * the account menu and the admin view of somebody else's devices (TODO-56).
+ */
+export function formatDateTime(iso: string | null | undefined): string {
+  if (!iso) return '—';
+  const parsed = new Date(iso);
+  return Number.isNaN(parsed.getTime()) ? '—' : dateTimeFormatter.format(parsed);
+}
+
 export function formatMoney(amount: number | null | undefined): string {
   return amount === null || amount === undefined ? '—' : currencyFormatter.format(amount);
 }

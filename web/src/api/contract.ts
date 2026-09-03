@@ -188,7 +188,15 @@ export type ClaimResult =
   | { state: 'expired'; message: string }
   | { state: 'unknown'; message: string };
 
-/** One row of GET /auth/sessions — a device holding a live refresh token. */
+/**
+ * One device holding a live refresh token.
+ *
+ * Two endpoints answer with this shape and the difference is who is asking:
+ * `GET /auth/sessions` is the caller's own devices, `GET
+ * /admin/employees/{id}/sessions` is somebody else's (TODO-56). `current`
+ * always means "the device making this request", so on the admin list it is
+ * only ever true when an admin is looking at their own row.
+ */
 export interface SessionDevice {
   id: string;
   device: string;
@@ -398,6 +406,20 @@ export interface EmployeesApi {
   update(id: number, input: Partial<CreateEmployeeInput>): Promise<Employee>;
   /** DELETE /admin/employees/{id} — requires an admin role on the caller's token. */
   remove(id: number): Promise<void>;
+
+  /**
+   * GET /admin/employees/{id}/sessions — the devices that employee is signed in
+   * on (TODO-56). Admin-only, and the only way to end somebody else's session:
+   * everything under `AuthApi` is scoped to the caller.
+   */
+  listSessions(employeeId: number): Promise<SessionDevice[]>;
+  /** DELETE /admin/employees/{employeeId}/sessions/{sessionId} — one device. */
+  revokeSession(employeeId: number, sessionId: string): Promise<void>;
+  /**
+   * DELETE /admin/employees/{id}/sessions — every device, except the caller's
+   * own when an admin runs it on themselves. Resolves to how many were revoked.
+   */
+  revokeAllSessions(employeeId: number): Promise<number>;
 }
 
 export interface RoutesApi {

@@ -25,22 +25,9 @@ import {
 import { Avatar, AvatarFallback } from '@/components/shadcn/avatar';
 import { useAuth } from '@/auth';
 import { Badge, Button, EmptyState, Modal, Skeleton, useToast } from '@/components/ui';
-import { ROLE_LABELS } from '@/components/domain';
+import { formatDateTime, ROLE_LABELS } from '@/components/domain';
 import { useRevokeOtherSessions, useRevokeSession, useSessions } from './queries';
 
-const dateTimeFormatter = new Intl.DateTimeFormat('ro-RO', {
-  day: '2-digit',
-  month: '2-digit',
-  year: 'numeric',
-  hour: '2-digit',
-  minute: '2-digit',
-});
-
-function formatWhen(iso: string): string {
-  if (!iso) return '—';
-  const parsed = new Date(iso);
-  return Number.isNaN(parsed.getTime()) ? '—' : dateTimeFormatter.format(parsed);
-}
 
 function initials(fullName: string): string {
   const parts = fullName.trim().split(/\s+/).filter(Boolean);
@@ -74,7 +61,7 @@ function SessionsPanel() {
                     {session.current && <Badge tone="info">acest dispozitiv</Badge>}
                   </p>
                   <p className="text-xs text-ink-subtle">
-                    Activ ultima dată: {formatWhen(session.lastUsedAt)}
+                    Activ ultima dată: {formatDateTime(session.lastUsedAt)}
                   </p>
                 </div>
                 {!session.current && (

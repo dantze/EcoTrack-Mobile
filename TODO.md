@@ -36,10 +36,10 @@ unless its status says otherwise.
 The whole of what is left, in one place. Everything not listed here is `[DONE]`.
 
 - **TODO-17** `[POSTPONED]` — All other AI ideas *(F)*
-- **TODO-31** `[ ]` — The backend test suite shares one database across classes *(J)*
 - **TODO-32** `[ ]` — Deploy fails at the SSH step — the VPS is unreachable *(G)*
 - **TODO-45** `[ ]` — Drop `individual.id_photo_url` once every environment is drained *(E)*
 - **TODO-72** `[ ]` — Installed phones need a rebuild, and the Maps key needs revoking *(G)*
+- **TODO-74** `[ ]` — `DataLoader` seeds every test context, and no test asks it to *(J)*
 - **TODO-73** `[ ]` — `AccessRequestsPage` paints with tokens that do not exist *(J)*
 - **TODO-48** `[ ]` — `bootNavigation.test.tsx` fails on Node 24 *(G)*
 - **TODO-50** `[ ]` — Nothing checks that the index at the top of TODO.md is true *(G)*
@@ -106,7 +106,7 @@ full text lives further down.
 | TODO-28 | `[DONE]` | A | Dead password-login plumbing in the web mock |
 | TODO-29 | `[DONE]` | G | Nothing validates the docker-compose files |
 | TODO-30 | `[DONE]` | A | There is no recovery path when the last admin loses their session |
-| TODO-31 | **`[ ]`** | J | The backend test suite shares one database across classes |
+| TODO-31 | `[DONE]` | J | The backend test suite shares one database across classes |
 | TODO-32 | **`[ ]`** | G | Deploy fails at the SSH step — the VPS is unreachable |
 | TODO-33 | `[DONE]` | H | Make the web app responsive, and move Sales + Technical out of mobile |
 | TODO-34 | `[DONE]` | C | `/tasks/order/{id}/exists` returns one task, but the guard rolls up all of them |
@@ -148,6 +148,7 @@ full text lives further down.
 | TODO-70 | **`[ ]`** | J | Orders created before the numbering fix are still `#0` |
 | TODO-72 | **`[ ]`** | G | Installed phones need a rebuild, and the Maps key needs revoking |
 | TODO-73 | **`[ ]`** | J | `AccessRequestsPage` paints with tokens that do not exist |
+| TODO-74 | **`[ ]`** | J | `DataLoader` seeds every test context, and no test asks it to |
 
 ---
 
@@ -2866,7 +2867,7 @@ question, and untouched here.
 **Verified:** typecheck clean, **395 tests green**, build clean, bundle
 **139.6 kB / 160 kB**.
 
-### TODO-31 `[ ]` The backend test suite shares one database across classes
+### TODO-31 `[DONE]` The backend test suite shares one database across classes
 Found while doing TODO-22: **the backend suite was not reliably green before
 this change**, and the reason is test isolation, not product code.
 
@@ -2899,6 +2900,77 @@ non-transactional classes `@DirtiesContext` (slow — a fresh context each time)
 have them clean up after themselves explicitly, or move bootstrap tests onto
 their own isolated datasource. Until then, **any new assertion about a global
 count is unsafe by default.**
+
+**Done — part 2 decided, and the option the text above listed third is the one
+that landed: an isolated datasource, applied to the whole suite rather than to
+the bootstrap tests alone.**
+
+**One annotation, and the reason it is the cheap option.**
+`@AutoConfigureTestDatabase` on every `@SpringBootTest` replaces the configured
+DataSource with an auto-configured embedded one, and Spring Boot builds those
+with `generateUniqueName(true)` — so the database name is unique **per Spring
+context** instead of shared per JVM. It is not `@DirtiesContext`: nothing is
+evicted and no context is rebuilt, because the annotation is identical on all
+eleven classes and so does not change how they group. Measured: the full
+`./gradlew build` went 48s → 44s, i.e. unchanged.
+
+What the shared database actually was: `jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1` in
+`application-test.properties`. Named, and that close delay keeps an H2 in-memory
+database alive for the whole JVM — so it outlived every context in the run and
+all of them shared it. Five classes cannot be `@Transactional` because they
+exercise the first-user bootstrap, which keys on COMMITTED state:
+`EnrollmentFlowTest`, `EnrollmentBootstrapCodeTest`, `ConfiguredSetupCodeTest`,
+`ShortConfiguredSetupCodeTest` and `AdminLockoutRecoveryTest`. (The text above
+named three; it predates the last two.) Each committed an ADMIN that outlived
+it.
+
+**The payoff, which is why this was worth doing rather than documenting.**
+`LastAdminGuardTest` no longer demotes every pre-existing admin in its
+`@BeforeEach` — the table starts empty, so it just seeds its one admin. The
+precondition assertion stays: it is one line, and it is precisely what would
+break first if the isolation were undone, which is when a guard test failing for
+the wrong reason costs the most.
+
+**`SuiteTests/DatabaseIsolationTest.java` is what keeps it true**, and it asserts
+three different things because each alone would pass vacuously:
+
+- *behavioural* — it takes a context of its own (via a property nothing else
+  sets) and asserts the employees and access-request tables are empty. Five
+  classes commit employees; reading zero means none of them can reach it,
+  independent of run order, which JUnit does not guarantee anyway.
+- *mechanical* — its own DataSource URL does not contain `h2:mem:testdb`.
+  Without this the assertion above would still pass on the day the annotation is
+  removed and this class happens to run first.
+- *the rule, for classes that do not exist yet* — it scans the compiled test
+  classes for `@SpringBootTest` and fails naming any that lack
+  `@AutoConfigureTestDatabase`, plus a fourth case asserting the scan finds
+  anything at all. **Verified by deleting the annotation from
+  `EnrollmentFlowTest`: the guard failed and named it.** A new
+  `@SpringBootTest` that forgets is otherwise invisible — it would pass on its
+  own and only break somebody else.
+
+**What this does NOT fix, on purpose.** Two classes with identical configuration
+still share one context and therefore one database — `EnrollmentFlowTest` and
+`AdminLockoutRecoveryTest` are that case. Both already clear the three tables
+they use in `@BeforeEach`, which is what makes their sharing safe. Forking them
+apart would mean adding a dummy property purely to defeat the context cache,
+which is a worse thing to leave behind than the explicit clear. So the rule is
+now "**a global count is safe unless another class has your exact
+configuration**", where it used to be "unsafe by default".
+
+**Found while doing this, and it contradicted the docs: `DataLoader` runs under
+the `test` profile.** CLAUDE.md said it was disabled and
+`application-test.properties` credited `spring.sql.init.mode=never` with
+disabling it. Neither is true — that key governs `schema.sql`/`data.sql`, not a
+`CommandLineRunner`, and `SpringBootContextLoader` runs the runners. Probed
+directly: 4 role rows and 11 products in a `@SpringBootTest` context. It seeds
+no employees, which is why this never showed up as the leak being chased here.
+Both comments are corrected. It also changes shape with this fix — the seed used
+to happen once per JVM and now happens once per context, same content — which is
+why nothing had to move. Whether to actually disable it is TODO-74.
+
+Part 1 (the clock-granularity races) was already fixed and is unchanged.
+Verified: `./gradlew build` green, 44s.
 
 ### TODO-51 `[ ]` The web app throws away the server's Romanian refusal text
 Found while doing TODO-39, which adds a third backend 409 whose whole value is
@@ -3177,6 +3249,34 @@ line in `README.md` next to the other setup steps, since the same trap is one
 `git pull` away for anyone who had `web/node_modules` from before the rebuild.
 
 
+
+
+### TODO-74 `[ ]` `DataLoader` seeds every test context, and no test asks it to
+Found while doing TODO-31, which had to establish what was actually in a test
+database before it could isolate them.
+
+`DataLoader` is an unconditional `@Component implements CommandLineRunner`, and
+`SpringBootContextLoader` runs the runners — so every `@SpringBootTest` context
+starts with 4 role rows and 11 products in it. Two comments claimed otherwise
+(CLAUDE.md's Profiles section, and `spring.sql.init.mode=never` in
+`application-test.properties`, which governs `schema.sql`/`data.sql` and not a
+runner); both are corrected, so this item is about the behaviour, not the docs.
+
+It is not currently harmful. It seeds no employees, so it was never the
+cross-class leak TODO-31 was about, and it only writes when the tables are
+empty. But it is unrequested state that every context pays for, and it makes
+"the products table has N rows" mean something different in a `@SpringBootTest`
+than in a `@DataJpaTest` (which does not load `DataLoader` at all) — a
+difference nothing states and a future assertion could trip over.
+
+Needs deciding, and the reason it was not just done: some tests may be leaning
+on the seeded catalogue or the role rows without saying so — `LastAdminGuardTest`
+finds-or-creates its role, which works either way, but that is one class of
+eleven. Disabling it (`@Profile("!test")`, or a `@ConditionalOnProperty`) needs
+a run to find out who was depending on it, and the payoff is small enough that
+it should not ride along with an unrelated change.
+
+*Found while doing TODO-31.*
 
 ### TODO-72 `[ ]` Installed phones need a rebuild, and the Maps key needs revoking
 Two things TODO-33 could not do from inside the repository.

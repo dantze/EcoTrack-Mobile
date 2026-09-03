@@ -310,10 +310,25 @@ it is on the classpath, and a second registration would double-add headers.
 **Profiles.** Base and `dev` both use the H2 file DB at `backend/data/damiprod`;
 `dev` overrides nothing that matters any more. `prod` switches to Postgres,
 building its JDBC URL from `DB_HOST`/`DB_PORT`/`DB_NAME` env vars. `test` =
-in-memory H2, `create-drop`, `DataLoader` disabled.
+in-memory H2, `create-drop`.
 `DataLoader` seeds the role rows and the product catalogue, and only when those
 tables are empty. It no longer seeds employees — the first enrolled device
 becomes the first ADMIN instead.
+
+**`DataLoader` runs under `test` too** — this file said it was disabled, and
+that was wrong (TODO-31 verified it: 4 roles and 11 products in every
+`@SpringBootTest` context). `spring.sql.init.mode=never` governs `schema.sql` /
+`data.sql`, not a `CommandLineRunner`, and `SpringBootContextLoader` runs the
+runners. Tests are written against the seeded catalogue, so it stays.
+
+**Every `@SpringBootTest` gets its own database** (TODO-31). The suite used to
+share one JVM-wide `jdbc:h2:mem:testdb`, and the classes that exercise the
+first-user bootstrap cannot be `@Transactional` — they need committed state — so
+each left an ADMIN behind for whoever ran next. `@AutoConfigureTestDatabase` on
+every `@SpringBootTest` gives one uniquely-named database per Spring **context**;
+contexts are still cached, so classes with matching configuration still share a
+context, and now share only with each other. `SuiteTests/DatabaseIsolationTest.java`
+carries the rule and fails if a new `@SpringBootTest` omits the annotation.
 
 ## Two definitions of "done", on purpose
 

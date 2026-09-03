@@ -5,6 +5,7 @@ import com.example.damiProd.service.ClientService;
 import com.example.damiProd.repository.ClientRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 
@@ -14,6 +15,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 // @ActiveProfiles("test") makes Spring load application-test.properties,
 // which uses an in-memory H2 DB so tests never touch the real data file.
 @SpringBootTest
+@AutoConfigureTestDatabase
 @ActiveProfiles("test")
 class DamiProdApplicationTests {
 

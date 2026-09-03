@@ -8,6 +8,7 @@ import com.example.damiProd.service.TokenService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
@@ -41,6 +42,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * that actually holds.
  */
 @SpringBootTest
+@AutoConfigureTestDatabase
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 @Transactional
@@ -63,38 +65,25 @@ class LastAdminGuardTest {
 
     @BeforeEach
     void setUp() {
-        // "The last admin" is a statement about the WHOLE table, so this test has
-        // to own that table. DataLoader is disabled under the test profile, but
-        // the database is shared across the run and three classes -
-        // EnrollmentFlowTest, EnrollmentBootstrapCodeTest, AuthEnforcementOffTest
-        // - are deliberately NOT @Transactional, because they exercise the
-        // first-user bootstrap. Each COMMITS an ADMIN that outlives it.
+        // "The last admin" is a statement about the WHOLE table, so this test
+        // has to own that table.
         //
-        // So the admins already there are demoted here rather than assumed away.
-        // This class IS @Transactional, so that demotion is rolled back at the
-        // end of every method and cannot leak back into anyone else.
-        demoteEveryExistingAdmin();
-
+        // It used to have to TAKE it: the suite ran on one JVM-wide H2 database
+        // and the classes that exercise the first-user bootstrap cannot be
+        // @Transactional, so each committed an ADMIN that outlived it. This
+        // method demoted every one of them before it could say anything.
+        // TODO-31 gave every @SpringBootTest its own database instead
+        // (@AutoConfigureTestDatabase; SuiteTests/DatabaseIsolationTest holds
+        // the rule), so the table starts empty and the demotion is gone.
         soleAdmin = seed("guard_admin", "ADMIN");
         adminToken = tokenService.issueNewSession(soleAdmin, "test-device").accessToken();
 
         // Assert the precondition rather than trust it: if this ever stops
         // holding, the failure should name the setup, not look like a guard bug.
+        // Cheap, and it is the thing that would break first if the isolation
+        // were ever undone - which is exactly when a guard test failing for the
+        // wrong reason costs the most.
         assertThat(employeeRepository.countByRoleName("ADMIN")).isEqualTo(1);
-    }
-
-    private void demoteEveryExistingAdmin() {
-        for (Employee employee : employeeRepository.findAll()) {
-            Set<EmployeeRole> withoutAdmin = employee.getRoles().stream()
-                    .filter(role -> !"ADMIN".equalsIgnoreCase(role.getRoleName()))
-                    .collect(Collectors.toCollection(HashSet::new));
-            if (withoutAdmin.size() != employee.getRoles().size()) {
-                // A fresh mutable set, not a removeIf on the existing one: some of
-                // these were seeded with an immutable Set.of(...).
-                employee.setRoles(withoutAdmin);
-                employeeRepository.save(employee);
-            }
-        }
     }
 
     // ---------------------------------------------------------------- refusals

@@ -14,7 +14,14 @@
 
 import { useState } from 'react';
 import type { ClientInput } from '@/api';
-import { Button, Drawer, TextInput } from '@/components/ui';
+import {
+  Button,
+  Drawer,
+  SegmentedControl,
+  TextInput,
+  snapshot,
+  useUnsavedChangesGuard,
+} from '@/components/ui';
 import type { Client } from '@/types/domain';
 import { IdScanField } from '../idScan/IdScanField';
 import type { MrzRead } from '../idScan/mrz';
@@ -123,6 +130,16 @@ export function ClientFormDrawer({
   const [state, setState] = useState<FormState>(() => initialState(client));
   const [errors, setErrors] = useState<Errors>({});
 
+  // Unsaved-changes guard (TODO-58) — same arrangement as OrderFormDrawer:
+  // the state this drawer opened with, captured once and never updated, in
+  // `useState` rather than a ref because it is read during render.
+  const [baseline] = useState(() => snapshot(state));
+  const requestClose = useUnsavedChangesGuard({
+    dirty: snapshot(state) !== baseline,
+    onClose,
+    body: 'Clientul nu a fost salvat. Modificările din formular se pierd.',
+  });
+
   const createClient = useCreateClient();
   const updateClient = useUpdateClient();
 
@@ -172,12 +189,12 @@ export function ClientFormDrawer({
   return (
     <Drawer
       open
-      onClose={onClose}
+      onClose={requestClose}
       width="lg"
       title={editing ? 'Editare client' : 'Client nou'}
       footer={
         <>
-          <Button variant="secondary" onClick={onClose} disabled={saving}>
+          <Button variant="secondary" onClick={requestClose} disabled={saving}>
             Anulează
           </Button>
           {!editing && onCreated && (
@@ -197,22 +214,15 @@ export function ClientFormDrawer({
             {state.kind === 'company' ? 'Persoană juridică (PJ)' : 'Persoană fizică (PF)'}
           </p>
         ) : (
-          <div className="inline-flex rounded-md border border-border p-0.5">
-            {(['individual', 'company'] as ClientKind[]).map((kind) => (
-              <button
-                key={kind}
-                type="button"
-                onClick={() => patch({ kind })}
-                className={`rounded px-3 py-1 text-sm font-medium transition-colors ${
-                  state.kind === kind
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-ink-muted hover:bg-surface-hover'
-                }`}
-              >
-                {kind === 'company' ? 'Persoană juridică' : 'Persoană fizică'}
-              </button>
-            ))}
-          </div>
+          <SegmentedControl
+            aria-label="Tip client"
+            value={state.kind}
+            onChange={(kind: ClientKind) => patch({ kind })}
+            options={[
+              { value: 'individual', label: 'Persoană fizică' },
+              { value: 'company', label: 'Persoană juridică' },
+            ]}
+          />
         )}
       </FormSection>
 

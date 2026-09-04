@@ -104,6 +104,47 @@ export interface CheckboxProps {
 }
 
 // ---------------------------------------------------------------------------
+// Segmented controls
+// ---------------------------------------------------------------------------
+
+/** Buttons that share a border and read as one control. */
+export interface ButtonGroupProps {
+  orientation?: 'horizontal' | 'vertical';
+  className?: string;
+  children: ReactNode;
+}
+
+export interface ToggleOption<T extends string> {
+  value: T;
+  label: ReactNode;
+  disabled?: boolean;
+}
+
+/**
+ * One choice from a few, always exactly one. `onChange` never fires with an
+ * empty value — see the deselect guard in `Toggles.tsx`.
+ */
+export interface SegmentedControlProps<T extends string> {
+  value: T;
+  onChange: (value: T) => void;
+  options: ToggleOption<T>[];
+  size?: 'sm' | 'md';
+  className?: string;
+  /** Required: without it the group is an unlabelled row of buttons. */
+  'aria-label': string;
+}
+
+/** Independent on/off switches that read as one control. Empty is allowed. */
+export interface MultiToggleProps<T extends string> {
+  value: T[];
+  onChange: (value: T[]) => void;
+  options: ToggleOption<T>[];
+  size?: 'sm' | 'md';
+  className?: string;
+  'aria-label': string;
+}
+
+// ---------------------------------------------------------------------------
 // Overlays & feedback
 // ---------------------------------------------------------------------------
 

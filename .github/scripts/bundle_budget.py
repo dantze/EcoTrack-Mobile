@@ -78,13 +78,22 @@ STATIC_IMPORT_RE = re.compile(
 # out of the eager graph rather than left in it, and the route screens, the
 # map and the OCR engine are still lazy.
 #
-# 280 kB is ~8% headroom over the current ~260 kB: still tight enough to catch
-# an accidental eager import of something large. It is NOT an invitation to
-# drift — TODO-59 tracks bringing it back down (per-component Mantine CSS,
-# splitting the UI-kit barrel so a screen stops pulling the date picker).
+# LOWERED 280 -> 260 once the UI-kit barrel stopped leaking (TODO-59).
+#
+# `web/package.json` now declares `"sideEffects": ["**/*.css"]`, which is what
+# lets Rollup drop a re-export nothing uses. Before it, importing `Button` from
+# `@/components/ui` pulled the whole barrel — including `DateInput`, and through
+# it `@mantine/dates` and dayjs — into the eager graph. Measured: 262.0 -> 247.8
+# kB gzip, with `DateInput` now its own chunk shared by the seven screens that
+# actually use it.
+#
+# 260 kB is ~5% headroom over the current 247.8 kB. The ceiling is deliberately
+# tighter than the old one because the thing it now guards against is narrower:
+# a re-introduced eager import, not the whole rebuild's floor. It is NOT an
+# invitation to drift — TODO-60 (per-component Mantine CSS) is the next lever.
 # Raise it deliberately, in a commit that says what grew and why — never to
 # make a red build green.
-BUDGET_GZIP_KB = 280.0
+BUDGET_GZIP_KB = 260.0
 
 
 def gzip_kb(path: Path) -> float:

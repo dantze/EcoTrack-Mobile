@@ -129,15 +129,22 @@ export interface RecurringRow {
 }
 
 /**
- * The per-employee row that used to hold login credentials. It carries no
- * secret any more: there is no password anywhere in this system, so the row
- * survives only for `email` — an optional contact detail that nothing
- * authenticates with, which sits here rather than on the employee because the
- * mock's `Employee` mirrors the API shape, and that does not carry it.
+ * An employee's email address, which is all this row has ever been since
+ * passwords were removed.
+ *
+ * It sits beside `Employee` rather than on it because the mock's `Employee`
+ * mirrors the API shape, and the API does not carry an email. Nothing
+ * authenticates with it — `toAuthUser` reads it as a contact detail.
+ *
+ * It was called `CredentialRow` and also carried `username` (TODO-53). The
+ * username was written in three places and read in none: every lookup goes
+ * through `employeeId`, and `toAuthUser` takes the username off the `Employee`,
+ * which is the one that a rename actually updates. A second copy that no code
+ * reads is not a debugging affordance, it is a thing to keep in sync for
+ * nothing — so it is gone, and the name now says what the row is.
  */
-export interface CredentialRow {
+export interface EmployeeEmailRow {
   employeeId: number;
-  username: string;
   email: string;
 }
 
@@ -194,7 +201,7 @@ export interface MockDb {
   products: Product[];
   subscriptions: Subscription[];
   employees: Employee[];
-  credentials: CredentialRow[];
+  employeeEmails: EmployeeEmailRow[];
   routes: RouteRow[];
   tasks: TaskRow[];
   orders: OrderRow[];

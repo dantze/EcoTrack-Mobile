@@ -25,11 +25,19 @@ import { useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMediaQuery } from '@mantine/hooks';
 import { SlidersHorizontal } from 'lucide-react';
-import { Badge, Button, DateInput, EmptyState, Select, TextInput, cx } from '@/components/ui';
+import {
+  Badge,
+  Button,
+  DateInput,
+  EmptyState,
+  MultiToggle,
+  Select,
+  TextInput,
+  cx,
+} from '@/components/ui';
 import { CommandBar, PaneHeader, ToolbarGroup, Workbench } from '@/components/layout';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/shadcn/sheet';
 import { Toggle } from '@/components/shadcn/toggle';
-import { ToggleGroup, ToggleGroupItem } from '@/components/shadcn/toggle-group';
 import { ORDER_TYPE_LABELS } from '@/components/domain';
 import { useDeepLink, useDeepLinkOnce } from '@/lib/deepLink';
 import { useShortcuts } from '@/lib/hotkeys';
@@ -228,20 +236,19 @@ export function MapPage() {
         }
         actions={
           <ToolbarGroup>
-            <ToggleGroup
-              type="multiple"
+            <MultiToggle
               size="sm"
-              variant="outline"
+              aria-label="Straturi hartă"
               value={layers}
-              onValueChange={(next: string[]) => {
+              onChange={(next) => {
                 setShowHeatmap(next.includes('heatmap'));
                 if (isTech) setShowRoutes(next.includes('routes'));
               }}
-              aria-label="Straturi hartă"
-            >
-              <ToggleGroupItem value="heatmap">Densitate</ToggleGroupItem>
-              {isTech && <ToggleGroupItem value="routes">Trasee</ToggleGroupItem>}
-            </ToggleGroup>
+              options={[
+                { value: 'heatmap', label: 'Densitate' },
+                ...(isTech ? [{ value: 'routes', label: 'Trasee' }] : []),
+              ]}
+            />
           </ToolbarGroup>
         }
         tools={

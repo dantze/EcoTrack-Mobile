@@ -22,12 +22,15 @@ import {
   Button,
   DateInput,
   Drawer,
+  SegmentedControl,
   Select,
   Spinner,
   SuggestionCard,
   TextArea,
   TextInput,
   WarningNote,
+  snapshot,
+  useUnsavedChangesGuard,
   type AutocompleteOption,
   type SelectOption,
 } from '@/components/ui';
@@ -111,6 +114,24 @@ export function OrderFormDrawer({ order = null, initialClient = null, onClose }:
   /** Suggestion cards the operator has dismissed, keyed by `${clientId}:${type}`. */
   const [dismissed, setDismissed] = useState<Set<string>>(new Set());
 
+  /**
+   * Unsaved-changes guard (TODO-58). The baseline is taken once, from the same
+   * props the state was seeded with, and never updated — `useState` with a lazy
+   * initialiser rather than a ref because this is READ during render, which a
+   * ref is not allowed to be. The client id is folded in because choosing a
+   * client is real work that lives outside `form`.
+   *
+   * `dismissed` is deliberately absent: dismissing a suggestion card is not
+   * work worth warning about losing.
+   */
+  const asSnapshot = () => snapshot({ clientId: client?.id ?? null, form });
+  const [baseline] = useState(asSnapshot);
+  const requestClose = useUnsavedChangesGuard({
+    dirty: asSnapshot() !== baseline,
+    onClose,
+    body: 'Comanda nu a fost salvată. Modificările din formular se pierd.',
+  });
+
   const clientsQuery = useClients();
   const productsQuery = useProducts();
   const subscriptionsQuery = useSubscriptions(false);
@@ -124,6 +145,24 @@ export function OrderFormDrawer({ order = null, initialClient = null, onClose }:
 
   const patch = (changes: Partial<OrderFormState>) =>
     setForm((current) => ({ ...current, ...changes }));
+
+  /**
+   * Changing the type resets the subtype-specific fields — they do not
+   * translate — but keeps the three that are common to every type, so an
+   * operator who typed a phone number and then noticed the wrong type does not
+   * retype it. Both the segmented control and the "Comută pe …" hint go
+   * through here; they used to hold two copies of this list, one of which
+   * would eventually have been forgotten when a field was added.
+   */
+  const switchOrderType = (type: OrderTypeTag) => {
+    setErrors({});
+    setForm((current) => ({
+      ...emptyOrderForm(type),
+      contactCode: current.contactCode,
+      contactDigits: current.contactDigits,
+      details: current.details,
+    }));
+  };
 
   // ── This client's history ───────────────────────────────────────────────
   // Fetched as soon as a client is chosen, not only for Ridicari: the same
@@ -315,7 +354,7 @@ export function OrderFormDrawer({ order = null, initialClient = null, onClose }:
   return (
     <Drawer
       open
-      onClose={onClose}
+      onClose={requestClose}
       width="xl"
       title={
         editing && order
@@ -324,7 +363,7 @@ export function OrderFormDrawer({ order = null, initialClient = null, onClose }:
       }
       footer={
         <>
-          <Button variant="secondary" onClick={onClose} disabled={saving}>
+          <Button variant="secondary" onClick={requestClose} disabled={saving}>
             Anulează
           </Button>
           <Button variant="primary" loading={saving} onClick={() => void handleSubmit()}>
@@ -359,30 +398,15 @@ export function OrderFormDrawer({ order = null, initialClient = null, onClose }:
         {editing ? (
           <p className="text-sm text-ink">{ORDER_TYPE_LABELS[form.orderType]}</p>
         ) : (
-          <div className="inline-flex rounded-md border border-border p-0.5">
-            {ORDER_TYPES.map((type: OrderTypeTag) => (
-              <button
-                key={type}
-                type="button"
-                onClick={() => {
-                  setErrors({});
-                  setForm({
-                    ...emptyOrderForm(type),
-                    contactCode: form.contactCode,
-                    contactDigits: form.contactDigits,
-                    details: form.details,
-                  });
-                }}
-                className={`rounded px-3 py-1 text-sm font-medium transition-colors ${
-                  form.orderType === type
-                    ? 'bg-primary text-primary-foreground'
-                    : 'text-ink-muted hover:bg-surface-hover'
-                }`}
-              >
-                {ORDER_TYPE_LABELS[type]}
-              </button>
-            ))}
-          </div>
+          <SegmentedControl
+            aria-label="Tip comandă"
+            value={form.orderType}
+            onChange={switchOrderType}
+            options={ORDER_TYPES.map((type: OrderTypeTag) => ({
+              value: type,
+              label: ORDER_TYPE_LABELS[type],
+            }))}
+          />
         )}
 
         {typeHint && !editing && (
@@ -393,15 +417,7 @@ export function OrderFormDrawer({ order = null, initialClient = null, onClose }:
             {typeHint.type !== form.orderType && (
               <button
                 type="button"
-                onClick={() => {
-                  setErrors({});
-                  setForm({
-                    ...emptyOrderForm(typeHint.type),
-                    contactCode: form.contactCode,
-                    contactDigits: form.contactDigits,
-                    details: form.details,
-                  });
-                }}
+                onClick={() => switchOrderType(typeHint.type)}
                 className="ml-1.5 font-medium text-primary underline underline-offset-2 hover:text-primary"
               >
                 Comută pe {typeHint.label}

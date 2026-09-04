@@ -9,11 +9,30 @@
  */
 
 import '@testing-library/jest-dom/vitest';
-import { cleanup } from '@testing-library/react';
+import { cleanup, configure } from '@testing-library/react';
+import { resetConfirms } from '@/components/ui/feedback';
 import { afterEach, beforeAll, vi } from 'vitest';
+
+// `waitFor` and the `findBy*` queries default to 1000ms, and that budget is
+// SEPARATE from Vitest's `testTimeout` — raising one does nothing for the
+// other. One second is enough for a component test and not enough for the
+// handful that boot the real router under the real provider stack: those were
+// measured at ~4s for the first case in a file, and they flake when the whole
+// suite runs in parallel on a loaded machine.
+//
+// Raised here rather than per call site so the next router test inherits it
+// instead of rediscovering the same flake. It only bounds how long a query may
+// WAIT for something that never arrives — a passing assertion still returns
+// the moment the DOM settles, so this costs nothing when tests are healthy.
+configure({ asyncUtilTimeout: 5_000 });
 
 afterEach(() => {
   cleanup();
+  // The confirm queue is module-level (it has to be — `requestConfirm` is
+  // called from outside React), so an unanswered question survives `cleanup()`
+  // and the NEXT test renders with a modal already on screen, whose overlay
+  // makes every control in it unclickable. Same category as unmounting the DOM.
+  resetConfirms();
 });
 
 beforeAll(() => {

@@ -63,6 +63,16 @@ const REFUSAL_MESSAGES: Record<MrzRejection, string> = {
 const ENGINE_ERROR =
   'Scanarea nu a putut porni pe acest dispozitiv. Introduceți datele manual.';
 
+/**
+ * A dropped file is not filtered by `accept` — that attribute only constrains
+ * the picker dialog. Without this check a dropped PDF or document reaches the
+ * OCR engine, which fails somewhere inside itself and surfaces as
+ * ENGINE_ERROR: "scanning could not start on this device", sending the
+ * operator to look for a problem with their computer instead of their file.
+ */
+const NOT_AN_IMAGE =
+  'Fișierul nu este o imagine. Trageți o fotografie a actului (JPG, PNG sau HEIC).';
+
 const PRIVACY_NOTE =
   'Fotografia este citită pe acest calculator și nu este trimisă sau salvată nicăieri.';
 
@@ -115,8 +125,25 @@ export function IdScanField({ onRead }: { onRead: (read: MrzRead) => void }) {
 
   const pick = (files: FileList | null) => {
     const file = files?.[0];
-    if (file) void handleFile(file);
+    if (!file) return;
+    // Some browsers report an empty `type` for an unknown extension; treat that
+    // as "let the engine decide" rather than refusing a valid photo outright.
+    if (file.type !== '' && !file.type.startsWith('image/')) {
+      setStatus({ kind: 'refused', message: NOT_AN_IMAGE });
+      clearInputs();
+      return;
+    }
+    void handleFile(file);
   };
+
+  /**
+   * `dragleave` fires when the pointer crosses onto a CHILD of the dropzone —
+   * the icon, the text, either button — so a single boolean toggled by it
+   * flickers the highlight off while the file is still very much over the
+   * target. Counting enter/leave pairs is the fix that does not depend on
+   * where the child boundaries happen to be.
+   */
+  const dragDepth = useRef(0);
 
   /** Abandon the wait. The engine has no abort signal, so this drops the run. */
   const cancel = () => {
@@ -178,13 +205,21 @@ export function IdScanField({ onRead }: { onRead: (read: MrzRead) => void }) {
         </div>
       ) : (
         <div
-          onDragOver={(event) => {
+          onDragEnter={(event) => {
             event.preventDefault();
+            dragDepth.current += 1;
             setDragging(true);
           }}
-          onDragLeave={() => setDragging(false)}
+          // Still needed even with onDragEnter: without preventDefault on
+          // dragover the browser refuses the drop and opens the file instead.
+          onDragOver={(event) => event.preventDefault()}
+          onDragLeave={() => {
+            dragDepth.current = Math.max(0, dragDepth.current - 1);
+            if (dragDepth.current === 0) setDragging(false);
+          }}
           onDrop={(event) => {
             event.preventDefault();
+            dragDepth.current = 0;
             setDragging(false);
             pick(event.dataTransfer.files);
           }}
@@ -259,15 +294,28 @@ export function IdScanField({ onRead }: { onRead: (read: MrzRead) => void }) {
             Nu completăm nimic dintr-o citire nesigură. Încercați altă fotografie sau introduceți
             datele manual.
           </p>
-          <Button
-            className="mt-2"
-            size="sm"
-            variant="secondary"
-            icon={<Camera aria-hidden />}
-            onClick={() => fileRef.current?.click()}
-          >
-            Încearcă din nou
-          </Button>
+          {/* Both ways back, and each icon matches what its button does — the
+              single button here used to wear a camera and open the file
+              picker. On a phone the camera is the one that matters, since the
+              usual next step after a bad read is another photo. */}
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            <Button
+              size="sm"
+              variant="secondary"
+              icon={<Camera aria-hidden />}
+              onClick={() => cameraRef.current?.click()}
+            >
+              Fotografiază din nou
+            </Button>
+            <Button
+              size="sm"
+              variant="secondary"
+              icon={<Upload aria-hidden />}
+              onClick={() => fileRef.current?.click()}
+            >
+              Alege altă fotografie
+            </Button>
+          </div>
         </div>
       )}
 

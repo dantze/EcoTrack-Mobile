@@ -3,6 +3,9 @@
   "private": true,
   "version": "0.1.0",
   "type": "module",
+  "sideEffects": [
+    "**/*.css"
+  ],
   "scripts": {
     "ocr-assets": "node scripts/fetch-ocr-assets.mjs",
     "predev": "npm run ocr-assets",

@@ -17,7 +17,7 @@
  */
 
 import { describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { MrzResult } from '../idScan/mrz';
 
@@ -126,5 +126,42 @@ describe('IdScanField', () => {
 
     expect(scanIdImage).toHaveBeenCalledTimes(1);
     expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  // TODO-58. `accept="image/*"` constrains the picker dialog and nothing else,
+  // so a dropped file is whatever the operator dragged.
+  it('refuses a dropped file that is not an image, without starting the engine', async () => {
+    render(<IdScanField onRead={vi.fn()} />);
+
+    const dropzone = screen.getByText('Scanează buletinul').closest('div')!.parentElement!;
+    const contract = new File(['%PDF-1.4'], 'contract.pdf', { type: 'application/pdf' });
+
+    fireEvent.drop(dropzone, { dataTransfer: { files: [contract] } });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/nu este o imagine/i);
+    // The point of checking first: the engine's own failure would have been
+    // reported as "scanning could not start on this device".
+    expect(scanIdImage).not.toHaveBeenCalled();
+  });
+
+  it('keeps the drop highlight while the pointer crosses a child element', () => {
+    // `dragleave` bubbles from children, so a naive boolean flickers the
+    // highlight off while the file is still over the dropzone.
+    render(<IdScanField onRead={vi.fn()} />);
+
+    const label = screen.getByText('Scanează buletinul');
+    const dropzone = label.closest('div')!.parentElement!;
+
+    fireEvent.dragEnter(dropzone);
+    expect(dropzone.className).toContain('border-accent-500');
+
+    // Pointer moves onto the inner text: enter the child, leave the parent.
+    fireEvent.dragEnter(label);
+    fireEvent.dragLeave(dropzone);
+    expect(dropzone.className).toContain('border-accent-500');
+
+    // Genuinely leaving unwinds the remaining depth.
+    fireEvent.dragLeave(label);
+    expect(dropzone.className).not.toContain('border-accent-500');
   });
 });

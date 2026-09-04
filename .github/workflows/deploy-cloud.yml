@@ -408,7 +408,10 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # Single source of truth for the toolchain version, shared with
+          # developers' shells (TODO-48). Hardcoding it here let CI sit on 22
+          # while a contributor ran 24, where the suite failed.
+          node-version-file: .nvmrc
           cache: npm
           cache-dependency-path: web/package-lock.json
 

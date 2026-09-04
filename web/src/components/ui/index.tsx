@@ -48,6 +48,11 @@ export type { TabsExtraProps } from './Tabs';
 export { Modal, Drawer, DetailList } from './Overlay';
 export type { OverlayExtraProps } from './Overlay';
 
+export { SegmentedControl, MultiToggle, ButtonGroup } from './Toggles';
+
+export { useUnsavedChangesGuard, snapshot } from './useUnsavedChanges';
+export type { UnsavedChangesGuard } from './useUnsavedChanges';
+
 export {
   ToastProvider,
   ToastViewport,
@@ -58,6 +63,7 @@ export {
   toast,
   dismissToast,
   requestConfirm,
+  resetConfirms,
 } from './feedback';
 
 export { DataTable } from './DataTable';

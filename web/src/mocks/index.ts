@@ -77,7 +77,7 @@ import {
   type AccessRequestRow,
   type AmplasareRow,
   type AuthSessionRow,
-  type CredentialRow,
+  type EmployeeEmailRow,
   type OrderRow,
   type RecurringRow,
   type RidicareRow,
@@ -190,28 +190,28 @@ function makeRefreshToken(sessionId: number): string {
   return `mock.refresh.${sessionId}.${Math.random().toString(36).slice(2)}`;
 }
 
-function toAuthUser(employee: Employee, credential: CredentialRow): AuthUser {
+function toAuthUser(employee: Employee, emailRow: EmployeeEmailRow): AuthUser {
   return {
     id: employee.id,
     username: employee.username,
     fullName: employee.fullName,
     phone: employee.phone,
     county: employee.county,
-    email: credential.email,
+    email: emailRow.email,
     roles: [...employee.roles],
   };
 }
 
 /** Requires an access token on the bridge that decodes to a live employee. */
-function currentEmployee(): { employee: Employee; credential: CredentialRow } {
+function currentEmployee(): { employee: Employee; emailRow: EmployeeEmailRow } {
   const employeeId = employeeIdFromAccessToken(getAccessToken());
   const employee = employeeId === null ? undefined : db.employees.find((e) => e.id === employeeId);
-  const credential = employee && db.credentials.find((c) => c.employeeId === employee.id);
-  if (!employee || !credential) throw new MockApiError('Neautentificat', 401);
-  return { employee, credential };
+  const emailRow = employee && db.employeeEmails.find((c) => c.employeeId === employee.id);
+  if (!employee || !emailRow) throw new MockApiError('Neautentificat', 401);
+  return { employee, emailRow };
 }
 
-function issueSession(employee: Employee, credential: CredentialRow, device = 'Acest browser'): AuthSession {
+function issueSession(employee: Employee, emailRow: EmployeeEmailRow, device = 'Acest browser'): AuthSession {
   const id = nextId('session');
   const now = new Date().toISOString();
   const row: AuthSessionRow = {
@@ -226,7 +226,7 @@ function issueSession(employee: Employee, credential: CredentialRow, device = 'A
   db.authSessions.push(row);
 
   return {
-    user: toAuthUser(employee, credential),
+    user: toAuthUser(employee, emailRow),
     tokens: { accessToken: makeAccessToken(employee.id), refreshToken: row.refreshToken, expiresIn: ACCESS_TTL_SECONDS },
   };
 }
@@ -253,8 +253,8 @@ const authApi: EcoTrackApi['auth'] = {
 
   me(): Promise<AuthUser> {
     return respond(() => {
-      const { employee, credential } = currentEmployee();
-      return toAuthUser(employee, credential);
+      const { employee, emailRow } = currentEmployee();
+      return toAuthUser(employee, emailRow);
     });
   },
 
@@ -838,9 +838,8 @@ const employeesApi: EcoTrackApi['employees'] = {
         roles: [...input.roles],
       };
       db.employees.push(employee);
-      db.credentials.push({
+      db.employeeEmails.push({
         employeeId: employee.id,
-        username: input.username,
         email: `${input.username}@ecotrack.ro`,
       });
       return cloneEmployee(employee);
@@ -858,8 +857,11 @@ const employeesApi: EcoTrackApi['employees'] = {
       if (input.county !== undefined) employee.county = input.county ?? null;
       if (input.roles && input.roles.length > 0) employee.roles = [...input.roles];
 
-      const credential = db.credentials.find((row) => row.employeeId === id);
-      if (credential && input.username) credential.username = input.username;
+      // No email-row write here on purpose (TODO-53). The address is seeded
+      // from the username, but renaming an employee does NOT re-derive it —
+      // matching the backend, where an email is a contact detail somebody set,
+      // not a projection of the login name. This used to also copy the new
+      // username into a second field that nothing ever read.
 
       return cloneEmployee(employee);
     }),
@@ -879,8 +881,8 @@ const employeesApi: EcoTrackApi['employees'] = {
       }
 
       db.employees.splice(index, 1);
-      const credentialIndex = db.credentials.findIndex((row) => row.employeeId === id);
-      if (credentialIndex !== -1) db.credentials.splice(credentialIndex, 1);
+      const emailRowIndex = db.employeeEmails.findIndex((row) => row.employeeId === id);
+      if (emailRowIndex !== -1) db.employeeEmails.splice(emailRowIndex, 1);
     }),
 
   // Somebody else's devices (TODO-56). The mock does not model roles on the
@@ -1510,11 +1512,11 @@ function makeVerificationCode(): string {
   return String(Math.floor(Math.random() * 1_000_000)).padStart(6, '0');
 }
 
-function findApprovableEmployee(role: Role): { employee: Employee; credential: CredentialRow } | null {
+function findApprovableEmployee(role: Role): { employee: Employee; emailRow: EmployeeEmailRow } | null {
   const employee = db.employees.find((e) => e.roles.includes(role));
-  const credential = employee && db.credentials.find((c) => c.employeeId === employee.id);
-  if (!employee || !credential) return null;
-  return { employee, credential };
+  const emailRow = employee && db.employeeEmails.find((c) => c.employeeId === employee.id);
+  if (!employee || !emailRow) return null;
+  return { employee, emailRow };
 }
 
 const enrollmentApi: EcoTrackApi['enrollment'] = {
@@ -1575,7 +1577,7 @@ const enrollmentApi: EcoTrackApi['enrollment'] = {
       row.status = 'CLAIMED';
       return {
         state: 'issued',
-        session: issueSession(match.employee, match.credential, row.deviceLabel ?? 'Acest browser'),
+        session: issueSession(match.employee, match.emailRow, row.deviceLabel ?? 'Acest browser'),
       };
     });
   },

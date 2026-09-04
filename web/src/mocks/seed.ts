@@ -20,7 +20,7 @@ import { clientName } from '@/types/domain';
 import type {
   AccessRequestRow,
   AuthSessionRow,
-  CredentialRow,
+  EmployeeEmailRow,
   MockDb,
   OrderRow,
   RecurringRow,
@@ -347,11 +347,10 @@ export function createSeedDb(): MockDb {
     county: seed.county,
     roles: [...seed.roles],
   }));
-  const credentials: CredentialRow[] = employees.map((employee) => ({
+  // The Employee entity has no email field; auth is the only consumer, so it
+  // lives in this side table instead. Deterministic from the seed.
+  const employeeEmails: EmployeeEmailRow[] = employees.map((employee) => ({
     employeeId: employee.id,
-    username: employee.username,
-    // The Employee entity has no email field; auth is the only consumer, so
-    // it lives on the credential row instead. Deterministic from the seed.
     email: `${employee.username}@ecotrack.ro`,
   }));
   const drivers = employees.filter((e) => e.roles.includes('DRIVER'));
@@ -802,7 +801,7 @@ export function createSeedDb(): MockDb {
     products,
     subscriptions,
     employees,
-    credentials,
+    employeeEmails,
     routes,
     tasks,
     orders,

@@ -1,35 +1,27 @@
 /**
- * Custom zoom / fit-bounds chrome, styled to match the app instead of
- * MapLibre's stock white squares. `IconButton` from the UI kit gives us the
- * focus ring, disabled state and hover treatment for free.
+ * Floating zoom / fit chrome, styled as the app rather than MapLibre's stock
+ * white squares.
+ *
+ * Three changes from the first version (TODO-58):
+ *
+ * - It is a real `ButtonGroup` now, not a `<div>` imitating one. The group owns
+ *   the shared border and the corner rounding, so the buttons no longer each
+ *   carry a hand-written `rounded-none border-b` that has to be re-derived
+ *   whenever a button is added or reordered — the last one used to need a
+ *   different class from the rest, purely because it was last.
+ * - The three hand-drawn `<svg>`s are lucide icons. They were the only
+ *   bespoke icons left in the app, and `Maximize` says "fit to frame" more
+ *   clearly than the corner brackets did.
+ * - It sits above the legend's mobile trigger in the corner ordering, and is
+ *   reachable by keyboard in the order it is read.
+ *
+ * Positioned as a sibling of the MapLibre container rather than inside it —
+ * see the comment on that container in `MapCanvas`, which must keep its inline
+ * `position: absolute; inset: 0`.
  */
 
-import { IconButton } from '@/components/ui';
-
-function PlusIcon() {
-  return (
-    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" aria-hidden className="size-4">
-      <path d="M8 3v10M3 8h10" />
-    </svg>
-  );
-}
-
-function MinusIcon() {
-  return (
-    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" aria-hidden className="size-4">
-      <path d="M3 8h10" />
-    </svg>
-  );
-}
-
-/** Corner brackets read as "fit to frame" without borrowing a magnifying-glass metaphor already used for search. */
-function FitIcon() {
-  return (
-    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden className="size-4">
-      <path d="M2 5.5V3a1 1 0 0 1 1-1h2.5M14 5.5V3a1 1 0 0 0-1-1h-2.5M2 10.5V13a1 1 0 0 0 1 1h2.5M14 10.5V13a1 1 0 0 1-1 1h-2.5" />
-    </svg>
-  );
-}
+import { Maximize, Minus, Plus } from 'lucide-react';
+import { ButtonGroup, IconButton } from '@/components/ui';
 
 export interface MapControlsProps {
   onZoomIn: () => void;
@@ -40,27 +32,24 @@ export interface MapControlsProps {
 
 export function MapControls({ onZoomIn, onZoomOut, onFit, fitDisabled }: MapControlsProps) {
   return (
-    <div className="absolute top-3 right-3 flex flex-col overflow-hidden rounded-lg bg-surface shadow-popover ring-1 ring-border ring-inset">
-      <IconButton
-        label="Mărește"
-        variant="ghost"
-        className="rounded-none border-b border-border"
-        onClick={onZoomIn}
-      >
-        <PlusIcon />
+    <ButtonGroup
+      orientation="vertical"
+      className="absolute top-3 right-3 shadow-popover"
+    >
+      <IconButton label="Mărește" variant="secondary" onClick={onZoomIn}>
+        <Plus />
       </IconButton>
-      <IconButton label="Micșorează" variant="ghost" className="rounded-none border-b border-border" onClick={onZoomOut}>
-        <MinusIcon />
+      <IconButton label="Micșorează" variant="secondary" onClick={onZoomOut}>
+        <Minus />
       </IconButton>
       <IconButton
         label="Încadrează toate comenzile"
-        variant="ghost"
-        className="rounded-none"
+        variant="secondary"
         onClick={onFit}
         disabled={fitDisabled}
       >
-        <FitIcon />
+        <Maximize />
       </IconButton>
-    </div>
+    </ButtonGroup>
   );
 }

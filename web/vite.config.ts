@@ -70,7 +70,7 @@ export default defineConfig({
   // imports only `@/api` is what keeps mock and live substitutable, and a test
   // harness with its own alias table could quietly break that.
   test: {
-    environment: 'jsdom',
+    environment: './src/test/jsdomNodeAbort.ts',
     globals: false, // describe/it/expect are imported explicitly
     setupFiles: ['./src/test/setup.ts'],
     include: ['src/**/*.{test,spec}.{ts,tsx}'],
@@ -81,6 +81,16 @@ export default defineConfig({
     env: { VITE_MOCK_LATENCY_MS: '0' },
     css: false,
     restoreMocks: true,
+    // Vitest's default is 5000ms, which this suite outgrew. `screensSmoke` and
+    // `bootNavigation` boot the REAL router under the real provider stack, and
+    // the first case in a file also pays for loading a screen's module graph —
+    // measured at ~4.2s for `/comenzi` on an unloaded machine. Two such files
+    // running in parallel push that past 5s and the run fails on a timeout
+    // rather than on anything being wrong, which is the worst kind of red.
+    //
+    // Raised rather than the tests being made shallower: booting the real
+    // router is the entire point of both files — it is what caught TODO-48.
+    testTimeout: 15_000,
     coverage: {
       provider: 'v8',
       reporter: ['text-summary', 'lcov'],

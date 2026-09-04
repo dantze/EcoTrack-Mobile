@@ -661,7 +661,7 @@ green; `AdminSessionRevocationTest` is `@Transactional` and has to be — it sha
 a cached context, and therefore a database, with `LastAdminGuardTest`, which
 asserts things about the whole employee table.
 
-### TODO-53 `[ ]` `CredentialRow.username` in the web mock is write-only
+### TODO-53 `[DONE]` `CredentialRow.username` in the web mock is write-only
 Found while doing TODO-28. With `password` gone, the row carries `employeeId`,
 `username` and `email` — and `username` is written in three places
 (`seed.ts`'s `createSeedDb`, `employees.create`, and `employees.update`, which
@@ -677,6 +677,31 @@ dead plumbing, one field smaller, and deleting it also removes the `if
 Needs deciding: drop `username` and let the row be `{ employeeId, email }` — at
 which point "CredentialRow" is a misnomer for what is really an employee-email
 side table and probably wants renaming — or keep it as a debugging affordance.
+
+
+**Done — dropped, and the type renamed to match what it actually is.**
+`username` was written in three places and read in none, confirmed by grep
+before touching anything: every lookup goes through `employeeId`, and
+`toAuthUser` reads the username off the `Employee`. Keeping a second copy that
+no code reads is not a debugging affordance — it is a field to keep in sync for
+nothing, and `employees.update` was doing exactly that.
+
+So the row is now `{ employeeId, email }`, and since that is no longer a
+credential in any sense, `CredentialRow` became **`EmployeeEmailRow`** and
+`db.credentials` became `db.employeeEmails`. The rename was the other half of
+this item's question, and it is safe here: the mock store is session-lifetime
+with no persistence, so no stored shape depends on the old names, and nothing
+outside `src/mocks` ever referenced them.
+
+One behaviour change worth naming, in `employees.update`: it used to copy a new
+username into the row. It no longer writes there at all, so **renaming an
+employee no longer re-derives their email**. That is the more correct of the two
+— the seed derives an address from the username for convenience, but an email is
+a contact detail somebody set, not a projection of the login name, and the real
+backend has no such coupling either. A comment at that site says so, because the
+absence of a write is the kind of thing that gets "fixed" back.
+
+Verified: `typecheck` clean, `lint` clean (0 errors), **498 tests passing**.
 
 ### TODO-76 `[ ]` `AdminController` answers in three shapes, none of them the app's
 Found while doing TODO-56, adding session endpoints next to the existing ones.
@@ -2482,7 +2507,7 @@ should pass), and a missing `index.html`, a missing `dist/assets`, or an
 is unchanged — same argv, same `web/dist` default, same 0/1 exit codes, same
 `GITHUB_STEP_SUMMARY` markdown table — so `ci-web.yml` needs no edit.
 
-### TODO-48 `[ ]` `bootNavigation.test.tsx` fails on Node 24
+### TODO-48 `[DONE]` `bootNavigation.test.tsx` fails on Node 24
 `stays on /comenzi when a dead refresh token is stored` throws
 `TypeError: RequestInit: Expected signal ("AbortSignal {}") to be an instance of
 AbortSignal` from inside react-router's `createBrowserRouter`, under undici.
@@ -2504,6 +2529,55 @@ because it also boots the real router. So `npm run test:run` reports **11 failed
 across 2 files**, not one — re-verified from a clean stash at HEAD on 2026-09-02,
 where it fails identically. Every other web test file passes. The fix is the
 same single decision; only the blast radius was understated.
+
+
+**Done — the two classes both stay, and the one place they meet is bridged.**
+Reproduced first, against a standalone Node 24.20.0: the failure is exactly as
+described, and `screensSmoke` goes down with it for the same reason.
+
+The cause is that Vitest's jsdom environment copies jsdom's
+`AbortController`/`AbortSignal` onto the global, shadowing Node's — while
+`fetch` and `Request` stay Node's, because jsdom has no fetch. Undici
+brand-checks the signal against the class it captured at bootstrap, which is the
+one jsdom just replaced. Node 24's undici applies that check to
+`RequestInit.signal` where 22 was laxer, which is the whole of "only on 24".
+
+**Swapping the globals back to Node's was tried and is wrong**, which is worth
+recording because it is the obvious fix: jsdom's `EventTarget.addEventListener`
+webidl-checks `options.signal` against ITS class, so restoring Node's trades the
+router failure for `parameter 3 dictionary has member 'signal' that is not of
+type 'AbortSignal'` — and React and Radix pass `{ signal }` to
+`addEventListener` constantly. Each side is right about its own class.
+
+So `src/test/jsdomNodeAbort.ts` is a custom environment that wraps the stock
+jsdom one, captures Node's classes in the one moment they are still on the
+global, leaves jsdom's in place, and translates only at the `fetch`/`Request`
+boundary. The translation is a real link — aborting the caller's signal aborts
+the one undici holds, with the same reason — so a cancelled navigation still
+cancels its request. `src/test/__tests__/abortSignalBridge.test.ts` pins both
+directions plus the abort propagation, so the next person to "simplify" it fails
+on a named test instead of on 11 router tests.
+
+**Two flakes surfaced once the suite could run at all**, both time budgets
+rather than bugs, and both fixed:
+
+- Vitest's `testTimeout` was the default 5000ms. The first case in a file also
+  pays for loading a screen's module graph — ~4.2s for `/comenzi` — so two
+  router files in parallel tipped past it. Raised to 15s in `vite.config.ts`.
+- Testing Library's `asyncUtilTimeout` is a SEPARATE 1000ms budget that
+  `testTimeout` does not affect. Set to 5s in `src/test/setup.ts`.
+
+**The version pin is the other half.** There was no `.nvmrc`, so nothing told a
+developer that CI runs 22 — the gap that let this sit undiagnosed. There is one
+now, at the repo root, and `ci-web`, `ci-mobile`, `audit`, `deploy-mobile` and
+`deploy-cloud` all read `node-version-file: .nvmrc` instead of each hardcoding
+`'22'`. `.nvmrc` is in `ci-web.yml`'s and `ci-mobile.yml`'s `paths:` filters, so
+changing the toolchain re-runs the suites that depend on it.
+
+Verified: **498 tests, 38 files, all passing on Node 22.14.0 AND Node 24.20.0**,
+with two consecutive clean full runs on 24 to check the flakes are actually
+gone. `npm run typecheck` and `npm run lint` are clean (86 pre-existing
+`react-refresh` warnings, 0 errors).
 
 ### TODO-49 `[DONE]` CLAUDE.md's Known gaps still says mobile cannot authenticate
 ``Known gaps`` opens with "**The mobile app cannot authenticate.** It still posts
@@ -3480,7 +3554,7 @@ body once, as text, now.
 Covered by `web/src/api/__tests__/serverMessage.test.ts` (14 cases, including
 both `errorMessage`s) and `mobile/services/__tests__/serverMessage.test.ts` (9).
 
-### TODO-58 `[ ]` The UI rebuild stopped short on four surfaces
+### TODO-58 `[DONE]` The UI rebuild stopped short on four surfaces
 The web UI was rebuilt on shadcn/ui + Mantine (see `.claude/skills/web-ui-shadcn`
 and `web-ui-mantine`): one token system with real dark mode, an Outlook-style
 shell (navy top bar, collapsible nav pane, `CommandBar` ribbon, `ListDetail`
@@ -3512,7 +3586,132 @@ NOT done, because the agents doing them ran out of budget mid-file:
 None of these is broken — they are the parts that are merely *fine*. Deciding
 needs nothing; it is work, not a question.
 
-### TODO-59 `[ ]` The eager bundle grew from ~125 kB to ~260 kB gzip
+
+**Done, and two of the four bullets were already stale.** Checked against the
+code before touching anything, which is the only reason the work was small:
+
+| Bullet | State found |
+|---|---|
+| `OrderFormDrawer` "lays fields out by hand" | **Already false.** It uses `FormSection` — which is shadcn `FieldSet`/`FieldLegend`/`FieldGroup` — plus `FormGrid`/`Col` throughout, as does `ClientFormDrawer`. Someone did this and did not strike the bullet |
+| no unsaved-changes guard | **True.** Fixed |
+| `IdScanField` "has the three states but not the dragged-file/camera polish" | **Mostly false** — drag-and-drop and a separate camera input were both there. Three real defects in them were not |
+| map chrome not redesigned | **True.** Fixed |
+
+**The unsaved-changes guard** is `useUnsavedChangesGuard` +`snapshot` in
+`components/ui/useUnsavedChanges.ts`, wired into both drawers on all three exits
+— Anulează, Escape and the backdrop. It asks only when the form differs from
+the state it opened with, compared structurally against a baseline captured
+once in `useState` (not a ref: this is read during render). A guard that asks
+every time is trained away within a day, so "typed something and undid it"
+counts as clean and is a test case.
+
+**It surfaced a real accessibility bug that was already shipping.** A confirm
+opened from inside a Drawer or Modal was `aria-hidden="true"`: the overlay's
+`hideOthers` sweep marks every other child of `<body>`, and `ConfirmHost`
+portals into one of those. So the question was invisible to a screen reader
+while the dialog behind it was not. **`EmployeeSessionsModal` already had this**
+— "revoke this session?" — it was not introduced here. `ConfirmHost` now clears
+the marking on its own container and keeps it clear through a MutationObserver,
+scoped to that one node so everything else the overlay hid stays hidden. Found
+because Testing Library honours `aria-hidden` and could not see the dialog;
+without that the fix would have shipped as "looks fine".
+
+**A second, smaller leak fell out of it:** the confirm queue is module-level, so
+an unanswered question outlived its asker — in tests that meant the next test
+rendered with a modal already on screen and every control unclickable.
+`resetConfirms()` settles pending promises with `false` and is called from
+`src/test/setup.ts` beside `cleanup()`.
+
+**`SegmentedControl` / `MultiToggle` / `ButtonGroup`** are new kit components.
+The segmented pattern existed three times — hand-rolled `<div>`s of `<button>`s
+in both drawers, and `MapPage` reaching past the kit into
+`@/components/shadcn/toggle-group` directly, which the kit rule forbids. The
+hand-rolled pair had no roving focus, no arrow keys and no group semantics.
+`SegmentedControl` also swallows Radix's deselect (`onValueChange('')`), which
+would otherwise let the order type become empty — a state the validator does not
+model. That is the one behaviour a reviewer should not "simplify"; it has a test.
+
+`OrderFormDrawer` also had the order-type reset list written twice, in the
+control and in the "Comută pe …" hint. One `switchOrderType` now.
+
+**Map chrome:** `MapControls` is a real `ButtonGroup` (the group owns the shared
+border, so the last button no longer needs a different class purely for being
+last) with lucide icons in place of the last three hand-drawn `<svg>`s in the
+app. `MapLegend` collapses to a **Legendă** button below `sm` — the panel is
+224px wide and permanently covered about a fifth of a 390px screen, in the
+corner where the southern-Romania pins are — with the content written once and
+rendered in both places.
+
+**`IdScanField`'s three defects**, none of them cosmetic:
+- A dropped **non-image** went straight to the OCR engine, whose failure
+  surfaced as "scanning could not start on this device" — sending the operator
+  to debug their computer instead of their file. `accept="image/*"` constrains
+  the picker only; a drop is whatever was dragged.
+- `dragleave` **bubbles from children**, so the highlight flickered off while
+  the file was still over the dropzone. Counted enter/leave pairs now.
+- The refusal panel's single retry button wore a **camera icon and opened the
+  file picker**. Two buttons now, each icon matching what it does.
+
+`HoverCard` was reviewed and left alone: it is already on kit components and
+tokens, and nothing in the brief applied to it.
+
+Verified: **510 tests across 40 files** (up from 498 — 10 new across
+`unsavedChangesGuard.test.tsx`, `Toggles.test.tsx` and `IdScanField.test.tsx`),
+`typecheck` clean, `lint` 0 errors.
+
+
+**Done — 262.0 → 247.8 kB gzip, and all three "left to try" items now have an
+answer.** Measured with the repo's own `bundle_budget.py` throughout, not by
+reading Vite's output table, because only that script walks the real eager
+static-import graph.
+
+**1. Splitting the UI-kit barrel — this was the whole win, and it needed no
+splitting.** The cause was not the barrel's shape but that `web/package.json`
+declared no `sideEffects`, so Rollup had to assume every re-export might matter
+and kept the lot. Declaring `"sideEffects": ["**/*.css"]` was enough:
+
+| | before | after |
+|---|---|---|
+| eager total | 262.0 kB | **247.8 kB** |
+| entry chunk | 141.3 kB | 127.1 kB |
+| lazy total | 428.3 kB | 442.3 kB |
+
+The lazy total rising by roughly what the eager total lost is the point — the
+weight moved to the seven screens that actually use `DateInput`, which is now
+its own chunk carrying `@mantine/dates` and dayjs.
+
+**Checked that nothing side-effectful was dropped**, since that is the failure
+mode of this field and no test would catch it: the only bare imports in `src`
+are CSS (exempted) plus `dayjs/locale/ro`; the only module-scope side effects in
+the app are `dayjs.extend`/`dayjs.locale` in `DateInput.tsx`, which travel with
+the module that needs them; `AppProviders` registers the locale separately for
+`DatesProvider` and is eager either way; only those two files use dayjs at all;
+and the emitted CSS still carries both the Mantine layer and the `.dark` block.
+
+**2. `radix-ui` umbrella vs individual `@radix-ui/react-*` — no change needed.**
+30 of the 61 shadcn primitives are imported by nothing, and none of them are in
+the bundle: `Accordion`, `Menubar`, `NavigationMenu`, `Slider` and `ScrollArea`
+all appear zero times in the eager radix chunk. The umbrella tree-shakes, so
+switching to per-package imports would buy nothing and would mean hand-editing
+CLI-managed files.
+
+Separately measured, and **rejected**: dropping `radix` from `manualChunks`
+takes the eager total to 243.8 kB (−4.0). It is not worth it — the 37 kB of
+Radix would then be inlined into `index` and `mantine`, which change every
+deploy, so returning operators would re-download it on every release instead of
+never. `manualChunks` is a cache-lifetime decision, as the comment there says.
+
+**3. The mock seed IS dropped from a `VITE_DATA_MODE=live` build.** 247.8 kB
+mock vs **239.2 kB live**, and `createSeedDb` / `MOCK_LATENCY` appear in zero
+chunks of the live build. The old "155 vs 153 kB" reading was the barrel
+masking it — the same missing `sideEffects` field was preventing the mock store
+from being shaken out. That also settles the open half of TODO-54.
+
+**`BUDGET_GZIP_KB` lowered 280 → 260** to lock the gain in, with the reasoning
+in the comment. TODO-60 (per-component Mantine CSS, ~73 kB gzip of stylesheet
+for four components) is the next lever and is untouched.
+
+### TODO-59 `[DONE]` The eager bundle grew from ~125 kB to ~260 kB gzip
 Two component libraries have a floor. `MantineProvider` wraps the app (~37 kB
 gzip), the Radix primitives behind the shell's dialogs, menus, tooltips and
 sheets are on the first-paint path (~37 kB), and the shell is bigger than the
@@ -3532,6 +3731,48 @@ well as the individual `@radix-ui/react-*` packages would; and confirm whether
 the mock seed is really being dropped from the `VITE_DATA_MODE=live` build
 (measured 155 kB vs 153 kB, which is suspiciously little — see TODO-54).
 
+
+### TODO-77 `[ ]` Two confirmation dialogs, with different accessibility
+Found while adding the unsaved-changes guard (TODO-58). The app has **two**
+promise-based confirms:
+
+- **The kit's** — `useConfirm` / `requestConfirm` in `components/ui/feedback.tsx`,
+  a module-level queue rendered by one always-mounted `ConfirmHost`, built on
+  shadcn `AlertDialog`. Used by `features/admin/EmployeesPage`,
+  `EmployeeSessionsModal` and now both sales form drawers.
+- **A feature-local one** — `features/sales/components/useConfirm.tsx`, built on
+  the kit's `Modal`, which hands back a `confirmDialog` node the caller has to
+  render itself. Used by `features/sales/ClientsPage`.
+
+They are not interchangeable, which is the part that matters. The kit's version
+carries the fix from TODO-58 that keeps a confirm perceivable when it opens on
+top of a Drawer or Modal — the local one has no such handling, so a confirm it
+raises from inside an overlay is `aria-hidden` to a screen reader. It also
+renders `role="dialog"` rather than `alertdialog`, and its "requires the caller
+to render a node" shape is the reason it exists at all.
+
+**Why it was not merged here:** deleting one means re-checking every call site's
+focus behaviour and its destructive-action wording, and TODO-58 was already
+touching the confirm host for an unrelated reason. Doing both in one pass would
+have made the accessibility fix unreviewable.
+
+**Deciding it needs:** confirming the kit's version can serve `ClientsPage`
+(it can — nothing there needs a locally-rendered node), then deleting
+`features/sales/components/useConfirm.tsx` and its `Modal` styling. One commit,
+one screen to re-test.
+
+### TODO-78 `[ ]` `.nvmrc` exists now but nothing tells a new contributor
+Found while closing TODO-48. The repo root has a `.nvmrc` pinning Node 22, and
+every workflow reads it via `node-version-file`, so CI and a developer using
+`nvm use` cannot drift apart any more. Nothing *says* so: `README.md` is one
+line (`# ecotrack`), and a contributor who simply has Node 24 installed gets no
+signal until something behaves oddly.
+
+The suite itself no longer breaks on 24 — that was the point of TODO-48, and it
+is verified on both 22 and 24 — so this is a papercut, not a trap. It overlaps
+TODO-65, which asks the same question about `npm ci` after the UI rebuild:
+**both are really "README.md should have a setup section"**, and neither is
+worth a commit alone. Decide them together.
 ### TODO-60 `[ ]` Mantine's full stylesheet ships for four components
 `src/index.css` imports `@mantine/core/styles.css` (plus dates, notifications,
 spotlight, charts) into `@layer mantine`. That is ~500 kB raw / ~73 kB gzip of

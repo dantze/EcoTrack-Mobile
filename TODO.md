@@ -27,11 +27,11 @@ unless its status says otherwise.
 **Status legend:** `[ ]` not started · `[~]` in progress · `[DONE]` done ·
 `[POSTPONED]` deliberately deferred · `[?]` needs a decision first
 
-**Next free ID: TODO-82.** (Highest used is TODO-81.)
+**Next free ID: TODO-83.** (Highest used is TODO-82.)
 
 ---
 
-## Still open — 16 of 81
+## Still open — 14 of 82
 
 The whole of what is left, in one place. Everything not listed here is `[DONE]`.
 
@@ -39,9 +39,6 @@ The whole of what is left, in one place. Everything not listed here is `[DONE]`.
 - **TODO-72** `[ ]` — Installed phones need a rebuild, and the Maps key needs revoking *(G)*
 - **TODO-74** `[ ]` — `DataLoader` seeds every test context, and no test asks it to *(J)*
 - **TODO-55** `[ ]` — The bundle budget measures the mock build, not the deployed one *(G)*
-- **TODO-60** `[ ]` — Mantine's full stylesheet ships for four components *(J)*
-- **TODO-61** `[ ]` — The legacy `brand-*` ramp has no dark values *(J)*
-- **TODO-62** `[ ]` — `PageHeader` and `CommandBar` are two components for one job *(J)*
 - **TODO-63** `[ ]` — The dispatch board is still drag-and-drop only *(J)*
 - **TODO-65** `[ ]` — `web/`'s dependencies were declared but never installed *(J)*
 - **TODO-66** `[ ]` — The map tiles stay light in dark mode *(J)*
@@ -51,6 +48,7 @@ The whole of what is left, in one place. Everything not listed here is `[DONE]`.
 - **TODO-79** `[ ]` — The "GCP deployment" still depends on a DigitalOcean bucket *(G)*
 - **TODO-80** `[ ]` — Paying for a warm instance to run two cron jobs *(G)*
 - **TODO-81** `[ ]` — Both nightly jobs run on EVERY Cloud Run instance *(G)*
+- **TODO-82** `[ ]` — Two Mantine providers are mounted and neither is ever used *(G)*
 
 **Done, but flagged by whoever did it** — not open, but not finished-and-forgotten
 either:
@@ -126,9 +124,9 @@ full text lives further down.
 | TODO-57 | `[DONE]` | D | Produse has no "what is still using it" dialog |
 | TODO-58 | `[DONE]` | J | The UI rebuild stopped short on four surfaces |
 | TODO-59 | `[DONE]` | J | The eager bundle grew from ~125 kB to ~260 kB gzip |
-| TODO-60 | **`[ ]`** | J | Mantine's full stylesheet ships for four components |
-| TODO-61 | **`[ ]`** | J | The legacy `brand-*` ramp has no dark values |
-| TODO-62 | **`[ ]`** | J | `PageHeader` and `CommandBar` are two components for one job |
+| TODO-60 | `[DONE]` | J | Mantine's full stylesheet ships for four components |
+| TODO-61 | `[DONE]` | J | The legacy `brand-*` ramp has no dark values |
+| TODO-62 | `[DONE]` | J | `PageHeader` and `CommandBar` are two components for one job |
 | TODO-63 | **`[ ]`** | J | The dispatch board is still drag-and-drop only |
 | TODO-64 | `[DONE]` | J | Two `/comenzi` tests time out under the full web suite |
 | TODO-65 | **`[ ]`** | J | `web/`'s dependencies were declared but never installed |
@@ -148,6 +146,7 @@ full text lives further down.
 | TODO-79 | **`[ ]`** | G | The "GCP deployment" still depends on a DigitalOcean bucket |
 | TODO-80 | **`[ ]`** | G | Paying for a warm instance to run two cron jobs |
 | TODO-81 | **`[ ]`** | G | Both nightly jobs run on EVERY Cloud Run instance |
+| TODO-82 | **`[ ]`** | G | Two Mantine providers are mounted and neither is ever used |
 
 ---
 
@@ -3177,6 +3176,30 @@ entirely per TODO-80 — which solves this one too, since Cloud Scheduler fires
 once and hits one instance. That overlap is worth noting before either is
 picked.
 
+### TODO-82 `[ ]` Two Mantine providers are mounted and neither is ever used
+Found while doing TODO-60. `src/theme/AppProviders.tsx` mounts `ModalsProvider`
+and the `Notifications` host, and nothing in `src/` calls `modals.open` or
+`notifications.show` — verified by grep across the whole tree. Toasts are
+Sonner's, stated as much in `components/ui/feedback.tsx`; dialogs are shadcn's
+`Dialog`/`AlertDialog` through the kit's `Modal` and `Drawer`.
+
+So both are live providers rendering containers nobody fills, and TODO-60 keeps
+importing `Modal.css`, `ModalBase.css` and `@mantine/notifications/styles.css`
+for them — about 7 kB raw, under 1 kB gzip. The CSS is not the point; the point
+is that a reader of `AppProviders` reasonably concludes the app has two toast
+systems and two modal systems.
+
+**Not folded into TODO-60** because that item was about stylesheet size and this
+is a behaviour change to the provider tree: removing a provider is the kind of
+thing that should be its own commit, and `ModalsProvider` in particular is the
+sort of thing someone adds back the first time they want a Mantine confirm
+without noticing why it went.
+
+**Deciding it needs** confirming nothing plans to use them — TODO-77 is about
+consolidating the app's TWO confirm implementations, and whoever does that
+should decide there whether Mantine's modals are a third candidate or a dead
+end — then deleting both providers and the three CSS imports together.
+
 ## H. Mobile
 
 *The Expo app: what it can do, and what it should stop doing.*
@@ -4040,7 +4063,7 @@ TODO-65, which asks the same question about `npm ci` after the UI rebuild:
 **both are really "README.md should have a setup section"**, and neither is
 worth a commit alone. Decide them together.
 
-### TODO-60 `[ ]` Mantine's full stylesheet ships for four components
+### TODO-60 `[DONE]` Mantine's full stylesheet ships for four components
 `src/index.css` imports `@mantine/core/styles.css` (plus dates, notifications,
 spotlight, charts) into `@layer mantine`. That is ~500 kB raw / ~73 kB gzip of
 CSS for what the app actually uses out of Mantine: the date field, the combobox
@@ -4054,7 +4077,58 @@ write the list, ideally with a lint rule or a comment pinning it next to the
 imports. Keep the `layer(mantine)` wrapper on whatever replaces it: that layer
 order is what lets a Tailwind utility beat a Mantine style without `!important`.
 
-### TODO-61 `[ ]` The legacy `brand-*` ramp has no dark values
+
+**Done — CSS is 497,804 → 291,530 bytes raw, 71,989 → 43,187 gzip (−29 kB,
+−40%).** Both numbers measured from `dist/assets/index-*.css` on two real
+builds, not estimated.
+
+**Two of the five stylesheets were for components that are not imported
+anywhere in `src/`.** `@mantine/spotlight` and `@mantine/charts` — 24 kB raw
+between them — could never have styled anything, because nothing renders a
+Spotlight or a chart. That was free.
+
+The rest is the per-component split for `@mantine/core`: `baseline`,
+`default-css-variables`, `global`, then `Input`, `Popover`, `CloseButton`,
+`UnstyledButton`, `ScrollArea`, `Modal`, `ModalBase`. 272 kB → ~53 kB.
+
+**`@mantine/dates` stays whole**, and that is not laziness: it ships no
+per-component CSS at all, one 32 kB sheet or nothing. It is also what styles
+the calendar inside the DateInput dropdown — the part hardest to verify — so
+the risk this item was most worried about does not arise.
+
+**The safe list was derived, not guessed.** A probe rendered the app's whole
+Mantine surface (the kit's DateInput, open and closed, inside the real
+`AppProviders`) and collected the component classes that actually appear.
+
+**And it is now checked, which is what this item asked for.**
+`components/ui/__tests__/mantineStyles.test.tsx` renders the same surface and
+fails if any rendered element's class has no rule in the imported sheets. It
+works from two things that are already true — the `@import` lines read off
+`src/index.css`, and the DOM — rather than from a hand-written list, because a
+second list to keep in sync is this problem again.
+
+**One non-obvious thing about that test, worth knowing before editing it:** it
+matches on Mantine's HASHED class (`m_6c018570`), not the readable
+`mantine-Input-input`. The readable class carries no rules at all — it exists
+only so application code has something to target — so checking the CSS for
+`.mantine-Input-` finds nothing even when `Input.css` is imported. The first
+version of this test did exactly that and passed vacuously. Verified the finished
+one by deleting the `Input.css` import and watching it fail with
+`Input (.m_6c018570)`.
+
+Three smaller assertions came with it: that spotlight/charts stay unimported,
+that the three base sheets are present (without `default-css-variables` every
+component style resolves its `--mantine-*` values to nothing), and that every
+import keeps `layer(mantine)` — an unlayered import beats every layered rule in
+Tailwind 4, which would silently invert the whole cascade this file sets up.
+
+**Found while doing it, not fixed here:** `ModalsProvider` and the
+`Notifications` host are both mounted in `AppProviders` and neither is ever
+used — nothing calls `modals.open` or `notifications.show`, and toasts are
+Sonner's. Their CSS is still imported because the providers are still live.
+Split out as **TODO-82**.
+
+### TODO-61 `[DONE]` The legacy `brand-*` ramp has no dark values
 `--brand-50 … --brand-900` are declared once, on `:root`, and NOT redefined
 under `.dark` — unlike every other token in `src/index.css`. Nothing in
 `src/features` uses them any more (they were swept to `accent-*` / `primary` /
@@ -4067,7 +4141,25 @@ values, or delete the tokens and let the class stop compiling. The second is
 better and is a five-line change; it is listed here rather than done because
 deleting a token is the kind of thing that should be one commit with a reason.
 
-### TODO-62 `[ ]` `PageHeader` and `CommandBar` are two components for one job
+
+**Done — deleted, both halves.** The `:root` declarations and the ten
+`--color-brand-*` entries in `@theme inline` are gone. The second half is the
+one that matters: that block is what made `bg-brand-50` a real utility, so
+removing it is what makes the class stop compiling rather than compile to
+something wrong.
+
+Checked before deleting, because the rail is navy and looked like a dependency:
+`--sidebar: #16283c` is written as its own literal, not `var(--brand-700)`. The
+ramp was referenced by nothing outside its own declaration.
+
+**It is now a test failure rather than a trap.** TODO-73 (done the same day)
+added `components/ui/__tests__/colorTokensExist.test.ts`, which fails on any
+colour class naming a token that `@theme inline` does not declare — so
+`bg-brand-500` reintroduced anywhere in `src/` now fails by name. Verified by
+adding one and watching it fail. That is the guard this ramp never had, and it
+is why deleting was safe to prefer over giving the ramp dark values.
+
+### TODO-62 `[DONE]` `PageHeader` and `CommandBar` are two components for one job
 The kit's `PageHeader` (title / subtitle / actions) and the layout module's
 `CommandBar` (the same, plus `tools`, `tabs` and an overflow menu) now render
 the same strip, and they are styled to match by hand rather than by sharing an
@@ -4088,6 +4180,34 @@ in `components/ui/types.ts`, which is the frozen contract, and removing an
 export from it is exactly the decision this item exists to make. It is a smaller
 question now — the answer is "delete it or make it a wrapper", with no caller to
 migrate either way.
+
+
+**Done — `PageHeader` is now a wrapper over `CommandBar` and holds no markup of
+its own.** It maps the simpler prop set on: `title`/`subtitle` pass through,
+`actions` → `tools` (CommandBar's own `actions` is the ribbon strip BELOW the
+title, a different slot), `below` → `tabs`.
+
+**The decision this item asked for: `PageHeaderProps` stays in the frozen
+contract.** Removing an entry from `types.ts` is a bigger decision than
+deduplicating an implementation, and it is not the one that was hurting — the
+complaint was drift, and a wrapper cannot drift. Deleting it later is now a
+one-line removal with no implementation to delete alongside, which is a strictly
+easier decision than it was.
+
+Worth recording: **the two had already drifted**, so this was not hypothetical.
+`PageHeader` was opaque `bg-surface-header` while `CommandBar` is translucent
+with a backdrop blur, and the two spaced their title rows differently. The
+doc-comment promising they "must stay visually identical" was already false when
+it was read.
+
+`eyebrow` is gone — a `PageHeaderExtraProps` field with no caller and no
+`CommandBar` equivalent. Adding one to the live component to preserve an unused
+prop is how the second implementation grows back.
+
+`components/ui/__tests__/PageHeader.test.tsx` (4 cases) pins that it renders
+`CommandBar`'s strip (`data-slot="command-bar"`) rather than markup of its own,
+and that `actions` lands on the title row rather than dropping to the ribbon.
+No bundle cost: the unused export tree-shakes away, 247.8 → 247.7 kB.
 
 ### TODO-63 `[ ]` The dispatch board is still drag-and-drop only
 `RoutesPage` moves a task onto a route by dragging (`@dnd-kit`), and below `lg`

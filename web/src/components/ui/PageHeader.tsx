@@ -1,20 +1,40 @@
 /**
  * Screen header — the Outlook command-bar strip, in its plainest form.
  *
- * Sticks to the top of the content column and stays shallow: every pixel here
- * is a row of data the operator does not see. The shell also exports a richer
- * `CommandBar` (actions + tools + a tab row); this is the same strip for
- * screens that only need a title and a couple of buttons, and **the two must
- * stay visually identical** — same fill, same hairline, same heights.
+ * **This is a thin wrapper over `CommandBar` and holds no markup of its own
+ * (TODO-62).** It used to be a second implementation of the same strip, kept
+ * visually identical to `CommandBar` by hand: same fill, same hairline, same
+ * heights, maintained in two files. That is a promise nobody can keep — the two
+ * had already diverged on the header's translucency and on how the title row
+ * spaces itself — and the drift is invisible until two screens sit side by side.
+ *
+ * So there is one strip now. `CommandBar` renders it; this maps the simpler
+ * prop set onto it:
+ *
+ *   title     -> title
+ *   subtitle  -> subtitle
+ *   actions   -> tools    (right-aligned, on the title row — where PageHeader
+ *                          put them; CommandBar's own `actions` is the ribbon
+ *                          strip BELOW the title, which is a different slot)
+ *   below     -> tabs     (docked to the bottom edge)
+ *
+ * WHY IT STILL EXISTS, given that nothing renders it. `PageHeaderProps` is part
+ * of `types.ts`, the frozen contract feature screens code against, and removing
+ * an entry from that is a bigger decision than deduplicating an implementation.
+ * A wrapper settles the thing TODO-62 actually complained about — two strips
+ * that will drift — while leaving the contract untouched. Deleting it later is
+ * then a one-line removal with no implementation to delete alongside.
+ *
+ * `eyebrow` is gone. It was a `PageHeaderExtraProps` addition with no caller,
+ * and `CommandBar` has no equivalent; adding one to the live component to
+ * preserve an unused prop is how the second implementation would grow back.
  */
 
 import type { ReactNode } from 'react';
-import { cn } from '@/lib/utils';
+import { CommandBar } from '@/components/layout/Workbench';
 import type { PageHeaderProps } from './types';
 
 export interface PageHeaderExtraProps {
-  /** Small caps line above the title, e.g. the module name. */
-  eyebrow?: ReactNode;
   /** Tabs or a FilterBar docked to the bottom edge of the header. */
   below?: ReactNode;
   className?: string;
@@ -24,37 +44,16 @@ export function PageHeader({
   title,
   subtitle,
   actions,
-  eyebrow,
   below,
   className,
 }: PageHeaderProps & PageHeaderExtraProps) {
   return (
-    <header
-      className={cn(
-        'sticky top-0 z-20 shrink-0 border-b border-border bg-surface-header',
-        className,
-      )}
-    >
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 px-3 py-2 sm:px-4">
-        <div className="min-w-0 flex-1">
-          {eyebrow && (
-            <p className="text-[0.6875rem] font-semibold tracking-wide text-ink-subtle uppercase">
-              {eyebrow}
-            </p>
-          )}
-          <h1 className="truncate text-[0.9375rem] leading-5 font-semibold tracking-tight text-ink">
-            {title}
-          </h1>
-          {subtitle && (
-            <div className="truncate text-xs text-ink-muted [&_strong]:font-medium [&_strong]:text-ink">
-              {subtitle}
-            </div>
-          )}
-        </div>
-        {/* Wraps onto its own line under ~480px rather than crushing the title. */}
-        {actions && <div className="flex shrink-0 items-center gap-1.5">{actions}</div>}
-      </div>
-      {below}
-    </header>
+    <CommandBar
+      title={title}
+      subtitle={subtitle}
+      tools={actions}
+      tabs={below}
+      className={className}
+    />
   );
 }

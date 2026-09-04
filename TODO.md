@@ -27,11 +27,11 @@ unless its status says otherwise.
 **Status legend:** `[ ]` not started · `[~]` in progress · `[DONE]` done ·
 `[POSTPONED]` deliberately deferred · `[?]` needs a decision first
 
-**Next free ID: TODO-77.** (Highest used is TODO-76.)
+**Next free ID: TODO-79.** (Highest used is TODO-78.)
 
 ---
 
-## Still open — 23 of 76
+## Still open — 19 of 78
 
 The whole of what is left, in one place. Everything not listed here is `[DONE]`.
 
@@ -42,22 +42,18 @@ The whole of what is left, in one place. Everything not listed here is `[DONE]`.
 - **TODO-74** `[ ]` — `DataLoader` seeds every test context, and no test asks it to *(J)*
 - **TODO-75** `[ ]` — The web bundle falls back to the dead droplet, over plain HTTP *(G)*
 - **TODO-73** `[ ]` — `AccessRequestsPage` paints with tokens that do not exist *(J)*
-- **TODO-48** `[ ]` — `bootNavigation.test.tsx` fails on Node 24 *(G)*
-- **TODO-53** `[ ]` — `CredentialRow.username` in the web mock is write-only *(A)*
-- **TODO-54** `[ ]` — The live production build still ships the mock seed database *(G)*
 - **TODO-55** `[ ]` — The bundle budget measures the mock build, not the deployed one *(G)*
-- **TODO-58** `[ ]` — The UI rebuild stopped short on four surfaces *(J)*
-- **TODO-59** `[ ]` — The eager bundle grew from ~125 kB to ~260 kB gzip *(J)*
 - **TODO-60** `[ ]` — Mantine's full stylesheet ships for four components *(J)*
 - **TODO-61** `[ ]` — The legacy `brand-*` ramp has no dark values *(J)*
 - **TODO-62** `[ ]` — `PageHeader` and `CommandBar` are two components for one job *(J)*
 - **TODO-63** `[ ]` — The dispatch board is still drag-and-drop only *(J)*
-- **TODO-64** `[ ]` — Two `/comenzi` tests time out under the full web suite *(J)*
 - **TODO-65** `[ ]` — `web/`'s dependencies were declared but never installed *(J)*
 - **TODO-66** `[ ]` — The map tiles stay light in dark mode *(J)*
 - **TODO-67** `[ ]` — Confirm the map's cold-load fix against a live tile server *(J)*
 - **TODO-68** `[ ]` — This machine cannot run the backend suite or the hygiene guards *(G)*
 - **TODO-70** `[ ]` — Orders created before the numbering fix are still `#0` *(J)*
+- **TODO-77** `[ ]` — Two confirmation dialogs, with different accessibility *(J)*
+- **TODO-78** `[ ]` — `.nvmrc` exists now but nothing tells a new contributor *(J)*
 
 **Done, but flagged by whoever did it** — not open, but not finished-and-forgotten
 either:
@@ -121,23 +117,23 @@ full text lives further down.
 | TODO-45 | `[DONE]` | E | Drop `individual.id_photo_url` once every environment is drained |
 | TODO-46 | `[DONE]` | E | Task photos are still uploaded with a public-read ACL |
 | TODO-47 | `[DONE]` | G | `bundle_budget.py` counts lazy chunks named `index-*` as eager |
-| TODO-48 | **`[ ]`** | G | `bootNavigation.test.tsx` fails on Node 24 |
+| TODO-48 | `[DONE]` | G | `bootNavigation.test.tsx` fails on Node 24 |
 | TODO-49 | `[DONE]` | G | CLAUDE.md's Known gaps still says mobile cannot authenticate |
 | TODO-50 | `[DONE]` | G | Nothing checks that the index at the top of TODO.md is true |
 | TODO-51 | `[DONE]` | J | The web app throws away the server's Romanian refusal text |
 | TODO-52 | `[DONE]` | C | The batch order-status endpoint in TODO-43 needs TODO-42's guard |
-| TODO-53 | **`[ ]`** | A | `CredentialRow.username` in the web mock is write-only |
-| TODO-54 | **`[ ]`** | G | The live production build still ships the mock seed database |
+| TODO-53 | `[DONE]` | A | `CredentialRow.username` in the web mock is write-only |
+| TODO-54 | `[DONE]` | G | The live production build still ships the mock seed database |
 | TODO-55 | **`[ ]`** | G | The bundle budget measures the mock build, not the deployed one |
 | TODO-56 | `[DONE]` | A | An admin cannot revoke another employee's session |
 | TODO-57 | `[DONE]` | D | Produse has no "what is still using it" dialog |
-| TODO-58 | **`[ ]`** | J | The UI rebuild stopped short on four surfaces |
-| TODO-59 | **`[ ]`** | J | The eager bundle grew from ~125 kB to ~260 kB gzip |
+| TODO-58 | `[DONE]` | J | The UI rebuild stopped short on four surfaces |
+| TODO-59 | `[DONE]` | J | The eager bundle grew from ~125 kB to ~260 kB gzip |
 | TODO-60 | **`[ ]`** | J | Mantine's full stylesheet ships for four components |
 | TODO-61 | **`[ ]`** | J | The legacy `brand-*` ramp has no dark values |
 | TODO-62 | **`[ ]`** | J | `PageHeader` and `CommandBar` are two components for one job |
 | TODO-63 | **`[ ]`** | J | The dispatch board is still drag-and-drop only |
-| TODO-64 | **`[ ]`** | J | Two `/comenzi` tests time out under the full web suite |
+| TODO-64 | `[DONE]` | J | Two `/comenzi` tests time out under the full web suite |
 | TODO-65 | **`[ ]`** | J | `web/`'s dependencies were declared but never installed |
 | TODO-66 | **`[ ]`** | J | The map tiles stay light in dark mode |
 | TODO-67 | **`[ ]`** | J | Confirm the map's cold-load fix against a live tile server |
@@ -150,6 +146,8 @@ full text lives further down.
 | TODO-74 | **`[ ]`** | J | `DataLoader` seeds every test context, and no test asks it to |
 | TODO-75 | **`[ ]`** | G | The web bundle falls back to the dead droplet, over plain HTTP |
 | TODO-76 | **`[ ]`** | A | `AdminController` answers in three shapes, none of them the app's |
+| TODO-77 | **`[ ]`** | J | Two confirmation dialogs, with different accessibility |
+| TODO-78 | **`[ ]`** | J | `.nvmrc` exists now but nothing tells a new contributor |
 
 ---
 
@@ -2622,7 +2620,7 @@ mobile stores `user.roles` at claim time and never refetches, so a promotion or
 demotion in Angajați never reaches the device. That is now the bullet in its
 place. TODO-35 stays `[ ]`; this item only fixed the documentation.
 
-### TODO-54 `[ ]` The live production build still ships the mock seed database
+### TODO-54 `[DONE]` The live production build still ships the mock seed database
 Found while measuring the bundle for TODO-47. `src/api/index.ts` does
 `import { mockApi } from '@/mocks'` unconditionally and re-exports
 `DEV_DEVICE_ID` from the same module, so `@/mocks` — and through it `seed.ts` —
@@ -2642,6 +2640,31 @@ dynamic `import()` guarded by `IS_MOCK`), or to accept it and say so in a
 comment, since the alternative loses the single synchronous `api` binding that
 `src/api/index.ts` currently gives every feature.
 
+**Done — as a side effect of TODO-59, and verified against this item's own
+criterion.** `web/package.json` now declares `"sideEffects": ["**/*.css"]`,
+without which Rollup had to assume every re-export might matter and kept the
+whole `@/mocks` graph. With it, a `VITE_DATA_MODE=live` build contains none of
+it:
+
+```
+grep -l "Radu Nistor" dist/assets/*.js   ->  no match
+createSeedDb / mockApi / DEV_DEVICE_ID   ->  0 chunks each
+```
+
+(`Radu Nistor` is still in `src/mocks/seed.ts` — checked, so the grep is
+testing the build and not a renamed fixture.)
+
+Measured: **247.8 kB gzip mock vs 239.2 kB live**, where this item recorded
+2.2 kB. The `IS_MOCK ? mockApi : liveApi` ternary was always capable of shaking
+the mock out; the missing `sideEffects` field was what stopped it.
+
+So neither option this item offered was needed: `src/api/index.ts` keeps its
+unconditional `import { mockApi } from '@/mocks'` and its single synchronous
+`api` binding, and the seed still does not ship. **That is worth knowing before
+someone "fixes" it again** — the import being unconditional is not the problem
+and never was.
+
+
 ### TODO-55 `[ ]` The bundle budget measures the mock build, not the deployed one
 Same investigation. `ci-web.yml` runs `npm run build` with no `VITE_DATA_MODE`,
 which `src/lib/config.ts` defaults to `'mock'` — so the number the budget gates
@@ -2655,6 +2678,18 @@ invert: a future mock-only dependency would inflate the gated number, and a
 live-only one would escape it entirely. Cheapest fix is a `VITE_DATA_MODE=live`
 on the CI build step so the gate measures the shipped bundle; that also makes
 the number comparable to what the Dockerfile produces.
+
+**Update (TODO-59): the gap is now four times bigger, so this matters more than
+when it was written.** Declaring `"sideEffects"` let Rollup shake the mock store
+out of a live build (TODO-54), which widened the mock/live difference from
+**2.1 kB to 8.6 kB gzip** — 247.8 mock vs 239.2 live.
+
+The gate still errs high, which is still the safe side, so nothing is broken.
+But the number CI prints is now ~3.5% above the artefact users download, and the
+budget was just tightened to 260 kB — so the headroom the comment in
+`bundle_budget.py` describes is measured against the wrong build. Adding
+`VITE_DATA_MODE=live` to `ci-web.yml`'s build step is still the cheap fix, and
+it is now worth doing rather than merely worth recording.
 
 ---
 
@@ -3835,7 +3870,7 @@ with "Trimite pe ruta…", reusing `RoutePickerModal`, which the stops column
 already does. Not done in the rebuild because the board's drag wiring was left
 untouched on purpose and this adds a second write path through it.
 
-### TODO-64 `[ ]` Two `/comenzi` tests time out under the full web suite
+### TODO-64 `[DONE]` Two `/comenzi` tests time out under the full web suite
 Found while doing the map work, and **not caused by it** — verified by stashing
 the change and re-running: the same two fail either way, and both pass when
 their files are run alone.
@@ -3855,6 +3890,35 @@ Needs deciding, and they are not equivalent: raise `testTimeout` for these two
 smoke test mount `/comenzi` with a smaller seeded dataset; or fix TODO-43, which
 removes the fan-out that makes this screen slow in the first place and is the
 only option that makes the app faster rather than the test looser.
+
+**Done — option 1, and the reason it was not option 3 is worth stating.**
+Both named tests now pass under the full parallel suite, verified with two
+consecutive clean runs on Node 24 (where they were slowest) and repeated runs
+on Node 22.
+
+Two budgets had to move, and only one of them was the one this item names:
+
+- `testTimeout` 5000 → **15000** in `vite.config.ts`. This is the budget the
+  item is about.
+- Testing Library's `asyncUtilTimeout` 1000 → **5000** in `src/test/setup.ts`.
+  This one is SEPARATE and `testTimeout` does not affect it, which is why
+  raising only the first left `bootNavigation` still failing intermittently —
+  it dies inside a `waitFor`, not on the test's own clock. Anyone re-treading
+  this will hit the same thing.
+
+Raised globally rather than per-test on purpose: the next test that boots the
+real router inherits the budget instead of rediscovering the flake, and the
+timeout only bounds how long a query may wait for something that never arrives
+— a healthy test still returns the moment the DOM settles.
+
+**This does not make Comenzi faster, and option 3 is still the right fix.**
+`useOrderTaskStatuses` still fans out one request per order (TODO-43), which is
+why this screen is the one that crosses the line; the test is now looser and the
+app is unchanged. What has been bought is that a red run means something is
+wrong. Chosen over option 2 (a smaller seeded dataset) because booting the real
+screen with real data is what these two tests exist to do — it is what caught
+TODO-48.
+
 
 ### TODO-69 `[DONE]` Three bugs only a live backend could show
 The web had never actually been run against the Spring backend — mock mode is

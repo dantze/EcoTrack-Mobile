@@ -1,3 +1,9 @@
+# The LOCAL stack's edge. Not deployed anywhere — see docker-compose.yml.
+#
+# It used to terminate TLS for the production domain on a droplet; production
+# is Vercel (frontend) and Cloud Run (backend) now, each with its own
+# Google-/Vercel-managed certificate, and neither reads this file.
+
 {
 	# Global options
 	admin off

@@ -208,9 +208,36 @@ variable "backend_memory" {
 }
 
 variable "backend_min_instances" {
-  description = "Scale-to-zero (0) is free when idle but pays a JVM cold start — tens of seconds — on the first request. Set 1 to keep one instance warm."
+  description = "Instances kept warm. MUST BE >= 1: the backend has two nightly @Scheduled jobs, and Cloud Run runs no code when it has scaled to zero. See the block comment above this variable before lowering it."
   type        = number
-  default     = 0
+
+  # NOT a performance setting, and not scale-to-zero's usual cost trade.
+  #
+  # `RecurringTaskScheduler.generateUpcomingTasks` runs at 02:00 and is what
+  # tops up indefinite Igienizare plans; `TokenService.pruneStaleSessions` runs
+  # at 03:30. Both are Spring `@Scheduled` methods — they need a JVM that is
+  # alive and holding CPU at that moment.
+  #
+  # At 0, Cloud Run has no instance at 02:00 (nobody uses the app at night) and
+  # the jobs simply never run. Nothing errors and nothing is logged, because no
+  # code executes; the first sign is a recurring plan quietly running out of
+  # tasks. The single always-on container this deployment replaced had no such
+  # failure mode, which is exactly why it is easy to miss in the move.
+  #
+  # 1 also flips `cpu_idle` to false in main.tf, so the instance keeps CPU
+  # between requests — a throttled instance would not reliably fire a timer
+  # either. Cost is roughly $10-15/month, and it removes the JVM cold start on
+  # the first request as a side effect.
+  #
+  # The cheaper alternative, not built: scale to zero and drive both jobs from
+  # Cloud Scheduler against an authenticated endpoint. That needs an endpoint,
+  # a role-matrix row and an OIDC invoker — see TODO-80.
+  default = 1
+
+  validation {
+    condition     = var.backend_min_instances >= 1
+    error_message = "backend_min_instances must be at least 1, or the nightly schedulers never run. Read the comment above this variable — if you genuinely want scale-to-zero, the schedulers have to move to Cloud Scheduler first (TODO-80)."
+  }
 }
 
 variable "backend_max_instances" {

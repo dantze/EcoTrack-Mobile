@@ -1,22 +1,36 @@
-# infra/ — Terraform for the GCP + Vercel deployment
+# infra/ — Terraform for the deployment
 
-Scaffolding for a **second** deployment target. Nothing here is live yet, and
-nothing here touches the existing one.
+**This is the deployment.** `deploy.yml` applies it, and there is no other
+target. It replaced a single DigitalOcean droplet running everything under one
+`docker compose`; that droplet is gone, and `docker-compose.yml` + the
+`Caddyfile` survive only as the local development stack.
 
-| | Today (`deploy.yml`, live) | Here (`deploy-cloud.yml`) |
+| | Before (one VPS) | Now |
 |---|---|---|
-| Backend | Docker on a VPS | Cloud Run |
-| Database | Postgres container on the same VPS | Cloud SQL |
+| Backend | Docker container on the droplet | Cloud Run |
+| Database | Postgres container, same box | Cloud SQL (PostgreSQL 16), private IP |
 | Frontend | Nginx container, same box | Vercel |
 | TLS + routing | Caddy, one domain for both | Google-managed cert + Vercel |
-| Origins | **one** — `/api` is same-origin | **two** — CORS is load-bearing |
+| Origins | **one** — `/api` was same-origin | **two** — CORS is load-bearing |
+| If the machine dies | down until someone fixes it | Google replaces it |
+| Nightly `@Scheduled` jobs | always-on container, always ran | need `min_instances >= 1` |
 
-That last row is the difference that reaches application code. On the VPS the
-SPA fetches a relative `/api` and the browser never performs a cross-origin
-check. Split across two clouds it does, so `ECOTRACK_CORS_ALLOWED_ORIGINS` on
-the backend must name the Vercel origin. `main.tf` computes and sets it; if you
-rename the Vercel project without applying, the frontend breaks with a CORS
-error and a backend that looks perfectly healthy.
+The last two rows are where the move actually bites.
+
+**CORS.** On the droplet the SPA fetched a relative `/api` and the browser never
+performed a cross-origin check. Split across two clouds it does, so
+`ECOTRACK_CORS_ALLOWED_ORIGINS` must name the Vercel origin. `main.tf` computes
+and sets it — but if you rename the Vercel project without re-applying, the
+frontend breaks with a CORS error while the backend reports itself perfectly
+healthy. Local `docker compose` is still one origin, so **this class of bug
+cannot be reproduced locally**.
+
+**Scale to zero would break the schedulers.** `RecurringTaskScheduler` (02:00)
+and `TokenService.pruneStaleSessions` (03:30) are Spring `@Scheduled` methods:
+they need a live JVM holding CPU at that moment. Cloud Run at zero instances
+runs no code and logs nothing, so the jobs would silently never run. Hence
+`backend_min_instances` defaults to 1 and Terraform validates it — read the
+comment on that variable before changing it.
 
 ## Files
 
@@ -86,7 +100,7 @@ never rolls a deployed revision back to the placeholder.
 
 `providers.tf` has **no backend block**, so `terraform.tfstate` is a local file.
 That is fine for one person bootstrapping. It is wrong the moment
-`deploy-cloud.yml` runs `apply`, because a GitHub runner starts with an empty
+`deploy.yml` runs `apply`, because a GitHub runner starts with an empty
 checkout: run 1 creates everything, run 2 sees empty state, tries to create it
 all again, and fails on a dozen "already exists" errors — with no way to import
 what run 1 made except by hand.
@@ -159,7 +173,7 @@ gcloud iam service-accounts add-iam-policy-binding \
 
 Keep the `--attribute-condition`: without it, **any** GitHub repository can mint
 tokens for your service account. Then swap the two commented lines in
-`deploy-cloud.yml`'s auth step for `credentials_json`.
+`deploy.yml`'s auth step for `credentials_json`.
 
 ## Costs
 
@@ -168,13 +182,16 @@ Roughly, `europe-west1`, defaults as written:
 | | |
 |---|---|
 | Cloud SQL `db-f1-micro`, 10 GB, ZONAL | ~$9–12/mo, and it runs 24/7 whether or not anyone uses it |
-| Cloud Run, `min_instances = 0` | ~$0 idle, then per request |
+| Cloud Run, `min_instances = 1` | ~$10–15/mo — one warm instance, which is what keeps the nightly schedulers running |
 | Artifact Registry | ~$0.10/GB/mo, capped by the cleanup policy |
 | VPC, Secret Manager | cents |
 | Vercel Hobby | $0 |
 
-Cloud SQL is the whole bill and cannot scale to zero. `db-f1-micro` is
-shared-core and carries **no SLA** — fine for a first deploy, not for customers.
+Neither of the two big lines can scale to zero, and only one of those is
+Google's doing: Cloud SQL has no idle mode, and Cloud Run is pinned at one
+instance because the app's nightly jobs need a live JVM. Budget **~$20–27/month**
+before any traffic. `db-f1-micro` is shared-core and carries **no SLA** — fine
+for a first deploy, not for customers.
 
 `terraform destroy` will refuse while `db_deletion_protection = true`. That is
 the point: the backend runs `ddl-auto=update` with no migration tool, so a

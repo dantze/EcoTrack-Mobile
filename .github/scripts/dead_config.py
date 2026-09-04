@@ -37,6 +37,13 @@ COMPANION_FILES = [
     "docker-compose.dev-hosted.yml",
     ".github/workflows/deploy.yml",
     ".github/workflows/deploy-mobile.yml",
+    # Where an ecotrack.* key reaches PRODUCTION since TODO-71: main.tf sets the
+    # container's env and the secret-backed ones, and the tfvars template is
+    # where an operator would have copied a name from. Without these, a stale
+    # key's siblings would be listed from the local stack only - which is now
+    # the half that does not ship.
+    "infra/main.tf",
+    "infra/terraform.tfvars.example",
 ]
 
 KEY = re.compile(r"^([a-z0-9.\-]*ecotrack\.[a-z0-9.\-]+)\s*=(.*)$")

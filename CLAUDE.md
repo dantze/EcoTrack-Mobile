@@ -9,12 +9,15 @@ tool — each has its own dependencies and is built from its own directory.
 
 | Dir | Stack | Deploy |
 |---|---|---|
-| `backend/` | Spring Boot 3.5, Java 21, Gradle, JPA | `deploy.yml` → SSH to a VPS, docker compose |
-| `web/` | React 19, Vite 6, Tailwind 4, TanStack Query, React Router 7 | `deploy.yml` — same stack, same domain as the backend |
+| `backend/` | Spring Boot 3.5, Java 21, Gradle, JPA | `deploy.yml` → Cloud Run, with Cloud SQL behind it |
+| `web/` | React 19, Vite 6, Tailwind 4, TanStack Query, React Router 7 | `deploy.yml` → Vercel |
 | `mobile/` | Expo ~54 / React Native 0.81, expo-router. **Drivers only** (TODO-33) | `deploy-mobile.yml` → EAS Update (OTA) / EAS Build |
 
 **See `DEPLOYMENT.md`** for triggers, required secrets and the runbook. The
-backend and web deploy together because Caddy serves both from one domain.
+backend and web still deploy together, in one workflow — not because they share
+a domain any more, but because the frontend build has the backend's URL inlined
+into it, so shipping one without the other publishes a bundle pointing at the
+wrong place.
 
 CI is split into `ci-backend.yml` / `ci-web.yml` / `ci-mobile.yml`, each filtered
 on its own `paths:`. Keep that filtering when adding workflows — it is the reason
@@ -23,18 +26,31 @@ on purpose and runs on every PR; it is the only check that covers files no
 project workflow watches. `audit.yml` is scheduled, not a PR gate. See the
 `verify` skill for which checks a given diff actually needs.
 
-**`infra/` is a SECOND deploy target that has never been run.** Terraform for
-GCP (Cloud Run + Cloud SQL + Artifact Registry + Secret Manager) and Vercel,
-driven by `.github/workflows/deploy-cloud.yml`, with `ci-infra.yml` as its
-path-filtered gate (`terraform fmt` + `validate`, no credentials needed). There
-is no GCP project and no Vercel account yet, so none of it has been applied.
-`deploy.yml` — VPS, docker compose, Caddy — is still the live deployment, and
-the two are unrelated. The one difference that reaches application code: on the
-VPS the SPA and the API share an origin, so CORS is inert; split across Cloud
-Run and Vercel it is not, which is why `main.tf` sets
-`ECOTRACK_CORS_ALLOWED_ORIGINS`. TODO-71 lists what must be decided first —
-starting with the fact that Terraform state is local, so the workflow's `apply`
-would fail on its second run.
+**`infra/` describes the whole deployment**, in Terraform: Cloud Run, Cloud SQL,
+Artifact Registry, Secret Manager, a VPC, two least-privilege service accounts,
+and the Vercel project. `deploy.yml` applies it; `ci-infra.yml` is its
+path-filtered gate (`terraform fmt` + `validate`, no credentials needed).
+
+It replaced a single DigitalOcean droplet that ran backend + web + Postgres +
+Caddy under one `docker compose` (TODO-71). **`docker-compose.yml` and the
+`Caddyfile` are still here and still work — they are the LOCAL stack now**, and
+are deployed nowhere.
+
+Two things about the app changed with the move, both easy to undo by accident:
+
+- **CORS is load-bearing.** Caddy served the SPA and the API from one origin;
+  Vercel and Cloud Run are two. `main.tf` computes
+  `ECOTRACK_CORS_ALLOWED_ORIGINS` from the Vercel project name. Local compose is
+  still one origin, so **a CORS failure cannot be reproduced locally** — it is
+  the one class of bug this deployment can produce that the old one could not.
+- **`backend_min_instances` must stay ≥ 1.** The backend's two nightly
+  `@Scheduled` jobs — `RecurringTaskScheduler` at 02:00, session pruning at
+  03:30 — need a live JVM holding CPU. Cloud Run at zero instances runs no code
+  and logs nothing, so they would silently never fire. Terraform validates it.
+
+**Nothing has been applied yet**: there is no GCP project and no Vercel account,
+so `deploy.yml` skips itself (green) until the secrets exist. `DEPLOYMENT.md`
+has the one-time setup.
 
 ## Commands
 
@@ -461,11 +477,17 @@ or `@/mocks` directly. That rule is the only thing keeping the two implementatio
 substitutable. The `web-data-layer` skill has the full procedure.
 
 Mock is the default for local development, where it needs no backend at all.
-**Production builds live mode.** `web/Dockerfile` defaults to
-`VITE_DATA_MODE=live` with a RELATIVE `VITE_API_BASE_URL=/api`: Caddy serves the
-SPA and proxies `/api` to the backend on the same domain, so the call is
-same-origin. That is what retired the old mixed-content blocker — the backend is
-no longer plain HTTP on a bare IP.
+**Production builds live mode**, on Vercel: Terraform writes `VITE_DATA_MODE=live`
+and an ABSOLUTE `VITE_API_BASE_URL` — the Cloud Run URL plus `/api` — into the
+Vercel project, and Vite inlines both at build time. The absolute URL is why the
+frontend must be rebuilt whenever the backend URL changes, and why `deploy.yml`
+redeploys Vercel after Cloud Run rather than in parallel with it.
+
+`web/Dockerfile` still exists and still defaults to a relative
+`VITE_API_BASE_URL=/api`, because it now builds the LOCAL compose stack, where
+Caddy does serve both from one origin. Production is not that shape any more:
+`config.ts`'s `/api` fallback is a diagnostic for a build that forgot the
+variable, not the deployment.
 
 **`src/api/live/normalize.ts` absorbs the wire/domain mismatch.** The Spring
 entities do not serialise cleanly into `@/types/domain`: associations are
@@ -685,13 +707,21 @@ Deliberate or unresolved; do not assume these are safe.
   column sits in H2 and in Postgres like the orphaned `intake_message` /
   `order_draft` tables above. Nothing reads or writes it. `DEPLOYMENT.md` has
   the `ALTER TABLE` and the bucket check to run first.
-- `mobile/constants/ApiConfig.ts` reads `EXPO_PUBLIC_API_BASE_URL` and falls
-  back to the old hardcoded `http://146.190.224.202:8080/api`. The fallback is
-  load-bearing for installed builds; compose still publishes 8080 for them.
-  New builds should set the env var to the HTTPS domain.
-- `application-prod.properties` says its env vars are "provided by Render". They
-  are not — `deploy.yml` SSHes into a VPS and passes them on the command line.
-  The comment is stale.
+- **Installed phones still call the retired droplet.** `EXPO_PUBLIC_*` is
+  inlined at build time, so every binary in the field carries the old
+  `http://146.190.224.202:8080/api` and cannot be redirected by an OTA. They
+  need `eas build` with `EXPO_PUBLIC_API_BASE_URL` set to the Cloud Run URL —
+  the same rebuild TODO-33 already required (TODO-72). The fallback in
+  `mobile/constants/ApiConfig.ts` is now `http://localhost:8080/api`, which is
+  right for a developer running compose and obviously-wrong-but-diagnosable in
+  a build that forgot the variable.
+- **The nightly schedulers depend on a Terraform variable.**
+  `RecurringTaskScheduler` (02:00) and session pruning (03:30) are Spring
+  `@Scheduled` methods, so they run only while an instance is alive with CPU.
+  `backend_min_instances` is validated `>= 1` for that reason, and raising
+  `backend_max_instances` has the opposite hazard: the jobs run on EVERY
+  instance, with nothing guarding against a concurrent double-generation
+  (TODO-81).
 
 ## Security scanning
 

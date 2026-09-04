@@ -1,178 +1,460 @@
 name: Deploy
 
-# ONE workflow deploys the whole stack (backend + web + Caddy TLS) to the VPS.
-# It replaces the old deploy-backend.yml / deploy-web.yml pair: because the SPA
-# and the API are now served from the same Caddy on the same domain, they share
-# a docker-compose stack and there is nothing left to deploy separately.
+# =============================================================================
+# THE deploy. Backend to Cloud Run, database on Cloud SQL, frontend on Vercel.
+#
+# It replaced an SSH-to-a-VPS workflow of the same name, which brought up
+# backend + web + Postgres + Caddy as one docker compose stack on a single
+# DigitalOcean droplet. That droplet no longer exists and the workflow had been
+# gated off behind a `DEPLOY_ENABLED` variable since TODO-32; `git log
+# .github/workflows/deploy.yml` has it if you need to read it. `docker-compose.yml`
+# and the `Caddyfile` survive as the LOCAL full-stack environment and are no
+# longer deployed anywhere — see DEPLOYMENT.md.
+#
+# Four steps, in order:
+#
+#   1. run the CI gates against this exact commit;
+#   2. apply infra/ with Terraform (GCP + Vercel);
+#   3. build the backend image, push it to Artifact Registry, and roll a new
+#      Cloud Run revision;
+#   4. redeploy the Vercel frontend so the build picks up VITE_API_BASE_URL.
+#
+# Step 4 is not optional garnish. Vite inlines VITE_* at BUILD time, so a
+# backend URL that changed in Terraform does not reach a single user until the
+# frontend is rebuilt.
+#
+# THE ONE THING THAT CHANGED FOR APPLICATION CODE: the VPS served the SPA and
+# the API from one Caddy on one domain, so the browser's API call was
+# same-origin and CORS never applied. Cloud Run and Vercel are two origins, so
+# it does — `ECOTRACK_CORS_ALLOWED_ORIGINS` is computed and set in
+# `infra/main.tf`, and a wrong value there fails in the browser while both
+# services report themselves perfectly healthy.
+#
+# -----------------------------------------------------------------------------
+# REQUIRED GITHUB SECRETS
+# -----------------------------------------------------------------------------
+#   GCP_CREDENTIALS_JSON  Full JSON of a GCP service-account key. The identity
+#                         that runs `terraform apply` needs admin rights over
+#                         SQL, IAM, networking and Secret Manager — see
+#                         infra/README.md, which explains why that is a bigger
+#                         grant than the deployer service account Terraform
+#                         creates, and how to avoid the key entirely with
+#                         Workload Identity Federation.
+#   GCP_PROJECT_ID        Target GCP project id.
+#   VERCEL_API_TOKEN      https://vercel.com/account/tokens
+#   VERCEL_ORG_ID         Vercel team/user id. `vercel whoami` or .vercel/project.json
+#
+# OPTIONAL
+#   VERCEL_TEAM_ID        Set only when the Vercel project lives under a Team.
+#   BACKEND_SECRETS_JSON  JSON object of extra secret env for the container,
+#                         e.g. {"DO_SPACES_SECRET_KEY":"..."}. Becomes one
+#                         Secret Manager secret per key.
+#
+# REPOSITORY VARIABLES (Settings -> Variables, not secrets)
+#   GCP_REGION            Defaults to europe-west1 below.
+#   VERCEL_PROJECT_NAME   Defaults to ecotrack-web below.
+# =============================================================================
 
 on:
-  # Manual trigger — adds a "Run workflow" button in GitHub.
   workflow_dispatch:
+    inputs:
+      skip_terraform:
+        description: 'Skip the Terraform job and only ship a new backend image'
+        type: boolean
+        default: false
 
   push:
     branches:
       - main
     paths:
+      - 'infra/**'
       - 'backend/**'
       - 'web/**'
-      - 'docker-compose.yml'
-      - 'Caddyfile'
+      - 'shared/**'
       - '.github/workflows/deploy.yml'
 
-# One deploy at a time, and never cancel one in flight: a cancelled run leaves
-# the box with a stopped service or a half-built image and no rollback.
-# A second push queues behind the first instead.
+# One deploy at a time, and never cancel one in flight. A cancelled Terraform
+# run can leave state locked or a half-created resource behind; a cancelled
+# `gcloud run deploy` leaves a revision nobody chose. A second push queues.
 concurrency:
   group: deploy-production
   cancel-in-progress: false
 
 permissions:
   contents: read
+  # Needed only by the Workload Identity Federation variant of the auth step.
+  # Harmless when unused, and cheaper to leave here than to debug its absence.
+  id-token: write
+
+env:
+  TF_WORKING_DIR: infra
+  TERRAFORM_VERSION: '1.15.8'
+  GCP_REGION: ${{ vars.GCP_REGION || 'europe-west1' }}
+  VERCEL_PROJECT_NAME: ${{ vars.VERCEL_PROJECT_NAME || 'ecotrack-web' }}
 
 jobs:
-  # The gates. Both run the real CI — build + all tests — against this exact
-  # commit before anything touches the server. `docker compose build` on the
-  # VPS skips tests (backend builds with -x test), which is only defensible
-  # because these jobs already ran them on a clean runner for this commit.
+  # ---------------------------------------------------------------------------
+  # Preflight — is there a cloud to deploy to yet?
+  # ---------------------------------------------------------------------------
+  # Everything below is gated on this. Without it, the first push to main after
+  # merging infra/ fails on the very first auth step — `google-github-actions/auth`
+  # errors on an empty credentials_json — and main goes red for the entirely
+  # normal reason that the GCP project does not exist yet.
   #
-  # Both gates run even when only one project changed. That is deliberate: the
-  # two are deployed as one stack, so both must be green for the stack to ship.
+  # It has to be a JOB rather than a job-level `if:`, because the `secrets`
+  # context is not available in `jobs.<id>.if` — only `github`, `needs`, `vars`
+  # and `inputs` are. A step CAN read secrets, so one step reads them and
+  # publishes a plain output the other jobs are allowed to branch on.
+  #
+  # Missing secrets are a SKIP, not a failure: nothing is wrong with the commit.
+  # Add the secrets and the same workflow starts deploying, with no edit here.
+  preflight:
+    name: Check cloud credentials
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    outputs:
+      configured: ${{ steps.check.outputs.configured }}
+
+    steps:
+      - name: Are the deploy secrets present?
+        id: check
+        env:
+          GCP_CREDENTIALS_JSON: ${{ secrets.GCP_CREDENTIALS_JSON }}
+          GCP_PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+          VERCEL_API_TOKEN: ${{ secrets.VERCEL_API_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+        run: |
+          MISSING=""
+          for NAME in GCP_CREDENTIALS_JSON GCP_PROJECT_ID VERCEL_API_TOKEN VERCEL_ORG_ID; do
+            eval "VALUE=\${$NAME}"
+            if [ -z "$VALUE" ]; then
+              MISSING="$MISSING $NAME"
+            fi
+          done
+
+          if [ -n "$MISSING" ]; then
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+            echo "::notice title=Cloud deploy not configured::Skipping the GCP and Vercel jobs. Missing repository secrets:$MISSING. This is expected until infra/ has been applied once — see infra/README.md."
+            {
+              echo "### Cloud deploy skipped"
+              echo ""
+              echo "Missing secrets:$MISSING"
+              echo ""
+              echo "Nothing is wrong with this commit — CI ran and passed. Add these secrets, and the same workflow starts deploying. See DEPLOYMENT.md."
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+            echo "All deploy secrets present."
+          fi
+
+  # ---------------------------------------------------------------------------
+  # Gates. The same reusable CI workflows a pull request runs, against this
+  # exact commit. Both run even when only one project changed: the frontend
+  # build inlines the backend's URL, so they ship as a pair.
+  # ---------------------------------------------------------------------------
   verify-backend:
     name: Verify backend
+    needs: preflight
+    if: needs.preflight.outputs.configured == 'true'
     uses: ./.github/workflows/ci-backend.yml
 
   verify-web:
     name: Verify web
+    needs: preflight
+    if: needs.preflight.outputs.configured == 'true'
     uses: ./.github/workflows/ci-web.yml
 
-  # The deploy itself is GATED, and the gate is on the step rather than the job
-  # (TODO-32).
-  #
-  # There is no VPS. Every push touching backend/, web/, docker-compose.yml or
-  # the Caddyfile ran this job, and it died on its first action with
-  # `dial tcp ***:22: i/o timeout` - packets dropped, so: no host, a host that
-  # is off, or a firewall DROP. That turned main red on a schedule, which
-  # trains everyone to ignore a red main. The expensive part is that the two
-  # gates that DO mean something, verify-backend and verify-web, are in this
-  # same workflow run and go unread with it.
-  #
-  # So: `DEPLOY_ENABLED` (a repository VARIABLE, not a secret - it is not
-  # sensitive and `vars` is readable in `if:`, which `secrets` is not). Set it
-  # to `true` when a server exists and pushes deploy again. Until then the job
-  # runs, stays green, and says in the log why it did nothing.
-  #
-  # deploy-cloud.yml solves the same problem with a `preflight` job that checks
-  # whether its secrets are present - and that shape does NOT work here. The
-  # secrets ARE present: GitHub printed `***` for the host, which it only does
-  # for a secret with a value. What is missing is the machine, and no secret can
-  # say that. Hence an explicit switch rather than an inferred one.
-  #
-  # Two things this deliberately does NOT do:
-  #   - it does not drop the `push:` trigger. The gates must keep running on
-  #     every push; only the SSH step is conditional.
-  #   - it does not gate `workflow_dispatch`. Pressing "Run workflow" is a
-  #     deliberate act and should attempt the deploy whatever the variable says
-  #     - including failing loudly, which is how you test a new server.
-  deploy:
-    name: Deploy stack
-    needs: [verify-backend, verify-web]
+  # ---------------------------------------------------------------------------
+  # Infrastructure
+  # ---------------------------------------------------------------------------
+  terraform:
+    name: Terraform
+    needs: [preflight, verify-backend, verify-web]
+    if: needs.preflight.outputs.configured == 'true' && !inputs.skip_terraform
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
+    defaults:
+      run:
+        working-directory: infra
+
+    outputs:
+      registry_host: ${{ steps.tf_outputs.outputs.registry_host }}
+      image_repository: ${{ steps.tf_outputs.outputs.image_repository }}
+      service_name: ${{ steps.tf_outputs.outputs.service_name }}
+      backend_url: ${{ steps.tf_outputs.outputs.backend_url }}
+      vercel_project_id: ${{ steps.tf_outputs.outputs.vercel_project_id }}
+
+    env:
+      # Terraform reads TF_VAR_<name> for every input variable. Passing them
+      # this way rather than through a -var flag or a written tfvars file keeps
+      # secrets out of the process table and off the runner's disk.
+      TF_VAR_gcp_project_id: ${{ secrets.GCP_PROJECT_ID }}
+      TF_VAR_gcp_region: ${{ vars.GCP_REGION || 'europe-west1' }}
+      TF_VAR_gcp_credentials_json: ${{ secrets.GCP_CREDENTIALS_JSON }}
+      TF_VAR_vercel_api_token: ${{ secrets.VERCEL_API_TOKEN }}
+      TF_VAR_vercel_team_id: ${{ secrets.VERCEL_TEAM_ID }}
+      TF_VAR_vercel_project_name: ${{ vars.VERCEL_PROJECT_NAME || 'ecotrack-web' }}
+      TF_VAR_vercel_git_repository: ${{ github.repository }}
+      TF_VAR_backend_secrets: ${{ secrets.BACKEND_SECRETS_JSON || '{}' }}
+      # Never prompt, never colour-code, and print a diff a human can read in
+      # the Actions log.
+      TF_IN_AUTOMATION: 'true'
+      TF_INPUT: 'false'
+
     steps:
-      - name: Is deploying enabled?
-        id: gate
-        # Through env, never spliced into the script with ${{ }} - same rule as
-        # the commit message in deploy-mobile.yml, applied for consistency
-        # rather than because a repo variable is attacker-controlled.
-        env:
-          DEPLOY_ENABLED: ${{ vars.DEPLOY_ENABLED }}
-          EVENT_NAME: ${{ github.event_name }}
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_CREDENTIALS_JSON }}
+          # PREFERRED ALTERNATIVE — Workload Identity Federation, no key at all.
+          # Delete credentials_json above and uncomment these two, after running
+          # the setup in infra/README.md:
+          #
+          # workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER }}
+          # service_account: ${{ secrets.GCP_DEPLOYER_SA }}
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TERRAFORM_VERSION }}
+          terraform_wrapper: false
+
+      # LOUD WARNING, not a failure. providers.tf ships without a backend block,
+      # so state is written next to the files — and a runner starts with an
+      # empty checkout. That means every run would believe nothing exists and
+      # try to create it all again, which fails on the second run with "already
+      # exists" on a dozen resources. Move state to GCS before trusting the
+      # apply below. providers.tf has the four-line block.
+      - name: Check Terraform state is remote
         run: |
-          if [ "$DEPLOY_ENABLED" = "true" ] || [ "$EVENT_NAME" = "workflow_dispatch" ]; then
-            echo "enabled=true" >> "$GITHUB_OUTPUT"
-            echo "Deploying: DEPLOY_ENABLED='$DEPLOY_ENABLED', event '$EVENT_NAME'."
+          if grep -rqE '^\s*backend\s+"' *.tf; then
+            echo "Remote state backend configured."
           else
-            echo "enabled=false" >> "$GITHUB_OUTPUT"
-            echo "::warning title=Deploy skipped::No server is configured. The backend and web gates ran and passed; only the SSH step was skipped. Set the repository variable DEPLOY_ENABLED=true (Settings -> Secrets and variables -> Actions -> Variables) once a VPS exists, or use Run workflow to deploy once regardless. See TODO-32."
+            echo "::warning title=Terraform state is local::infra/ has no backend block, so this run starts from empty state. Configure the GCS backend in providers.tf before relying on apply — see the comment at the top of that file."
           fi
 
-      - name: Deploy Docker stack to VPS
-        if: steps.gate.outputs.enabled == 'true'
-        uses: appleboy/ssh-action@v1.0.3
-        env:
-          DB_NAME: ${{ secrets.DB_NAME }}
-          DB_USER: ${{ secrets.DB_USER }}
-          DB_PASS: ${{ secrets.DB_PASS }}
-          DO_SPACES_ACCESS_KEY: ${{ secrets.DO_SPACES_ACCESS_KEY }}
-          DO_SPACES_SECRET_KEY: ${{ secrets.DO_SPACES_SECRET_KEY }}
-          DO_SPACES_BUCKET: ${{ secrets.DO_SPACES_BUCKET }}
-          DO_SPACES_REGION: ${{ secrets.DO_SPACES_REGION }}
-          ECOTRACK_SECURITY_ENFORCE: ${{ secrets.ECOTRACK_SECURITY_ENFORCE }}
-          ECOTRACK_CORS_ALLOWED_ORIGINS: ${{ secrets.ECOTRACK_CORS_ALLOWED_ORIGINS }}
-          # Optional (TODO-36). Set it and the first enrolment needs no SSH to
-          # read a generated code out of the log. Unset is fine and is the
-          # default; it is inert the moment one employee exists.
-          ECOTRACK_SETUP_CODE: ${{ secrets.ECOTRACK_SETUP_CODE }}
-          DOMAIN_NAME: ${{ secrets.DOMAIN_NAME }}
-          # Vite inlines these at build time — see web/Dockerfile.
-          VITE_DATA_MODE: ${{ vars.VITE_DATA_MODE || 'live' }}
-          VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL || '/api' }}
+      - name: Terraform fmt
+        run: terraform fmt -check -recursive -diff
+
+      - name: Terraform init
+        run: terraform init -input=false
+
+      - name: Terraform validate
+        run: terraform validate -no-color
+
+      - name: Terraform plan
+        run: terraform plan -input=false -no-color -out=tfplan
+
+      # `apply` runs only for main. A pull request gets everything above — fmt,
+      # init, validate, plan — and stops, so a broken change is caught without
+      # touching a live resource.
+      - name: Terraform apply
+        if: github.ref == 'refs/heads/main'
+        run: terraform apply -auto-approve -input=false tfplan
+
+      - name: Collect Terraform outputs
+        id: tf_outputs
+        if: github.ref == 'refs/heads/main'
+        run: |
+          {
+            echo "registry_host=$(terraform output -raw artifact_registry_host)"
+            echo "image_repository=$(terraform output -raw backend_image_repository)"
+            echo "service_name=$(terraform output -raw backend_service_name)"
+            echo "backend_url=$(terraform output -raw backend_url)"
+            echo "vercel_project_id=$(terraform output -raw vercel_project_id)"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Summary
+        if: github.ref == 'refs/heads/main'
+        run: |
+          {
+            echo "### Infrastructure"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Backend | ${{ steps.tf_outputs.outputs.backend_url }} |"
+            echo "| Image repo | \`${{ steps.tf_outputs.outputs.image_repository }}\` |"
+            echo "| Cloud Run service | \`${{ steps.tf_outputs.outputs.service_name }}\` |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # ---------------------------------------------------------------------------
+  # Backend image -> Artifact Registry -> Cloud Run
+  # ---------------------------------------------------------------------------
+  backend:
+    name: Build and deploy backend
+    needs: [preflight, verify-backend, verify-web, terraform]
+    # `always()` so a manual run with skip_terraform (which SKIPS the terraform
+    # job) still reaches this one; the gates must still have passed.
+    if: |
+      always()
+      && needs.preflight.outputs.configured == 'true'
+      && github.ref == 'refs/heads/main'
+      && needs.verify-backend.result == 'success'
+      && needs.verify-web.result == 'success'
+      && needs.terraform.result != 'failure'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    outputs:
+      backend_url: ${{ steps.deploy.outputs.url }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
         with:
-          host: ${{ secrets.SERVER_IP }}
-          username: ${{ secrets.SERVER_USER }}
-          key: ${{ secrets.SSH_PRIVATE_KEY }}
-          command_timeout: 25m
-          envs: DB_NAME,DB_USER,DB_PASS,DO_SPACES_ACCESS_KEY,DO_SPACES_SECRET_KEY,DO_SPACES_BUCKET,DO_SPACES_REGION,ECOTRACK_SECURITY_ENFORCE,ECOTRACK_CORS_ALLOWED_ORIGINS,ECOTRACK_SETUP_CODE,DOMAIN_NAME,VITE_DATA_MODE,VITE_API_BASE_URL
-          script: |
-            set -e
-            echo "🚀 Starting deployment..."
-            APP_DIR=~/Dami-Prod-EcoTrack
-            mkdir -p "$APP_DIR"
-            cd "$APP_DIR"
+          credentials_json: ${{ secrets.GCP_CREDENTIALS_JSON }}
 
-            echo "📥 Pulling latest code..."
-            if [ -d .git ]; then
-              git fetch origin main
-              git reset --hard origin/main
-            else
-              git clone https://github.com/dantze/Dami-Prod-EcoTrack.git .
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ secrets.GCP_PROJECT_ID }}
+
+      # Resolve the image path. Terraform is the source of truth when it ran;
+      # the fallback reconstructs the same string so a skip_terraform run works.
+      # Keep the two in step with outputs.tf if you rename anything.
+      - name: Resolve image coordinates
+        id: coords
+        run: |
+          REPO='${{ needs.terraform.outputs.image_repository }}'
+          SERVICE='${{ needs.terraform.outputs.service_name }}'
+          if [ -z "$REPO" ]; then
+            REPO="${GCP_REGION}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID }}/ecotrack-prod-backend/backend"
+            SERVICE="ecotrack-prod-backend"
+            echo "::warning title=Using fallback image path::Terraform produced no outputs, falling back to the conventional name. Verify it matches infra/."
+          fi
+          echo "repo=$REPO"       >> "$GITHUB_OUTPUT"
+          echo "service=$SERVICE" >> "$GITHUB_OUTPUT"
+          echo "tag=${GITHUB_SHA::12}" >> "$GITHUB_OUTPUT"
+
+      # Artifact Registry rejects an anonymous push; this writes a docker
+      # credential helper entry for the regional host using the SA above.
+      - name: Configure Docker for Artifact Registry
+        run: gcloud auth configure-docker "${GCP_REGION}-docker.pkg.dev" --quiet
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          file: ./backend/Dockerfile
+          push: true
+          # Tagged with the commit as well as latest: `latest` says what is
+          # newest, the SHA is what lets you roll back to a known commit.
+          tags: |
+            ${{ steps.coords.outputs.repo }}:${{ steps.coords.outputs.tag }}
+            ${{ steps.coords.outputs.repo }}:latest
+          # GitHub's cache saves the Gradle dependency layer, which is most of
+          # the build.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: false
+
+      # Rolls a new revision at 100% traffic. Terraform deliberately ignores
+      # changes to the service's `image` (see the lifecycle block in main.tf),
+      # so this deploy is not reverted by the next apply.
+      - name: Deploy to Cloud Run
+        id: deploy
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: ${{ steps.coords.outputs.service }}
+          region: ${{ env.GCP_REGION }}
+          image: ${{ steps.coords.outputs.repo }}:${{ steps.coords.outputs.tag }}
+
+      # The deploy above already waits for the revision to become ready, which
+      # means the startup probe on /actuator/health passed. This asserts the
+      # same thing from OUTSIDE, through the public URL, which is what a user
+      # actually traverses.
+      - name: Smoke test the public URL
+        run: |
+          URL='${{ steps.deploy.outputs.url }}'
+          echo "Probing ${URL}/actuator/health"
+          for i in $(seq 1 20); do
+            CODE=$(curl -s -o /dev/null -w '%{http_code}' "${URL}/actuator/health" || echo 000)
+            if [ "$CODE" = "200" ]; then
+              echo "Backend healthy after $((i * 5))s"
+              exit 0
             fi
+            echo "  attempt $i/20 -> HTTP $CODE"
+            sleep 5
+          done
+          echo "Backend never returned 200. Recent logs:"
+          gcloud run services logs read '${{ steps.coords.outputs.service }}' \
+            --region "${GCP_REGION}" --limit 50 || true
+          exit 1
 
-            echo "🐳 Building and starting containers..."
-            docker compose up -d --build
+  # ---------------------------------------------------------------------------
+  # Frontend -> Vercel
+  # ---------------------------------------------------------------------------
+  # Runs AFTER the backend, on purpose: the build inlines the API URL, so
+  # shipping the frontend first would publish a bundle pointing at a revision
+  # that is not serving yet.
+  frontend:
+    name: Deploy frontend
+    needs: [preflight, terraform, backend]
+    if: |
+      always()
+      && needs.preflight.outputs.configured == 'true'
+      && github.ref == 'refs/heads/main'
+      && needs.backend.result == 'success'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
 
-            echo "🩺 Waiting for backend healthcheck (Actuator)..."
-            i=1
-            while [ "$i" -le 40 ]; do
-              STATUS=$(docker inspect --format='{{.State.Health.Status}}' ecotrack_backend 2>/dev/null || true)
-              if [ "$STATUS" = "healthy" ]; then
-                echo "✅ Backend HEALTHY after $((i * 5))s"
-                break
-              fi
-              if [ "$i" -eq 40 ]; then
-                echo "❌ Backend never became healthy. Logs:"
-                docker compose logs --tail=50 backend
-                exit 1
-              fi
-              echo "⏳ Health status: '$STATUS' (attempt $i/40)..."
-              sleep 5
-              i=$((i + 1))
-            done
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      # Terraform is the source of truth. The secret is the fallback for a
+      # manual run with skip_terraform, where the terraform job produced no
+      # outputs and `vercel pull` would otherwise have no project to pull.
+      VERCEL_PROJECT_ID: ${{ needs.terraform.outputs.vercel_project_id || secrets.VERCEL_PROJECT_ID }}
 
-            echo "🌐 Checking the SPA is served through Caddy..."
-            # Hit the edge from inside the network. -k because DOMAIN_NAME may
-            # be a bare IP/localhost, which gets a self-signed cert.
-            if docker compose exec -T caddy wget -q -O /dev/null --no-check-certificate http://web:80/; then
-              echo "✅ Web container is serving the bundle"
-            else
-              echo "❌ Web container is not serving. Logs:"
-              docker compose logs --tail=50 web caddy
-              exit 1
-            fi
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
 
-            echo "🧹 Pruning old images..."
-            docker image prune -f
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          # Single source of truth for the toolchain version, shared with
+          # developers' shells (TODO-48). Hardcoding it here let CI sit on 22
+          # while a contributor ran 24, where the suite failed.
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: web/package-lock.json
 
-            docker compose ps
-            echo "🎉 Deploy complete."
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      # `pull` fetches the project settings Terraform wrote — including
+      # VITE_API_BASE_URL, which is where the Cloud Run URL enters the build.
+      - name: Pull Vercel project settings
+        run: vercel pull --yes --environment=production --token='${{ secrets.VERCEL_API_TOKEN }}'
+
+      - name: Build
+        run: vercel build --prod --token='${{ secrets.VERCEL_API_TOKEN }}'
+
+      - name: Deploy
+        id: deploy
+        run: |
+          URL=$(vercel deploy --prebuilt --prod --token='${{ secrets.VERCEL_API_TOKEN }}')
+          echo "url=$URL" >> "$GITHUB_OUTPUT"
+          echo "Deployed to $URL"
+
+      - name: Summary
+        run: |
+          {
+            echo "### Deployed"
+            echo ""
+            echo "| | |"
+            echo "|---|---|"
+            echo "| Frontend | ${{ steps.deploy.outputs.url }} |"
+            echo "| Backend | ${{ needs.backend.outputs.backend_url }} |"
+          } >> "$GITHUB_STEP_SUMMARY"

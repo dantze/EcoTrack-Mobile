@@ -54,9 +54,18 @@ NO_CI_REQUIRED = {
     "TODO.md",
     "DEPLOYMENT.md",    # the runbook; prose, ships in no build
     ".env.example",     # a template of NAMES only; read by nothing at build time
-    # The compose files ARE load-bearing - deploy.yml watches docker-compose.yml
-    # and rebuilds the stack from it - and no ci-*.yml validates them, because
-    # repo-hygiene.yml does instead. Its "Validate compose files" step runs
+    # The Caddyfile configures the LOCAL stack's edge and nothing else since
+    # TODO-71 - production is Vercel and Cloud Run, each with its own managed
+    # certificate, and neither reads it. It used to be covered incidentally, by
+    # the old deploy.yml's `paths:` filter watching it for a VPS rebuild; the
+    # workflow that replaced it has no reason to. Exempt rather than validated
+    # because breaking it now breaks `docker compose up` for the person who
+    # broke it, immediately - there is no deployment left for it to break.
+    "Caddyfile",
+    # The compose files are still load-bearing, as the LOCAL full-stack
+    # environment (they stopped being a deployment in TODO-71), and no ci-*.yml
+    # validates them, because repo-hygiene.yml does instead. Its
+    # "Validate compose files" step runs
     # `docker compose config -q` on every docker-compose*.yml on every PR, twice:
     # once on the `:-` defaults and once with --env-file .env.example. That
     # resolves interpolation and validates the Compose schema, not just the YAML

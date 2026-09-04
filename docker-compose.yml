@@ -1,3 +1,17 @@
+# =========================================================================
+# The LOCAL full-stack environment: Postgres + backend + web + Caddy.
+#
+# THIS IS NOT DEPLOYED ANYWHERE. It used to be — one `docker compose up` on a
+# DigitalOcean droplet was the production deployment — and it is kept because
+# it is still the fastest way to run the whole system on one machine. Production
+# is Cloud Run + Cloud SQL + Vercel now; see infra/ and DEPLOYMENT.md.
+#
+# ONE WAY IT NO LONGER RESEMBLES PRODUCTION: Caddy serves the SPA and proxies
+# /api on the same host, so every API call here is same-origin and CORS never
+# applies. In production the SPA is on Vercel and the API on Cloud Run — two
+# origins — so a CORS misconfiguration is invisible from here. DEPLOYMENT.md's
+# "Local" section has a two-origin arrangement for when that matters.
+# =========================================================================
 services:
   # =========================================================================
   # PostgreSQL Database Service

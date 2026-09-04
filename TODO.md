@@ -27,20 +27,18 @@ unless its status says otherwise.
 **Status legend:** `[ ]` not started · `[~]` in progress · `[DONE]` done ·
 `[POSTPONED]` deliberately deferred · `[?]` needs a decision first
 
-**Next free ID: TODO-79.** (Highest used is TODO-78.)
+**Next free ID: TODO-82.** (Highest used is TODO-81.)
 
 ---
 
-## Still open — 19 of 78
+## Still open — 19 of 81
 
 The whole of what is left, in one place. Everything not listed here is `[DONE]`.
 
 - **TODO-17** `[POSTPONED]` — All other AI ideas *(F)*
 - **TODO-76** `[ ]` — `AdminController` answers in three shapes, none of them the app's *(A)*
-- **TODO-71** `[ ]` — A second deploy target exists in `infra/` and is wired to nothing *(G)*
 - **TODO-72** `[ ]` — Installed phones need a rebuild, and the Maps key needs revoking *(G)*
 - **TODO-74** `[ ]` — `DataLoader` seeds every test context, and no test asks it to *(J)*
-- **TODO-75** `[ ]` — The web bundle falls back to the dead droplet, over plain HTTP *(G)*
 - **TODO-73** `[ ]` — `AccessRequestsPage` paints with tokens that do not exist *(J)*
 - **TODO-55** `[ ]` — The bundle budget measures the mock build, not the deployed one *(G)*
 - **TODO-60** `[ ]` — Mantine's full stylesheet ships for four components *(J)*
@@ -50,10 +48,12 @@ The whole of what is left, in one place. Everything not listed here is `[DONE]`.
 - **TODO-65** `[ ]` — `web/`'s dependencies were declared but never installed *(J)*
 - **TODO-66** `[ ]` — The map tiles stay light in dark mode *(J)*
 - **TODO-67** `[ ]` — Confirm the map's cold-load fix against a live tile server *(J)*
-- **TODO-68** `[ ]` — This machine cannot run the backend suite or the hygiene guards *(G)*
 - **TODO-70** `[ ]` — Orders created before the numbering fix are still `#0` *(J)*
 - **TODO-77** `[ ]` — Two confirmation dialogs, with different accessibility *(J)*
 - **TODO-78** `[ ]` — `.nvmrc` exists now but nothing tells a new contributor *(J)*
+- **TODO-79** `[ ]` — The "GCP deployment" still depends on a DigitalOcean bucket *(G)*
+- **TODO-80** `[ ]` — Paying for a warm instance to run two cron jobs *(G)*
+- **TODO-81** `[ ]` — Both nightly jobs run on EVERY Cloud Run instance *(G)*
 
 **Done, but flagged by whoever did it** — not open, but not finished-and-forgotten
 either:
@@ -137,17 +137,20 @@ full text lives further down.
 | TODO-65 | **`[ ]`** | J | `web/`'s dependencies were declared but never installed |
 | TODO-66 | **`[ ]`** | J | The map tiles stay light in dark mode |
 | TODO-67 | **`[ ]`** | J | Confirm the map's cold-load fix against a live tile server |
-| TODO-68 | **`[ ]`** | G | This machine cannot run the backend suite or the hygiene guards |
+| TODO-68 | `[DONE]` | G | This machine cannot run the backend suite or the hygiene guards |
 | TODO-69 | `[DONE]` | J | Three bugs only a live backend could show |
 | TODO-70 | **`[ ]`** | J | Orders created before the numbering fix are still `#0` |
-| TODO-71 | **`[ ]`** | G | A second deploy target exists in `infra/` and is wired to nothing |
+| TODO-71 | `[DONE]` | G | A second deploy target exists in `infra/` and is wired to nothing |
 | TODO-72 | **`[ ]`** | G | Installed phones need a rebuild, and the Maps key needs revoking |
 | TODO-73 | **`[ ]`** | J | `AccessRequestsPage` paints with tokens that do not exist |
 | TODO-74 | **`[ ]`** | J | `DataLoader` seeds every test context, and no test asks it to |
-| TODO-75 | **`[ ]`** | G | The web bundle falls back to the dead droplet, over plain HTTP |
+| TODO-75 | `[DONE]` | G | The web bundle falls back to the dead droplet, over plain HTTP |
 | TODO-76 | **`[ ]`** | A | `AdminController` answers in three shapes, none of them the app's |
 | TODO-77 | **`[ ]`** | J | Two confirmation dialogs, with different accessibility |
 | TODO-78 | **`[ ]`** | J | `.nvmrc` exists now but nothing tells a new contributor |
+| TODO-79 | **`[ ]`** | G | The "GCP deployment" still depends on a DigitalOcean bucket |
+| TODO-80 | **`[ ]`** | G | Paying for a warm instance to run two cron jobs |
+| TODO-81 | **`[ ]`** | G | Both nightly jobs run on EVERY Cloud Run instance |
 
 ---
 
@@ -2792,7 +2795,7 @@ against eleven deliberately mutated copies, at least one per check, every one of
 which it rejected with the intended message. The Python itself first executes in
 CI, so treat its first run there as the real one.
 
-### TODO-68 `[ ]` This machine cannot run the backend suite or the hygiene guards
+### TODO-68 `[DONE]` This machine cannot run the backend suite or the hygiene guards
 Found while doing TODO-35/57, and recorded because it puts an asterisk on "the
 tests pass" for every backend change made here.
 
@@ -2838,7 +2841,37 @@ not name an order type; mobile's API surface is a closed list) whose logic was
 verified by re-implementing the scan in Node against the real tree, not by
 running the script. `winget install Python.Python.3.12` is the whole fix.
 
-### TODO-71 `[ ]` A second deploy target exists in `infra/` and is wired to nothing
+**Done — the Python half is fixed too, so all of it runs here now.**
+`winget install Python.Python.3.12` landed Python 3.13.5, and all five guards
+run against the real tree:
+
+```
+todo_index                 OK (81 items, 20 open, index and 'Still open' agree)
+repo_hygiene               OK
+cross_project_invariants   OK (0 skipped, 0 mismatches)
+doc_claims                 OK (8 doc files, 3 pinned claims, 0 problems)
+dead_config                OK (14 ecotrack.* keys checked, all read)
+bundle_budget              OK (247.8 kB / 260 kB)
+```
+
+`todo_index.py` is a sixth that did not exist when this was written, and it is
+the one that caught a real drift — the *Index* and *Still open* lists were four
+statuses and two items behind after TODO-48/53/58/59.
+
+Two things worth knowing for the next person on Windows:
+
+- **`PYTHONIOENCODING=utf-8` is effectively required.** The scripts print `✓`,
+  `✗` and `✅`; on a cp1252 console `todo_index.py` and `junit_summary.py` die
+  with `UnicodeEncodeError` *while reporting a failure*, so the run looks like a
+  crash rather than a list of problems. Export it before running any of them.
+- `cross_project_invariants.py`'s TODO-33 checks — the ones this item notes were
+  verified by re-implementing the scan in Node rather than by running the script
+  — have now been run for real, and pass.
+
+Backend suite re-confirmed on this machine at the same time: **320 tests across
+36 classes, 0 failed**, on Temurin 21.0.9.
+
+### TODO-71 `[DONE]` A second deploy target exists in `infra/` and is wired to nothing
 Scaffolded on request: Terraform for GCP (Cloud Run + Cloud SQL Postgres +
 Artifact Registry + Secret Manager + a least-privilege IAM pair) and Vercel (the
 `web/` SPA), plus `.github/workflows/deploy-cloud.yml`.
@@ -2885,6 +2918,57 @@ Also unresolved: no monitoring or alerting, no rate limiting in front of Cloud
 Run, and `db-f1-micro` is shared-core with no SLA, so the default tier is a
 first-deploy choice rather than a production one.
 
+**Done — the decision was made and executed: GCP + Vercel REPLACE the VPS.**
+Luca decided this on 2026-09-05. The droplet was already gone and the workflow
+that deployed to it had been gated off since TODO-32, so nothing live was
+switched over — there was no data to migrate and no cutover window.
+
+What changed:
+
+- **`.github/workflows/deploy.yml` is now the Cloud Run + Vercel pipeline.** The
+  SSH-to-a-droplet workflow of that name was deleted and `deploy-cloud.yml`
+  renamed onto it, so there is ONE workflow called Deploy again. `git log` has
+  the old one.
+- **`docker-compose.yml` and the `Caddyfile` stay, as the LOCAL stack**, with a
+  header on each saying so. They are the fastest way to run the whole system on
+  one machine and are deployed nowhere.
+- `DEPLOYMENT.md` rewritten: triggers, the two-origin diagram, one-time setup,
+  first enrolment and admin recovery via `gcloud run services logs read` instead
+  of `docker compose logs`, rollback by Cloud Run revision + Vercel promote, and
+  a *Getting a shell on the database* section (the instance has no public IP).
+- `CLAUDE.md`, `infra/README.md`, `infra/main.tf`, `.env.example` and
+  `application-prod.properties` all re-pointed; the last of these no longer
+  claims a workflow SSHes anywhere, and now explains why the JDBC URL uses a
+  private IP rather than the Cloud SQL Auth proxy.
+
+**The open questions this item listed, answered:**
+
+| Question | Answer |
+|---|---|
+| Replace or run both? | **Replace.** Decided. |
+| Data migration | None needed — no server, no users. |
+| Local Terraform state | Still local; `DEPLOYMENT.md` step 3 makes moving it to GCS a prerequisite before CI applies. Unchanged risk, now impossible to miss. |
+| Who runs `apply` | Recommendation stated (from a laptop; CI ships images only). Not enforced — that is a repo-settings decision. |
+| CORS | Handled in `main.tf`, and now stated in five places because it is the one failure this deployment can produce that the old one could not. |
+| Task photos on Spaces | Still true. Split out as **TODO-79**. |
+| `mobile/` | Fallback no longer names the dead droplet; installed builds still need a rebuild (TODO-72). |
+
+**One thing this item did not anticipate, found while doing it and fixed:**
+Cloud Run's scale-to-zero would have silently broken both nightly `@Scheduled`
+jobs. `RecurringTaskScheduler` tops up indefinite plans at 02:00 and
+`TokenService.pruneStaleSessions` runs at 03:30 — at 02:00 there is no traffic,
+so with `min_instances = 0` there is no instance, no code runs, and nothing is
+logged. The first symptom would have been a recurring plan quietly running out
+of tasks weeks later. `backend_min_instances` now defaults to 1 and Terraform
+**validates** it, `cpu_idle` follows it, and the cost of that (~$10–15/month) is
+in `infra/README.md`. **TODO-80** is the cheaper alternative; **TODO-81** is the
+opposite hazard at more than one instance.
+
+**Still not done, and none of it is code:** there is no GCP project and no
+Vercel account, so nothing has been applied and `deploy.yml` skips itself
+(green) until the secrets exist. `DEPLOYMENT.md` is the runbook for that.
+
+
 ### TODO-72 `[ ]` Installed phones need a rebuild, and the Maps key needs revoking
 Two things TODO-33 could not do from inside the repository.
 
@@ -2909,7 +2993,7 @@ order, or knowingly not.
 
 *Found while doing TODO-33.*
 
-### TODO-75 `[ ]` The web bundle falls back to the dead droplet, over plain HTTP
+### TODO-75 `[DONE]` The web bundle falls back to the dead droplet, over plain HTTP
 `web/src/lib/config.ts` ends with
 
 ```ts
@@ -2942,9 +3026,113 @@ deliberately: it is what already-installed builds resolve to, and Expo inlines
 `EXPO_PUBLIC_*` at build time so those binaries cannot be repointed without a
 rebuild (see the Known gaps section of CLAUDE.md, and TODO-72).
 
+**Done — defaulted to `/api`, and mobile's twin was changed too. That second
+part contradicts the paragraph above, so here is why.**
+
+The web half is exactly as prescribed: `API_BASE_URL` now falls back to `'/api'`,
+so a live build that forgot the variable fails against its own origin instead of
+issuing plain-HTTP requests to a stranger's IP from an HTTPS page.
+
+One thing the reasoning above no longer holds, and it is worth correcting rather
+than quietly inheriting: **`/api` is no longer what the deployment looks like.**
+TODO-71 replaced the VPS with Cloud Run + Vercel, so the SPA and the API are on
+two origins and production always sets an ABSOLUTE `VITE_API_BASE_URL`, written
+into the Vercel project by Terraform. `/api` is still the right *fallback* — a
+404 from the site you are looking at points straight at the missing variable —
+but it is a diagnostic, not the shape. The comment in `config.ts` says so, so
+nobody reads the default as evidence that production is same-origin.
+
+**On mobile.** The instruction above was to leave `mobile/constants/ApiConfig.ts`
+alone because the bare IP "is what already-installed builds resolve to". That
+premise does not survive its own next sentence: `EXPO_PUBLIC_*` is inlined at
+build time, so an installed binary carries its own copy and **cannot be affected
+by editing this file**. Keeping the IP in source therefore protected nothing —
+and the droplet it names is dead, so those installs are broken either way, which
+is TODO-72's rebuild.
+
+So it now falls back to `http://localhost:8080/api`: right for a developer
+running `docker compose` (which publishes 8080), and obviously-wrong-but-
+diagnosable in a build that forgot the variable. The one case where the edit is
+visible to an existing install is an `eas update` OTA, which would move it from
+one dead host to another — no worse, and the real fix for those installs is
+`EXPO_PUBLIC_API_BASE_URL` pointing at Cloud Run, which overrides the fallback
+entirely.
+
+
 *Found while doing TODO-32.*
 
 ---
+### TODO-79 `[ ]` The "GCP deployment" still depends on a DigitalOcean bucket
+Found while doing TODO-71. Task photos are written to and read from
+**DigitalOcean Spaces** — `PhotoService` points the AWS S3 SDK at
+`https://$DO_SPACES_REGION.digitaloceanspaces.com`, and the presigned URLs that
+TODO-46 introduced are Spaces URLs. Nothing about that moved to GCP.
+
+So the deployment spans three vendors, and the odd one out is invisible from
+`infra/`: Terraform creates no bucket, and the credentials reach the container
+as ordinary entries in `BACKEND_SECRETS_JSON`. It works, and it is billed and
+administered somewhere nobody looking at the GCP console would think to check.
+
+**Deciding it needs** weighing a migration against leaving it. Moving to a GCS
+bucket is not just a bucket: `PhotoService` would keep the S3 SDK (GCS has an
+S3-compatible endpoint) or move to the GCS client; the presigning would change
+shape; and **the objects already in Spaces would have to be copied**, which is
+the part with a date on it — `DEPLOYMENT.md` still documents two one-time
+Spaces operations (the `persoane fizice/` check and the `poze cabine/` ACL
+flip) that assume the bucket is where it is.
+
+Not urgent: nothing is broken and nothing is unsafe. It is a "how many bills do
+we want" question, and worth answering before more objects accumulate.
+
+### TODO-80 `[ ]` Paying for a warm instance to run two cron jobs
+`backend_min_instances` is pinned at 1, and validated, because
+`RecurringTaskScheduler` (02:00) and `TokenService.pruneStaleSessions` (03:30)
+are Spring `@Scheduled` methods that need a live JVM holding CPU at that moment.
+Cloud Run at zero instances runs no code, so they would never fire — silently,
+since nothing executes to log anything (TODO-71).
+
+That is correct and it costs roughly **$10–15/month to keep a JVM awake for two
+jobs that take seconds**. The app has no other reason to stay warm: it is used
+during working hours by a handful of operators, and a cold start on the first
+request of the morning would be perfectly acceptable.
+
+**The alternative:** scale to zero and drive both from **Cloud Scheduler**,
+which POSTs to the service on a cron and wakes it. That needs an endpoint per
+job (or one with a discriminator), a `SecurityConfig` row for it, and OIDC
+invoker auth so only the scheduler can call it — the `api-endpoint` skill covers
+the first two. Terraform would add `google_cloud_scheduler_job` resources and a
+service account with `run.invoker`.
+
+**Deciding it needs** someone to decide the endpoints are worth the security
+surface. An unauthenticated "run the nightly job" URL is a denial-of-service
+lever and a way to generate unbounded tasks, so the OIDC half is not optional —
+which is most of the work.
+
+### TODO-81 `[ ]` Both nightly jobs run on EVERY Cloud Run instance
+The other half of TODO-71's scheduler problem, and the opposite of TODO-80.
+
+`@Scheduled` is per-JVM. One always-on container had exactly one, so both
+nightly jobs ran exactly once. Cloud Run runs as many instances as it wants up
+to `backend_max_instances` (4), and **each one runs its own copy of the cron**.
+If more than one instance is alive at 02:00, `RecurringTaskScheduler.generateUpcomingTasks`
+runs concurrently on each, over the same `findByActiveTrue()` list.
+
+Nothing guards against that. There is no `@Version` on any entity (a known gap
+in CLAUDE.md), no advisory lock, and `generateTasksForPlan` is not obviously
+idempotent under concurrency — two instances can both read a plan's
+`lastGeneratedDate`, both decide tasks are missing, and both write them.
+
+**In practice it is unlikely today**: at 02:00 there is no traffic, so Cloud Run
+sits at the one instance `min_instances` pins. It becomes reachable the moment
+someone raises `backend_max_instances` and the service happens to be scaled up
+overnight — a config change with a consequence nobody would connect to it.
+
+**Deciding it needs** a choice of guard: a `SELECT … FOR UPDATE` on a scheduler
+lock row (the pattern `SubscriptionRepository.findByIdForUpdate` already
+establishes in this codebase), ShedLock, or moving the jobs out of the app
+entirely per TODO-80 — which solves this one too, since Cloud Scheduler fires
+once and hits one instance. That overlap is worth noting before either is
+picked.
 
 ## H. Mobile
 
@@ -3808,6 +3996,7 @@ is verified on both 22 and 24 — so this is a papercut, not a trap. It overlaps
 TODO-65, which asks the same question about `npm ci` after the UI rebuild:
 **both are really "README.md should have a setup section"**, and neither is
 worth a commit alone. Decide them together.
+
 ### TODO-60 `[ ]` Mantine's full stylesheet ships for four components
 `src/index.css` imports `@mantine/core/styles.css` (plus dates, notifications,
 spotlight, charts) into `@layer mantine`. That is ~500 kB raw / ~73 kB gzip of

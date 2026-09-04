@@ -13,13 +13,24 @@
 #   Artifact Registry holds the backend image; Secret Manager holds the
 #   database password and any other credential the container needs.
 #
-# THIS IS A SECOND, PARALLEL TARGET. The repo still deploys backend + web to a
-# VPS through .github/workflows/deploy.yml (see DEPLOYMENT.md); nothing here
-# touches that. The two differ in one way that matters to the application code:
-# on the VPS, Caddy serves the SPA and the API from ONE origin, so the browser's
-# API call is same-origin. Here they are two origins, so CORS becomes
-# load-bearing — which is why the Cloud Run service is given
-# ECOTRACK_CORS_ALLOWED_ORIGINS below.
+# THIS IS THE DEPLOYMENT. `.github/workflows/deploy.yml` applies it. It replaced
+# an SSH-to-a-droplet workflow that ran backend + web + Postgres + Caddy as one
+# docker compose stack; `docker-compose.yml` and the `Caddyfile` are the local
+# development environment now and are deployed nowhere.
+#
+# Two consequences of the move that the application can feel, both handled
+# below and both easy to undo by accident:
+#
+#   CORS. Caddy served the SPA and the API from ONE origin, so the browser's
+#   API call was same-origin and CORS never applied. Vercel and Cloud Run are
+#   two origins, so ECOTRACK_CORS_ALLOWED_ORIGINS is computed here and set on
+#   the service. Get it wrong and both halves report themselves healthy while
+#   every call between them is refused.
+#
+#   SCHEDULERS. The droplet ran one always-on container, so the backend's two
+#   nightly @Scheduled jobs always fired. Cloud Run runs no code at zero
+#   instances, so `backend_min_instances` is validated >= 1 and `cpu_idle`
+#   follows it — see the comment on that variable.
 
 locals {
   # Every resource name starts with this, so a second environment in the same
@@ -465,10 +476,11 @@ resource "google_cloud_run_v2_service" "backend" {
           memory = var.backend_memory
         }
 
-        # Bill for CPU only while a request is in flight — but only when the
-        # service scales to zero. With a warm instance we want it always on, or
-        # background work (RecurringTaskScheduler, session pruning) is frozen
-        # between requests.
+        # CPU allocated between requests, which is what a Spring `@Scheduled`
+        # method needs to fire at 02:00 — a throttled instance would not run
+        # one. Tied to min_instances rather than hardcoded so the two cannot
+        # disagree, and `backend_min_instances` is validated >= 1 for the same
+        # reason (read its comment before changing either).
         cpu_idle          = var.backend_min_instances == 0
         startup_cpu_boost = true
       }

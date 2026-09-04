@@ -115,3 +115,37 @@ describe('errorMessage surfaces the refusal instead of the status code', () => {
     );
   });
 });
+
+/**
+ * TODO-76: `AdminController` used to hand-roll its own error shapes, and the
+ * one that mattered most was `createEmployee`'s.
+ *
+ * These two cases are the before and after of the same refusal. They are kept
+ * together because the old shape is the thing to recognise: it looks like a
+ * perfectly reasonable error body, it is JSON, it has the message in it — and
+ * `serverMessage` returns null for it, because the key is `error` and not
+ * `message`. The screen then showed its generic fallback and the admin was told
+ * nothing about why the create failed.
+ */
+describe('the duplicate-username refusal reaches the operator', () => {
+  const TAKEN = 'Există deja un angajat cu numele de utilizator „ion.popescu”.';
+
+  it('the standard envelope carries it through', () => {
+    const conflict = apiError(400, envelope(400, 'Bad Request', TAKEN));
+    expect(serverMessage(conflict)).toBe(TAKEN);
+  });
+
+  it("the shape it used to send is still unreadable, which is why it changed", () => {
+    // {"error": "..."} — no `message` key at all.
+    const oldShape = apiError(400, JSON.stringify({ error: TAKEN }));
+    expect(serverMessage(oldShape)).toBeNull();
+  });
+
+  it('so the admin screen now shows the reason instead of a generic failure', () => {
+    const conflict = apiError(400, envelope(400, 'Bad Request', TAKEN));
+    expect(technicalMessage(conflict)).toBe(TAKEN);
+    expect(technicalMessage(apiError(400, JSON.stringify({ error: TAKEN })))).toBe(
+      'Cererea a eșuat (cod 400).',
+    );
+  });
+});

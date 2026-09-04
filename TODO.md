@@ -31,15 +31,13 @@ unless its status says otherwise.
 
 ---
 
-## Still open — 19 of 81
+## Still open — 16 of 81
 
 The whole of what is left, in one place. Everything not listed here is `[DONE]`.
 
 - **TODO-17** `[POSTPONED]` — All other AI ideas *(F)*
-- **TODO-76** `[ ]` — `AdminController` answers in three shapes, none of them the app's *(A)*
 - **TODO-72** `[ ]` — Installed phones need a rebuild, and the Maps key needs revoking *(G)*
 - **TODO-74** `[ ]` — `DataLoader` seeds every test context, and no test asks it to *(J)*
-- **TODO-73** `[ ]` — `AccessRequestsPage` paints with tokens that do not exist *(J)*
 - **TODO-55** `[ ]` — The bundle budget measures the mock build, not the deployed one *(G)*
 - **TODO-60** `[ ]` — Mantine's full stylesheet ships for four components *(J)*
 - **TODO-61** `[ ]` — The legacy `brand-*` ramp has no dark values *(J)*
@@ -48,7 +46,6 @@ The whole of what is left, in one place. Everything not listed here is `[DONE]`.
 - **TODO-65** `[ ]` — `web/`'s dependencies were declared but never installed *(J)*
 - **TODO-66** `[ ]` — The map tiles stay light in dark mode *(J)*
 - **TODO-67** `[ ]` — Confirm the map's cold-load fix against a live tile server *(J)*
-- **TODO-70** `[ ]` — Orders created before the numbering fix are still `#0` *(J)*
 - **TODO-77** `[ ]` — Two confirmation dialogs, with different accessibility *(J)*
 - **TODO-78** `[ ]` — `.nvmrc` exists now but nothing tells a new contributor *(J)*
 - **TODO-79** `[ ]` — The "GCP deployment" still depends on a DigitalOcean bucket *(G)*
@@ -139,13 +136,13 @@ full text lives further down.
 | TODO-67 | **`[ ]`** | J | Confirm the map's cold-load fix against a live tile server |
 | TODO-68 | `[DONE]` | G | This machine cannot run the backend suite or the hygiene guards |
 | TODO-69 | `[DONE]` | J | Three bugs only a live backend could show |
-| TODO-70 | **`[ ]`** | J | Orders created before the numbering fix are still `#0` |
+| TODO-70 | `[DONE]` | J | Orders created before the numbering fix are still `#0` |
 | TODO-71 | `[DONE]` | G | A second deploy target exists in `infra/` and is wired to nothing |
 | TODO-72 | **`[ ]`** | G | Installed phones need a rebuild, and the Maps key needs revoking |
-| TODO-73 | **`[ ]`** | J | `AccessRequestsPage` paints with tokens that do not exist |
+| TODO-73 | `[DONE]` | J | `AccessRequestsPage` paints with tokens that do not exist |
 | TODO-74 | **`[ ]`** | J | `DataLoader` seeds every test context, and no test asks it to |
 | TODO-75 | `[DONE]` | G | The web bundle falls back to the dead droplet, over plain HTTP |
-| TODO-76 | **`[ ]`** | A | `AdminController` answers in three shapes, none of them the app's |
+| TODO-76 | `[DONE]` | A | `AdminController` answers in three shapes, none of them the app's |
 | TODO-77 | **`[ ]`** | J | Two confirmation dialogs, with different accessibility |
 | TODO-78 | **`[ ]`** | J | `.nvmrc` exists now but nothing tells a new contributor |
 | TODO-79 | **`[ ]`** | G | The "GCP deployment" still depends on a DigitalOcean bucket |
@@ -704,7 +701,7 @@ absence of a write is the kind of thing that gets "fixed" back.
 
 Verified: `typecheck` clean, `lint` clean (0 errors), **498 tests passing**.
 
-### TODO-76 `[ ]` `AdminController` answers in three shapes, none of them the app's
+### TODO-76 `[DONE]` `AdminController` answers in three shapes, none of them the app's
 Found while doing TODO-56, adding session endpoints next to the existing ones.
 `GlobalExceptionHandler.body()` builds one envelope for the whole API —
 `{timestamp, status, error, message}` — and `AdminController` predates it and
@@ -736,6 +733,52 @@ unaffected. What it does touch is the web client: `remove()` in
 `web/src/api/live/employees.ts` carries a comment pinning the
 200-with-`{message}` answer, and `create()` would want a test proving the
 duplicate-username message now reaches the toast.
+
+
+**Done — the whole controller answers in `GlobalExceptionHandler`'s envelope,
+and the decision was the first option this item offered.**
+
+The service was already throwing the right types. The controller was catching
+them and flattening them, which is why the fix is mostly deletion:
+
+| Method | Was | Now |
+|---|---|---|
+| `createEmployee` | `catch (RuntimeException)` → `400 {"error": …}` | throws; handler answers `400` with `message` |
+| `getEmployeeById` | bare `404`, no body | `ResourceNotFoundException` → `404` with `message` |
+| `updateEmployee` | bare `404`, no body | same |
+| `deleteEmployee` | `200 {"message": "Employee deleted successfully"}` | `204`, no body |
+| `createRole` | both old shapes in one method | throws; `400` with `message` |
+
+**`catch (RuntimeException)` was wider than this item said.** It also catches
+`IllegalStateException`, which the last-admin guards throw and which is meant to
+be a **409** — so anything of theirs reaching `createEmployee` would have been
+downgraded to a 400 in the wrong shape. Nothing throws it there today, which is
+exactly why an over-broad catch is easy to leave alone. `AdminControllerTest`
+pins that a 409 stays a 409.
+
+**Two messages were English**, in an app whose user-facing strings are Romanian
+— and they matter more now that the screen shows them verbatim:
+`"Username already exists: X"` → `"Există deja un angajat cu numele de
+utilizator „X”."`, and the role equivalent. **The mock was changed to the same
+sentence**, word for word: the mock is what development and most tests see, so
+one that phrases the same refusal differently makes mock mode a worse rehearsal
+of live than it appears to be.
+
+**Tests, on both sides of the seam, because this bug lives between them:**
+
+- `ControllerTests/AdminControllerTest` — **10 new cases**, the first
+  `AdminControllerTest` there has been. A `@WebMvcTest` slice is the right level
+  and a limited one: `@ControllerAdvice` IS picked up so the envelope under test
+  is the real one, but `SecurityConfig` is not, so it says nothing about who may
+  call these — `AuthorizationMatrixTest` already covers that.
+- `web/src/api/__tests__/serverMessage.test.ts` — 3 new cases holding **both**
+  shapes: the new envelope reaches the toast, and the old `{"error": …}` still
+  returns `null`. Keeping the old one is the point — it looks like a perfectly
+  reasonable error body, and that is why it went unnoticed.
+
+Two existing assertions in `LastAdminGuardTest` expected `200` from the delete
+and now expect `204`. Full backend suite: **335 passed** (was 320). Web: **514**
+(was 510).
 
 ---
 
@@ -4156,7 +4199,7 @@ errors; a client created; an order created and rendered as **#33** with the date
 picked from the calendar. Backend **302 tests**; web typecheck, lint, build and
 **458 tests** green (the one failure is TODO-64's known `/comenzi` timeout).
 
-### TODO-70 `[ ]` Orders created before the numbering fix are still `#0`
+### TODO-70 `[DONE]` Orders created before the numbering fix are still `#0`
 TODO-69 numbers orders from now on. It does not touch rows that already exist,
 so any database written before it has orders whose `number` is 0 — they all
 render as "#0" on Comenzi and sort arbitrarily under
@@ -4168,6 +4211,42 @@ already done. If any database is worth keeping by the time this is read, it
 needs a one-off `UPDATE orders SET number = id WHERE number = 0` — and there is
 no migration tool in this repo (`ddl-auto=update`, see *Known gaps*), so decide
 where such a statement is supposed to live before writing it.
+
+
+**Done — the statement lives in code, which is the question this item actually
+asked.** TODO-70 did not ask for the `UPDATE`; it asked *where such a statement
+is supposed to live* in a repo with no migration tool. The options were a
+documented manual `UPDATE` per environment, or something that runs itself.
+
+`OrderNumberBackfill` (a `CommandLineRunner` in `bootstrap/`) runs
+`backfillMissingOrderNumbers()` at every boot:
+
+```sql
+UPDATE Order o SET o.number = o.id WHERE o.number = 0
+```
+
+**Why at boot rather than in the runbook.** A manual statement has to be
+remembered, per environment, by whoever happens to deploy — and a developer's
+local H2 file would never receive it, so "#0" would keep reappearing on laptops
+long after production was clean. `WHERE number = 0` makes it idempotent, so it
+is a no-op on a healthy database and cannot renumber anything; it logs only when
+it actually changed rows, so a normal boot stays quiet.
+
+**It restates OrderService's rule rather than inventing one.** New orders get
+`number = id` there; these get `number = id` here. The comment on the repository
+method says the two move together.
+
+`DataLoader` gained `@Order(0)` and the backfill `@Order(100)`. An unannotated
+`CommandLineRunner` sits at `LOWEST_PRECEDENCE`, so without that the ordering
+between two runners writing the same database was undefined — which does not
+matter today (DataLoader seeds no orders) and would matter silently the moment
+someone seeds one.
+
+`OrderNumberBackfillTest` — **5 cases**, `@DataJpaTest` against the real schema:
+that a repository-saved order really does start at 0 (the premise; if it ever
+fails, this whole thing can go), that zeroes become their own id, that a
+numbered row is left alone, that a mixed table gets only its zeroes fixed, and
+that a second run reports 0 changes.
 
 ### TODO-66 `[ ]` The map tiles stay light in dark mode
 Found during a browser pass over every screen in both themes. `MAP_STYLE_URL`
@@ -4250,7 +4329,7 @@ it should not ride along with an unrelated change.
 
 *Found while doing TODO-31.*
 
-### TODO-73 `[ ]` `AccessRequestsPage` paints with tokens that do not exist
+### TODO-73 `[DONE]` `AccessRequestsPage` paints with tokens that do not exist
 `web/src/features/admin/AccessRequestsPage.tsx` uses `text-content` and
 `text-content-muted` in four places. Neither is defined — `src/index.css` has no
 `--content` variable and no `@theme` entry for one — so the classes compile to
@@ -4267,6 +4346,37 @@ lists the surfaces the UI rebuild stopped short on, and this is plausibly a
 fifth.
 
 *Found while auditing every screen at phone width for TODO-33.*
+
+
+**Done — four tokens substituted, and a test so the class of bug cannot recur
+silently.** `text-content` → `text-ink`, `text-content-muted` → `text-ink-muted`.
+That was the whole fix, and it took a minute; the rest of this is about why it
+survived a full two-theme browser pass in the first place.
+
+A wrong colour token is **not a crash, not a type error and not a lint error**.
+Tailwind simply emits no rule for `text-content`, the element inherits whatever
+is above it, and here the inherited colour happened to be close enough that the
+page looked right. Nothing in the toolchain had an opinion.
+
+So `components/ui/__tests__/colorTokensExist.test.ts` now parses `index.css`'s
+`@theme inline` block — which is the actual list of legal colour names, since a
+`--color-*` entry is what makes `text-ink` a real utility — and fails on any
+`text|bg|border|ring-*` in `src/` that names something else. Verified both ways:
+it passes on the fixed tree, and reintroducing `text-content` on one line fails
+it with that file named.
+
+Two things it needs by hand, both deliberate:
+
+- **An allowlist of Tailwind's own non-colour utilities** under the same
+  prefixes — `text-sm`, `text-center`, `border-t`, `bg-cover`, `ring-inset` and
+  ~40 more. Having to edit that list is the point: it is the moment someone
+  notices they are adding a colour outside the token system.
+- **Five MapLibre property names** (`text-field`, `text-size`, `text-color`,
+  `text-font`, `text-allow-overlap`) which appear as string keys in the map
+  style. Excluding the map files instead would have blinded the check to the
+  real classes those files also contain.
+
+This was indeed a fifth surface for TODO-58's list, as this item guessed.
 
 ---
 

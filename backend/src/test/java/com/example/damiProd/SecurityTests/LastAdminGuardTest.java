@@ -160,7 +160,8 @@ class LastAdminGuardTest {
 
         mockMvc.perform(delete("/api/admin/employees/" + second.getId())
                         .header("Authorization", "Bearer " + adminToken))
-                .andExpect(status().isOk());
+                // 204 since TODO-76: a successful delete has no body.
+                .andExpect(status().isNoContent());
 
         assertThat(employeeRepository.countByRoleName("ADMIN")).isEqualTo(1);
     }
@@ -175,7 +176,8 @@ class LastAdminGuardTest {
 
         mockMvc.perform(delete("/api/admin/employees/" + driver.getId())
                         .header("Authorization", "Bearer " + adminToken))
-                .andExpect(status().isOk());
+                // 204 since TODO-76: a successful delete has no body.
+                .andExpect(status().isNoContent());
     }
 
     /**

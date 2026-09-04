@@ -83,7 +83,8 @@ public class AdminService {
     public EmployeeResponse createEmployee(CreateEmployeeRequest request) {
         // Check if username already exists
         if (employeeRepository.findByUsername(request.getUsername()).isPresent()) {
-            throw new IllegalArgumentException("Username already exists: " + request.getUsername());
+            throw new IllegalArgumentException(
+                    "Există deja un angajat cu numele de utilizator „" + request.getUsername() + "”.");
         }
 
         // No password: nothing logs in with credentials any more. This creates
@@ -319,7 +320,7 @@ public class AdminService {
     public String createRole(String roleName) {
         String upperRoleName = roleName.toUpperCase();
         if (employeeRoleRepository.findByRoleName(upperRoleName).isPresent()) {
-            throw new IllegalArgumentException("Role already exists: " + upperRoleName);
+            throw new IllegalArgumentException("Rolul „" + upperRoleName + "” există deja.");
         }
         EmployeeRole role = new EmployeeRole(upperRoleName);
         return employeeRoleRepository.save(role).getRoleName();

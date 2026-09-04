@@ -51,17 +51,17 @@ function RequestCard({ request }: { request: AccessRequest }) {
     <li className="rounded-lg border border-border bg-surface p-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <p className="font-medium text-content">{request.fullName}</p>
-          <p className="mt-0.5 text-sm text-content-muted">
+          <p className="font-medium text-ink">{request.fullName}</p>
+          <p className="mt-0.5 text-sm text-ink-muted">
             {request.deviceLabel ?? 'Dispozitiv necunoscut'}
           </p>
         </div>
 
         <div className="text-right">
-          <p className="font-mono text-3xl tracking-[0.2em] text-content">
+          <p className="font-mono text-3xl tracking-[0.2em] text-ink">
             {request.verificationCode}
           </p>
-          <p className="mt-1 text-xs text-content-muted">
+          <p className="mt-1 text-xs text-ink-muted">
             {decided ? 'Aprobat — se așteaptă dispozitivul' : `Expiră în ${countdown ?? '0:00'}`}
           </p>
         </div>

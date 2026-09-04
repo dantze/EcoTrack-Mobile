@@ -8,6 +8,7 @@ import com.example.damiProd.repository.ProductRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -20,7 +21,12 @@ import org.springframework.transaction.annotation.Transactional;
  * EnrollmentService - and every account after that exists because that admin
  * approved a device.
  */
+// Seeding runs FIRST. Without an explicit order a CommandLineRunner sits at
+// LOWEST_PRECEDENCE, so the ordering between this and OrderNumberBackfill
+// (TODO-70) would be undefined - and two runners writing the same database in
+// an undefined order is a bug waiting for someone to seed an order here.
 @Component
+@Order(0)
 public class DataLoader implements CommandLineRunner {
 
         private static final Logger log = LoggerFactory.getLogger(DataLoader.class);

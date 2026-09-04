@@ -4,6 +4,7 @@ import com.example.damiProd.config.EmployeePrincipal;
 import com.example.damiProd.dto.CreateEmployeeRequest;
 import com.example.damiProd.dto.EmployeeResponse;
 import com.example.damiProd.dto.SessionResponse;
+import com.example.damiProd.exception.ResourceNotFoundException;
 import com.example.damiProd.service.AdminService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -26,6 +27,11 @@ import java.util.Map;
 @RequestMapping("/api/admin")
 public class AdminController {
 
+    // Same wording AdminService already uses for this row (see its own lookup
+    // at AdminService:303), so the API does not describe one missing employee
+    // two ways.
+    private static final String EMPLOYEE_NOT_FOUND = "Angajatul nu a fost găsit";
+
     private final AdminService adminService;
 
     public AdminController(AdminService adminService) {
@@ -42,14 +48,30 @@ public class AdminController {
         return ResponseEntity.ok(adminService.getAllEmployees());
     }
 
+    // ─── One error shape, GlobalExceptionHandler's (TODO-76) ────────────────
+    //
+    // These four used to hand-roll three different answers between them: a
+    // bare 404 with no body, a 200 carrying an English {"message": ...} nobody
+    // read, and a 400 {"error": ...} with no `message` key at all. The rest of
+    // the API has ONE envelope - {timestamp, status, error, message} - built by
+    // GlobalExceptionHandler.
+    //
+    // It stopped being cosmetic when the web app began surfacing the server's
+    // own Romanian text (TODO-51): `serverMessage` reads `.message`, so
+    // createEmployee's {"error": ...} returned null and "this username is
+    // taken" - the one message that method exists to produce - was replaced by
+    // a generic fallback.
+    //
+    // So they throw now, and the handler answers. The service already threw the
+    // right types; the controller was catching them and flattening them.
+
     /**
      * GET /api/admin/employees/{id} - Get specific employee
      */
     @GetMapping("/employees/{id}")
     public ResponseEntity<?> getEmployeeById(@PathVariable Long id) {
-        return adminService.getEmployeeById(id)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+        return ResponseEntity.ok(adminService.getEmployeeById(id)
+                .orElseThrow(() -> new ResourceNotFoundException(EMPLOYEE_NOT_FOUND)));
     }
 
     /**
@@ -57,12 +79,12 @@ public class AdminController {
      */
     @PostMapping("/employees")
     public ResponseEntity<?> createEmployee(@RequestBody CreateEmployeeRequest request) {
-        try {
-            EmployeeResponse created = adminService.createEmployee(request);
-            return ResponseEntity.status(HttpStatus.CREATED).body(created);
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
-        }
+        // No try/catch. It used to catch RuntimeException, which is wider than
+        // it looks: the last-admin guards throw IllegalStateException and are
+        // meant to be 409s, so anything of theirs reaching this method would
+        // have been downgraded to a 400 with the wrong shape.
+        EmployeeResponse created = adminService.createEmployee(request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(created);
     }
 
     /**
@@ -70,20 +92,23 @@ public class AdminController {
      */
     @PutMapping("/employees/{id}")
     public ResponseEntity<?> updateEmployee(@PathVariable Long id, @RequestBody CreateEmployeeRequest request) {
-        return adminService.updateEmployee(id, request)
-                .map(ResponseEntity::ok)
-                .orElse(ResponseEntity.notFound().build());
+        return ResponseEntity.ok(adminService.updateEmployee(id, request)
+                .orElseThrow(() -> new ResourceNotFoundException(EMPLOYEE_NOT_FOUND)));
     }
 
     /**
      * DELETE /api/admin/employees/{id} - Delete employee
+     *
+     * <p>204, not a 200 carrying "Employee deleted successfully": nothing read
+     * that string, it was English in an app whose user-facing text is Romanian,
+     * and a delete has no body worth sending.
      */
     @DeleteMapping("/employees/{id}")
-    public ResponseEntity<?> deleteEmployee(@PathVariable Long id) {
-        if (adminService.deleteEmployee(id)) {
-            return ResponseEntity.ok(Map.of("message", "Employee deleted successfully"));
+    public ResponseEntity<Void> deleteEmployee(@PathVariable Long id) {
+        if (!adminService.deleteEmployee(id)) {
+            throw new ResourceNotFoundException(EMPLOYEE_NOT_FOUND);
         }
-        return ResponseEntity.notFound().build();
+        return ResponseEntity.noContent().build();
     }
 
     // ==================== SESSION ENDPOINTS (TODO-56) ====================
@@ -157,17 +182,15 @@ public class AdminController {
     /**
      * POST /api/admin/roles - Create new role
      */
+    // Same treatment as the employee endpoints above (TODO-76): this had both
+    // of the old shapes in one method.
     @PostMapping("/roles")
     public ResponseEntity<?> createRole(@RequestBody Map<String, String> request) {
         String roleName = request.get("roleName");
-        if (roleName == null || roleName.isEmpty()) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Role name is required"));
+        if (roleName == null || roleName.isBlank()) {
+            throw new IllegalArgumentException("Numele rolului este obligatoriu.");
         }
-        try {
-            String created = adminService.createRole(roleName);
-            return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("roleName", created));
-        } catch (RuntimeException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
-        }
+        String created = adminService.createRole(roleName);
+        return ResponseEntity.status(HttpStatus.CREATED).body(Map.of("roleName", created));
     }
 }

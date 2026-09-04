@@ -93,7 +93,10 @@ export const employeesApi: EmployeesApi = {
   },
 
   async remove(id: number): Promise<void> {
-    // Answers 200 with {message}, not 204 — request() tolerates both.
+    // 204 with no body since TODO-76. It used to answer 200 with an English
+    // {"message": "Employee deleted successfully"} that nothing read; this
+    // comment survives because `request()` tolerates both, so the change is
+    // invisible from here and would otherwise look like it never happened.
     await request<void>(`/admin/employees/${id}`, { method: 'DELETE' });
   },
 

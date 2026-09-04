@@ -827,7 +827,14 @@ const employeesApi: EcoTrackApi['employees'] = {
   create: (input: CreateEmployeeInput) =>
     respond(() => {
       if (db.employees.some((e) => e.username === input.username)) {
-        throw new MockApiError(`Username already exists: ${input.username}`, 400);
+        // Word for word what AdminService throws (TODO-76). The screen shows
+        // the server's own sentence now, so a mock that phrases the same
+        // refusal differently — in English, as this did — makes mock mode a
+        // worse rehearsal of live than it looks.
+        throw new MockApiError(
+          `Există deja un angajat cu numele de utilizator „${input.username}”.`,
+          400,
+        );
       }
       const employee: Employee = {
         id: nextId('employee'),

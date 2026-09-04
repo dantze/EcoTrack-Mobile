@@ -3,6 +3,7 @@ package com.example.damiProd.repository;
 import com.example.damiProd.domain.IgienizareOrder;
 import com.example.damiProd.domain.Order;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -108,4 +109,24 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     int sumRidicareQuantityByClientLocationAndProduct(@Param("clientId") Long clientId,
                                                       @Param("coords") String coords,
                                                       @Param("productName") String productName);
+
+    // ─── Backfill for orders written before numbering existed (TODO-70) ─────
+    //
+    // `number` is a primitive long, so every order created before TODO-69 was
+    // saved as 0. They all render as "#0" on Comenzi and make
+    // findLiveBySubscriptionId's `ORDER BY o.number ASC` an ordering over a
+    // column of zeroes.
+    //
+    // `number = id` is not a choice made here — it is the SAME rule
+    // OrderService applies to every new order, restated for the rows that
+    // predate it. If that rule ever changes, this has to change with it.
+    //
+    // `WHERE o.number = 0` is what makes it idempotent and therefore safe to
+    // run on every boot: rows that already have a number are not touched, and
+    // a second run matches nothing.
+    @Modifying(clearAutomatically = true, flushAutomatically = true)
+    @Query("UPDATE Order o SET o.number = o.id WHERE o.number = 0")
+    int backfillMissingOrderNumbers();
+
+    long countByNumber(long number);
 }

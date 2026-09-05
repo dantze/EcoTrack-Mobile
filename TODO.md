@@ -27,23 +27,21 @@ unless its status says otherwise.
 **Status legend:** `[ ]` not started · `[~]` in progress · `[DONE]` done ·
 `[POSTPONED]` deliberately deferred · `[?]` needs a decision first
 
-**Next free ID: TODO-87.** (Highest used is TODO-86.)
+**Next free ID: TODO-88.** (Highest used is TODO-87.)
 
 ---
 
-## Still open — 9 of 86
+## Still open — 7 of 87
 
 The whole of what is left, in one place. Everything not listed here is `[DONE]`.
 
 - **TODO-17** `[POSTPONED]` — All other AI ideas *(F)*
-- **TODO-55** `[ ]` — The bundle budget measures the mock build, not the deployed one *(G)*
-- **TODO-65** `[ ]` — `web/`'s dependencies were declared but never installed *(J)*
-- **TODO-78** `[ ]` — `.nvmrc` exists now but nothing tells a new contributor *(J)*
 - **TODO-79** `[ ]` — The "GCP deployment" still depends on a DigitalOcean bucket *(G)*
 - **TODO-80** `[ ]` — Paying for a warm instance to run two cron jobs *(G)*
 - **TODO-81** `[ ]` — Both nightly jobs run on EVERY Cloud Run instance *(G)*
 - **TODO-82** `[ ]` — Two Mantine providers are mounted and neither is ever used *(G)*
 - **TODO-83** `[ ]` — `Button`'s default variant is `secondary`, and one screen relied on it by accident *(G)*
+- **TODO-87** `[ ]` — The bundle ceiling still describes headroom over a build CI no longer makes *(G)*
 
 **Done, but flagged by whoever did it** — not open, but not finished-and-forgotten
 either:
@@ -114,7 +112,7 @@ full text lives further down.
 | TODO-52 | `[DONE]` | C | The batch order-status endpoint in TODO-43 needs TODO-42's guard |
 | TODO-53 | `[DONE]` | A | `CredentialRow.username` in the web mock is write-only |
 | TODO-54 | `[DONE]` | G | The live production build still ships the mock seed database |
-| TODO-55 | **`[ ]`** | G | The bundle budget measures the mock build, not the deployed one |
+| TODO-55 | `[DONE]` | G | The bundle budget measures the mock build, not the deployed one |
 | TODO-56 | `[DONE]` | A | An admin cannot revoke another employee's session |
 | TODO-57 | `[DONE]` | D | Produse has no "what is still using it" dialog |
 | TODO-58 | `[DONE]` | J | The UI rebuild stopped short on four surfaces |
@@ -124,7 +122,7 @@ full text lives further down.
 | TODO-62 | `[DONE]` | J | `PageHeader` and `CommandBar` are two components for one job |
 | TODO-63 | `[DONE]` | J | The dispatch board is still drag-and-drop only |
 | TODO-64 | `[DONE]` | J | Two `/comenzi` tests time out under the full web suite |
-| TODO-65 | **`[ ]`** | J | `web/`'s dependencies were declared but never installed |
+| TODO-65 | `[DONE]` | J | `web/`'s dependencies were declared but never installed |
 | TODO-66 | `[DONE]` | J | The map tiles stay light in dark mode |
 | TODO-67 | `[DONE]` | J | Confirm the map's cold-load fix against a live tile server |
 | TODO-68 | `[DONE]` | G | This machine cannot run the backend suite or the hygiene guards |
@@ -137,7 +135,7 @@ full text lives further down.
 | TODO-75 | `[DONE]` | G | The web bundle falls back to the dead droplet, over plain HTTP |
 | TODO-76 | `[DONE]` | A | `AdminController` answers in three shapes, none of them the app's |
 | TODO-77 | `[DONE]` | J | Two confirmation dialogs, with different accessibility |
-| TODO-78 | **`[ ]`** | J | `.nvmrc` exists now but nothing tells a new contributor |
+| TODO-78 | `[DONE]` | J | `.nvmrc` exists now but nothing tells a new contributor |
 | TODO-79 | **`[ ]`** | G | The "GCP deployment" still depends on a DigitalOcean bucket |
 | TODO-80 | **`[ ]`** | G | Paying for a warm instance to run two cron jobs |
 | TODO-81 | **`[ ]`** | G | Both nightly jobs run on EVERY Cloud Run instance |
@@ -146,6 +144,7 @@ full text lives further down.
 | TODO-84 | `[DONE]` | H | The office signpost sends staff to the backend, not the web app |
 | TODO-85 | `[DONE]` | H | Cleartext HTTP is enabled app-wide, for a backend that is HTTPS-only |
 | TODO-86 | `[DONE]` | G | `python3` is gone again, so the hygiene guards ran nowhere for TODO-72/74 |
+| TODO-87 | **`[ ]`** | G | The bundle ceiling still describes headroom over a build CI no longer makes |
 
 ---
 
@@ -2709,7 +2708,7 @@ someone "fixes" it again** — the import being unconditional is not the problem
 and never was.
 
 
-### TODO-55 `[ ]` The bundle budget measures the mock build, not the deployed one
+### TODO-55 `[DONE]` The bundle budget measures the mock build, not the deployed one
 Same investigation. `ci-web.yml` runs `npm run build` with no `VITE_DATA_MODE`,
 which `src/lib/config.ts` defaults to `'mock'` — so the number the budget gates
 on is mock mode's. `web/Dockerfile` builds `VITE_DATA_MODE=live`, which is the
@@ -2734,6 +2733,45 @@ budget was just tightened to 260 kB — so the headroom the comment in
 `bundle_budget.py` describes is measured against the wrong build. Adding
 `VITE_DATA_MODE=live` to `ci-web.yml`'s build step is still the cheap fix, and
 it is now worth doing rather than merely worth recording.
+
+**Done — `VITE_DATA_MODE: live` on `ci-web.yml`'s Build step, and the gap was
+exactly what TODO-59 measured.**
+
+Both builds run here, on the same tree, with the real script rather than an
+estimate:
+
+| Build | Eager gzip |
+|---|---|
+| default (what CI used to gate) | **247.7 kB** |
+| `VITE_DATA_MODE=live` (what Vercel serves) | **239.1 kB** |
+
+8.6 kB, all of it the seeded mock store that `"sideEffects"` lets Rollup drop.
+The difference lands entirely in the app chunk — 127.0 → 118.3 kB — while
+`mantine`, `query`, `radix` and `react` are byte-identical, which is the shape
+you would expect if the only thing changing is which branch of `src/api/index.ts`
+survives.
+
+**`VITE_API_BASE_URL` deliberately left unset, and that is measured too.** A live
+build with an absolute Cloud Run URL comes to 239.1 kB; with the `/api` fallback,
+239.0 kB. One inlined string, 0.1 kB — no signal. Setting it would put a
+plausible-looking production URL in a workflow for nothing, and a fake URL in CI
+is something a reader can later mistake for the real one.
+
+**One premise of this item is out of date and the note in `ci-web.yml` says so.**
+It framed the fix as making CI's number "comparable to what the Dockerfile
+produces". Since TODO-71 the Dockerfile is not what users download — it builds
+the LOCAL compose stack. The artefact users download is Vercel's, and Terraform
+writes `VITE_DATA_MODE=live` into that project, so live is the right target for
+the reason the item gives even though the file it names is no longer the
+reference.
+
+**The ceiling was NOT moved, on purpose.** 260 kB was written as "~5% headroom
+over 247.8"; against 239.1 it is ~8.7%. Re-tightening toward 250 in the same
+change would mean a later red build could not be attributed to the measurement
+or the limit — and this repo has twice recorded that folding an unrelated
+adjustment into a diff hides it (TODO-73, TODO-75). The comment in
+`bundle_budget.py` now states what it measures, what that number is, and that
+the headroom grew; the decision to re-tighten is **TODO-87**.
 
 ---
 
@@ -3325,6 +3363,7 @@ requires on every developer machine.
 **Done — reinstalled, not rewritten, and the first real run immediately found a
 bug in one of the guards.**
 
+
 `winget install Python.Python.3.12 --scope user` landed 3.12.10 at
 `%LOCALAPPDATA%\Programs\Python\Python312\python.exe`. All six guards run here
 again:
@@ -3364,6 +3403,35 @@ Fixed by skipping dot-directories in that scan, with the reasoning in a comment.
 Confirmed it was pre-existing rather than newly introduced by running the script
 against a `git archive` of HEAD, where it passes — the archive contains only
 tracked files, which is exactly why CI never saw it.
+
+### TODO-87 `[ ]` The bundle ceiling still describes headroom over a build CI no longer makes
+Created by TODO-55, which changed what `bundle_budget.py` is pointed at without
+changing what it allows.
+
+`BUDGET_GZIP_KB = 260.0` was chosen as "~5% headroom over the current 247.8 kB",
+and 247.8 was the **mock** build. `ci-web.yml` now builds live, so the same tree
+measures 239.1 kB and the ceiling sits ~8.7% above it. Nothing is broken and the
+gate still catches drift; the limit is simply looser in effect than the number it
+was set to express, and the comment beside it now says so rather than pretending
+otherwise.
+
+Deliberately not folded into TODO-55: moving the measurement and the limit in one
+commit means a later red build cannot be attributed to either — the same argument
+TODO-73 and TODO-75 both make about unrelated fixes riding along.
+
+**Deciding it needs** a choice between three. Re-tighten to ~250 kB, restoring the
+~5% the ceiling was written to express — cheap, and the honest reading of the
+original intent. Leave 260 and rewrite the comment to justify 8.7% on its own
+terms, which is defensible only if the eager set is expected to grow, and after
+TODO-60 there is no queued Mantine or Radix reduction left to spend it on. Or
+make the budget a ratchet — store the last measured number, fail on any increase
+past a small delta — which is where most projects end up and is more machinery
+than this repo has wanted so far.
+
+Whichever it is, do it in a commit that changes only the number, so the first red
+build afterwards is unambiguous.
+
+*Found while doing TODO-55.*
 
 ## H. Mobile
 
@@ -4392,7 +4460,7 @@ dialog was `aria-hidden` to a screen reader while visually on top.
 `useConfirm` is only ever imported from `@/components/ui`, and that no
 feature-local `useConfirm.tsx` exists.
 
-### TODO-78 `[ ]` `.nvmrc` exists now but nothing tells a new contributor
+### TODO-78 `[DONE]` `.nvmrc` exists now but nothing tells a new contributor
 Found while closing TODO-48. The repo root has a `.nvmrc` pinning Node 22, and
 every workflow reads it via `node-version-file`, so CI and a developer using
 `nvm use` cannot drift apart any more. Nothing *says* so: `README.md` is one
@@ -4404,6 +4472,13 @@ is verified on both 22 and 24 — so this is a papercut, not a trap. It overlaps
 TODO-65, which asks the same question about `npm ci` after the UI rebuild:
 **both are really "README.md should have a setup section"**, and neither is
 worth a commit alone. Decide them together.
+
+**Done, together with TODO-65 as this item asked.** `README.md` has a
+*Prerequisites* table naming Node 22 and pointing at `.nvmrc` as where the number
+lives, plus the sentence that makes it matter: CI reads the same file through
+`node-version-file`, so `nvm use` and CI cannot drift, and anything else is on
+the contributor to match. See TODO-65 for what else went in and why the two were
+closed in one pass.
 
 ### TODO-60 `[DONE]` Mantine's full stylesheet ships for four components
 `src/index.css` imports `@mantine/core/styles.css` (plus dates, notifications,
@@ -4852,7 +4927,7 @@ it renders on `ready`, so pins without a legend would be the real regression.
 
 Confirmed in both themes (TODO-66 landed in the same pass).
 
-### TODO-65 `[ ]` `web/`'s dependencies were declared but never installed
+### TODO-65 `[DONE]` `web/`'s dependencies were declared but never installed
 Found when the UI work would not typecheck: `lucide-react`, `@mantine/*`,
 `class-variance-authority` and the rest of the rebuild's packages were in
 `package.json` **and** in `package-lock.json`, but `web/node_modules` did not
@@ -4864,6 +4939,35 @@ Nothing is wrong in the repo; this is a note for the next person who clones or
 pulls the rebuild and finds every import red. Worth deciding whether it earns a
 line in `README.md` next to the other setup steps, since the same trap is one
 `git pull` away for anyone who had `web/node_modules` from before the rebuild.
+
+**Done — it earns a line, and the decision was easy once someone opened
+`README.md`: there were no "other setup steps" to sit next to.** The file was
+one line, `# ecotrack`. So the question was never "does this deserve a bullet",
+it was "does this repo have a README", and the answer was no.
+
+**Closed together with TODO-78, because that item says to.** TODO-78 is the same
+question about `.nvmrc` and it ends "both are really *README.md should have a
+setup section*, and neither is worth a commit alone. Decide them together." That
+is the recorded instruction for how to resolve this one, so following it is not
+scope creep — and writing a setup section while deliberately omitting the Node
+version would have been the odd choice.
+
+`README.md` now has: what the three projects are and that there is **no
+workspace tool**, a prerequisites table (Node 22 from `.nvmrc`, Java 21, Python 3
+for the hygiene guards, Docker optional), per-project setup, how to run each
+piece, how to run the tests, and how anyone gets a first session given there is
+no password login. It points at `CLAUDE.md`, `DEPLOYMENT.md` and this file for
+everything else rather than restating them — a second copy of the architecture
+is a second thing to go stale.
+
+The `npm ci` trap gets its own paragraph and its own explanation of the
+*symptom*, which is the part worth writing down: every command fails identically
+with `Cannot find module`, which reads like a broken checkout rather than a
+missing install. That is why it cost time the first time.
+
+Note `README.md` is not covered by `doc_claims.py`, which path-checks `CLAUDE.md`
+and the skills only. Nothing mechanical will catch it going stale — the commands
+in it were each run while writing it.
 
 ### TODO-74 `[DONE]` `DataLoader` seeds every test context, and no test asks it to
 Found while doing TODO-31, which had to establish what was actually in a test

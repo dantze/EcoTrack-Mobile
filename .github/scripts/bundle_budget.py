@@ -87,12 +87,22 @@ STATIC_IMPORT_RE = re.compile(
 # kB gzip, with `DateInput` now its own chunk shared by the seven screens that
 # actually use it.
 #
-# 260 kB is ~5% headroom over the current 247.8 kB. The ceiling is deliberately
-# tighter than the old one because the thing it now guards against is narrower:
-# a re-introduced eager import, not the whole rebuild's floor. It is NOT an
-# invitation to drift — TODO-60 (per-component Mantine CSS) is the next lever.
-# Raise it deliberately, in a commit that says what grew and why — never to
-# make a red build green.
+# **What this is now measured against changed, without the ceiling moving**
+# (TODO-55). ci-web.yml used to build with no VITE_DATA_MODE, which config.ts
+# defaults to 'mock' — so the gated number was a bundle nobody is served. It now
+# builds live, like Vercel does, and the same tree measures **239.1 kB** instead
+# of 247.8: `"sideEffects"` lets Rollup shake the seeded mock store out of a
+# live build, and that is 8.6 kB of it.
+#
+# So 260 kB is ~8.7% headroom over 239.1, not the ~5% over 247.8 it was written
+# to be. The ceiling was left alone on purpose: moving the measurement and the
+# limit in one change means a later red build cannot be attributed to either.
+# Whether to re-tighten it toward ~250 is TODO-87.
+#
+# The ceiling is deliberately tighter than the old 280 because the thing it now
+# guards against is narrower: a re-introduced eager import, not the whole
+# rebuild's floor. It is NOT an invitation to drift. Raise it deliberately, in a
+# commit that says what grew and why — never to make a red build green.
 BUDGET_GZIP_KB = 260.0
 
 

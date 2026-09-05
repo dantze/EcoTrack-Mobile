@@ -68,7 +68,27 @@ jobs:
       - name: Test
         run: npm run test:run
 
+      # LIVE mode, because that is the artefact users download (TODO-55).
+      #
+      # `src/lib/config.ts` defaults VITE_DATA_MODE to 'mock', so this step used
+      # to build — and the budget below used to gate — a bundle nobody is served.
+      # Vercel builds live: Terraform writes VITE_DATA_MODE=live into the
+      # project. The two differ by 8.6 kB gzip because `"sideEffects"` lets
+      # Rollup shake the seeded mock store out of a live build (TODO-54/59), so
+      # the gate was reading 247.7 kB where the deployed bundle is 239.1.
+      #
+      # It erred high, which is the safe side — but it could invert silently: a
+      # mock-only dependency inflates a number nobody ships, and a live-only one
+      # escapes the budget entirely. The second is the one that matters.
+      #
+      # VITE_API_BASE_URL is deliberately NOT set. Measured both ways: an
+      # absolute Cloud Run URL versus the `/api` fallback moves the total by
+      # 0.1 kB, which is one inlined string. Setting it would mean writing a
+      # plausible-looking production URL into CI for no signal, and a fake URL
+      # in a workflow is something a reader can mistake for the real one.
       - name: Build
+        env:
+          VITE_DATA_MODE: live
         run: npm run build
 
       # Bundle size only ever drifts upward, one innocent import at a time.

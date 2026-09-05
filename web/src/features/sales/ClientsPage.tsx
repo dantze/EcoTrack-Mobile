@@ -24,6 +24,7 @@ import {
   DataTable,
   EmptyState,
   Select,
+  useConfirm,
   type Column,
   type SelectOption,
 } from '@/components/ui';
@@ -37,7 +38,6 @@ import { matchesClient } from './components/ClientPicker';
 import { ErrorNotice, FilterBar, FilterField, SearchInput } from './components/FilterBar';
 import { OrderFormDrawer } from './components/OrderFormDrawer';
 import { errorMessage, toast } from './components/Toaster';
-import { useConfirm } from './components/useConfirm';
 import { useCheckClientHasOrders, useClients, useDeleteClient, useOrders } from './queries';
 
 const KIND_OPTIONS: SelectOption<string>[] = [
@@ -60,7 +60,7 @@ export function ClientsPage() {
   const ordersQuery = useOrders();
   const deleteClient = useDeleteClient();
   const checkHasOrders = useCheckClientHasOrders();
-  const { confirm, confirmDialog } = useConfirm();
+  const confirm = useConfirm();
 
   const [search, setSearch] = useState('');
   const [kindFilter, setKindFilter] = useState('');
@@ -413,7 +413,6 @@ export function ClientsPage() {
         />
       )}
 
-      {confirmDialog}
     </Workbench>
   );
 }

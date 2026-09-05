@@ -23,13 +23,33 @@ export function styleValue<T>(value: unknown): T {
 }
 
 /**
- * OpenFreeMap's hosted "liberty" style: free vector tiles, no API key, no
- * signup, no billing surprise. The production path once external dependencies
- * matter (an outage on tiles.openfreemap.org, or "zero third parties") is
- * self-hosted Protomaps `.pmtiles` behind our own CDN — that swap is this one
- * constant, nothing else in this module changes.
+ * OpenFreeMap's hosted styles: free vector tiles, no API key, no signup, no
+ * billing surprise. The production path once external dependencies matter (an
+ * outage on tiles.openfreemap.org, or "zero third parties") is self-hosted
+ * Protomaps `.pmtiles` behind our own CDN — that swap is these two constants,
+ * nothing else in this module changes.
+ *
+ * **The basemap follows the app theme (TODO-66).** It used to be `liberty` in
+ * both, so dark mode put a bright white-and-green sheet inside an otherwise
+ * dark app — made worse, not better, by the overlay sweep that moved the legend
+ * and hover card onto `bg-surface/95`: a dark card floating on a light map.
+ *
+ * The alternative was to keep it light on purpose, and it is a real argument —
+ * a light basemap is easier to read outdoors, and the pin colours were picked
+ * against white. It loses: this is a dispatcher's desk screen far more often
+ * than a phone in daylight, and every other surface in the app already honours
+ * the choice the user made. `dark` is OpenFreeMap's own variant, a near-black
+ * ground (`rgb(12,12,12)`) with the same layer vocabulary as `liberty`, so the
+ * overlay layers below need no per-theme variants of their own.
  */
-export const MAP_STYLE_URL = 'https://tiles.openfreemap.org/styles/liberty';
+export const MAP_STYLE_URLS = {
+  light: 'https://tiles.openfreemap.org/styles/liberty',
+  dark: 'https://tiles.openfreemap.org/styles/dark',
+} as const;
+
+export function mapStyleUrl(scheme: 'light' | 'dark'): string {
+  return MAP_STYLE_URLS[scheme];
+}
 
 export const SOURCE_POINTS = 'ecotrack-points';
 export const SOURCE_HEAT = 'ecotrack-points-heat';
@@ -175,15 +195,30 @@ export function heatmapLayer(): AddLayerObject {
   });
 }
 
-/** Wide, low-contrast line under the colour so overlapping routes stay separable. */
-export function routeCasingLayer(): AddLayerObject {
+/**
+ * Wide, low-contrast line under the colour so overlapping routes stay
+ * separable.
+ *
+ * **"Low-contrast" is relative to the ground, so this follows the theme
+ * (TODO-66).** White is a quiet separator on the light basemap and the loudest
+ * thing on screen against the dark one's `rgb(12,12,12)` — several routes
+ * sharing a corridor merged into one bright rope, with the colours that
+ * identify them reduced to a thin core. Near-black restores the intent: it
+ * still breaks an overlapping line where one crosses another, without
+ * competing with the line it exists to support.
+ *
+ * The point and cluster strokes below stay white in both themes on purpose —
+ * their job is the opposite one, making a small mark pop off the ground, and
+ * white does that in both.
+ */
+export function routeCasingLayer(scheme: 'light' | 'dark'): AddLayerObject {
   return styleValue({
     id: LAYER_ROUTE_CASING,
     type: 'line',
     source: SOURCE_ROUTES,
     layout: { 'line-cap': 'round', 'line-join': 'round' },
     paint: {
-      'line-color': '#ffffff',
+      'line-color': scheme === 'dark' ? '#05070a' : '#ffffff',
       'line-width': ['interpolate', ['linear'], ['zoom'], 6, 4.5, 14, 8],
       'line-opacity': 0.85,
     },

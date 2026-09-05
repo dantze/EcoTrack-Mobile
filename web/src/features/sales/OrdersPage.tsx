@@ -43,6 +43,7 @@ import {
   Select,
   Skeleton,
   Tabs,
+  useConfirm,
   type Column,
   type RowKey,
   type SelectOption,
@@ -61,7 +62,6 @@ import { ErrorNotice, FilterBar, FilterField, SearchInput } from './components/F
 import { OrderDetailPane } from './components/OrderDetailDrawer';
 import { OrderFormDrawer } from './components/OrderFormDrawer';
 import { errorMessage, toast } from './components/Toaster';
-import { useConfirm } from './components/useConfirm';
 import {
   filterOrders,
   hasActiveFilters,
@@ -100,7 +100,7 @@ export function OrdersPage() {
   const ordersQuery = useOrders();
   const clientsQuery = useClients();
   const deleteOrders = useDeleteOrders();
-  const { confirm, confirmDialog } = useConfirm();
+  const confirm = useConfirm();
 
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState('');
@@ -561,7 +561,6 @@ export function OrdersPage() {
         <OrderFormDrawer key="create" onClose={() => setDrawer({ kind: 'none' })} />
       )}
 
-      {confirmDialog}
     </Workbench>
   );
 }

@@ -15,6 +15,7 @@ import {
   DataTable,
   EmptyState,
   TextInput,
+  useConfirm,
   type Column,
 } from '@/components/ui';
 import { formatMoney } from '@/components/domain';
@@ -23,7 +24,6 @@ import { includesFolded } from '@/lib/search';
 import { ErrorNotice, SearchInput } from './components/FilterBar';
 import { ProductUsageModal } from './components/ProductUsageModal';
 import { errorMessage, toast } from './components/Toaster';
-import { useConfirm } from './components/useConfirm';
 import {
   useCheckProductUsage,
   useCreateProduct,
@@ -88,7 +88,7 @@ export function ProductsPage() {
   const createProduct = useCreateProduct();
   const updateProduct = useUpdateProduct();
   const deleteProduct = useDeleteProduct();
-  const { confirm, confirmDialog } = useConfirm();
+  const confirm = useConfirm();
   const checkUsage = useCheckProductUsage();
   const navigate = useNavigate();
 
@@ -446,7 +446,6 @@ export function ProductsPage() {
         />
       )}
 
-      {confirmDialog}
     </Workbench>
   );
 }

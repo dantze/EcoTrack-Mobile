@@ -23,6 +23,7 @@ import { AttributionControl, Map as MapLibreMap, type GeoJSONSource } from 'mapl
 import 'maplibre-gl/dist/maplibre-gl.css';
 import './mapCanvas.css';
 import { Button, cx, EmptyState } from '@/components/ui';
+import { useTheme } from '@/theme/ThemeProvider';
 import { DEFAULT_VIEW, type MapBounds, type MapPoint, type MapRouteLine } from '../types';
 import {
   pointsToFeatureCollection,
@@ -39,7 +40,7 @@ import {
   LAYER_HEATMAP,
   LAYER_POINT,
   LAYER_STOP_CIRCLE,
-  MAP_STYLE_URL,
+  mapStyleUrl,
   ROUTE_LAYERS,
   SOURCE_HEAT,
   SOURCE_POINTS,
@@ -151,6 +152,21 @@ export function MapCanvas({
   const [failed, setFailed] = useState(false);
   /** Bumped by the retry button to tear the map down and build a fresh one. */
   const [retryKey, setRetryKey] = useState(0);
+
+  /**
+   * The basemap follows the app theme (TODO-66), and swapping it rebuilds the
+   * map — `map.setStyle` drops every custom source and layer, so re-adding them
+   * would mean a second copy of the setup below that could drift from it.
+   * Rebuilding reuses the one that exists.
+   */
+  const { scheme } = useTheme();
+
+  /**
+   * Where the camera was when the map was last torn down, so a rebuild can put
+   * it back. Written on every `moveend` rather than read at teardown, because
+   * by then the map is already going.
+   */
+  const cameraRef = useRef<{ longitude: number; latitude: number; zoom: number } | null>(null);
   const [hover, setHover] = useState<{ point: PointProperties; x: number; y: number } | null>(null);
 
   // The map is created once; interaction handlers registered at that point
@@ -186,9 +202,16 @@ export function MapCanvas({
 
     const map = new MapLibreMap({
       container,
-      style: MAP_STYLE_URL,
-      center: [DEFAULT_VIEW.longitude, DEFAULT_VIEW.latitude],
-      zoom: DEFAULT_VIEW.zoom,
+      style: mapStyleUrl(scheme),
+      // The camera survives a rebuild (TODO-66). A theme change swaps the
+      // basemap by re-running this effect, and landing the dispatcher back on
+      // Bucharest every time they toggle dark mode would be worse than the
+      // light map was. `cameraRef` is null on a genuine first mount and on the
+      // retry button's rebuild after a failure, where the default is right.
+      center: cameraRef.current
+        ? [cameraRef.current.longitude, cameraRef.current.latitude]
+        : [DEFAULT_VIEW.longitude, DEFAULT_VIEW.latitude],
+      zoom: cameraRef.current ? cameraRef.current.zoom : DEFAULT_VIEW.zoom,
       attributionControl: false,
       dragRotate: false,
       pitchWithRotate: false,
@@ -211,6 +234,15 @@ export function MapCanvas({
     map.addControl(new AttributionControl({ compact: false }), 'bottom-right');
 
     const subscriptions: { unsubscribe: () => void }[] = [];
+
+    // Remember where the camera is, so a rebuild (a theme swap, TODO-66) can
+    // put it back instead of jumping to the country view.
+    subscriptions.push(
+      map.on('moveend', () => {
+        const center = map.getCenter();
+        cameraRef.current = { longitude: center.lng, latitude: center.lat, zoom: map.getZoom() };
+      }),
+    );
 
     // The only path to the failure screen. Generous, because it now has to be
     // certain: a cold vector-tile cache over a slow connection can legitimately
@@ -260,7 +292,7 @@ export function MapCanvas({
       // Bottom to top: density under everything, routes under the markers
       // that sit on them, clusters/points/selection ring on top.
       map.addLayer(heatmapLayer());
-      map.addLayer(routeCasingLayer());
+      map.addLayer(routeCasingLayer(scheme));
       map.addLayer(routeLineLayer());
       map.addLayer(stopCircleLayer());
       map.addLayer(stopLabelLayer());
@@ -355,12 +387,18 @@ export function MapCanvas({
       map.remove();
       mapRef.current = null;
     };
-    // Mount + explicit retry only. Every PROP change is pushed onto the live
-    // map instead of re-running this effect (see the file header); `retryKey`
-    // is the one thing that rebuilds it, and it reuses the teardown above
-    // rather than needing a page reload.
+    // Mount, explicit retry, and a theme change — nothing else. Every PROP
+    // change is pushed onto the live map instead of re-running this effect
+    // (see the file header).
+    //
+    // `scheme` is here because the basemap follows the app theme (TODO-66) and
+    // there is no cheap way to swap it: `map.setStyle` discards every custom
+    // source and layer, so honouring it in place would mean a second copy of
+    // the setup above, free to drift from it. A rebuild reuses the one that
+    // exists, and `cameraRef` keeps the view. Toggling the theme is rare;
+    // filtering the map is not, and that path is untouched.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [retryKey]);
+  }, [retryKey, scheme]);
 
   // ── Colour, independent of the source: a `setPaintProperty` swap, not a rebuild. ──
   useEffect(() => {

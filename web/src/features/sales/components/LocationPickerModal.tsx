@@ -36,7 +36,8 @@ import '@/features/map/components/mapCanvas.css';
 import { Button, Modal, SearchIcon, Spinner, TextInput, cx } from '@/components/ui';
 import { parseCoordinates, type LatLng } from '@/types/domain';
 import { DEFAULT_VIEW } from '@/features/map/types';
-import { MAP_STYLE_URL } from '@/features/map/components/mapStyle';
+import { mapStyleUrl } from '@/features/map/components/mapStyle';
+import { useTheme } from '@/theme/ThemeProvider';
 import {
   MIN_QUERY_LENGTH,
   formatPickedCoordinates,
@@ -170,6 +171,7 @@ function PickerBody({
 
   const initialPoint = useMemo(() => parseCoordinates(value.coordinates), [value.coordinates]);
 
+  const { scheme } = useTheme();
   const [point, setPoint] = useState<LatLng | null>(initialPoint);
   const [address, setAddress] = useState(value.address);
   const [dragging, setDragging] = useState(false);
@@ -199,7 +201,10 @@ function PickerBody({
     const start = initialPoint ?? { lat: DEFAULT_VIEW.latitude, lng: DEFAULT_VIEW.longitude };
     const map = new MapLibreMap({
       container,
-      style: MAP_STYLE_URL,
+      // Same basemap as /harta, same reason (TODO-66). The picker is a modal
+      // that remounts per open, so reading the theme at mount is enough — there
+      // is no live map to swap under a toggle.
+      style: mapStyleUrl(scheme),
       center: [start.lng, start.lat],
       zoom: initialPoint ? PICK_ZOOM : DEFAULT_VIEW.zoom,
       attributionControl: false,

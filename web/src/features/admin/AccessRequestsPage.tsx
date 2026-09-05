@@ -83,7 +83,15 @@ function RequestCard({ request }: { request: AccessRequest }) {
             className="w-44"
           />
 
+          {/*
+            Explicitly primary. `Button` defaults to `secondary`, and this is
+            the one action the screen exists for — approving a device — sitting
+            next to a ghost "Respinge". Without the variant it rendered as a
+            quiet bordered button, indistinguishable in weight from the reject
+            beside it.
+          */}
           <Button
+            variant="primary"
             disabled={busy}
             onClick={() =>
               approve.mutate(

@@ -27,11 +27,11 @@ unless its status says otherwise.
 **Status legend:** `[ ]` not started · `[~]` in progress · `[DONE]` done ·
 `[POSTPONED]` deliberately deferred · `[?]` needs a decision first
 
-**Next free ID: TODO-83.** (Highest used is TODO-82.)
+**Next free ID: TODO-84.** (Highest used is TODO-83.)
 
 ---
 
-## Still open — 14 of 82
+## Still open — 11 of 83
 
 The whole of what is left, in one place. Everything not listed here is `[DONE]`.
 
@@ -39,16 +39,13 @@ The whole of what is left, in one place. Everything not listed here is `[DONE]`.
 - **TODO-72** `[ ]` — Installed phones need a rebuild, and the Maps key needs revoking *(G)*
 - **TODO-74** `[ ]` — `DataLoader` seeds every test context, and no test asks it to *(J)*
 - **TODO-55** `[ ]` — The bundle budget measures the mock build, not the deployed one *(G)*
-- **TODO-63** `[ ]` — The dispatch board is still drag-and-drop only *(J)*
 - **TODO-65** `[ ]` — `web/`'s dependencies were declared but never installed *(J)*
-- **TODO-66** `[ ]` — The map tiles stay light in dark mode *(J)*
-- **TODO-67** `[ ]` — Confirm the map's cold-load fix against a live tile server *(J)*
-- **TODO-77** `[ ]` — Two confirmation dialogs, with different accessibility *(J)*
 - **TODO-78** `[ ]` — `.nvmrc` exists now but nothing tells a new contributor *(J)*
 - **TODO-79** `[ ]` — The "GCP deployment" still depends on a DigitalOcean bucket *(G)*
 - **TODO-80** `[ ]` — Paying for a warm instance to run two cron jobs *(G)*
 - **TODO-81** `[ ]` — Both nightly jobs run on EVERY Cloud Run instance *(G)*
 - **TODO-82** `[ ]` — Two Mantine providers are mounted and neither is ever used *(G)*
+- **TODO-83** `[ ]` — `Button`'s default variant is `secondary`, and one screen relied on it by accident *(G)*
 
 **Done, but flagged by whoever did it** — not open, but not finished-and-forgotten
 either:
@@ -127,11 +124,11 @@ full text lives further down.
 | TODO-60 | `[DONE]` | J | Mantine's full stylesheet ships for four components |
 | TODO-61 | `[DONE]` | J | The legacy `brand-*` ramp has no dark values |
 | TODO-62 | `[DONE]` | J | `PageHeader` and `CommandBar` are two components for one job |
-| TODO-63 | **`[ ]`** | J | The dispatch board is still drag-and-drop only |
+| TODO-63 | `[DONE]` | J | The dispatch board is still drag-and-drop only |
 | TODO-64 | `[DONE]` | J | Two `/comenzi` tests time out under the full web suite |
 | TODO-65 | **`[ ]`** | J | `web/`'s dependencies were declared but never installed |
-| TODO-66 | **`[ ]`** | J | The map tiles stay light in dark mode |
-| TODO-67 | **`[ ]`** | J | Confirm the map's cold-load fix against a live tile server |
+| TODO-66 | `[DONE]` | J | The map tiles stay light in dark mode |
+| TODO-67 | `[DONE]` | J | Confirm the map's cold-load fix against a live tile server |
 | TODO-68 | `[DONE]` | G | This machine cannot run the backend suite or the hygiene guards |
 | TODO-69 | `[DONE]` | J | Three bugs only a live backend could show |
 | TODO-70 | `[DONE]` | J | Orders created before the numbering fix are still `#0` |
@@ -141,12 +138,13 @@ full text lives further down.
 | TODO-74 | **`[ ]`** | J | `DataLoader` seeds every test context, and no test asks it to |
 | TODO-75 | `[DONE]` | G | The web bundle falls back to the dead droplet, over plain HTTP |
 | TODO-76 | `[DONE]` | A | `AdminController` answers in three shapes, none of them the app's |
-| TODO-77 | **`[ ]`** | J | Two confirmation dialogs, with different accessibility |
+| TODO-77 | `[DONE]` | J | Two confirmation dialogs, with different accessibility |
 | TODO-78 | **`[ ]`** | J | `.nvmrc` exists now but nothing tells a new contributor |
 | TODO-79 | **`[ ]`** | G | The "GCP deployment" still depends on a DigitalOcean bucket |
 | TODO-80 | **`[ ]`** | G | Paying for a warm instance to run two cron jobs |
 | TODO-81 | **`[ ]`** | G | Both nightly jobs run on EVERY Cloud Run instance |
 | TODO-82 | **`[ ]`** | G | Two Mantine providers are mounted and neither is ever used |
+| TODO-83 | **`[ ]`** | G | `Button`'s default variant is `secondary`, and one screen relied on it by accident |
 
 ---
 
@@ -3200,6 +3198,33 @@ consolidating the app's TWO confirm implementations, and whoever does that
 should decide there whether Mantine's modals are a third candidate or a dead
 end — then deleting both providers and the three CSS imports together.
 
+### TODO-83 `[ ]` `Button`'s default variant is `secondary`, and one screen relied on it by accident
+Found during a browser pass over every screen (the same one that closed TODO-66
+and TODO-67). `AccessRequestsPage`'s **Aprobă** — the one action that screen
+exists for, approving a device's access — was rendered with no `variant` prop.
+`Button` defaults to `secondary`, so it drew as a quiet bordered button
+immediately next to a ghost **Respinge**: the approve and the reject had the
+same visual weight, and neither read as the primary action.
+
+**Fixed there** — it is `variant="primary"` now, and the comment at the call site
+says why. What is left open is the general question.
+
+A default of `secondary` is defensible (most buttons in a dense app are
+secondary, and `Button` is used far more often for toolbar actions than for a
+screen's one primary action) and it is also silently wrong the one time it
+matters. Every other screen passes `variant="primary"` explicitly, so this was
+the single place the default leaked into a primary action — which is exactly the
+profile of a default that is right 40 times and invisible the 41st.
+
+**Deciding it needs** a choice between three: leave the default and accept that
+review catches it; make `variant` required in `ButtonExtraProps`, which is a
+change to a frozen contract and touches every call site; or add a lint/test rule
+that flags a `Button` with no `variant` outside a toolbar. The third is closest
+to how this repo guards its other invisible mistakes — see
+`colorTokensExist.test.ts` — but "is this a primary action" is not something a
+scan can answer, so it would have to be cruder: flag any variant-less Button and
+require an explicit `variant="secondary"` where that is the intent.
+
 ## H. Mobile
 
 *The Expo app: what it can do, and what it should stop doing.*
@@ -4021,7 +4046,7 @@ the mock seed is really being dropped from the `VITE_DATA_MODE=live` build
 (measured 155 kB vs 153 kB, which is suspiciously little — see TODO-54).
 
 
-### TODO-77 `[ ]` Two confirmation dialogs, with different accessibility
+### TODO-77 `[DONE]` Two confirmation dialogs, with different accessibility
 Found while adding the unsaved-changes guard (TODO-58). The app has **two**
 promise-based confirms:
 
@@ -4049,6 +4074,29 @@ have made the accessibility fix unreviewable.
 (it can — nothing there needs a locally-rendered node), then deleting
 `features/sales/components/useConfirm.tsx` and its `Modal` styling. One commit,
 one screen to re-test.
+
+
+**Done — the kit's is the only one, and this item undercounted the callers by
+three.** TODO-77 named `ClientsPage`. The compiler found four the moment the
+local file was deleted: `ClientsPage`, `OrdersPage`, `ProductsPage` and
+`SubscriptionsPage`. That undercount is worth recording, because it is how a
+second implementation survives — it looked like one screen's local convenience.
+
+The migration was mechanical: `ConfirmOptions` is the same type on both sides,
+so every call site's options object passed through untouched. What changed per
+file is the import, `const { confirm, confirmDialog } = useConfirm()` →
+`const confirm = useConfirm()`, and dropping the `{confirmDialog}` node from the
+JSX — the kit's host is always mounted, so callers no longer render anything.
+
+**The accessibility difference was reachable in practice, not theoretical.**
+`ClientsPage`'s delete confirm is raised from the detail pane, and below `lg`
+that pane is a Sheet — so on a phone the confirm opened inside an overlay,
+which is exactly the case TODO-58's fix handles and the local one did not: the
+dialog was `aria-hidden` to a screen reader while visually on top.
+
+`components/ui/__tests__/confirmIsShared.test.ts` pins both halves: that
+`useConfirm` is only ever imported from `@/components/ui`, and that no
+feature-local `useConfirm.tsx` exists.
 
 ### TODO-78 `[ ]` `.nvmrc` exists now but nothing tells a new contributor
 Found while closing TODO-48. The repo root has a `.nvmrc` pinning Node 22, and
@@ -4209,7 +4257,7 @@ prop is how the second implementation grows back.
 and that `actions` lands on the title row rather than dropping to the ribbon.
 No bundle cost: the unused export tree-shakes away, 247.8 → 247.7 kB.
 
-### TODO-63 `[ ]` The dispatch board is still drag-and-drop only
+### TODO-63 `[DONE]` The dispatch board is still drag-and-drop only
 `RoutesPage` moves a task onto a route by dragging (`@dnd-kit`), and below `lg`
 its three columns are now tabs — which means the drag source and the drop target
 are frequently not on screen at the same time. There is a "Mută" button per
@@ -4221,6 +4269,30 @@ board's central action is unreachable. The fix is a per-task menu in the queue
 with "Trimite pe ruta…", reusing `RoutePickerModal`, which the stops column
 already does. Not done in the rebuild because the board's drag wiring was left
 untouched on purpose and this adds a second write path through it.
+
+
+**Done — the queue has a "Trimite" button per task, opening the same
+`RoutePickerModal` the stops column already uses.**
+
+The picker's state grew a `from` field, and it is not decoration: a task already
+ON a route is being MOVED, so the route it sits on is excluded — "move it to
+where it already is" is not an option. A task from the queue is being SENT
+somewhere for the first time, and the currently selected route is usually the
+destination, so excluding it would remove the best answer. Same modal, two
+titles, two exclusion rules, one write path (`useReassignTasks`).
+
+**The button is visible by default and hover-revealed only from `lg`**, which is
+deliberately unlike the "Mută" button on a route stop. `group-hover` never fires
+on a touch screen, and `opacity-0` still accepts taps — so copying that
+treatment would have left a phone with an invisible button exactly where this
+item says a phone needs a visible one.
+
+`features/technical/__tests__/poolAssignment.test.tsx` (3 cases) covers the path
+end to end against the mock API: every queued task offers the action, it opens
+the picker with the selected route still offered, and choosing a route moves the
+task out of the queue. Worth noting why there was no test here before — a drag
+cannot be exercised in jsdom at all, so the only path that existed was the only
+path no test could reach.
 
 ### TODO-64 `[DONE]` Two `/comenzi` tests time out under the full web suite
 Found while doing the map work, and **not caused by it** — verified by stashing
@@ -4368,7 +4440,7 @@ fails, this whole thing can go), that zeroes become their own id, that a
 numbered row is left alone, that a mixed table gets only its zeroes fixed, and
 that a second run reports 0 changes.
 
-### TODO-66 `[ ]` The map tiles stay light in dark mode
+### TODO-66 `[DONE]` The map tiles stay light in dark mode
 Found during a browser pass over every screen in both themes. `MAP_STYLE_URL`
 points at one OpenFreeMap style, so in dark mode a bright white-and-green map
 sits inside an otherwise dark app, framed by dark chrome. The overlays on top of
@@ -4383,7 +4455,55 @@ easier to read outdoors and the pin colours were picked against it — and a
 re-check of every pin, route line and heatmap ramp against the darker ground.
 `MapCanvas` already rebuilds on `retryKey`, so switching styles has a hook.
 
-### TODO-67 `[ ]` Confirm the map's cold-load fix against a live tile server
+
+**Done — the basemap follows the app theme.** `MAP_STYLE_URL` became
+`MAP_STYLE_URLS = { light: liberty, dark: dark }` plus a `mapStyleUrl(scheme)`
+helper, and both maps use it: `/harta` and the order location picker.
+
+**The decision this item asked for: it follows the theme rather than staying
+light.** The argument for staying light is real — a light basemap is easier to
+read outdoors and the pin colours were picked against white — and it loses on
+two counts. This is a dispatcher's desk screen far more often than a phone in
+daylight, and every other surface in the app already honours the user's choice;
+a single bright sheet in the middle is the outlier, which is exactly why the
+overlay sweep made it more obvious rather than less.
+
+`dark` is OpenFreeMap's own variant — checked before wiring it, not assumed: it
+answers 200 with a real 47-layer style on a `rgb(12,12,12)` ground and shares
+`liberty`'s layer vocabulary, so none of the overlay layers needed per-theme
+variants.
+
+**Swapping the style rebuilds the map, and that is the considered choice.**
+`map.setStyle` discards every custom source and layer, so honouring the theme in
+place would mean a second copy of the `load` handler's setup, free to drift from
+it. The rebuild reuses the one that exists. The cost — losing the camera — is
+paid off by a `cameraRef` written on every `moveend` and read as the initial
+centre/zoom, so a toggle keeps the dispatcher where they were instead of
+returning them to the country view. A first mount and the retry button both find
+that ref null and get `DEFAULT_VIEW`, which is right for both.
+
+Toggling the theme is rare; filtering the map is not, and that path is untouched
+— every prop change still goes to the live map via `setData` / `setPaintProperty`.
+
+**The re-check this item asked for was done in a browser, not reasoned about**,
+and it found one thing. `routeCasingLayer` painted its casing `#ffffff`, and its
+own doc-comment calls that a "wide, LOW-CONTRAST line under the colour so
+overlapping routes stay separable". White is low-contrast on the light basemap
+and the loudest thing on screen against `rgb(12,12,12)`: several routes sharing
+a corridor merged into one bright rope with their identifying colours reduced to
+a thin core. The casing follows the theme now — near-black in dark — and the
+same diagonal that read as pale cream reads as its actual orange.
+
+The point and cluster strokes stay white in both themes on purpose: their job is
+the opposite one, making a small mark pop off the ground, and white does that
+against either. The heatmap ramp was checked and needs nothing — it runs from
+transparent through light blue to amber and red, so it reads as density on
+either ground.
+
+Also verified in the browser: the camera survives the swap (same view before and
+after toggling), and both themes fit the same bounds.
+
+### TODO-67 `[DONE]` Confirm the map's cold-load fix against a live tile server
 The bug is fixed and the mechanism is understood; what is missing is one look at
 it working.
 
@@ -4408,6 +4528,35 @@ was a blank canvas that proves nothing either way. It typechecks, lints and the
 suite is green. Someone should open `/harta` on a cold cache and confirm the pins
 are there *without* touching a filter — and ideally the same on a throttled
 connection, which is the case that produced the bug.
+
+
+**Done — confirmed in a browser, and on exactly the throttled connection this
+item names as the case that produced the bug.**
+
+`/harta` was opened cold against the live OpenFreeMap tile server, which was
+serving very slowly by that point (repeated reloads from one IP, the same thing
+that stopped the last attempt). The style, TileJSON and sprites answered 200
+within a second; the basemap and the layers took **30–40 seconds** to appear.
+
+That is the ideal test, not a spoiled one. The failure this fixed was precisely
+"the style settles later than `ready` flips, the guard fails once, and the update
+is dropped for good" — so a slow style is the condition that used to break it.
+
+What was observed, with no filter touched and no reload:
+
+- the stats rail said **120 comenzi · 336 unități · 20 rute** from the start;
+- the canvas eventually drew all of it — clusters (2, 4, 5, 10, 17, 7, 74),
+  route polylines, and the numbered stop badges;
+- the viewport **fitted itself to the data** rather than sitting on
+  `DEFAULT_VIEW`, which is the `bounds` effect landing through the same path.
+
+An intermediate state is worth recording because it looks alarming and is not:
+for the first ~20 seconds the map area is the style's background colour with no
+tiles, no pins and no legend. That is `ready` still false — the `load` event has
+not fired — and not the dropped-update bug. The legend appearing is the tell:
+it renders on `ready`, so pins without a legend would be the real regression.
+
+Confirmed in both themes (TODO-66 landed in the same pass).
 
 ### TODO-65 `[ ]` `web/`'s dependencies were declared but never installed
 Found when the UI work would not typecheck: `lucide-react`, `@mantine/*`,

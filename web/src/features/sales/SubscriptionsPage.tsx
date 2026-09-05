@@ -25,6 +25,7 @@ import {
   Select,
   TextArea,
   TextInput,
+  useConfirm,
   type Column,
   type SelectOption,
 } from '@/components/ui';
@@ -34,7 +35,6 @@ import { includesFolded } from '@/lib/search';
 import { ErrorNotice, SearchInput } from './components/FilterBar';
 import { Col, FormGrid, ToggleField } from './components/fields';
 import { errorMessage, toast } from './components/Toaster';
-import { useConfirm } from './components/useConfirm';
 import { SubscriptionUsageModal } from './components/SubscriptionUsageModal';
 import {
   useCheckSubscriptionUsage,
@@ -146,7 +146,7 @@ export function SubscriptionsPage() {
   const updateSubscription = useUpdateSubscription();
   const deleteSubscription = useDeleteSubscription();
   const moveSubscriptionOrders = useMoveSubscriptionOrders();
-  const { confirm, confirmDialog } = useConfirm();
+  const confirm = useConfirm();
 
   const checkUsage = useCheckSubscriptionUsage();
   const navigate = useNavigate();
@@ -613,7 +613,6 @@ export function SubscriptionsPage() {
         />
       )}
 
-      {confirmDialog}
     </Workbench>
   );
 }

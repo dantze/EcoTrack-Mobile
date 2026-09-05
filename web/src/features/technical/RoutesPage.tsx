@@ -149,7 +149,18 @@ function RoutesScreen() {
   // TODO-05: moving a stop off this route and onto another driver's route —
   // the cover-a-sick-day case. Route-level driver swap is the other half and
   // lives on the driver name in the routes table.
-  const [moveTargetTask, setMoveTargetTask] = useState<Task | null>(null);
+  /**
+   * The task the route picker is open for, and where it came from (TODO-63).
+   *
+   * `from` is not decoration. A task already ON a route is being MOVED, so the
+   * route it is on is excluded — "move it to where it already is" is not an
+   * option worth offering. A task from the unassigned queue is being SENT
+   * somewhere for the first time, and the currently selected route is the most
+   * likely destination, so excluding it would remove the best answer.
+   */
+  const [moveTarget, setMoveTarget] = useState<{ task: Task; from: 'route' | 'pool' } | null>(
+    null,
+  );
   const [draggedTask, setDraggedTask] = useState<Task | null>(null);
 
   // --- server state --------------------------------------------------------
@@ -756,7 +767,7 @@ function RoutesScreen() {
                                 className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 focus:opacity-100"
                                 onClick={(event) => {
                                   event.stopPropagation();
-                                  setMoveTargetTask(task);
+                                  setMoveTarget({ task, from: 'route' });
                                 }}
                               >
                                 Mută
@@ -815,6 +826,33 @@ function RoutesScreen() {
                         held={placement.isHeld(task.id)}
                         onToggleHold={selectedRoute ? () => placement.toggle(task) : undefined}
                       />
+                      {/*
+                        The queue's non-drag path (TODO-63). Dragging was the
+                        ONLY way to assign from here, which made the board's
+                        central action unreachable twice over: from the keyboard
+                        at any width, and on a phone at all — below `lg` the
+                        three columns are tabs, so the drag source and the drop
+                        target are rarely on screen together.
+
+                        Visible by default and hover-revealed only from `lg`,
+                        unlike the "Mută" button on a route stop. A
+                        `group-hover` affordance never appears on a touch screen,
+                        and `opacity-0` still accepts taps — so the hover-only
+                        treatment would have left a phone with an invisible
+                        button exactly where it needs a visible one.
+                      */}
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        aria-label={`Trimite pe rută: ${task.clientName ?? 'sarcină'}`}
+                        className="absolute top-1 right-1 opacity-100 focus-visible:opacity-100 lg:opacity-0 lg:group-hover:opacity-100"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          setMoveTarget({ task, from: 'pool' });
+                        }}
+                      >
+                        Trimite
+                      </Button>
                     </div>
                   ))}
                 </div>
@@ -879,29 +917,39 @@ function RoutesScreen() {
       />
 
       <RoutePickerModal
-        open={moveTargetTask !== null}
-        onClose={() => setMoveTargetTask(null)}
-        title="Mută sarcina pe altă rută"
+        open={moveTarget !== null}
+        onClose={() => setMoveTarget(null)}
+        title={
+          moveTarget?.from === 'pool' ? 'Trimite sarcina pe o rută' : 'Mută sarcina pe altă rută'
+        }
         subtitle={
-          moveTargetTask
-            ? `${moveTargetTask.clientName ?? 'Client necunoscut'} — ${moveTargetTask.address ?? 'fără adresă'}`
+          moveTarget
+            ? `${moveTarget.task.clientName ?? 'Client necunoscut'} — ${moveTarget.task.address ?? 'fără adresă'}`
             : undefined
         }
-        // Excluding the current route: "move it to where it already is" is not
-        // an option worth offering.
-        routes={routes.filter((route) => route.id !== selectedRouteId)}
+        // See the comment on `moveTarget`: only a task already on a route
+        // excludes the route it is on.
+        routes={
+          moveTarget?.from === 'pool'
+            ? routes
+            : routes.filter((route) => route.id !== selectedRouteId)
+        }
         isPending={routesQuery.isPending}
         error={routesQuery.error}
         busy={reassignTasks.isPending}
         onSelect={(route) => {
-          const task = moveTargetTask;
-          if (!task) return;
+          const target = moveTarget;
+          if (!target) return;
           reassignTasks.mutate(
-            { taskIds: [task.id], routeId: route.id },
+            { taskIds: [target.task.id], routeId: route.id },
             {
               onSuccess: () => {
-                toast.success(`Sarcina a fost mutată pe ${routeLabel(route)}.`);
-                setMoveTargetTask(null);
+                toast.success(
+                  target.from === 'pool'
+                    ? `Sarcina a fost trimisă pe ${routeLabel(route)}.`
+                    : `Sarcina a fost mutată pe ${routeLabel(route)}.`,
+                );
+                setMoveTarget(null);
               },
               onError: (error) => toast.error(errorMessage(error)),
             },

@@ -14,6 +14,13 @@ name: Deploy Mobile
 # runtimeVersion policy is "appVersion", so an OTA only reaches installs whose
 # expo.version matches. Bumping expo.version therefore fences off old installs
 # until they get a new build — which is the safe default, not a bug.
+#
+# EXPO_PUBLIC_* travels on the OTA path, which is easy to get backwards
+# (TODO-72). Those variables are inlined by the BUNDLER, not baked into the
+# native binary, and `eas update` runs the bundler — so an update DOES repoint
+# an installed app at a different backend. That is why the step below refuses
+# to ship without one, and why redirecting the field off the retired droplet
+# needs no store release.
 
 on:
   workflow_dispatch:
@@ -80,12 +87,57 @@ jobs:
 
       - run: npm ci
 
+      # EXPO_PUBLIC_* is inlined by the BUNDLER, and `eas update` bundles — so
+      # the value below is not merely this job's configuration, it is what every
+      # installed phone will call after the update lands. Unset, GitHub
+      # interpolates an empty string, constants/ApiConfig.ts falls back to
+      # localhost, and the OTA quietly bricks the fleet: a phone's localhost is
+      # the phone. Nothing downstream would fail — `eas update` succeeds, the
+      # job goes green, and the breakage shows up as drivers reporting the app
+      # "not loading".
+      #
+      # This is also the step that makes TODO-72's cutover possible in the first
+      # place: pointing the field at Cloud Run IS setting this variable and
+      # shipping an update, and it must not be possible to do half of that.
+      - name: Require a backend URL
+        env:
+          EXPO_PUBLIC_API_BASE_URL: ${{ vars.EXPO_PUBLIC_API_BASE_URL }}
+          EXPO_PUBLIC_WEB_APP_URL: ${{ vars.EXPO_PUBLIC_WEB_APP_URL }}
+        run: |
+          if [ -z "${EXPO_PUBLIC_API_BASE_URL// /}" ]; then
+            echo "::error::EXPO_PUBLIC_API_BASE_URL is not set (Settings → Secrets and variables → Actions → Variables)."
+            echo "Every shipped bundle inlines it. Without it the app calls http://localhost:8080/api,"
+            echo "which on a phone is the phone. Set it to Terraform's backend_api_base_url output + /api."
+            exit 1
+          fi
+          case "$EXPO_PUBLIC_API_BASE_URL" in
+            */api|*/api/) ;;
+            *) echo "::error::EXPO_PUBLIC_API_BASE_URL must end in /api — every path in services/http.ts is appended to it."
+               exit 1 ;;
+          esac
+          echo "Shipping against ${EXPO_PUBLIC_API_BASE_URL}"
+
+          # A WARNING, not an error, and the asymmetry is deliberate (TODO-84).
+          # No backend URL means nothing in the app works; no web-app URL means
+          # one signpost screen, seen only by office staff who are not supposed
+          # to be using this app, says it does not know the address instead of
+          # showing a button. Degraded, not broken — and failing the whole
+          # driver deploy over it would be the wrong trade. There is no
+          # fallback on purpose: the address used to be computed from the API
+          # base, which named the backend once the SPA moved to Vercel.
+          if [ -z "${EXPO_PUBLIC_WEB_APP_URL// /}" ]; then
+            echo "::warning::EXPO_PUBLIC_WEB_APP_URL is not set — app/office.tsx will tell office staff it does not know the web app's address. Set it to Terraform's frontend_url output."
+          else
+            echo "Office signpost points at ${EXPO_PUBLIC_WEB_APP_URL}"
+          fi
+
       # A push to main always takes the OTA path. The build paths are manual
       # only — they cost EAS build minutes and, for production, a store review.
       - name: Publish OTA update
         if: github.event_name == 'push' || inputs.action == 'update'
         env:
           EXPO_PUBLIC_API_BASE_URL: ${{ vars.EXPO_PUBLIC_API_BASE_URL }}
+          EXPO_PUBLIC_WEB_APP_URL: ${{ vars.EXPO_PUBLIC_WEB_APP_URL }}
           # Via env, never inlined into the run script: a commit message is
           # attacker-controllable text and `${{ }}` splices it in before the
           # shell ever sees it, which is a command-injection hole.
@@ -101,10 +153,12 @@ jobs:
         if: github.event_name == 'workflow_dispatch' && inputs.action == 'build-preview'
         env:
           EXPO_PUBLIC_API_BASE_URL: ${{ vars.EXPO_PUBLIC_API_BASE_URL }}
+          EXPO_PUBLIC_WEB_APP_URL: ${{ vars.EXPO_PUBLIC_WEB_APP_URL }}
         run: eas build --platform android --profile preview --non-interactive --no-wait
 
       - name: Build production app bundle
         if: github.event_name == 'workflow_dispatch' && inputs.action == 'build-production'
         env:
           EXPO_PUBLIC_API_BASE_URL: ${{ vars.EXPO_PUBLIC_API_BASE_URL }}
+          EXPO_PUBLIC_WEB_APP_URL: ${{ vars.EXPO_PUBLIC_WEB_APP_URL }}
         run: eas build --platform android --profile production --non-interactive --no-wait

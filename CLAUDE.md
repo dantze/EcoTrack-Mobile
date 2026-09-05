@@ -189,6 +189,15 @@ reports `kind: 'office'` rather than `kind: 'none'`, because 'none' drops the
 session and would loop a salesperson through an admin-approved enrollment on
 every launch to be told the same thing.
 
+**That signpost's address is configured, never derived** (TODO-84).
+`EXPO_PUBLIC_WEB_APP_URL` — Terraform's `frontend_url` — reaches it through
+`mobile/constants/WebAppConfig.ts`. It used to be `API_BASE_URL` with the `/api`
+suffix stripped, which was right while Caddy served both from one origin and
+names the Cloud Run **backend** now that the SPA is on Vercel. There is no
+fallback: unset, the screen says it does not know the address, because the only
+value that could be computed is the wrong one. A test asserts `office.tsx` never
+mentions `API_BASE_URL` again.
+
 **Both projects can get a session** (TODO-19). `web/` has
 `features/auth/EnrollmentPage.tsx`; `mobile/` has `app/enrollment.tsx` plus
 `services/EnrollmentService.ts`, and its password login is deleted. Token
@@ -359,11 +368,19 @@ in-memory H2, `create-drop`.
 tables are empty. It no longer seeds employees — the first enrolled device
 becomes the first ADMIN instead.
 
-**`DataLoader` runs under `test` too** — this file said it was disabled, and
-that was wrong (TODO-31 verified it: 4 roles and 11 products in every
-`@SpringBootTest` context). `spring.sql.init.mode=never` governs `schema.sql` /
-`data.sql`, not a `CommandLineRunner`, and `SpringBootContextLoader` runs the
-runners. Tests are written against the seeded catalogue, so it stays.
+**`DataLoader` is OFF under `test`** (TODO-74), via
+`ecotrack.bootstrap.seed-reference-data=false` in `application-test.properties`.
+It used to run there and this file twice got that wrong in both directions:
+`spring.sql.init.mode=never` governs `schema.sql` / `data.sql`, not a
+`CommandLineRunner`, and `SpringBootContextLoader` runs the runners — so every
+`@SpringBootTest` context really did start with 4 roles and 11 products in it.
+Nothing was leaning on them: **a test that needs a role find-or-creates it**,
+which is what `EnrollmentService.resolveRole` does in production too, and no
+`@SpringBootTest` touches the catalogue. So a `@SpringBootTest` database now
+starts empty, exactly like a `@DataJpaTest` one, and a row count means the same
+thing in both. `SuiteTests/DatabaseIsolationTest` asserts it;
+`BootstrapTests/DataLoaderTest` still covers the seeding itself by calling
+`run()` directly, and is unaffected by the property.
 
 **Every `@SpringBootTest` gets its own database** (TODO-31). The suite used to
 share one JVM-wide `jdbc:h2:mem:testdb`, and the classes that exercise the
@@ -695,26 +712,36 @@ Deliberate or unresolved; do not assume these are safe.
   Postgres. Nothing in the code references them. Drop them by hand if the dead
   columns bother you. **Do not resurrect the feature:** AI work is postponed
   (TODO-17) and the only sanctioned future use is autofill.
-- **Installed phones need a REBUILD, not an OTA update, to pick up TODO-33.**
-  It removed native modules (`react-native-maps`, ML Kit text recognition, the
-  calendar and draggable-list packages) and the Google Maps key from
-  `mobile/app.config.js`. `eas update` cannot ship a native change, so until
-  `deploy-mobile.yml` runs `build-production`, installed builds keep the old
-  binary — including its Sales and Technical screens, which still talk to a
-  backend that will happily serve an office role.
+- **Installed phones are one OTA behind, not one rebuild behind** (corrected by
+  TODO-72). TODO-33 deleted the Sales and Technical screens and TODO-71 retired
+  the droplet those phones call, and both of those ship over the air: screens
+  are JS, and `EXPO_PUBLIC_*` is inlined by the **bundler**, which `eas update`
+  runs. `expo.version` has not moved since before TODO-33 and `runtimeVersion`
+  is `appVersion`, so every install in the field is still in an update's range.
+  What an OTA genuinely cannot remove is native — the now-unused modules
+  (`react-native-maps`, ML Kit text recognition, the calendar and
+  draggable-list packages), the Maps key `app.config.js` used to write into the
+  manifest, and the Android cleartext-HTTP exemption (TODO-85) — and that is
+  dead weight rather than a fault. Until the update is shipped, an old install
+  still renders Sales and Technical against a backend that will happily serve an
+  office role. `DEPLOYMENT.md` has the ordered cutover; `deploy-mobile.yml`
+  refuses to ship at all while `EXPO_PUBLIC_API_BASE_URL` is unset, because an
+  OTA reaches the whole fleet and the fallback is `localhost`.
 - **The `individual.id_photo_url` COLUMN outlives the field that mapped it.**
   The Java side is gone (TODO-45) but `ddl-auto=update` never drops, so the
   column sits in H2 and in Postgres like the orphaned `intake_message` /
   `order_draft` tables above. Nothing reads or writes it. `DEPLOYMENT.md` has
   the `ALTER TABLE` and the bucket check to run first.
-- **Installed phones still call the retired droplet.** `EXPO_PUBLIC_*` is
-  inlined at build time, so every binary in the field carries the old
-  `http://146.190.224.202:8080/api` and cannot be redirected by an OTA. They
-  need `eas build` with `EXPO_PUBLIC_API_BASE_URL` set to the Cloud Run URL —
-  the same rebuild TODO-33 already required (TODO-72). The fallback in
-  `mobile/constants/ApiConfig.ts` is now `http://localhost:8080/api`, which is
-  right for a developer running compose and obviously-wrong-but-diagnosable in
-  a build that forgot the variable.
+- **Installed phones still call the retired droplet, until an update ships.**
+  Every bundle in the field carries the old `http://146.190.224.202:8080/api`,
+  because `EXPO_PUBLIC_*` is inlined when the bundler runs. That is fixed by
+  setting the `EXPO_PUBLIC_API_BASE_URL` repository *variable* to the Cloud Run
+  URL and running Deploy Mobile — an OTA is enough, no `eas build` needed
+  (TODO-72). The fallback in `mobile/constants/ApiConfig.ts` is
+  `http://localhost:8080/api`, right for a developer running compose and
+  obviously-wrong-but-diagnosable otherwise; an **empty** value counts as unset
+  there, since an unset GitHub variable interpolates to `''` and `??` would not
+  catch it.
 - **The nightly schedulers depend on a Terraform variable.**
   `RecurringTaskScheduler` (02:00) and session pruning (03:30) are Spring
   `@Scheduled` methods, so they run only while an instance is alive with CPU.

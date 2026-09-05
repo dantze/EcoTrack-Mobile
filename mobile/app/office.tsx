@@ -4,7 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { AuthService } from '../services/AuthService';
 import { roleLabel } from '../services/roleRouting';
-import { API_BASE_URL } from '../constants/ApiConfig';
+import { WEB_APP_URL } from '../constants/WebAppConfig';
 import { AppColors } from '../constants/Colors';
 
 /**
@@ -27,20 +27,6 @@ import { AppColors } from '../constants/Colors';
  * Deconectare is still offered, because a shared phone has to be releasable.
  */
 
-/**
- * The web app is the same deployment as the API — Caddy serves the SPA and
- * proxies `/api` to the backend on one domain — so its address is the API base
- * with the `/api` suffix taken off. One configured URL rather than two that
- * can drift apart.
- *
- * A build that never set `EXPO_PUBLIC_API_BASE_URL` falls back to the old bare
- * IP (see constants/ApiConfig.ts), and stripping `/api` from that names the
- * backend rather than the SPA. The URL is printed under the button for exactly
- * that reason: it is a signpost, so a wrong one is readable and correctable
- * rather than a dead end. New builds set the variable to the HTTPS domain.
- */
-const webAppUrl = (): string => API_BASE_URL.replace(/\/api\/?$/, '');
-
 export default function OfficeScreen() {
     const router = useRouter();
     const params = useLocalSearchParams();
@@ -52,7 +38,9 @@ export default function OfficeScreen() {
         router.replace('/enrollment');
     };
 
-    const url = webAppUrl();
+    // Configured, never derived from the API base — see constants/WebAppConfig.ts
+    // (TODO-84). Null means this build was never told the address.
+    const url = WEB_APP_URL;
 
     return (
         <View style={styles.container}>
@@ -73,15 +61,24 @@ export default function OfficeScreen() {
                     telefon. Aplicația mobilă a rămas doar pentru șoferi.
                 </Text>
 
-                <Pressable
-                    style={({ pressed }) => [styles.linkButton, pressed && styles.pressed]}
-                    onPress={() => void Linking.openURL(url)}
-                >
-                    <Ionicons name="open-outline" size={20} color={AppColors.textWhite} />
-                    <Text style={styles.linkText}>Deschide aplicația web</Text>
-                </Pressable>
+                {url ? (
+                    <>
+                        <Pressable
+                            style={({ pressed }) => [styles.linkButton, pressed && styles.pressed]}
+                            onPress={() => void Linking.openURL(url)}
+                        >
+                            <Ionicons name="open-outline" size={20} color={AppColors.textWhite} />
+                            <Text style={styles.linkText}>Deschide aplicația web</Text>
+                        </Pressable>
 
-                <Text style={styles.url}>{url}</Text>
+                        <Text style={styles.url}>{url}</Text>
+                    </>
+                ) : (
+                    <Text style={styles.missingUrl}>
+                        Adresa aplicației web nu este configurată în această versiune. Cere-i
+                        adresa unui administrator și deschide-o în browser.
+                    </Text>
+                )}
             </View>
 
             <View style={styles.footer}>
@@ -150,6 +147,12 @@ const styles = StyleSheet.create({
     url: {
         fontSize: 12,
         textAlign: 'center',
+        color: AppColors.mutedText,
+    },
+    missingUrl: {
+        marginTop: 8,
+        fontSize: 14,
+        lineHeight: 20,
         color: AppColors.mutedText,
     },
     footer: {

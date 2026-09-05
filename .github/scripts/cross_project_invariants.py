@@ -269,6 +269,21 @@ def mobile_api_paths() -> set[str] | None:
         rel = path.relative_to(ROOT).as_posix()
         if "node_modules/" in rel or "__tests__/" in rel:
             continue
+        # Skip dot-directories: tooling output, gitignored, not hand-written.
+        #
+        # This scans the FILESYSTEM, not the git index, so it sees whatever a
+        # developer's tree happens to contain — and `mobile/.expo/types/router.d.ts`
+        # is expo-router's generated typed-routes union, which spells every screen
+        # as a template literal (`` `/enrollment${...}` ``). Two of those survived
+        # normalisation and read as undeclared API calls.
+        #
+        # It could only ever fail LOCALLY: repo-hygiene.yml runs on a fresh
+        # checkout with no npm install, so `.expo/` does not exist there. That is
+        # the worst shape for a guard - green in CI, red on the machine of whoever
+        # tries to check their work before pushing - and it went unnoticed because
+        # nothing on that machine could run this script at all (TODO-86).
+        if any(part.startswith(".") for part in rel.split("/")[:-1]):
+            continue
         code = strip_comments(path.read_text(encoding="utf-8", errors="replace"))
         for raw in API_PATH_RE.findall(code):
             # A template placeholder is one path parameter, whatever its name,

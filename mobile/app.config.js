@@ -1,3 +1,30 @@
+// Does THIS build need Android's cleartext-HTTP exemption? (TODO-85)
+//
+// Android 9+ refuses plaintext HTTP unless an app opts in, and this app opted in
+// app-wide because the backend was a droplet on `http://146.190.224.202:8080`.
+// Cloud Run is HTTPS-only, so a production build has no cleartext destination
+// left and the exemption buys nothing except the ability for a misconfiguration
+// — or a hostile network offering a plain-HTTP redirect — to be silently
+// accepted rather than refused by the platform.
+//
+// It cannot simply be deleted: the documented local loop is `docker compose`
+// on `http://localhost:8080`, and a developer on a physical device points at a
+// LAN address, also plain HTTP. So the permission follows the need — it is on
+// exactly when the backend this build was configured with is itself http://.
+// A production build sets EXPO_PUBLIC_API_BASE_URL to an https:// URL (and
+// deploy-mobile.yml refuses to ship without it), so production gets `false`
+// with nobody having to remember anything.
+//
+// The narrower alternative — a network_security_config.xml permitting cleartext
+// to localhost and 10.0.2.2 only — was rejected: it needs a custom config
+// plugin, and it would break the LAN-address case that physical-device
+// debugging actually uses.
+//
+// This mirrors the resolution in constants/ApiConfig.ts on purpose; both read
+// the same variable, and the fallback there is http://localhost:8080/api.
+const backendUrl = process.env.EXPO_PUBLIC_API_BASE_URL?.trim() || "http://localhost:8080/api";
+const usesCleartextTraffic = backendUrl.startsWith("http://");
+
 module.exports = {
     expo: {
         name: "EcoTrack",
@@ -38,7 +65,8 @@ module.exports = {
             googleServicesFile: "./google-services.json",
             edgeToEdgeEnabled: true,
             predictiveBackGestureEnabled: false,
-            usesCleartextTraffic: true
+            // Computed above (TODO-85): on only for an http:// backend.
+            usesCleartextTraffic
         },
         web: {
             bundler: "metro",
@@ -49,7 +77,10 @@ module.exports = {
             "expo-router",
             ["expo-build-properties", {
                 android: {
-                    usesCleartextTraffic: true
+                    // The same computed value, so the two cannot disagree —
+                    // this one writes the manifest attribute, the field above
+                    // is Expo's own. They were two hardcoded `true`s.
+                    usesCleartextTraffic
                 }
             }]
         ],

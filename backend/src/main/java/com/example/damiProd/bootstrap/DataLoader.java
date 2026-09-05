@@ -8,6 +8,7 @@ import com.example.damiProd.repository.ProductRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,8 +26,24 @@ import org.springframework.transaction.annotation.Transactional;
 // LOWEST_PRECEDENCE, so the ordering between this and OrderNumberBackfill
 // (TODO-70) would be undefined - and two runners writing the same database in
 // an undefined order is a bug waiting for someone to seed an order here.
+//
+// OFF UNDER THE `test` PROFILE (TODO-74). SpringBootContextLoader runs the
+// CommandLineRunners, so every @SpringBootTest context used to start with the
+// 4 role rows and the 11 products already in it - state no test asked for, and
+// which made "the products table has N rows" mean one thing in a
+// @SpringBootTest and another in a @DataJpaTest, where this bean is not
+// registered at all. Nothing turned out to be leaning on it: every test that
+// needs a role find-or-creates it, exactly as EnrollmentService.resolveRole
+// does in production.
+//
+// matchIfMissing = true, so the seed is on unless a configuration says
+// otherwise, and the only one that does is application-test.properties. The
+// seeding itself stays covered: BootstrapTests/DataLoaderTest drives run()
+// directly, and SuiteTests/DatabaseIsolationTest asserts a fresh
+// @SpringBootTest context is NOT seeded, so re-enabling it by accident fails.
 @Component
 @Order(0)
+@ConditionalOnProperty(name = "ecotrack.bootstrap.seed-reference-data", matchIfMissing = true)
 public class DataLoader implements CommandLineRunner {
 
         private static final Logger log = LoggerFactory.getLogger(DataLoader.class);

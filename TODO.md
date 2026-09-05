@@ -27,17 +27,15 @@ unless its status says otherwise.
 **Status legend:** `[ ]` not started · `[~]` in progress · `[DONE]` done ·
 `[POSTPONED]` deliberately deferred · `[?]` needs a decision first
 
-**Next free ID: TODO-84.** (Highest used is TODO-83.)
+**Next free ID: TODO-87.** (Highest used is TODO-86.)
 
 ---
 
-## Still open — 11 of 83
+## Still open — 9 of 86
 
 The whole of what is left, in one place. Everything not listed here is `[DONE]`.
 
 - **TODO-17** `[POSTPONED]` — All other AI ideas *(F)*
-- **TODO-72** `[ ]` — Installed phones need a rebuild, and the Maps key needs revoking *(G)*
-- **TODO-74** `[ ]` — `DataLoader` seeds every test context, and no test asks it to *(J)*
 - **TODO-55** `[ ]` — The bundle budget measures the mock build, not the deployed one *(G)*
 - **TODO-65** `[ ]` — `web/`'s dependencies were declared but never installed *(J)*
 - **TODO-78** `[ ]` — `.nvmrc` exists now but nothing tells a new contributor *(J)*
@@ -133,9 +131,9 @@ full text lives further down.
 | TODO-69 | `[DONE]` | J | Three bugs only a live backend could show |
 | TODO-70 | `[DONE]` | J | Orders created before the numbering fix are still `#0` |
 | TODO-71 | `[DONE]` | G | A second deploy target exists in `infra/` and is wired to nothing |
-| TODO-72 | **`[ ]`** | G | Installed phones need a rebuild, and the Maps key needs revoking |
+| TODO-72 | `[DONE]` | G | Installed phones need a rebuild, and the Maps key needs revoking |
 | TODO-73 | `[DONE]` | J | `AccessRequestsPage` paints with tokens that do not exist |
-| TODO-74 | **`[ ]`** | J | `DataLoader` seeds every test context, and no test asks it to |
+| TODO-74 | `[DONE]` | J | `DataLoader` seeds every test context, and no test asks it to |
 | TODO-75 | `[DONE]` | G | The web bundle falls back to the dead droplet, over plain HTTP |
 | TODO-76 | `[DONE]` | A | `AdminController` answers in three shapes, none of them the app's |
 | TODO-77 | `[DONE]` | J | Two confirmation dialogs, with different accessibility |
@@ -145,6 +143,9 @@ full text lives further down.
 | TODO-81 | **`[ ]`** | G | Both nightly jobs run on EVERY Cloud Run instance |
 | TODO-82 | **`[ ]`** | G | Two Mantine providers are mounted and neither is ever used |
 | TODO-83 | **`[ ]`** | G | `Button`'s default variant is `secondary`, and one screen relied on it by accident |
+| TODO-84 | `[DONE]` | H | The office signpost sends staff to the backend, not the web app |
+| TODO-85 | `[DONE]` | H | Cleartext HTTP is enabled app-wide, for a backend that is HTTPS-only |
+| TODO-86 | `[DONE]` | G | `python3` is gone again, so the hygiene guards ran nowhere for TODO-72/74 |
 
 ---
 
@@ -3009,7 +3010,7 @@ Vercel account, so nothing has been applied and `deploy.yml` skips itself
 (green) until the secrets exist. `DEPLOYMENT.md` is the runbook for that.
 
 
-### TODO-72 `[ ]` Installed phones need a rebuild, and the Maps key needs revoking
+### TODO-72 `[DONE]` Installed phones need a rebuild, and the Maps key needs revoking
 Two things TODO-33 could not do from inside the repository.
 
 **1. `eas update` cannot ship this.** TODO-33 removed native modules
@@ -3032,6 +3033,74 @@ those installs — which is fine and is the same event as (1), but do them in th
 order, or knowingly not.
 
 *Found while doing TODO-33.*
+
+**Done — and the first half of the premise was wrong, which is the useful part.**
+
+**A rebuild is not what the phones are waiting for. An OTA is.** `EXPO_PUBLIC_*`
+is inlined by the **bundler**, not baked into the native binary, and `eas update`
+runs the bundler — so an update carries a new `EXPO_PUBLIC_API_BASE_URL` to
+already-installed apps. It carries the deleted Sales and Technical screens too,
+because screens are JS. `expo.version` has not moved since before TODO-33
+(`1.2.0`) and `runtimeVersion` is `appVersion`, so every install in the field is
+still inside an update's range. The item above said the opposite, and so did
+CLAUDE.md's *Known gaps*; both are corrected. TODO-75 had already noticed the
+same thing in passing — "the one case where the edit is visible to an existing
+install is an `eas update` OTA" — without following it anywhere.
+
+What genuinely needs `eas build` is smaller than it looked: the compiled-in
+modules TODO-33 stopped importing (`react-native-maps`, ML Kit text recognition,
+the calendar and draggable-list packages) and the Maps key `app.config.js` used
+to write into the Android manifest. Unused native weight is not a fault, so that
+step can ride along with the next release rather than being its own event.
+
+**That turns the item from "wait for a store release" into a live hazard,
+because the OTA path was one unset variable away from bricking the fleet.**
+`deploy-mobile.yml` passes `${{ vars.EXPO_PUBLIC_API_BASE_URL }}` into
+`eas update` on **every push to main**. Unset, GitHub interpolates an empty
+string; `??` does not catch `''`, so `constants/ApiConfig.ts` would inline `''`
+and every request would be built from a path with no origin. Set it but get it
+wrong and the localhost fallback applies instead — and a phone's localhost is the
+phone. Either way `eas update` succeeds, the job goes green, and the failure
+surfaces as drivers saying the app "does not load".
+
+Three code changes, therefore:
+
+- **`deploy-mobile.yml` refuses to ship without a backend URL.** A *Require a
+  backend URL* step fails the job when the variable is empty, and also when it
+  does not end in `/api` — every path in `services/http.ts` is appended to it, so
+  a URL missing the suffix 404s every call. It guards the two build paths as well
+  as the OTA, since all three inline the same value.
+- **`ApiConfig.ts` treats the empty string as unset**, by trimming rather than
+  leaning on `??`. That is the exact shape an unset GitHub variable arrives in,
+  and the failure it produced was less legible than the one the localhost
+  fallback was written to produce. It also strips a trailing slash, which is
+  what lets the guard accept `…/api/` instead of refusing an address that is not
+  wrong: the base and the path are concatenated, so `…/api/` + `/tasks` would
+  otherwise carry an empty segment.
+- **`mobile/.env.example` no longer describes the droplet as the fallback.** It
+  had been left saying "Unset, it falls back to the old hardcoded
+  `http://146.190.224.202:8080/api`" after TODO-75 changed that to localhost.
+
+**The two console actions are a runbook now, not a memory.** `DEPLOYMENT.md`
+gains *Mobile cutover — moving the phones off the droplet*: set the variable,
+ship the OTA, confirm adoption on expo.dev, **then** revoke
+`EXPO_PUBLIC_GOOGLE_MAPS_API_KEY` in the Google Cloud console and delete the
+GitHub secret, then rebuild natively whenever convenient. The ordering argument
+survives from the item above but its reason changed: the key is only reachable
+from the map on the old Sales screens, and it is the OTA — not the rebuild — that
+removes those. Nothing in this repository has read the key since TODO-33, and
+**deleting the GitHub secret does not stop it billing; only the console does**,
+which is why it is a numbered step somewhere an operator will look rather than a
+sentence in a backlog. Marked done on that basis, the same way TODO-71 is done
+with its "none of it is code" remainder written into `DEPLOYMENT.md`.
+
+Two stale claims in `DEPLOYMENT.md`'s *Gotchas* went with it: `EXPO_PUBLIC_*` is
+bundle-time rather than binary-time (the whole point above), and the warning that
+the mobile ID scanner cannot ship over the air described a native module TODO-33
+deleted.
+
+**Two things found on the way, both recorded rather than folded in: TODO-84 and
+TODO-85.**
 
 ### TODO-75 `[DONE]` The web bundle falls back to the dead droplet, over plain HTTP
 `web/src/lib/config.ts` ends with
@@ -3224,6 +3293,77 @@ to how this repo guards its other invisible mistakes — see
 `colorTokensExist.test.ts` — but "is this a primary action" is not something a
 scan can answer, so it would have to be cruder: flag any variant-less Button and
 require an explicit `variant="secondary"` where that is the intent.
+
+### TODO-86 `[DONE]` `python3` is gone again, so the hygiene guards ran nowhere for TODO-72/74
+TODO-68 was closed on the strength of `winget install Python.Python.3.12` having
+landed Python 3.13.5, with the six guards' output pasted into it. That is not the
+state of the machine now: `python`, `python3` and `py` all resolve to the
+Microsoft Store alias stub, and a recursive search of
+`%LOCALAPPDATA%\Programs\Python`, `%ProgramFiles%\Python313` and the WinGet
+package directory finds no `python.exe`. The JDK half of TODO-68 is fine —
+`./gradlew build` runs the whole backend suite here in about 70 seconds.
+
+So TODO-72 and TODO-74 were verified with the backend suite (twice, plus a
+deliberate failing run) and mobile lint/typecheck/tests, and **none of
+`repo_hygiene.py`, `cross_project_invariants.py`, `doc_claims.py`,
+`dead_config.py` or `todo_index.py` was run against them** — which is the worst
+combination for that pair of changes specifically, since both edited CLAUDE.md,
+`DEPLOYMENT.md` and this file, and `doc_claims.py` and `todo_index.py` are the
+two guards that exist to check exactly that kind of prose. The index edits below
+were checked by hand against the script's regexes instead, which is not the same
+thing. CI will run them on the PR.
+
+Not reopening TODO-68: it was true when it was written, and an item that flips
+back to `[ ]` every time a laptop changes is not a backlog entry. **Deciding this
+needs** a choice between reinstalling and leaving it — and if it keeps happening,
+the question TODO-68 already framed is whether five small dependency-free Python
+scripts should be Node instead, since Node is the one toolchain this repo already
+requires on every developer machine.
+
+*Found while doing TODO-72 and TODO-74.*
+
+**Done — reinstalled, not rewritten, and the first real run immediately found a
+bug in one of the guards.**
+
+`winget install Python.Python.3.12 --scope user` landed 3.12.10 at
+`%LOCALAPPDATA%\Programs\Python\Python312\python.exe`. All six guards run here
+again:
+
+```
+todo_index                 OK (86 items, 12 open, index and 'Still open' agree)
+repo_hygiene               OK (11 files checked, 0 warnings)
+cross_project_invariants   OK (0 skipped, 0 mismatches)
+doc_claims                 OK (8 doc files, 3 pinned claims, 2 cross-references)
+dead_config                OK (15 ecotrack.* keys checked, all read)
+```
+
+Not rewritten in Node, despite this being the second time the interpreter has
+gone missing. The scripts are correct, tested by use, and dependency-free —
+which is what lets `repo-hygiene.yml` run them before any toolchain is
+installed; a Node rewrite would trade a working thing for the same thing in a
+language that happens to be installed today. If it goes a third time, the answer
+is a `.tool-versions`-style note in `README.md` next to `.nvmrc` (TODO-78's
+territory), not a port.
+
+**`cross_project_invariants.py` failed on first run, and it was not the
+changes.** It reported `mobile calls API paths that are not in its declared
+surface: ['/enrollment${', '/office${']`. Those come from
+`mobile/.expo/types/router.d.ts` — expo-router's **generated** typed-routes
+union, which spells every screen as a template literal. Two of them survive the
+script's placeholder normalisation and read as undeclared API calls.
+
+The shape of this bug is the interesting part. `mobile_api_paths()` globs the
+**filesystem**, not the git index, so it sees a gitignored generated file — and
+`repo-hygiene.yml` runs on a fresh checkout with no `npm install`, so `.expo/`
+never exists in CI. **Green in CI, red on the machine of anyone who tries to
+check their work before pushing**, which is the worst possible arrangement for a
+guard, and it survived because that machine could not run the script at all.
+The file is dated 2026-09-03, so it had been lying in wait since TODO-33.
+
+Fixed by skipping dot-directories in that scan, with the reasoning in a comment.
+Confirmed it was pre-existing rather than newly introduced by running the script
+against a `git archive` of HEAD, where it passes — the archive contains only
+tracked files, which is exactly why CI never saw it.
 
 ## H. Mobile
 
@@ -3495,6 +3635,160 @@ no false "changed" on reordered roles, keeps the cache on failure) and
 `services/__tests__/http.test.ts` (which 401s retry, and that `/auth/me` does not
 re-trigger its own hook). The residual gap — a phone idle on a menu still shows
 the old one until its next request — is recorded in CLAUDE.md's *Known gaps*.
+
+### TODO-84 `[DONE]` The office signpost sends staff to the backend, not the web app
+`mobile/app/office.tsx` is where an employee holding only SALES or TECH lands
+(TODO-33): a screen that says "use the web app" and prints its address. It
+derives that address from the API base:
+
+```ts
+const webAppUrl = (): string => API_BASE_URL.replace(/\/api\/?$/, '');
+```
+
+Its comment explains why that is sound — "the web app is the same deployment as
+the API — Caddy serves the SPA and proxies `/api` to the backend on one domain —
+so its address is the API base with the `/api` suffix taken off. One configured
+URL rather than two that can drift apart."
+
+**TODO-71 ended that.** The SPA is on Vercel and the API is on Cloud Run: two
+origins, which is the same fact that made CORS load-bearing. Stripping `/api`
+off `https://<service>-<hash>.<region>.run.app/api` names the **backend**, so the
+one screen whose entire job is to point a salesperson at the web app points them
+at a host that serves them JSON. It is latent today only because nothing has been
+deployed yet — it goes live with the first `EXPO_PUBLIC_API_BASE_URL` this repo's
+own `DEPLOYMENT.md` now tells an operator to set.
+
+Not fixed inside TODO-72 because it is not a one-line correction: the web app's
+address stops being derivable and has to be configured, which means a new
+`EXPO_PUBLIC_WEB_APP_URL`, a row in `deploy-mobile.yml` (and in its new *Require
+a backend URL* guard, if it should be mandatory too), a line in
+`DEPLOYMENT.md`'s variable list and in `mobile/.env.example`. Folding a new
+configuration variable into a diff about revoking a Maps key would hide it.
+
+**Deciding it needs** one call: whether the URL is configured independently, or
+read from the same Terraform outputs the rest of the deployment is (`infra/`
+already knows the Vercel project's domain, so the value exists — the question is
+whether mobile gets it as its own variable or whether the screen should stop
+printing a URL and just say "open EcoTrack in your browser"). The fallback
+behaviour needs a decision too: with no variable set, printing the Cloud Run host
+is worse than printing nothing.
+
+*Found while doing TODO-72.*
+
+**Done — configured, with no fallback, and the two decisions above went the way
+the last paragraph guessed.**
+
+`mobile/constants/WebAppConfig.ts` is a new module holding `WEB_APP_URL`, read
+from `EXPO_PUBLIC_WEB_APP_URL` (Terraform's `frontend_url`; a custom domain from
+`web_custom_domains` serves the same deployment and is equally valid). It gets
+its own file rather than a second export from `ApiConfig.ts` because the entire
+point of the change is that these are two independent addresses — putting them
+in one file called ApiConfig is how the next person re-derives one from the
+other.
+
+**Its own variable, not read from Terraform's other outputs.** `infra/` does
+know the Vercel domain, but nothing in `infra/` builds the app: the mobile
+bundle is built by `deploy-mobile.yml` from repository variables, and reaching
+into Terraform state from there would be a new dependency for one string. So it
+sits next to `EXPO_PUBLIC_API_BASE_URL` in the same variables list, and
+`DEPLOYMENT.md` says which `terraform output` to copy it from.
+
+**No fallback, deliberately.** Unset, `resolveWebAppUrl` returns `null` and the
+screen replaces the button with a line saying the address is not configured and
+to ask an administrator. Any fallback here re-opens the bug: the only address
+computable from what the app knows is the API base, and that is precisely the
+wrong one. A screen that admits it has no address produces a bug report from the
+person holding the phone; a screen showing a plausible wrong one produces a
+support call about the web app being broken.
+
+**Warn, do not fail, in CI.** `deploy-mobile.yml`'s *Require a backend URL* step
+now checks both, but only the backend URL is fatal. The asymmetry is the point:
+no backend URL means nothing in the app works, while no web-app URL means one
+signpost screen — seen only by office staff who are not supposed to be using
+this app — is degraded. Failing the driver fleet's deploy over that would be the
+wrong trade.
+
+**A test, because this is a wrong-but-well-formed expression.**
+`constants/__tests__/WebAppConfig.test.ts` pins the resolution rules (trailing
+slash dropped, `undefined` and `''` both `null`) and then reads `app/office.tsx`
+and fails if it mentions `API_BASE_URL` at all. Nothing else would catch the
+regression — putting `API_BASE_URL.replace(/\/api\/?$/, '')` back type-checks,
+lints clean and looks correct, which is how it survived TODO-71 in the first
+place. Same argument as `colorTokensExist.test.ts` on the web side. Verified by
+reintroducing exactly that line: the test fails and names the file.
+
+The stale comment that asserted the Caddy one-origin premise is gone with the
+code it justified, and CLAUDE.md's mobile paragraph now records the rule.
+
+### TODO-85 `[DONE]` Cleartext HTTP is enabled app-wide, for a backend that is HTTPS-only
+`mobile/app.config.js` sets `android.usesCleartextTraffic: true` **twice** — once
+directly and once through `expo-build-properties` — which turns off Android's
+default block on plaintext HTTP for every host the app talks to.
+
+It was correct when it was added: the droplet answered on
+`http://146.190.224.202:8080` and Android 9+ refuses cleartext unless told
+otherwise. After TODO-71 the backend is Cloud Run, which is HTTPS only, so the
+production app has no cleartext destination left and the flag now buys nothing
+except the ability for a misconfiguration — or a hostile network offering a
+plain-HTTP redirect — to be silently accepted rather than refused by the
+platform.
+
+Not just deleted as part of TODO-72 because it is not free: the localhost
+fallback in `constants/ApiConfig.ts` is `http://localhost:8080/api`, and a
+developer running `docker compose` against a physical device or emulator needs
+exactly this. Turning it off wholesale would break the local loop that the same
+change made the documented default.
+
+**Deciding it needs** a choice between a narrow network-security-config
+exception (permit cleartext to `localhost` / `10.0.2.2` and nothing else, which
+is what the flag is really being used for) and keeping it on with a comment
+saying why. The narrow version is a `plugins` entry, not a one-line delete, and
+should be verified against a real device build rather than reasoned about — which
+is why it is its own item.
+
+*Found while doing TODO-72.*
+
+**Done — the permission now follows the need, and neither option above is what
+it turned into.**
+
+`app.config.js` computes one value at the top:
+
+```js
+const backendUrl = process.env.EXPO_PUBLIC_API_BASE_URL?.trim() || "http://localhost:8080/api";
+const usesCleartextTraffic = backendUrl.startsWith("http://");
+```
+
+and both places that used to hardcode `true` — the `android` field and the
+`expo-build-properties` plugin entry — now read it. **They were two independent
+hardcoded `true`s**, which is its own small hazard: changing one and not the
+other produces a manifest that disagrees with the config.
+
+**Why not the network-security-config exception this item proposed.** It would
+have permitted cleartext to `localhost` and `10.0.2.2` and nothing else — and
+that is not what the flag is being used for. A physical Android device cannot
+reach the host's localhost; a developer testing on real hardware points the app
+at a **LAN address** (`http://192.168.x.y:8080/api`), which the narrow allowlist
+would refuse. It also needs a custom config plugin, so it is more code for a
+worse outcome. Tying the permission to the scheme of the backend this build was
+actually configured with covers every case the flag legitimately serves and
+nothing else.
+
+**Production gets `false` with nobody having to remember anything**, because
+production sets `EXPO_PUBLIC_API_BASE_URL` to an `https://` Cloud Run URL — and
+since TODO-72, `deploy-mobile.yml` refuses to ship without it. The one way to
+build a production binary with the exemption still on is to point it at a plain
+HTTP backend, which is when it is not an exemption but a requirement.
+
+Verified three ways through the real Expo resolver (`npx expo config --type
+public --json`), not just by reading the file: no variable → `true` (the
+compose/localhost default), `https://…run.app/api` → `false` in both the
+`android` field and the plugin entry, `http://192.168.1.20:8080/api` → `true`.
+
+**This one needs a native rebuild to take effect** — `usesCleartextTraffic` is a
+manifest attribute, so no OTA can carry it. It is therefore step 5 of
+`DEPLOYMENT.md`'s mobile cutover rather than something that ships with the
+update, and that step now says so. Nothing is broken meanwhile: an installed
+binary keeps a permission it does not exercise.
 
 ---
 
@@ -4571,7 +4865,7 @@ pulls the rebuild and finds every import red. Worth deciding whether it earns a
 line in `README.md` next to the other setup steps, since the same trap is one
 `git pull` away for anyone who had `web/node_modules` from before the rebuild.
 
-### TODO-74 `[ ]` `DataLoader` seeds every test context, and no test asks it to
+### TODO-74 `[DONE]` `DataLoader` seeds every test context, and no test asks it to
 Found while doing TODO-31, which had to establish what was actually in a test
 database before it could isolate them.
 
@@ -4597,6 +4891,62 @@ a run to find out who was depending on it, and the payoff is small enough that
 it should not ride along with an unrelated change.
 
 *Found while doing TODO-31.*
+
+**Done — disabled under `test`, and the answer to "who was depending on it" is
+nobody.**
+
+`DataLoader` now carries
+`@ConditionalOnProperty(name = "ecotrack.bootstrap.seed-reference-data",
+matchIfMissing = true)`, and `application-test.properties` sets that key to
+`false`. `@ConditionalOnProperty` rather than `@Profile("!test")` because it
+names the behaviour instead of a profile: the key is declared with a comment in
+`application.properties`, so it shows up next to the other `ecotrack.*` knobs and
+`dead_config.py` can see it is read.
+
+**The run was the point of the item, so here is what it said.** Full suite green
+first (336 tests), the property flipped, full suite green again — no failures, no
+edits to any other test. Nothing was leaning on the seed because every test that
+needs a role **find-or-creates** it (`AuthorizationMatrixTest`, `TaskScopingTest`,
+`LastAdminGuardTest`, `AdminSessionRevocationTest`, `AuthEnforcementOnTest`),
+which is exactly what `EnrollmentService.resolveRole` does in production — the
+item guessed this from `LastAdminGuardTest` and it holds for all five. And no
+`@SpringBootTest` touches the product catalogue at all; the eleven products were
+paid for by every context and read by none. So this is a removal, not a
+behaviour change.
+
+`matchIfMissing = true` matters: the seed is on unless a configuration says
+otherwise, so a profile added later, or a context that loads no properties, still
+gets a seeded database rather than silently skipping the roles a real server
+needs on first boot.
+
+**The seeding itself stays covered, from both directions.**
+`BootstrapTests/DataLoaderTest` is a `@DataJpaTest` that `@Import`s the class and
+calls `run()` explicitly — it never depended on the runner firing, so it is
+unaffected by the property and still asserts the four roles, the zero employees
+and the no-reseed rule. Going the other way,
+`SuiteTests/DatabaseIsolationTest.aFreshContextIsNotSeeded()` asserts a fresh
+`@SpringBootTest` database has no roles and no products, so switching the seed
+back on fails the suite instead of quietly restoring the state. Verified by doing
+exactly that: with the key set to `true` the new test fails and nothing else does
+— which is also a second, independent confirmation that no other test wanted the
+rows.
+
+It went in `DatabaseIsolationTest` rather than a class of its own because it is
+the same question that class already answers — *what is in a fresh
+`@SpringBootTest` database* — and that class has a private context (via a
+`@TestPropertySource` nobody else sets) for precisely that reason. A new class
+would have cost another Spring context to say something weaker.
+
+Two comments that had been wrong in both directions are now right: the
+`spring.sql.init.mode=never` block in `application-test.properties`, which for a
+while claimed to disable `DataLoader` and then claimed tests were written against
+the seed, and CLAUDE.md's *Profiles* paragraph.
+
+**One thing deliberately not touched:** `OrderNumberBackfill` is the other
+`CommandLineRunner` and still runs in every test context. It is a no-op on an
+empty database — it backfills order numbers, and a fresh context has no orders —
+so it writes nothing and there is nothing to disable. If it ever grows a write
+that fires on empty state, it needs the same treatment.
 
 ### TODO-73 `[DONE]` `AccessRequestsPage` paints with tokens that do not exist
 `web/src/features/admin/AccessRequestsPage.tsx` uses `text-content` and
@@ -4659,9 +5009,14 @@ This was indeed a fifth surface for TODO-58's list, as this item guessed.
 - **Mobile:** enrollment shipped (TODO-19) — **the app can authenticate again**.
   Sales and Technical are gone (TODO-33): the phone is the driver experience,
   office staff use the responsive web app. Installed builds still carry the old
-  screens until a rebuild — TODO-72.
-- **Deploy:** `deploy.yml` (backend + web to VPS, one domain via Caddy) and
-  `deploy-mobile.yml` (EAS OTA + builds). See `DEPLOYMENT.md`. `infra/` plus
-  `deploy-cloud.yml` scaffold a second, **unused** target (Cloud Run + Cloud SQL
-  + Vercel) that has never been run — TODO-71.
+  screens and still call the retired droplet **until an OTA ships** — that is one
+  repository variable and one workflow run, not a store release (TODO-72), and
+  `DEPLOYMENT.md`'s *Mobile cutover* is the order to do it in.
+- **Deploy:** Cloud Run + Cloud SQL + Vercel, all described by Terraform in
+  `infra/` and applied by `deploy.yml` (TODO-71); `deploy-mobile.yml` does EAS
+  OTA and builds. See `DEPLOYMENT.md`. The VPS, its `deploy.yml` SSH steps and
+  `deploy-cloud.yml` are gone; `docker-compose.yml` and the `Caddyfile` survive
+  as the LOCAL stack. **Nothing has been applied yet** — there is no GCP project
+  and no Vercel account, so `deploy.yml` skips itself green until the secrets
+  exist.
 - **No users and no server exist yet**, so nothing here needs a migration path.

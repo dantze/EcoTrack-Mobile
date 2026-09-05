@@ -2,6 +2,8 @@ package com.example.damiProd.SuiteTests;
 
 import com.example.damiProd.repository.AccessRequestRepository;
 import com.example.damiProd.repository.EmployeeRepository;
+import com.example.damiProd.repository.EmployeeRoleRepository;
+import com.example.damiProd.repository.ProductRepository;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
@@ -76,6 +78,8 @@ class DatabaseIsolationTest {
     @Autowired private DataSource dataSource;
     @Autowired private EmployeeRepository employeeRepository;
     @Autowired private AccessRequestRepository accessRequestRepository;
+    @Autowired private EmployeeRoleRepository employeeRoleRepository;
+    @Autowired private ProductRepository productRepository;
 
     /**
      * The behavioural half: this context's database has never been written to.
@@ -146,6 +150,35 @@ class DatabaseIsolationTest {
                         + "share one JVM-wide H2 database with the whole suite, and the classes "
                         + "that cannot be @Transactional commit employees into it (TODO-31)")
                 .isEmpty();
+    }
+
+    /**
+     * And nothing seeded it either (TODO-74).
+     *
+     * <p>Isolation says no other test class can reach this database. This says
+     * the APPLICATION did not write to it before the first test ran, which is a
+     * separate claim and was false until TODO-74: {@code DataLoader} is a
+     * {@code CommandLineRunner}, {@code SpringBootContextLoader} runs those, and
+     * so every {@code @SpringBootTest} context started with 4 role rows and 11
+     * products in it. Unrequested state that every context paid for, and it made
+     * a row count mean one thing here and another in a {@code @DataJpaTest},
+     * which never registers the bean.
+     *
+     * <p>It is off via {@code ecotrack.bootstrap.seed-reference-data=false} in
+     * application-test.properties. This assertion is what stops it coming back
+     * unnoticed - and it belongs in this class rather than its own, because the
+     * question is the same one: what is in a fresh {@code @SpringBootTest}
+     * database. Tests that need a role find-or-create it, as production does.
+     */
+    @Test
+    void aFreshContextIsNotSeeded() {
+        assertThat(employeeRoleRepository.count())
+                .as("DataLoader seeded roles into a test context — nothing asked it to (TODO-74)")
+                .isZero();
+        assertThat(productRepository.count())
+                .as("DataLoader seeded the catalogue into a test context — nothing asked it to "
+                        + "(TODO-74)")
+                .isZero();
     }
 
     /** Sanity: the scan finds classes at all, so an empty result is a real pass. */

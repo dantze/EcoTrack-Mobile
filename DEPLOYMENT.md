@@ -120,7 +120,14 @@ done (TODO-79).
 ```
 GCP_REGION=europe-west1        VERCEL_PROJECT_NAME=ecotrack-web
 EXPO_PUBLIC_API_BASE_URL=      # the Cloud Run URL + /api — see below
+EXPO_PUBLIC_WEB_APP_URL=       # the Vercel URL — `terraform output -raw frontend_url`
 ```
+
+`EXPO_PUBLIC_WEB_APP_URL` is a **second** variable rather than the first one
+with `/api` removed: the SPA and the API are on different origins now, so the
+office signpost in the app cannot compute one from the other (TODO-84). Deploy
+Mobile warns and still ships without it — the screen then says it does not know
+the address instead of guessing.
 
 **5. Read `infra/README.md` on who may run `terraform apply`.** The deployer
 service account Terraform creates can push images and roll revisions and
@@ -128,10 +135,12 @@ nothing else. An identity that runs `apply` needs admin over SQL, IAM,
 networking and Secret Manager — close to project owner. The recommendation is
 option 1 there: apply from a laptop, let CI ship images only.
 
-**6. Mobile.** Set `EXPO_PUBLIC_API_BASE_URL` to
-`terraform output -raw backend_api_base_url` and rebuild. `EXPO_PUBLIC_*` is
-inlined at build time, so installed binaries keep whatever they were built with
-— and the ones in the field were built against the droplet (TODO-72).
+**6. Mobile.** Set the `EXPO_PUBLIC_API_BASE_URL` **variable** to
+`terraform output -raw backend_api_base_url` plus `/api`, then run Deploy Mobile.
+`EXPO_PUBLIC_*` is inlined by the bundler, so nothing in the field is repointed
+until an update ships; the workflow refuses to ship at all while the variable is
+unset. Phones in the field were bundled against the droplet — the cutover below
+is what moves them.
 
 **7. Custom domains** (optional). Add them to `web_custom_domains` in
 `terraform.tfvars` and point DNS at Vercel. Terraform claims the domain on the
@@ -253,6 +262,62 @@ cd web && VITE_DATA_MODE=live VITE_API_BASE_URL=http://localhost:8080/api npm ru
 That needs `ECOTRACK_CORS_ALLOWED_ORIGINS` to include `http://localhost:5173`,
 which `.env.example` sets.
 
+## Mobile cutover — moving the phones off the droplet (TODO-72)
+
+Two changes landed in `mobile/` that the phones in the field have not seen:
+TODO-33 deleted the Sales and Technical sections, and TODO-71 retired the
+DigitalOcean droplet those phones still call. Both are delivered from here.
+
+**Most of it goes over the air, which is the counter-intuitive part.**
+`EXPO_PUBLIC_*` is inlined by the *bundler*, and `eas update` bundles — so an
+OTA carries a new `EXPO_PUBLIC_API_BASE_URL` to installed apps, and it carries
+the deleted screens too, because screens are JS. `expo.version` has not moved
+since before TODO-33 (`1.2.0`) and `runtimeVersion` is `appVersion`, so every
+install in the field is still in range of an update. What an OTA cannot remove
+is native: the compiled-in modules TODO-33 stopped using, and the Maps key
+`app.config.js` used to write into the Android manifest.
+
+Do it in this order. Each step is safe to stop after.
+
+**1. Set the variables.** Settings → Secrets and variables → Actions →
+*Variables* → `EXPO_PUBLIC_API_BASE_URL` = `terraform output -raw
+backend_api_base_url`, and `EXPO_PUBLIC_WEB_APP_URL` = `terraform output -raw
+frontend_url`. Deploy Mobile fails its *Require a backend URL* step without the
+first, on purpose: an update reaches every phone, and a bundle with no backend
+in it calls `http://localhost:8080/api`, which on a phone is the phone. The
+second only warns. Setting the first to an `https://` URL is also what turns the
+Android cleartext-HTTP exemption off for this build (TODO-85).
+
+**2. Ship the OTA.** Actions → Deploy Mobile → `update`, branch `production`.
+Phones pick it up on next launch. After this they call Cloud Run and no longer
+render Sales or Technical.
+
+**3. Confirm rollout before touching anything else.** expo.dev → the project →
+Updates shows adoption. A phone that has been offline or unopened is still on
+the old bundle, still calling the dead droplet, and still showing office
+screens.
+
+**4. Revoke `EXPO_PUBLIC_GOOGLE_MAPS_API_KEY`.** Google Cloud console →
+APIs & Services → Credentials → delete the key. **This is the half that stops it
+billing** — nothing in this repository reads it any more (TODO-33 removed it
+from `app.config.js`, `deploy-mobile.yml` and the secret list above), but a key
+is live until Google says otherwise, and an old binary still has it baked into
+its manifest. Delete the GitHub secret in the same pass. Do this *after* step 3:
+the key is only reachable from the map on the old Sales screens, and step 2 is
+what removes those.
+
+**5. Native rebuild, when convenient.** Actions → Deploy Mobile →
+`build-production`. This is the only step that drops the now-dead native modules
+(`react-native-maps`, ML Kit text recognition, the calendar and draggable-list
+packages) from the binary, **and the only one that closes the Android
+cleartext-HTTP exemption** (TODO-85) — `usesCleartextTraffic` is a manifest
+attribute, so no OTA can change it, and it is computed from
+`EXPO_PUBLIC_API_BASE_URL` at build time: an `https://` backend builds it
+`false`. Nothing is broken until this runs — unused native weight and a
+permission nothing exercises, not a fault — so it can ride along with the next
+release rather than being its own event. Bump `expo.version` and
+`android.versionCode` when you do.
+
 ## Legacy ID photos — drained, and how to check anyway
 
 EcoTrack no longer stores photographs of identity documents (TODO-14), and as of
@@ -336,7 +401,10 @@ first would show drivers broken images.
 
 - `ECOTRACK_SECURITY_ENFORCE=true` logs out every device on a pre-token build.
   Ship mobile, confirm rollout, *then* flip.
-- `VITE_*` / `EXPO_PUBLIC_*` are **build-time**. Changing one needs a rebuild.
+- `VITE_*` / `EXPO_PUBLIC_*` are **bundle-time**, not runtime — changing one and
+  restarting the app does nothing. But bundle-time is not the same as *binary*
+  time on mobile: `eas update` re-bundles, so an OTA does repoint an installed
+  app at a new `EXPO_PUBLIC_API_BASE_URL`. Only native changes need `eas build`.
 - `runtimeVersion` is `appVersion`: bumping `expo.version` fences OTAs off from
   older installs until they get a new binary. Intentional.
 - No DB migrations (`ddl-auto=update`). Destructive schema changes are manual,
@@ -360,7 +428,9 @@ first would show drivers broken images.
   top-up runs more than once concurrently, and nothing in the app guards
   against that (no `@Version`, no lock — TODO-81). One container could not do
   this.
-- **The mobile ID scanner is a native module and does NOT ship over the air.**
-  `eas update` cannot deliver `@react-native-ml-kit/text-recognition`; it needs
-  `eas build`. Installed builds without it simply do not show the button —
-  `isIdScanAvailable()` hides it — rather than failing on touch.
+- **There is no mobile ID scanner any more.** It went with the Sales section in
+  TODO-33 — creating a client is a web-app job now, and the web scanner runs
+  tesseract.js in the browser with no native module involved. This entry used to
+  warn that `@react-native-ml-kit/text-recognition` could not ship over the air;
+  the package is gone, and the general rule it was an instance of is the
+  `EXPO_PUBLIC_*` bullet above.
